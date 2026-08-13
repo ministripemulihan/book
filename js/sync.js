@@ -92,4 +92,59 @@ const Sync = {
       return false;
     }
   },
+
+  // ---------------- Log aktivitas (lihat js/activitylog.js) ----------------
+  async pushLog(entry) {
+    try {
+      await this._post(Object.assign({ type: "log" }, entry));
+      return true;
+    } catch (e) {
+      return false; // log tidak boleh sampai mengganggu pemakaian aplikasi
+    }
+  },
+
+  // ---------------- Pengumuman (hanya administrator yang menulis) ----------------
+  async pullAnnouncements() {
+    try {
+      const data = await this._get({ type: "announcements" });
+      return (data && data.ok && data.announcements) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async pushAnnouncement(username, text) {
+    try {
+      const data = await this._post({ type: "announcement", username, text, updatedAt: new Date().toISOString() });
+      return (data && data.ok) || false;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  async deleteAnnouncement(username, id) {
+    try {
+      const data = await this._post({ type: "announcement_delete", username, id: String(id) });
+      return (data && data.ok) || false;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---------------- Log aktivitas: MEMBACA kembali ----------------
+  // Dipakai oleh panel "Log Aktivitas" (administrator) dan "Pantau
+  // Pembacaan" (gembala dst). `days` opsional: 0/kosong = semua baris yang
+  // tersimpan (dibatasi 5000 baris terbaru di sisi server), atau isi angka
+  // (mis. 8) untuk hanya mengambil beberapa hari terakhir supaya lebih
+  // ringan -- dipakai panel Pantau Pembacaan yang hanya butuh 7 hari.
+  async pullLogs(username, days) {
+    try {
+      const params = { type: "logs", username };
+      if (days) params.days = String(days);
+      const data = await this._get(params);
+      return (data && data.ok && data.logs) || [];
+    } catch (e) {
+      return [];
+    }
+  },
 };
