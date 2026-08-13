@@ -288,14 +288,66 @@ orang yang memakai aplikasi) — tersimpan lokal secara instan, dan kalau
 sinkronisasi Google Sheet dikonfigurasi (lihat bagian di atas), pilihan
 yang sama ikut terbawa saat login dari perangkat lain.
 
-## Belum termasuk (bisa ditambahkan nanti)
+## Tema tampilan (menu ⋮ → 🎨 Tema tampilan)
 
-Sheet Alkitab asli Anda juga punya data rencana baca bawaan dan link
-audio/video/YouTube (`Link_Bacaan_Tahunan`, `Rencana_Baca`,
-`Pratinjau_Rencana_Tahunan`, `Leaderboard`). Fitur-fitur itu **belum**
-dimasukkan ke aplikasi (rencana baca di atas dibuat otomatis oleh aplikasi,
-bukan diambil dari sheet tersebut) — beri tahu saya kapan pun jika ingin
-menambahkan fitur dengar/tonton per hari dari link-link itu.
+10 tema warna siap pilih (terang & gelap), tersimpan otomatis untuk kunjungan
+berikutnya: Manuskrip (bawaan), Terang Klasik, Malam Gelap, Sepia Hangat,
+Hitam Pekat (OLED), Hijau Zaitun, Biru Malam, Merah Marun, Abu-abu Lembut,
+Ungu Senja. Tambah/ubah lewat blok `body.theme-N` di `css/style.css` dan
+larik `THEMES` di `js/app.js`.
+
+## Pengaturan suara pembacaan (menu ⋮ → 🔊)
+
+Selain tombol ▶️/⏸ di header, sekarang ada kontrol tambahan:
+- **Bahasa suara**: Indonesia / Inggris / Mandarin (memilih suara `speechSynthesis`
+  yang sesuai kode bahasa itu di perangkat Anda).
+- **Jenis suara**: Otomatis / Wanita / Pria — ditebak dari nama suara yang
+  tersedia di perangkat (tergantung suara apa yang terpasang di HP/komputer,
+  hasil bisa berbeda-beda).
+- **Kecepatan**: tombol − Lambat / + Cepat, dengan info kecepatan saat ini
+  (mis. "1.2x"), tersimpan untuk kunjungan berikutnya.
+
+## Pencarian banyak referensi sekaligus
+
+Kotak pencarian sekarang menerima beberapa referensi ayat dipisah titik-koma,
+mis. `matius 1:1; wahyu 2:2; kejadian 1:1-3` — menampilkan tiap ayat yang
+ditemukan sebagai daftar hasil yang bisa diklik untuk membuka pasal lengkap.
+
+## Tampilan kolom paralel — arah menyamping atau atas-bawah
+
+Saat memakai 2 atau 3 kolom bahasa berdampingan (menu ⋮ → 📐 Tampilan
+kolom), sekarang ada pilihan **arah**: **↔️ Menyamping** (kolom berjejer
+kiri-kanan, seperti sebelumnya) atau **↕️ Atas-bawah** (tiap bahasa
+ditumpuk vertikal, dipisah garis putus-putus) — sesuai selera masing-masing.
+Tetap bisa kembali ke **1 Kolom** biasa kapan saja lewat tombol yang sama.
+
+## Bacaan Bersuara harian (ikon 🎧 di header — MP3/MP4/YouTube)
+
+Panel terpisah yang menampilkan daftar rentang bacaan harian beserta link
+dengar (MP3), tonton (MP4), dan YouTube — diambil dari sheet **terpisah**
+dari sheet Alkitab utama (kolom: `No/Nomor | Pembacaan | Link MP3 | Link MP4
+| Youtube`). **Teks Alkitab yang dibaca tetap dari sheet Alkitab utama
+seperti biasa** — sheet ini hanya menyumbang rentang referensi + link
+dengar/tonton untuk tiap rentang itu.
+
+Atur di `js/config.js` bagian `READING_MEDIA_SHEETS` — 4 slot sudah
+disediakan (PL Indonesia, PB Indonesia, PB Mandarin, PB Inggris), isi
+`csvUrl` untuk tiap tab yang sudah dipublikasikan (kosongkan yang belum ada;
+otomatis disembunyikan, ikon 🎧 di header ikut tersembunyi kalau belum ada
+satupun yang terisi). Saat ini baru **PL Indonesia** yang terisi (dari link
+yang Anda kirim). Klik nomor/rentang bacaan untuk membuka pasalnya di
+pembaca; klik 🎵/🎬/▶️ untuk membuka link dengar/tontonnya di tab baru.
+Data di-cache di perangkat, ada tombol "🔄 Sinkronkan ulang" per sheet kalau
+isinya berubah di Google Sheet.
+
+## Belum termasuk (bisa ditambahkan lain waktu)
+
+- URL CSV untuk 3 sheet **Bacaan Bersuara** lainnya (PB Indonesia, PB
+  Mandarin, PB Inggris) — publikasikan tiap tab itu ke web sebagai CSV
+  (sama seperti sheet Alkitab), lalu kirim URL-nya untuk diisi ke
+  `READING_MEDIA_SHEETS`.
+- Leaderboard dari sheet asli — belum dimasukkan (beri tahu jika masih
+  diperlukan, dan jelaskan seperti apa tampilannya).
 
 ## Struktur berkas
 
