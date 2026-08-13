@@ -401,6 +401,7 @@ function initLanguageSelector() {
   sel.addEventListener("change", () => {
     currentLang = sel.value;
     localStorage.setItem("bible_app_lang", currentLang);
+    if (el("columnLang1")) el("columnLang1").value = currentLang;
     buildSidebar();
     if (currentBookNum && currentChapter) {
       if (bookAvailableInLang(currentLang, currentBookNum)) {
@@ -421,14 +422,25 @@ function initColumnsControl() {
   const available = CONFIG.LANGUAGES.filter((l) => verseIndex[l.code]);
   const langOptionsHtml = available.map((l) => `<option value="${l.code}">${l.label}</option>`).join("");
 
+  const sel1 = el("columnLang1");
   const sel2 = el("columnLang2");
   const sel3 = el("columnLang3");
-  if (!sel2 || !sel3) return; // menu belum ada di halaman (seharusnya selalu ada)
+  if (!sel1 || !sel2 || !sel3) return; // menu belum ada di halaman (seharusnya selalu ada)
 
   const settings = loadLocalSettings(currentUser);
   const savedLangs = settings.columnLangs || [];
+  sel1.innerHTML = langOptionsHtml;
   sel2.innerHTML = langOptionsHtml;
   sel3.innerHTML = langOptionsHtml;
+  // Kolom 1 selalu mengikuti bahasa aktif (sama seperti dropdown bahasa di
+  // header) — dropdown ini adalah cara lain untuk mengganti bahasa yang
+  // sama, supaya konsisten letaknya dengan Kolom 2/3.
+  sel1.value = currentLang;
+  sel1.addEventListener("change", () => {
+    el("langSelect").value = sel1.value;
+    el("langSelect").dispatchEvent(new Event("change"));
+  });
+
   if (savedLangs[0] && available.some((l) => l.code === savedLangs[0])) sel2.value = savedLangs[0];
   else if (available[1]) sel2.value = available[1].code;
   if (savedLangs[1] && available.some((l) => l.code === savedLangs[1])) sel3.value = savedLangs[1];
@@ -1010,19 +1022,23 @@ function showEmptyState() {
 // ------------------------------------------------------------
 // 10) KONTROL LEBAR TAMPILAN (HP / Tablet / Komputer / Penuh / bebas)
 // ------------------------------------------------------------
-const WIDTH_PRESETS = { mobile: 420, tablet: 720, desktop: 1100, full: 1400 };
+const WIDTH_PRESETS = { mobile: "420px", tablet: "720px", desktop: "1100px", full: "100%" };
 
-function applyWidth(px) {
-  el("contentInner").style.setProperty("--content-width", px + "px");
-  el("widthSlider").value = px;
-  localStorage.setItem("bible_app_width", px);
+function applyWidth(value) {
+  // value bisa angka piksel dari slider, atau string CSS dari tombol preset
+  // (termasuk "100%" untuk tombol ↔️ Penuh — benar-benar selebar layar,
+  // bukan dibatasi angka piksel tetap seperti sebelumnya).
+  const cssValue = /^\d+$/.test(String(value)) ? value + "px" : String(value);
+  el("contentInner").style.setProperty("--content-width", cssValue);
+  localStorage.setItem("bible_app_width", cssValue);
+  if (/^\d+px$/.test(cssValue)) el("widthSlider").value = parseInt(cssValue, 10);
   document.querySelectorAll(".width-btn").forEach((b) => {
-    b.classList.toggle("active", WIDTH_PRESETS[b.dataset.width] === Number(px));
+    b.classList.toggle("active", WIDTH_PRESETS[b.dataset.width] === cssValue);
   });
 }
 
 function initWidthControl() {
-  const saved = parseInt(localStorage.getItem("bible_app_width"), 10) || WIDTH_PRESETS.tablet;
+  const saved = localStorage.getItem("bible_app_width") || WIDTH_PRESETS.tablet;
   applyWidth(saved);
 
   document.querySelectorAll(".width-btn").forEach((btn) => {
