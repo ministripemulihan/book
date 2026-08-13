@@ -1,0 +1,611 @@
+/* ============================================================
+   TOKEN DESAIN
+   Tema: "manuskrip & kuningan" — kertas hangat, tinta cokelat gelap,
+   aksen hijau petrol (sampul kitab berjilid kain) dan kuningan pudar
+   untuk nomor ayat. Serif "Literata" untuk teks bacaan (dirancang
+   khusus untuk keterbacaan panjang), "Inter" untuk antarmuka.
+   ============================================================ */
+:root {
+  --paper: #F7F2E7;
+  --paper-raised: #FFFDF8;
+  --ink: #2B2118;
+  --ink-soft: #5B4E3F;
+  --rule: #E4D9C4;
+  --petrol: #2F6F63;
+  --petrol-dark: #1F4E45;
+  --brass: #A9812F;
+  --brass-soft: #D9C58B;
+  --danger: #A33B2A;
+  --shadow: 0 8px 24px rgba(43, 33, 24, 0.12);
+
+  --font-display: "Literata", Georgia, serif;
+  --font-body: "Literata", Georgia, serif;
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input { font-family: inherit; }
+
+::selection { background: var(--brass-soft); }
+
+/* ============================================================
+   LAYAR LOGIN
+   ============================================================ */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(47,111,99,0.08), transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(169,129,47,0.10), transparent 45%),
+    var(--paper);
+  padding: 24px;
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 40px 32px;
+  text-align: center;
+}
+.login-mark {
+  font-size: 32px;
+  color: var(--petrol);
+  margin-bottom: 8px;
+}
+.login-card h1 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+.login-sub {
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+#loginForm { display: flex; flex-direction: column; gap: 12px; }
+#loginPassword {
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: 15px;
+  color: var(--ink);
+}
+#loginPassword:focus { outline: 2px solid var(--petrol); outline-offset: 1px; }
+.login-error { color: var(--danger); font-size: 13px; text-align: left; }
+#loginForm button {
+  background: var(--petrol);
+  color: #fff;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  transition: background .15s ease;
+}
+#loginForm button:hover { background: var(--petrol-dark); }
+
+/* ============================================================
+   OVERLAY MEMUAT DATA
+   ============================================================ */
+.loading-overlay {
+  position: fixed; inset: 0;
+  background: var(--paper);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999;
+  padding: 24px;
+}
+.loading-box { text-align: center; max-width: 360px; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--rule);
+  border-top-color: var(--petrol);
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loadingText { color: var(--ink-soft); font-size: 14px; margin-bottom: 16px; }
+.progress-track {
+  height: 6px; border-radius: 4px; background: var(--rule); overflow: hidden;
+}
+.progress-fill {
+  height: 100%; width: 0%; background: var(--brass);
+  transition: width .2s ease;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.app-root { min-height: 100vh; display: flex; flex-direction: column; }
+
+.app-header {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--rule);
+}
+.icon-btn {
+  background: transparent; border: none;
+  font-size: 18px; width: 36px; height: 36px;
+  border-radius: 8px; color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.icon-btn:hover { background: var(--rule); }
+
+.brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.brand-mark { color: var(--petrol); font-size: 20px; }
+.brand-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
+
+.search-form {
+  flex: 1;
+  display: flex; align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 2px 4px 2px 14px;
+  min-width: 0;
+}
+.search-form input {
+  flex: 1; min-width: 0; border: none; background: transparent;
+  padding: 8px 4px; font-size: 14px; color: var(--ink);
+}
+.search-form input:focus { outline: none; }
+.search-btn { border-radius: 999px; }
+
+.header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.lang-select {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  max-width: 96px;
+}
+@media (min-width: 600px) {
+  .lang-select { max-width: none; }
+}
+
+.font-size-control {
+  display: none;
+  align-items: center; gap: 2px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 3px;
+}
+.font-btn { width: 30px; height: 30px; font-size: 12px; font-weight: 700; border-radius: 999px; }
+.font-btn:hover { background: var(--brass-soft); }
+@media (min-width: 600px) {
+  .font-size-control { display: flex; }
+}
+
+#fullscreenToggle.active { background: var(--petrol); color: #fff; }
+
+#ttsToggle { font-size: 15px; }
+#ttsToggle.playing { background: var(--petrol); color: #fff; }
+
+.width-control {
+  display: none;
+  align-items: center; gap: 2px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 3px;
+}
+.width-btn {
+  background: transparent; border: none; border-radius: 999px;
+  width: 30px; height: 30px; font-size: 14px;
+}
+.width-btn:hover, .width-btn.active { background: var(--brass-soft); }
+#widthSlider { width: 90px; margin: 0 6px 0 4px; accent-color: var(--petrol); }
+
+@media (min-width: 860px) {
+  .width-control { display: flex; }
+}
+
+.more-menu {
+  position: absolute; top: 56px; right: 16px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 8px;
+  width: 260px;
+  z-index: 60;
+}
+.more-menu-item {
+  font-size: 12px; color: var(--ink-soft); padding: 8px 10px;
+  border-bottom: 1px solid var(--rule); margin-bottom: 6px;
+}
+.more-menu-btn {
+  display: block; width: 100%; text-align: left;
+  background: transparent; border: none; border-radius: 8px;
+  padding: 10px; font-size: 14px; color: var(--ink);
+}
+.more-menu-btn:hover { background: var(--rule); }
+.more-menu-btn.danger { color: var(--danger); }
+
+.more-menu-toggle {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px; margin-bottom: 6px; border-radius: 8px;
+  font-size: 14px; color: var(--ink); cursor: pointer;
+}
+.more-menu-toggle:hover { background: var(--rule); }
+.toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--rule); border-radius: 999px;
+  transition: background .15s ease; cursor: pointer;
+}
+.toggle-slider::before {
+  content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: transform .15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--petrol); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+/* ============================================================
+   TOAST PROGRES MEMBACA — muncul sendiri, tanpa perlu diklik
+   ============================================================ */
+.reading-toast {
+  position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%) translateY(-12px);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: var(--font-ui); font-size: 14px; font-weight: 600;
+  padding: 12px 20px; border-radius: 999px;
+  box-shadow: var(--shadow);
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease, transform .35s ease;
+  text-align: center;
+  max-width: 90vw;
+}
+.reading-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.reading-toast.celebrate {
+  background: var(--petrol);
+  color: #fff;
+  border-color: var(--petrol);
+  font-size: 15px;
+}
+
+/* ============================================================
+   ANIMASI KEMBANG API — saat selesai membaca satu pasal
+   ============================================================ */
+#fireworksCanvas {
+  position: fixed; inset: 0; z-index: 149;
+  pointer-events: none;
+}
+
+/* ============================================================
+   BODY: SIDEBAR + KONTEN
+   ============================================================ */
+.app-body { flex: 1; display: flex; min-height: 0; }
+
+.sidebar {
+  width: 260px; flex-shrink: 0;
+  border-right: 1px solid var(--rule);
+  background: var(--paper-raised);
+  padding: 16px 10px;
+  overflow-y: auto;
+  height: calc(100vh - 57px);
+  position: sticky; top: 57px;
+}
+.sidebar-section h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--brass); margin: 14px 8px 8px;
+}
+.book-list { display: flex; flex-direction: column; gap: 2px; }
+.book-item {
+  text-align: left; background: transparent; border: none;
+  padding: 8px 10px; border-radius: 8px; font-size: 14px;
+  color: var(--ink); font-family: var(--font-body);
+}
+.book-item:hover { background: var(--rule); }
+.book-item.active { background: var(--petrol); color: #fff; }
+.book-item.unavailable { color: var(--rule); cursor: default; }
+.book-item.unavailable:hover { background: transparent; }
+
+.sidebar-backdrop {
+  position: fixed; inset: 0; background: rgba(43,33,24,0.4); z-index: 39;
+}
+
+@media (max-width: 859px) {
+  .sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 40;
+    height: 100vh; transform: translateX(-100%);
+    transition: transform .2s ease;
+    width: 82vw; max-width: 300px;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .brand-name { display: none; }
+}
+@media (min-width: 860px) {
+  .sidebar-backdrop { display: none !important; }
+}
+
+.content-wrap {
+  flex: 1; min-width: 0;
+  display: flex; justify-content: center;
+  padding: 24px 16px 80px;
+}
+.content-inner {
+  width: 100%;
+  max-width: var(--content-width, 720px);
+  transition: max-width .18s ease;
+}
+
+/* ============================================================
+   PEMILIH PASAL
+   ============================================================ */
+.chapter-picker h2 {
+  font-family: var(--font-display); font-size: 24px; margin: 0 0 16px;
+}
+.chapter-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 8px;
+}
+.chapter-grid button {
+  aspect-ratio: 1; border: 1px solid var(--rule); background: var(--paper-raised);
+  border-radius: 8px; font-size: 14px; color: var(--ink); font-family: var(--font-ui);
+}
+.chapter-grid button:hover { border-color: var(--petrol); color: var(--petrol); }
+
+/* ============================================================
+   HASIL PENCARIAN KATA
+   ============================================================ */
+.search-results h2 {
+  font-family: var(--font-display); font-size: 20px; margin: 0 0 6px;
+}
+#searchResultsList { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
+.result-item {
+  text-align: left; background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; font-family: var(--font-body);
+}
+.result-item:hover { border-color: var(--petrol); }
+.result-ref {
+  font-family: var(--font-ui); font-weight: 600; font-size: 12px;
+  color: var(--brass); text-transform: uppercase; letter-spacing: .04em;
+  margin-bottom: 4px;
+}
+.result-text { font-size: 15px; line-height: 1.55; color: var(--ink); }
+.result-text mark { background: var(--brass-soft); color: var(--ink); border-radius: 3px; }
+
+/* ============================================================
+   PEMBACAAN AYAT / PASAL
+   ============================================================ */
+.reader-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px;
+}
+.reader-nav h2 {
+  font-family: var(--font-display); font-size: 24px; margin: 0; text-align: center; flex: 1;
+}
+.chip-btn {
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 999px; padding: 8px 14px; font-size: 13px; color: var(--petrol);
+  white-space: nowrap;
+}
+.chip-btn:hover { border-color: var(--petrol); }
+.chip-btn:disabled { opacity: .35; cursor: default; }
+.chip-btn.primary { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+.chip-btn.primary:hover { background: var(--petrol-dark); }
+
+/* ============================================================
+   RENCANA BACA
+   ============================================================ */
+.plan-panel h2 {
+  font-family: var(--font-display); font-size: 24px; margin: 0 0 6px;
+}
+.plan-intro { color: var(--ink-soft); font-size: 14px; margin: 0 0 16px; }
+
+.plan-options {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px; margin-bottom: 8px;
+}
+.plan-option-card {
+  text-align: left; background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 12px; padding: 16px; font-family: var(--font-ui);
+}
+.plan-option-card:hover { border-color: var(--petrol); box-shadow: var(--shadow); }
+.plan-option-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.plan-option-sub { font-size: 12px; color: var(--brass); }
+
+.plan-head {
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 12px;
+  padding: 16px; margin-bottom: 14px;
+}
+.plan-head-title { font-family: var(--font-display); font-size: 19px; margin-bottom: 10px; }
+.plan-progress-track { height: 8px; border-radius: 5px; background: var(--rule); overflow: hidden; }
+.plan-progress-fill { height: 100%; background: var(--petrol); transition: width .2s ease; }
+.plan-progress-text { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+
+.plan-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+
+.plan-day-list { display: flex; flex-direction: column; gap: 6px; }
+.plan-day-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 4px 12px;
+}
+.plan-day-row.done { opacity: .55; }
+.plan-day-row input[type="checkbox"] {
+  width: 18px; height: 18px; accent-color: var(--petrol); flex-shrink: 0;
+}
+.plan-day-label {
+  flex: 1; text-align: left; background: transparent; border: none;
+  padding: 10px 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline;
+  font-family: var(--font-ui);
+}
+.plan-day-num { font-weight: 700; font-size: 13px; color: var(--brass); min-width: 56px; }
+.plan-day-reading { font-size: 14px; color: var(--ink); }
+.plan-day-row.done .plan-day-reading { text-decoration: line-through; }
+
+.reader-verses {
+  font-family: var(--font-body);
+  font-size: var(--verse-font-size, 19px);
+  line-height: 1.85; color: var(--ink);
+  margin-top: 20px;
+  transition: font-size .15s ease;
+}
+.verse-block {
+  display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  scroll-margin-top: 90px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background .15s ease, box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+
+  /* animasi kemunculan ayat: geser naik sambil memudar, bergiliran per ayat */
+  opacity: 0;
+  transform: translateY(10px);
+  animation: verseAppear .45s ease forwards;
+}
+@keyframes verseAppear {
+  to { opacity: 1; transform: translateY(0); }
+}
+.verse-block:hover {
+  background: var(--paper-raised);
+  border-color: var(--rule);
+  box-shadow: var(--shadow);
+}
+.verse-block.highlight { background: var(--brass-soft); }
+.verse-block.speaking {
+  background: var(--paper-raised);
+  border-color: var(--petrol);
+  box-shadow: 0 0 0 3px rgba(47,111,99,0.15);
+  transform: scale(1.01);
+}
+.verse-num {
+  font-family: var(--font-ui); font-weight: 700; font-size: 12px;
+  color: #fff; background: var(--petrol);
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 6px;
+  position: relative;
+}
+.verse-block.speaking .verse-num { background: var(--brass); }
+.verse-text-wrap { flex: 1; }
+.verse-note-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: 6px; font-size: 12px; vertical-align: middle;
+  color: var(--brass);
+}
+
+/* ============================================================
+   MODAL CATATAN AYAT — tampil saat ayat diklik
+   ============================================================ */
+.note-modal-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(43, 33, 24, 0.45);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0;
+  animation: noteBackdropFade .15s ease;
+}
+@keyframes noteBackdropFade { from { opacity: 0; } to { opacity: 1; } }
+@media (min-width: 640px) {
+  .note-modal-backdrop { align-items: center; padding: 24px; }
+}
+.note-modal {
+  width: 100%; max-width: 520px;
+  max-height: 88vh; overflow-y: auto;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 30px rgba(43,33,24,0.25);
+  padding: 20px 22px 24px;
+  animation: noteModalUp .22s cubic-bezier(.2,.7,.3,1);
+}
+@keyframes noteModalUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (min-width: 640px) {
+  .note-modal { border-radius: 18px; }
+  @keyframes noteModalUp {
+    from { transform: translateY(12px) scale(.98); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+}
+.note-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.note-modal-ref {
+  font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--petrol);
+}
+.note-modal-verse {
+  font-family: var(--font-body); font-size: 18px; line-height: 1.7;
+  color: var(--ink); margin: 0 0 16px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border-left: 3px solid var(--brass);
+  border-radius: 6px;
+}
+.note-modal-label {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--brass); margin-bottom: 6px;
+}
+.note-modal-admin { margin-bottom: 18px; }
+.note-modal-admin-text {
+  font-size: 14px; font-style: italic; color: var(--ink-soft); margin: 0;
+  line-height: 1.6;
+}
+.note-modal-personal textarea {
+  width: 100%; resize: vertical;
+  font-family: var(--font-ui); font-size: 14px; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 10px 12px; line-height: 1.5;
+}
+.note-modal-personal textarea:focus { outline: 2px solid var(--petrol); outline-offset: 1px; }
+.note-modal-actions {
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  margin-top: 10px;
+}
+.note-modal-hint { font-size: 12px; color: var(--petrol); font-weight: 600; }
+
+.empty-state {
+  text-align: center; color: var(--ink-soft); font-family: var(--font-body);
+  font-size: 16px; margin-top: 60px;
+}
+
+@media (max-width: 480px) {
+  .search-form input { font-size: 13px; }
+}
+
+/* ============================================================
+   LAYAR PENUH (Fullscreen API) — sembunyikan elemen yang tidak
+   perlu supaya fokus ke bacaan
+   ============================================================ */
+:fullscreen .app-header .brand,
+:fullscreen .sidebar,
+:fullscreen .sidebar-backdrop { display: none; }
+:fullscreen .content-wrap { padding-top: 8px; }
