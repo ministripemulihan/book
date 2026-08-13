@@ -316,7 +316,6 @@ function afterDataReady() {
   initTTS();
   initReadingProgressControl();
   initColumnsControl();
-  initMediaControl();
   updateStatusPanel();
   showEmptyState();
 }
@@ -1108,7 +1107,45 @@ function renderPlanChooser(container) {
     });
     grid.appendChild(card);
   });
+
+  // Rencana berbasis Bacaan Bersuara (audio/video) -- digabungkan ke sini
+  // supaya cuma ada SATU menu "Rencana Baca" (sebelumnya 🎧 Bacaan Bersuara
+  // adalah menu terpisah). Tiap sheet yang sudah diisi URL-nya di
+  // CONFIG.READING_MEDIA_SHEETS (js/config.js) muncul sebagai satu pilihan
+  // rencana di sini; kalau dipilih, tiap "hari" dalam rencana mengikuti
+  // persis satu baris di sheet itu (label bacaan APA ADANYA dari kolom
+  // Pembacaan), dan link 🎵 MP3 / 🎬 MP4 / ▶️ YouTube-nya tampil menempel
+  // di baris hari itu.
+  const mediaSheets = typeof availableMediaSheets === "function" ? availableMediaSheets() : [];
+  mediaSheets.forEach((sheet) => {
+    const card = document.createElement("button");
+    card.className = "plan-option-card";
+    card.innerHTML = `<div class="plan-option-title">🎧 ${sheet.label}</div><div class="plan-option-sub">Bacaan Bersuara (MP3/MP4/YouTube)</div>`;
+    card.addEventListener("click", async () => {
+      card.disabled = true;
+      const originalHtml = card.innerHTML;
+      card.innerHTML = `<div class="plan-option-title">Memuat…</div>`;
+      try {
+        const plan = await buildMediaPlan(sheet);
+        savePlan(currentUser, plan);
+        renderPlanPanel();
+      } catch (e) {
+        alert("Gagal mengambil data Bacaan Bersuara: " + e.message);
+        card.disabled = false;
+        card.innerHTML = originalHtml;
+      }
+    });
+    grid.appendChild(card);
+  });
+
   container.appendChild(grid);
+
+  if (typeof availableMediaSheets === "function" && !mediaSheets.length && (CONFIG.READING_MEDIA_SHEETS || []).length) {
+    const note = document.createElement("p");
+    note.className = "media-empty";
+    note.textContent = "Belum ada sheet Bacaan Bersuara yang terisi URL-nya (lihat CONFIG.READING_MEDIA_SHEETS di js/config.js).";
+    container.appendChild(note);
+  }
 }
 
 function renderPlanDetail(container, plan) {
@@ -1128,12 +1165,14 @@ function renderPlanDetail(container, plan) {
   const actions = document.createElement("div");
   actions.className = "plan-actions";
 
-  if (nextIdx !== -1 && plan.schedule[nextIdx] && plan.schedule[nextIdx].length) {
+  const nextFirst = nextIdx !== -1 && plan.schedule[nextIdx] && plan.schedule[nextIdx][0];
+  if (nextFirst && nextFirst.bookNum && nextFirst.chapter) {
     const continueBtn = document.createElement("button");
     continueBtn.className = "chip-btn primary";
     continueBtn.textContent = `▶ Lanjutkan — Hari ${nextIdx + 1}`;
     continueBtn.addEventListener("click", () => {
-      renderChapter(plan.schedule[nextIdx][0].bookNum, plan.schedule[nextIdx][0].chapter);
+      if (!bookAvailableInLang(currentLang, nextFirst.bookNum)) { showLangUnavailable(); return; }
+      renderChapter(nextFirst.bookNum, nextFirst.chapter);
     });
     actions.appendChild(continueBtn);
   }
@@ -1148,6 +1187,31 @@ function renderPlanDetail(container, plan) {
     }
   });
   actions.appendChild(changeBtn);
+
+  // Rencana berbasis Bacaan Bersuara: tombol untuk menarik ulang link
+  // MP3/MP4/YouTube terbaru dari Google Sheet (mis. kalau ada link yang
+  // baru ditambahkan/diperbaiki) TANPA menghapus progres centang yang
+  // sudah ada (dicocokkan berdasar urutan hari).
+  if (plan.mediaSheetKey) {
+    const resyncBtn = document.createElement("button");
+    resyncBtn.className = "chip-btn small";
+    resyncBtn.textContent = "🔄 Sinkronkan ulang link audio/video";
+    resyncBtn.addEventListener("click", async () => {
+      resyncBtn.disabled = true;
+      const original = resyncBtn.textContent;
+      resyncBtn.textContent = "Menyinkronkan…";
+      try {
+        await resyncMediaPlan(plan);
+        savePlan(currentUser, plan);
+        renderPlanPanel();
+      } catch (e) {
+        alert("Gagal menyinkronkan: " + e.message);
+        resyncBtn.disabled = false;
+        resyncBtn.textContent = original;
+      }
+    });
+    actions.appendChild(resyncBtn);
+  }
   container.appendChild(actions);
 
   const list = document.createElement("div");
@@ -1155,6 +1219,12 @@ function renderPlanDetail(container, plan) {
   plan.schedule.forEach((dayItems, idx) => {
     const row = document.createElement("div");
     row.className = "plan-day-row" + (plan.completed[idx] ? " done" : "");
+
+    const first = dayItems[0] || {};
+    const readingLabel = first.label ? first.label : formatDayReading(dayItems);
+
+    const mainRow = document.createElement("div");
+    mainRow.className = "plan-day-row-main";
 
     const cb = document.createElement("input");
     cb.type = "checkbox";
@@ -1167,16 +1237,33 @@ function renderPlanDetail(container, plan) {
 
     const label = document.createElement("button");
     label.className = "plan-day-label";
-    label.innerHTML = `<span class="plan-day-num">Hari ${idx + 1}</span><span class="plan-day-reading">${formatDayReading(dayItems)}</span>`;
+    label.innerHTML = `<span class="plan-day-num">Hari ${idx + 1}</span><span class="plan-day-reading">${readingLabel}</span>`;
     label.addEventListener("click", () => {
-      if (dayItems.length) {
-        renderChapter(dayItems[0].bookNum, dayItems[0].chapter);
+      if (first.bookNum && first.chapter) {
+        if (!bookAvailableInLang(currentLang, first.bookNum)) { showLangUnavailable(); return; }
+        renderChapter(first.bookNum, first.chapter);
         closeSidebarOnMobile();
+      } else if (plan.mediaSheetKey) {
+        alert("Tidak bisa menebak kitab/pasal dari: " + readingLabel);
       }
     });
 
-    row.appendChild(cb);
-    row.appendChild(label);
+    mainRow.appendChild(cb);
+    mainRow.appendChild(label);
+    row.appendChild(mainRow);
+
+    // Link dengar/tonton (kalau rencana ini berbasis Bacaan Bersuara dan
+    // baris ini punya link) -- ditempel langsung di bawah baris harinya,
+    // memakai tombol yang sama seperti bekas menu 🎧 Bacaan Bersuara.
+    if (first.mp3 || first.mp4 || first.youtube) {
+      const mediaRow = document.createElement("div");
+      mediaRow.className = "plan-day-row-media";
+      if (first.mp3) mediaRow.appendChild(mediaLinkButton("🎵 MP3", first.mp3));
+      if (first.mp4) mediaRow.appendChild(mediaLinkButton("🎬 MP4", first.mp4));
+      if (first.youtube) mediaRow.appendChild(mediaLinkButton("▶️ YouTube", first.youtube));
+      row.appendChild(mediaRow);
+    }
+
     list.appendChild(row);
   });
   container.appendChild(list);
@@ -1656,7 +1743,6 @@ function hideAllPanels() {
   el("reader").hidden = true;
   el("emptyState").hidden = true;
   el("planPanel").hidden = true;
-  if (el("mediaPanel")) el("mediaPanel").hidden = true;
   if (el("announcementPanel")) el("announcementPanel").hidden = true;
   if (el("notesPanel")) el("notesPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
