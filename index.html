@@ -83,6 +83,7 @@
       <div class="more-menu-item" id="syncStatus">Memuat status…</div>
       <button id="announcementBtn" class="more-menu-btn">📢 Pengumuman</button>
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
+      <button id="collectionsMenuBtn" class="more-menu-btn">📚 Kumpulan Ayat</button>
       <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala/pra gembala/inti (lihat updateLevelGatedMenus() di js/app.js) -->
       <button id="monitorBtn" class="more-menu-btn" hidden>👀 Pantau Pembacaan</button>
       <!-- Tampil hanya untuk administrator -->
@@ -191,6 +192,7 @@
 
           <!-- panel catatan pribadi saya (semua ayat yang pernah dicatat) -->
           <div id="notesPanel" class="notes-panel" hidden></div>
+          <div id="collectionsPanel" class="collections-panel" hidden></div>
 
           <!-- panel pantau pembacaan 7 hari (level gembala dst) -->
           <div id="monitorPanel" class="monitor-panel" hidden></div>
@@ -264,6 +266,7 @@
         <textarea id="noteModalTextarea" rows="4" placeholder="Tulis renungan atau catatan pribadi Anda untuk ayat ini…"></textarea>
         <div class="note-modal-actions">
           <span id="noteModalSavedHint" class="note-modal-hint" hidden>Tersimpan ✓</span>
+          <button id="noteModalAddCollectionBtn" class="chip-btn" type="button">📚 Simpan ke Kumpulan Ayat</button>
           <button id="noteModalSaveBtn" class="chip-btn primary">Simpan Catatan</button>
         </div>
       </div>
@@ -283,6 +286,7 @@
   <script src="js/levels.js"></script>
   <script src="js/activitylog.js"></script>
   <script src="js/notes.js"></script>
+  <script src="js/collections.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/plans.js"></script>
   <script src="js/media.js"></script>
