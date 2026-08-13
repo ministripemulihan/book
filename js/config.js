@@ -83,4 +83,37 @@ const CONFIG = {
   // suara Google bawaan browser/Android bila tersedia). Aplikasi akan
   // otomatis mencoba mencari suara dengan kode ini dulu.
   TTS_LANG: "id-ID",
+
+  // ----------------------------------------------------------
+  // 5) BACAAN BERSUARA HARIAN (MP3 / MP4 / YouTube per rentang ayat)
+  // ----------------------------------------------------------
+  // Sheet TERPISAH dari sheet Alkitab utama — isinya bukan teks ayat,
+  // tapi daftar rentang bacaan + link (kolom: No/Nomor | Pembacaan |
+  // Link MP3 | Link MP4 | Youtube). Publikasikan tiap TAB sheet ke web
+  // sebagai CSV (sama caranya seperti sheet Alkitab di atas — tiap tab
+  // menghasilkan URL berbeda), lalu tempel URL-nya di bawah ini.
+  // Kosongkan csvUrl ("") kalau salah satu belum ada / belum ingin dipakai
+  // — sheet itu otomatis disembunyikan dari menu, aplikasi tidak error.
+  READING_MEDIA_SHEETS: [
+    {
+      key: "pl_ind",
+      label: "Perjanjian Lama (Indonesia)",
+      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?output=csv",
+    },
+    {
+      key: "pb_ind",
+      label: "Perjanjian Baru (Indonesia)",
+      csvUrl: "",
+    },
+    {
+      key: "pb_mandarin",
+      label: "Perjanjian Baru (Mandarin)",
+      csvUrl: "",
+    },
+    {
+      key: "pb_inggris",
+      label: "Perjanjian Baru (Inggris)",
+      csvUrl: "",
+    },
+  ],
 };
