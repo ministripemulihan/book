@@ -679,6 +679,15 @@ input { font-family: inherit; }
 .reader-columns[data-cols="1"] { grid-template-columns: minmax(0, 1fr); }
 .reader-columns[data-cols="2"] { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
 .reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(260px, 1fr)); }
+/* Arah "menyamping" DENGAN penyelarasan baris: dirender lewat
+   renderColumnsGridAligned() sebagai grid asli (header + sel per ayat
+   langsung jadi child grid, bukan dibungkus div per kolom), supaya tinggi
+   tiap baris grid otomatis mengikuti kolom yang teksnya paling panjang —
+   hasilnya ayat 1/2/3/dst selalu sejajar tingginya di semua kolom. */
+.reader-columns-grid { align-items: stretch; }
+.reader-columns-grid .reader-grid-cell { min-width: 0; }
+.reader-columns-grid .reader-grid-cell .verse-block { height: 100%; }
+.reader-columns-grid .reader-grid-cell-empty { color: var(--ink-soft); font-size: 12px; font-style: italic; padding: 10px 0; }
 /* Arah "atas-bawah" (stacked) — satu kolom lebar penuh per bahasa,
    ditumpuk vertikal, dipisah garis, bukannya berdampingan. */
 .reader-columns[data-direction="stacked"] { grid-template-columns: minmax(0, 1fr) !important; }
