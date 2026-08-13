@@ -211,6 +211,14 @@ async function startApp() {
     refreshSettingsFromRemote(currentUser).then(() => {
       if (el("readingAnimToggle")) el("readingAnimToggle").checked = isReadingProgressEnabled();
     });
+    refreshCollectionsFromRemote(currentUser).then((changed) => {
+      // Kalau panel Kumpulan Ayat sedang terbuka & ada perubahan dari
+      // perangkat lain, gambar ulang supaya langsung terlihat tanpa
+      // perlu menutup/buka panelnya lagi.
+      if (changed && el("collectionsPanel") && !el("collectionsPanel").hidden) {
+        renderCollectionsPanel();
+      }
+    });
     logActivity("Login");
     // sedikit jeda supaya tidak "berebut" dengan showEmptyState() yang
     // dipanggil di akhir afterDataReady() (terutama saat sinkron pertama kali)
@@ -1577,6 +1585,21 @@ function renderCollectionDetailInto(container, id, col) {
       renderCollectionsPanel(id);
     });
 
+    // Link 🎵MP3/🎬MP4/▶️YouTube (kalau kitab+pasal ayat ini ada di salah
+    // satu sheet Bacaan Bersuara) -- dicari di latar belakang supaya
+    // daftar kumpulan tetap tampil instan, tombolnya menyusul begitu
+    // ketemu. Lihat findMediaLinkForReference() di js/media.js.
+    if (v && typeof findMediaLinkForReference === "function") {
+      findMediaLinkForReference(v.bookNumber, v.chapter).then((media) => {
+        if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
+        const actions = item.querySelector(".collection-verse-actions");
+        if (!actions) return;
+        if (media.mp3) actions.appendChild(mediaLinkButton("🎵 MP3", media.mp3));
+        if (media.mp4) actions.appendChild(mediaLinkButton("🎬 MP4", media.mp4));
+        if (media.youtube) actions.appendChild(mediaLinkButton("▶️ YouTube", media.youtube));
+      }).catch(() => {});
+    }
+
     list.appendChild(item);
   });
   container.appendChild(list);
@@ -1954,6 +1977,23 @@ function initFontSizeControl() {
     const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
     applyFontSize(current - CONFIG.FONT_SIZE_STEP);
   });
+
+  // Tombol A-/A+ di panel hasil pencarian (lihat .search-font-size-control
+  // di css/style.css) -- sama persis fungsinya dengan yang di header,
+  // supaya besar/kecil huruf tetap satu pengaturan yang sama di mana pun
+  // dipakai, hanya saja yang ini tetap kelihatan di HP saat sedang mencari.
+  if (el("searchFontIncrease")) {
+    el("searchFontIncrease").addEventListener("click", () => {
+      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+      applyFontSize(current + CONFIG.FONT_SIZE_STEP);
+    });
+  }
+  if (el("searchFontDecrease")) {
+    el("searchFontDecrease").addEventListener("click", () => {
+      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+      applyFontSize(current - CONFIG.FONT_SIZE_STEP);
+    });
+  }
 }
 
 // ------------------------------------------------------------
