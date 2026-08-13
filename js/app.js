@@ -304,9 +304,12 @@ function afterDataReady() {
   buildSidebar();
   initWidthControl();
   initFontSizeControl();
+  initThemeControl();
   initFullscreenControl();
   initTTS();
   initReadingProgressControl();
+  initColumnsControl();
+  initMediaControl();
   updateStatusPanel();
   showEmptyState();
 }
@@ -411,6 +414,76 @@ function initLanguageSelector() {
   });
 }
 
+// ------------------------------------------------------------
+// 4b) TAMPILAN KOLOM (1/2/3 bahasa berdampingan) — menu ⋮
+// ------------------------------------------------------------
+function initColumnsControl() {
+  const available = CONFIG.LANGUAGES.filter((l) => verseIndex[l.code]);
+  const langOptionsHtml = available.map((l) => `<option value="${l.code}">${l.label}</option>`).join("");
+
+  const sel2 = el("columnLang2");
+  const sel3 = el("columnLang3");
+  if (!sel2 || !sel3) return; // menu belum ada di halaman (seharusnya selalu ada)
+
+  const settings = loadLocalSettings(currentUser);
+  const savedLangs = settings.columnLangs || [];
+  sel2.innerHTML = langOptionsHtml;
+  sel3.innerHTML = langOptionsHtml;
+  if (savedLangs[0] && available.some((l) => l.code === savedLangs[0])) sel2.value = savedLangs[0];
+  else if (available[1]) sel2.value = available[1].code;
+  if (savedLangs[1] && available.some((l) => l.code === savedLangs[1])) sel3.value = savedLangs[1];
+  else if (available[2]) sel3.value = available[2].code;
+
+  function applyColumnsUI(count) {
+    document.querySelectorAll(".columns-btn").forEach((b) => {
+      b.classList.toggle("active", Number(b.dataset.cols) === count);
+    });
+    el("columnLangRow2").hidden = count < 2;
+    el("columnLangRow3").hidden = count < 3;
+    const dirRow = el("columnDirectionRow");
+    if (dirRow) dirRow.hidden = count < 2;
+  }
+  applyColumnsUI(settings.columns || 1);
+
+  const dirGroup = el("columnDirectionBtnGroup");
+  function applyDirectionUI(direction) {
+    if (!dirGroup) return;
+    dirGroup.querySelectorAll(".columns-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.dir === direction);
+    });
+  }
+  applyDirectionUI(settings.columnDirection || "side");
+  if (dirGroup) {
+    dirGroup.querySelectorAll(".columns-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyDirectionUI(btn.dataset.dir);
+        setSetting(currentUser, "columnDirection", btn.dataset.dir);
+        rerenderIfReading();
+      });
+    });
+  }
+
+  function rerenderIfReading() {
+    if (currentBookNum && currentChapter) renderChapter(currentBookNum, currentChapter, highlightVerse);
+  }
+
+  document.querySelectorAll(".columns-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const count = Number(btn.dataset.cols);
+      applyColumnsUI(count);
+      setSetting(currentUser, "columns", count);
+      rerenderIfReading();
+    });
+  });
+
+  function saveLangsAndRerender() {
+    setSetting(currentUser, "columnLangs", [sel2.value, sel3.value]);
+    rerenderIfReading();
+  }
+  sel2.addEventListener("change", saveLangsAndRerender);
+  sel3.addEventListener("change", saveLangsAndRerender);
+}
+
 function showLangUnavailable() {
   hideAllPanels();
   el("emptyState").hidden = false;
@@ -474,6 +547,110 @@ function openChapterPicker(bookNum) {
   });
 }
 
+// Membuat satu blok ayat (nomor, teks, badge catatan, tombol salin) —
+// dipakai baik untuk tampilan satu kolom (biasa) maupun tampilan
+// beberapa-kolom-berdampingan (lihat renderColumnsView).
+function buildVerseBlock(v, idx, fallbackBookName) {
+  const block = document.createElement("div");
+  block.className = "verse-block";
+  block.id = "v-" + v.id;
+  block.style.animationDelay = Math.min(idx * 35, 700) + "ms";
+  if (highlightVerse && v.verse === highlightVerse) block.classList.add("highlight");
+
+  const num = document.createElement("div");
+  num.className = "verse-num";
+  num.textContent = v.verse;
+
+  const textWrap = document.createElement("div");
+  textWrap.className = "verse-text-wrap";
+  textWrap.textContent = v.text;
+
+  const hasAdminNote = !!(v.note && v.note.trim());
+  const hasPersonalNote = !!getPersonalNote(currentUser, v.id);
+  if (hasAdminNote || hasPersonalNote) {
+    const badge = document.createElement("span");
+    badge.className = "verse-note-badge";
+    badge.title = "Ada catatan pada ayat ini — klik ayat untuk membaca";
+    badge.textContent = "📝";
+    textWrap.appendChild(badge);
+  }
+
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "verse-copy-btn";
+  copyBtn.title = "Salin ayat (kitab, pasal:ayat, teks)";
+  copyBtn.setAttribute("aria-label", "Salin ayat");
+  copyBtn.textContent = "📋";
+  copyBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const bookLabel = v.bookName || fallbackBookName;
+    const refText = `${bookLabel} ${v.chapter}:${v.verse}\n${v.text}`;
+    copyTextWithFeedback(refText, copyBtn);
+  });
+
+  block.appendChild(num);
+  block.appendChild(textWrap);
+  block.appendChild(copyBtn);
+  block.addEventListener("click", () => openNoteModal(v));
+  return block;
+}
+
+// Label bahasa untuk judul kolom (mis. "Indonesia (Recovery)"), dipakai di
+// tampilan kolom paralel.
+function langLabelFor(code) {
+  const found = (CONFIG.LANGUAGES || []).find((l) => l.code === code);
+  return found ? found.label : code;
+}
+
+// Tampilan kolom tunggal (perilaku lama / default).
+function renderSingleColumn(wrap, verses, displayName) {
+  wrap.classList.remove("reader-columns");
+  wrap.removeAttribute("data-cols");
+  wrap.innerHTML = "";
+  verses.forEach((v, idx) => wrap.appendChild(buildVerseBlock(v, idx, displayName)));
+}
+
+// Tampilan beberapa kolom berdampingan (bahasa berbeda per kolom), untuk
+// membaca beberapa terjemahan sekaligus. Kolom 1 selalu memakai bahasa
+// aktif (langSelect); kolom 2 & 3 memakai bahasa yang dipilih di menu ⋮.
+function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, columnsCount, extraLangs) {
+  wrap.classList.add("reader-columns");
+  wrap.setAttribute("data-cols", String(columnsCount));
+  wrap.setAttribute("data-direction", getSetting(currentUser, "columnDirection") || "side");
+  wrap.innerHTML = "";
+
+  const columns = [{ lang: currentLang, verses: primaryVerses }];
+  for (let i = 0; i < columnsCount - 1; i++) {
+    const lang = extraLangs[i];
+    const verses = lang ? getChapterVerses(lang, bookNum, chapter) : [];
+    columns.push({ lang, verses });
+  }
+
+  columns.forEach((col) => {
+    const colEl = document.createElement("div");
+    colEl.className = "reader-column";
+
+    const head = document.createElement("div");
+    head.className = "reader-column-head";
+    head.textContent = col.lang ? langLabelFor(col.lang) : "— pilih bahasa —";
+    colEl.appendChild(head);
+
+    const versesWrap = document.createElement("div");
+    versesWrap.className = "reader-verses";
+    if (col.verses.length === 0) {
+      const empty = document.createElement("p");
+      empty.style.fontSize = "13px";
+      empty.style.color = "var(--ink-soft)";
+      empty.textContent = col.lang ? "Pasal ini belum tersedia dalam bahasa ini." : "Pilih bahasa di menu ⋮.";
+      versesWrap.appendChild(empty);
+    } else {
+      col.verses.forEach((v, idx) => versesWrap.appendChild(buildVerseBlock(v, idx, displayName)));
+    }
+    colEl.appendChild(versesWrap);
+    wrap.appendChild(colEl);
+  });
+}
+
 // ------------------------------------------------------------
 // 6) MEMBACA PASAL / AYAT (dari index di memori — instan)
 // ------------------------------------------------------------
@@ -501,51 +678,13 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
   updateCurrentReadingIndicator(`${displayName} ${chapter}`);
 
   const wrap = el("readerVerses");
-  wrap.innerHTML = "";
-  verses.forEach((v, idx) => {
-    const block = document.createElement("div");
-    block.className = "verse-block";
-    block.id = "v-" + v.id;
-    block.style.animationDelay = Math.min(idx * 35, 700) + "ms";
-    if (highlightVerse && v.verse === highlightVerse) block.classList.add("highlight");
-
-    const num = document.createElement("div");
-    num.className = "verse-num";
-    num.textContent = v.verse;
-
-    const textWrap = document.createElement("div");
-    textWrap.className = "verse-text-wrap";
-    textWrap.textContent = v.text;
-
-    const hasAdminNote = !!(v.note && v.note.trim());
-    const hasPersonalNote = !!getPersonalNote(currentUser, v.id);
-    if (hasAdminNote || hasPersonalNote) {
-      const badge = document.createElement("span");
-      badge.className = "verse-note-badge";
-      badge.title = "Ada catatan pada ayat ini — klik ayat untuk membaca";
-      badge.textContent = "📝";
-      textWrap.appendChild(badge);
-    }
-
-    const copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.className = "verse-copy-btn";
-    copyBtn.title = "Salin ayat (kitab, pasal:ayat, teks)";
-    copyBtn.setAttribute("aria-label", "Salin ayat");
-    copyBtn.textContent = "📋";
-    copyBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const bookLabel = v.bookName || displayName;
-      const refText = `${bookLabel} ${v.chapter}:${v.verse}\n${v.text}`;
-      copyTextWithFeedback(refText, copyBtn);
-    });
-
-    block.appendChild(num);
-    block.appendChild(textWrap);
-    block.appendChild(copyBtn);
-    block.addEventListener("click", () => openNoteModal(v));
-    wrap.appendChild(block);
-  });
+  const columnsCount = getSetting(currentUser, "columns") || 1;
+  const columnLangs = getSetting(currentUser, "columnLangs") || [];
+  if (columnsCount > 1) {
+    renderColumnsView(wrap, bookNum, chapter, verses, displayName, columnsCount, columnLangs);
+  } else {
+    renderSingleColumn(wrap, verses, displayName);
+  }
 
   const chapters = getChaptersForBook(currentLang, bookNum);
   const idx = chapters.indexOf(chapter);
@@ -617,9 +756,71 @@ function runKeywordSearch(query) {
   return pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, 300);
 }
 
+// Pencarian gabungan beberapa referensi sekaligus, dipisah titik-koma atau
+// baris baru, mis. "matius 1:1; wahyu 2:2" — menampilkan tiap ayat yang
+// ditemukan sebagai daftar hasil (bukan pasal penuh).
+function handleMultiReferenceSearch(query) {
+  const parts = query.split(/[;\n]+/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return false;
+
+  const refs = parts.map((p) => ({ raw: p, ref: parseReference(p) }));
+  const validCount = refs.filter((r) => r.ref).length;
+  if (validCount < 2) return false; // bukan daftar referensi -> biarkan pencarian biasa yang menangani
+
+  hideAllPanels();
+  el("searchResults").hidden = false;
+  el("searchResultsTitle").textContent = `Hasil untuk ${validCount} referensi (${parts.length - validCount ? (parts.length - validCount) + " tidak dikenali" : "semua ditemukan"})`;
+  const list = el("searchResultsList");
+  list.innerHTML = "";
+
+  refs.forEach(({ raw, ref }) => {
+    if (!ref) {
+      const p = document.createElement("div");
+      p.className = "result-item";
+      p.innerHTML = `<div class="result-ref">“${raw}”</div><div class="result-text">Referensi tidak dikenali.</div>`;
+      list.appendChild(p);
+      return;
+    }
+    if (!bookAvailableInLang(currentLang, ref.book.num)) {
+      const p = document.createElement("div");
+      p.className = "result-item";
+      p.innerHTML = `<div class="result-ref">${ref.book.name} ${ref.chapter}${ref.verseStart ? ":" + ref.verseStart : ""}</div><div class="result-text">Tidak tersedia dalam bahasa yang aktif.</div>`;
+      list.appendChild(p);
+      return;
+    }
+    const verses = getChapterVerses(currentLang, ref.book.num, ref.chapter);
+    const vStart = ref.verseStart || 1;
+    const vEnd = ref.verseEnd || vStart;
+    const matched = ref.verseStart
+      ? verses.filter((v) => v.verse >= vStart && v.verse <= vEnd)
+      : verses; // tanpa nomor ayat -> seluruh pasal
+
+    if (!matched.length) {
+      const p = document.createElement("div");
+      p.className = "result-item";
+      p.innerHTML = `<div class="result-ref">${ref.book.name} ${ref.chapter}${ref.verseStart ? ":" + ref.verseStart : ""}</div><div class="result-text">Ayat tidak ditemukan.</div>`;
+      list.appendChild(p);
+      return;
+    }
+    const displayName = matched[0].bookName || ref.book.name;
+    const btn = document.createElement("button");
+    btn.className = "result-item";
+    btn.innerHTML = `
+      <div class="result-ref">${displayName} ${ref.chapter}:${matched.map((v) => v.verse).join(",")}</div>
+      <div class="result-text">${matched.map((v) => v.text).join(" ")}</div>
+    `;
+    btn.addEventListener("click", () => renderChapter(ref.book.num, ref.chapter, matched[0].verse));
+    list.appendChild(btn);
+  });
+
+  return true;
+}
+
 function handleSearch(rawQuery) {
   const query = rawQuery.trim();
   if (!query) return;
+
+  if (handleMultiReferenceSearch(query)) return;
 
   const ref = parseReference(query);
   if (ref) {
@@ -798,6 +999,7 @@ function hideAllPanels() {
   el("reader").hidden = true;
   el("emptyState").hidden = true;
   el("planPanel").hidden = true;
+  if (el("mediaPanel")) el("mediaPanel").hidden = true;
 }
 function showEmptyState() {
   hideAllPanels();
@@ -854,6 +1056,52 @@ function initFontSizeControl() {
 }
 
 // ------------------------------------------------------------
+// 11b) TEMA TAMPILAN (10 pilihan, lewat menu ⋮ → Tema)
+// ------------------------------------------------------------
+const THEME_STORAGE_KEY = "bible_app_theme_v1";
+const THEMES = [
+  { id: 1, name: "Manuskrip (bawaan)", swatch: "#F7F2E7", ink: "#2B2118" },
+  { id: 2, name: "Terang Klasik", swatch: "#FFFFFF", ink: "#1A1A1A" },
+  { id: 3, name: "Malam Gelap", swatch: "#14161A", ink: "#EDEDEF" },
+  { id: 4, name: "Sepia Hangat", swatch: "#F4ECD8", ink: "#3A2E1F" },
+  { id: 5, name: "Hitam Pekat", swatch: "#000000", ink: "#F2F2F2" },
+  { id: 6, name: "Hijau Zaitun", swatch: "#F3F5EC", ink: "#26301F" },
+  { id: 7, name: "Biru Malam", swatch: "#0F1B2D", ink: "#E7EEF7" },
+  { id: 8, name: "Merah Marun", swatch: "#FBF3F1", ink: "#2E1512" },
+  { id: 9, name: "Abu-abu Lembut", swatch: "#EDEEF0", ink: "#24262B" },
+  { id: 10, name: "Ungu Senja", swatch: "#17131F", ink: "#EDE7F5" },
+];
+
+function applyTheme(id) {
+  for (let i = 2; i <= 10; i++) document.body.classList.remove("theme-" + i);
+  if (id && id !== 1) document.body.classList.add("theme-" + id);
+  localStorage.setItem(THEME_STORAGE_KEY, id);
+  document.querySelectorAll("#themePicker .theme-swatch").forEach((btn) => {
+    btn.classList.toggle("active", parseInt(btn.dataset.theme, 10) === id);
+  });
+}
+
+function initThemeControl() {
+  const picker = el("themePicker");
+  if (!picker) return;
+  picker.innerHTML = "";
+  THEMES.forEach((t) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "theme-swatch";
+    btn.dataset.theme = t.id;
+    btn.title = t.name;
+    btn.setAttribute("aria-label", "Tema " + t.name);
+    btn.style.background = t.swatch;
+    btn.style.color = t.ink;
+    btn.addEventListener("click", () => applyTheme(t.id));
+    picker.appendChild(btn);
+  });
+  const saved = parseInt(localStorage.getItem(THEME_STORAGE_KEY), 10) || 1;
+  applyTheme(saved);
+}
+
+// ------------------------------------------------------------
 // 12) LAYAR PENUH (Fullscreen API)
 // ------------------------------------------------------------
 function initFullscreenControl() {
@@ -891,6 +1139,32 @@ function initFullscreenControl() {
 let ttsPlaying = false;
 let ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
+// Pengaturan suara pembacaan (bahasa, jenis suara, kecepatan) — tersimpan
+// di localStorage supaya bertahan untuk kunjungan berikutnya.
+const TTS_SETTINGS_KEY = "bible_app_tts_settings_v1";
+function loadTTSSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(TTS_SETTINGS_KEY) || "{}");
+    return {
+      lang: raw.lang || CONFIG.TTS_LANG || "id-ID",
+      gender: raw.gender || "any",
+      rate: typeof raw.rate === "number" ? raw.rate : 1.0,
+    };
+  } catch (e) {
+    return { lang: CONFIG.TTS_LANG || "id-ID", gender: "any", rate: 1.0 };
+  }
+}
+function saveTTSSettings(settings) {
+  localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(settings));
+}
+let ttsSettings = loadTTSSettings();
+
+// Nama-nama suara yang umum dikenal sebagai wanita/pria pada mesin TTS
+// bawaan Chrome/Android/Windows/macOS — dipakai sebagai penebak (heuristik)
+// karena Web Speech API tidak selalu memberi info gender langsung.
+const TTS_FEMALE_HINTS = /female|wanita|perempuan|zira|susan|samantha|siri|google.*(id|us|uk).*female|xiaoxiao|yaoyao|ting-ting|mei-jia|anna|amelie/i;
+const TTS_MALE_HINTS = /male|pria|laki|david|fred|daniel|alex|yunjian|kangkang|arthur/i;
+
 function initTTS() {
   if (!ttsSupported) {
     el("ttsToggle").disabled = true;
@@ -901,16 +1175,64 @@ function initTTS() {
   window.speechSynthesis.onvoiceschanged = () => {};
   el("ttsToggle").addEventListener("click", toggleTTS);
   window.addEventListener("beforeunload", stopTTS);
+  initTTSControls();
+}
+
+function initTTSControls() {
+  const langSel = el("ttsLangSelect");
+  const genderSel = el("ttsGenderSelect");
+  const rateVal = el("ttsRateValue");
+  if (!langSel || !genderSel || !rateVal) return;
+
+  langSel.value = ttsSettings.lang;
+  genderSel.value = ttsSettings.gender;
+  rateVal.textContent = ttsSettings.rate.toFixed(1) + "x";
+
+  langSel.addEventListener("change", () => {
+    ttsSettings.lang = langSel.value;
+    saveTTSSettings(ttsSettings);
+    if (ttsPlaying) { stopTTS(); playTTS(); }
+  });
+  genderSel.addEventListener("change", () => {
+    ttsSettings.gender = genderSel.value;
+    saveTTSSettings(ttsSettings);
+    if (ttsPlaying) { stopTTS(); playTTS(); }
+  });
+  el("ttsRateDown").addEventListener("click", () => {
+    ttsSettings.rate = Math.max(0.5, Math.round((ttsSettings.rate - 0.1) * 10) / 10);
+    rateVal.textContent = ttsSettings.rate.toFixed(1) + "x";
+    saveTTSSettings(ttsSettings);
+    if (ttsPlaying) { stopTTS(); playTTS(); }
+  });
+  el("ttsRateUp").addEventListener("click", () => {
+    ttsSettings.rate = Math.min(2.0, Math.round((ttsSettings.rate + 0.1) * 10) / 10);
+    rateVal.textContent = ttsSettings.rate.toFixed(1) + "x";
+    saveTTSSettings(ttsSettings);
+    if (ttsPlaying) { stopTTS(); playTTS(); }
+  });
 }
 
 function pickVoice() {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
+  const langPrefix = ttsSettings.lang.slice(0, 2).toLowerCase();
+  const inLang = voices.filter(
+    (v) => v.lang && v.lang.toLowerCase().startsWith(langPrefix)
+  );
+  const pool = inLang.length ? inLang : voices;
+
+  if (ttsSettings.gender === "female") {
+    const f = pool.find((v) => TTS_FEMALE_HINTS.test(v.name));
+    if (f) return f;
+  } else if (ttsSettings.gender === "male") {
+    const m = pool.find((v) => TTS_MALE_HINTS.test(v.name));
+    if (m) return m;
+  }
+
   return (
-    voices.find((v) => v.lang && v.lang.toLowerCase() === CONFIG.TTS_LANG.toLowerCase()) ||
-    voices.find((v) => v.lang && v.lang.toLowerCase().startsWith(CONFIG.TTS_LANG.slice(0, 2).toLowerCase())) ||
-    voices.find((v) => /google/i.test(v.name)) ||
-    voices[0]
+    pool.find((v) => v.lang && v.lang.toLowerCase() === ttsSettings.lang.toLowerCase()) ||
+    pool.find((v) => /google/i.test(v.name)) ||
+    pool[0]
   );
 }
 
@@ -947,8 +1269,8 @@ function playTTS() {
   currentChapterVerses.forEach((v, idx) => {
     const utter = new SpeechSynthesisUtterance(`Ayat ${v.verse}. ${v.text}`);
     if (voice) utter.voice = voice;
-    utter.lang = CONFIG.TTS_LANG;
-    utter.rate = 0.95;
+    utter.lang = ttsSettings.lang;
+    utter.rate = ttsSettings.rate;
     utter.onstart = () => setSpeakingHighlight(el("v-" + v.id));
     if (idx === currentChapterVerses.length - 1) {
       utter.onend = () => {
