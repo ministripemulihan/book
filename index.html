@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Alkitab — Baca &amp; Cari Ayat</title>
+<meta name="description" content="Aplikasi pembacaan Alkitab dengan data lokal, pencarian ayat dan kata cepat." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ===================== LAYAR LOGIN ===================== -->
+  <div id="loginScreen" class="login-screen" hidden>
+    <div class="login-card">
+      <div class="login-mark">☩</div>
+      <h1>Masuk</h1>
+      <p class="login-sub">Masukkan username dan password Anda. Anda hanya perlu melakukannya sekali di perangkat ini.</p>
+      <form id="loginForm">
+        <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required />
+        <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required />
+        <div id="loginError" class="login-error" hidden>Username atau password salah.</div>
+        <button type="submit" id="loginSubmitBtn">Masuk</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== OVERLAY MEMUAT DATA ===================== -->
+  <div id="loadingOverlay" class="loading-overlay" hidden>
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p id="loadingText">Mengambil data Alkitab dari server…</p>
+      <div class="progress-track"><div id="loadingProgress" class="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- ===================== APLIKASI UTAMA ===================== -->
+  <div id="appRoot" class="app-root" hidden>
+
+    <header class="app-header">
+      <button id="sidebarToggle" class="icon-btn" aria-label="Buka daftar kitab">☰</button>
+      <div class="brand">
+        <span class="brand-mark">☩</span>
+        <span class="brand-name" id="appTitle">Alkitab</span>
+      </div>
+
+      <form id="searchForm" class="search-form" role="search">
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Cari: kejadian 1:1, yehezkiel 26, atau kata seperti “kasih”"
+          autocomplete="off"
+        />
+        <button type="submit" class="icon-btn search-btn" aria-label="Cari">🔍</button>
+      </form>
+
+      <div class="header-actions">
+        <button id="ttsToggle" class="icon-btn" title="Putar pembacaan ayat" aria-label="Putar / jeda pembacaan ayat">▶️</button>
+        <div class="font-size-control" id="fontSizeControl">
+          <button id="fontDecrease" class="icon-btn font-btn" title="Perkecil huruf" aria-label="Perkecil huruf">A-</button>
+          <button id="fontIncrease" class="icon-btn font-btn" title="Perbesar huruf" aria-label="Perbesar huruf">A+</button>
+        </div>
+        <button id="fullscreenToggle" class="icon-btn" title="Layar penuh" aria-label="Layar penuh">⛶</button>
+        <button id="planToggle" class="icon-btn" title="Rencana Baca" aria-label="Rencana Baca">📅</button>
+        <select id="langSelect" class="lang-select" aria-label="Pilih bahasa"></select>
+        <div class="width-control" id="widthControl">
+          <button data-width="mobile" class="width-btn" title="Lebar HP">📱</button>
+          <button data-width="tablet" class="width-btn" title="Lebar Tablet">📓</button>
+          <button data-width="desktop" class="width-btn" title="Lebar Komputer">🖥️</button>
+          <button data-width="full" class="width-btn" title="Lebar Penuh">↔️</button>
+          <input type="range" id="widthSlider" min="320" max="1400" value="720" title="Atur lebar bebas" />
+        </div>
+        <button id="menuToggle" class="icon-btn" aria-label="Menu lainnya">⋮</button>
+      </div>
+    </header>
+
+    <div id="moreMenu" class="more-menu" hidden>
+      <div class="more-menu-item" id="userStatus">Memuat status…</div>
+      <div class="more-menu-item" id="syncStatus">Memuat status…</div>
+      <button id="resyncBtn" class="more-menu-btn">🔄 Sinkronkan ulang Alkitab</button>
+      <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
+      <label class="more-menu-toggle" for="readingAnimToggle">
+        <span>🎉 Animasi progres membaca</span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="readingAnimToggle" checked />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+      <button id="logoutBtn" class="more-menu-btn danger">🚪 Keluar (logout)</button>
+    </div>
+
+    <div class="app-body">
+      <!-- ===================== SIDEBAR DAFTAR KITAB ===================== -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-section">
+          <h3>Perjanjian Lama</h3>
+          <div id="bookListPL" class="book-list"></div>
+        </div>
+        <div class="sidebar-section">
+          <h3>Perjanjian Baru</h3>
+          <div id="bookListPB" class="book-list"></div>
+        </div>
+      </aside>
+      <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
+
+      <!-- ===================== KONTEN UTAMA ===================== -->
+      <main class="content-wrap">
+        <div id="contentInner" class="content-inner" style="--content-width: 720px;">
+
+          <!-- daftar pasal untuk kitab terpilih -->
+          <div id="chapterPicker" class="chapter-picker" hidden>
+            <h2 id="chapterPickerTitle"></h2>
+            <div id="chapterGrid" class="chapter-grid"></div>
+          </div>
+
+          <!-- panel rencana baca -->
+          <div id="planPanel" class="plan-panel" hidden></div>
+
+          <!-- hasil pencarian kata -->
+          <div id="searchResults" class="search-results" hidden>
+            <h2 id="searchResultsTitle"></h2>
+            <div id="searchResultsList"></div>
+          </div>
+
+          <!-- pembacaan pasal / ayat -->
+          <article id="reader" class="reader" hidden>
+            <div class="reader-nav">
+              <button id="prevChapter" class="chip-btn">← Pasal Sebelumnya</button>
+              <h2 id="readerTitle"></h2>
+              <button id="nextChapter" class="chip-btn">Pasal Berikutnya →</button>
+            </div>
+            <div id="readerVerses" class="reader-verses"></div>
+          </article>
+
+          <div id="emptyState" class="empty-state">
+            <p>Pilih kitab di sebelah kiri, atau cari ayat / kata di atas.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ===================== MODAL CATATAN AYAT ===================== -->
+  <div id="noteModalBackdrop" class="note-modal-backdrop" hidden>
+    <div id="noteModal" class="note-modal" role="dialog" aria-modal="true">
+      <div class="note-modal-header">
+        <span id="noteModalRef" class="note-modal-ref"></span>
+        <button id="noteModalClose" class="icon-btn" aria-label="Tutup">✕</button>
+      </div>
+      <p id="noteModalVerseText" class="note-modal-verse"></p>
+
+      <div id="noteModalAdminNoteWrap" class="note-modal-admin" hidden>
+        <div class="note-modal-label">📝 Catatan pada ayat ini</div>
+        <p id="noteModalAdminNote" class="note-modal-admin-text"></p>
+      </div>
+
+      <div class="note-modal-personal">
+        <div class="note-modal-label">🖊️ Catatan pribadi Anda</div>
+        <textarea id="noteModalTextarea" rows="4" placeholder="Tulis renungan atau catatan pribadi Anda untuk ayat ini…"></textarea>
+        <div class="note-modal-actions">
+          <span id="noteModalSavedHint" class="note-modal-hint" hidden>Tersimpan ✓</span>
+          <button id="noteModalSaveBtn" class="chip-btn primary">Simpan Catatan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TOAST PROGRES MEMBACA (tanpa perlu diklik) ===================== -->
+  <div id="readingProgressToast" class="reading-toast" hidden>
+    <span id="readingProgressToastText"></span>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/books.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/notes.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/plans.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
