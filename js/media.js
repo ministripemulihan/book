@@ -76,6 +76,41 @@ function availableMediaSheets() {
   return (CONFIG.READING_MEDIA_SHEETS || []).filter((s) => s.csvUrl && s.csvUrl.trim());
 }
 
+// ------------------------------------------------------------
+//  Mencari link 🎵MP3/🎬MP4/▶️YouTube untuk SATU kitab+pasal tertentu,
+//  dengan mengecek SEMUA sheet Bacaan Bersuara yang sudah diisi di
+//  CONFIG.READING_MEDIA_SHEETS. Dipakai oleh panel "📚 Kumpulan Ayat"
+//  (js/app.js renderCollectionDetailInto()) supaya ayat yang disimpan ke
+//  kumpulan tetap tersambung ke link dengar/tonton terbaru dari Google
+//  Sheet -- di perangkat MANA PUN, tanpa perlu link itu ikut disimpan di
+//  data kumpulannya sendiri (kalau linknya diganti di Sheet, kumpulan
+//  lama otomatis ikut memakai yang terbaru).
+//  Memakai cache lokal dulu kalau ada (instan); kalau sheet itu belum
+//  pernah di-cache di perangkat ini, ambil sekali dari server.
+// ------------------------------------------------------------
+async function findMediaLinkForReference(bookNumber, chapter) {
+  if (!bookNumber || !chapter) return null;
+  for (const sheet of availableMediaSheets()) {
+    let cached = loadMediaFromCache(sheet.key);
+    let rows = cached && cached.rows;
+    if (!rows || !rows.length) {
+      try {
+        rows = await fetchMediaSheet(sheet);
+      } catch (e) {
+        continue; // sheet ini gagal diambil (offline/URL salah) -- coba sheet berikutnya
+      }
+    }
+    const hit = (rows || []).find((row) => {
+      const guess = guessReferenceFromPembacaan(row.pembacaan);
+      return guess && guess.book.num === bookNumber && guess.chapter === chapter;
+    });
+    if (hit && (hit.mp3 || hit.mp4 || hit.youtube)) {
+      return { mp3: hit.mp3, mp4: hit.mp4, youtube: hit.youtube, label: hit.pembacaan };
+    }
+  }
+  return null;
+}
+
 function mediaLinkButton(label, url) {
   const a = document.createElement("a");
   a.href = driveOpenUrl(url);
