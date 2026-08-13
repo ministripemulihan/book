@@ -1434,6 +1434,155 @@ function renderNotesMenuPanel() {
 }
 
 // ------------------------------------------------------------
+// 8c-2) KUMPULAN AYAT — sekumpulan ayat pilihan disimpan dengan satu
+//     nama (mis. "SPR 17 Agustus 2026"), ditambahkan dari modal catatan
+//     (tombol "📚 Simpan ke Kumpulan Ayat"), dibuka lagi dari menu ini.
+// ------------------------------------------------------------
+function handleAddToCollection(verse) {
+  if (!verse) return;
+  const collections = loadCollections(currentUser);
+  const names = Object.values(collections).map((c) => c.name);
+  const hint = names.length
+    ? `Kumpulan yang sudah ada: ${names.join(", ")}.\n\nKetik salah satu nama di atas untuk menambah ke situ, atau ketik nama baru untuk membuat kumpulan baru:`
+    : 'Nama kumpulan ayat (mis. "SPR 17 Agustus 2026"):';
+  const name = prompt(hint);
+  if (!name || !name.trim()) return;
+  addVerseToCollection(currentUser, name.trim(), verse.id);
+  logActivity("Simpan ke Kumpulan Ayat");
+  alert(`Ayat disimpan ke kumpulan "${name.trim()}".`);
+}
+
+function showCollectionsPanel() {
+  hideAllPanels();
+  el("collectionsPanel").hidden = false;
+  logActivity("Kumpulan Ayat");
+  renderCollectionsPanel();
+}
+
+function renderCollectionsPanel(openId) {
+  const container = el("collectionsPanel");
+  container.innerHTML = "";
+  const collections = loadCollections(currentUser);
+
+  if (openId && collections[openId]) {
+    renderCollectionDetailInto(container, openId, collections[openId]);
+    return;
+  }
+
+  const title = document.createElement("h2");
+  title.textContent = "📚 Kumpulan Ayat Saya";
+  container.appendChild(title);
+
+  const ids = Object.keys(collections);
+  if (!ids.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = 'Belum ada kumpulan ayat. Buka catatan pada ayat mana pun (klik ayatnya saat membaca), lalu tekan "📚 Simpan ke Kumpulan Ayat".';
+    container.appendChild(p);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "collections-list";
+  ids
+    .sort((a, b) => new Date(collections[b].createdAt || 0) - new Date(collections[a].createdAt || 0))
+    .forEach((id) => {
+      const col = collections[id];
+      const row = document.createElement("div");
+      row.className = "collection-card";
+
+      const openBtn = document.createElement("button");
+      openBtn.className = "collection-card-open";
+      openBtn.innerHTML = `<div class="plan-option-title">${escapeHtml(col.name)}</div><div class="plan-option-sub">${col.verseIds.length} ayat</div>`;
+      openBtn.addEventListener("click", () => renderCollectionsPanel(id));
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "icon-btn";
+      delBtn.title = "Hapus kumpulan ini";
+      delBtn.textContent = "🗑️";
+      delBtn.addEventListener("click", () => {
+        if (confirm(`Hapus kumpulan "${col.name}"? Tidak bisa dibatalkan.`)) {
+          deleteCollection(currentUser, id);
+          renderCollectionsPanel();
+        }
+      });
+
+      row.appendChild(openBtn);
+      row.appendChild(delBtn);
+      list.appendChild(row);
+    });
+  container.appendChild(list);
+}
+
+function renderCollectionDetailInto(container, id, col) {
+  const backBtn = document.createElement("button");
+  backBtn.className = "chip-btn";
+  backBtn.textContent = "← Semua Kumpulan";
+  backBtn.addEventListener("click", () => renderCollectionsPanel());
+  container.appendChild(backBtn);
+
+  const title = document.createElement("h2");
+  title.textContent = "📚 " + col.name;
+  container.appendChild(title);
+
+  if (!col.verseIds.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Kumpulan ini masih kosong.";
+    container.appendChild(p);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "collection-verse-list";
+  col.verseIds.forEach((verseId, i) => {
+    const v = verseById[verseId];
+    const noteText = v ? getPersonalNote(currentUser, verseId) : "";
+    const ref = v ? `${v.bookName} ${v.chapter}:${v.verse}` : verseId;
+
+    const item = document.createElement("div");
+    item.className = "collection-verse-item";
+    item.innerHTML = `
+      <div class="collection-verse-num">${i + 1}</div>
+      <div class="collection-verse-body">
+        <div class="result-ref">${escapeHtml(ref)}</div>
+        <div class="result-text"></div>
+        <div class="collection-verse-actions">
+          ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
+          <button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>
+          <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
+        </div>
+        ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
+      </div>
+    `;
+    item.querySelector(".result-text").textContent = v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
+    if (noteText) item.querySelector(".collection-verse-note").textContent = noteText;
+
+    const toggleBtn = item.querySelector(".col-note-toggle");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        const noteEl = item.querySelector(".collection-verse-note");
+        noteEl.hidden = !noteEl.hidden;
+        toggleBtn.textContent = noteEl.hidden ? "📝 Lihat Catatan" : "📝 Sembunyikan Catatan";
+      });
+    }
+    item.querySelector(".col-open-btn").addEventListener("click", () => {
+      if (!v) return;
+      currentLang = v.lang;
+      if (el("langSelect")) el("langSelect").value = v.lang;
+      renderChapter(v.bookNumber, v.chapter, v.verse);
+    });
+    item.querySelector(".col-remove-btn").addEventListener("click", () => {
+      removeVerseFromCollection(currentUser, id, verseId);
+      renderCollectionsPanel(id);
+    });
+
+    list.appendChild(item);
+  });
+  container.appendChild(list);
+}
+
+// ------------------------------------------------------------
 // 8d) LOG AKTIVITAS (khusus administrator) — melihat semua baris log
 //     (menu yang dibuka, pencarian, tanggal/jam, OS, IP) yang sudah
 //     dikumpulkan js/activitylog.js, dengan filter & tombol simpan (CSV).
@@ -1745,6 +1894,7 @@ function hideAllPanels() {
   el("planPanel").hidden = true;
   if (el("announcementPanel")) el("announcementPanel").hidden = true;
   if (el("notesPanel")) el("notesPanel").hidden = true;
+  if (el("collectionsPanel")) el("collectionsPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
 }
@@ -2133,6 +2283,9 @@ function initNoteModalEvents() {
     if (e.target === el("noteModalBackdrop")) closeNoteModal();
   });
   el("noteModalSaveBtn").addEventListener("click", saveNoteFromModal);
+  if (el("noteModalAddCollectionBtn")) {
+    el("noteModalAddCollectionBtn").addEventListener("click", () => handleAddToCollection(noteModalCurrentVerse));
+  }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !el("noteModalBackdrop").hidden) closeNoteModal();
   });
@@ -2365,6 +2518,13 @@ function initUIEvents() {
     el("announcementBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
       showAnnouncementPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("collectionsMenuBtn")) {
+    el("collectionsMenuBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showCollectionsPanel();
       closeSidebarOnMobile();
     });
   }
