@@ -41,6 +41,7 @@ input { font-family: inherit; }
 /* ============================================================
    LAYAR LOGIN
    ============================================================ */
+[hidden] { display: none !important; }
 .login-screen {
   min-height: 100vh;
   display: flex;
