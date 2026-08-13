@@ -628,7 +628,8 @@ function renderSingleColumn(wrap, verses, displayName) {
 function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, columnsCount, extraLangs) {
   wrap.classList.add("reader-columns");
   wrap.setAttribute("data-cols", String(columnsCount));
-  wrap.setAttribute("data-direction", getSetting(currentUser, "columnDirection") || "side");
+  const direction = getSetting(currentUser, "columnDirection") || "side";
+  wrap.setAttribute("data-direction", direction);
   wrap.innerHTML = "";
 
   const columns = [{ lang: currentLang, verses: primaryVerses }];
@@ -636,6 +637,16 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
     const lang = extraLangs[i];
     const verses = lang ? getChapterVerses(lang, bookNum, chapter) : [];
     columns.push({ lang, verses });
+  }
+
+  // Tampilan "menyamping" (side-by-side) dengan >1 kolom: dirender sebagai
+  // baris grid per nomor ayat, supaya ayat yang sama sejajar tingginya di
+  // semua kolom (tinggi baris grid otomatis mengikuti kolom yang teksnya
+  // paling panjang). Tampilan "atas-bawah" (stacked) dan 1 kolom tetap
+  // memakai blok kolom independen seperti sebelumnya (tidak perlu sejajar).
+  if (direction === "side" && columnsCount > 1) {
+    renderColumnsGridAligned(wrap, columns, displayName, columnsCount);
+    return;
   }
 
   columns.forEach((col) => {
@@ -660,6 +671,52 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
     }
     colEl.appendChild(versesWrap);
     wrap.appendChild(colEl);
+  });
+}
+
+// Merender kolom paralel sebagai grid asli (bukan kolom independen),
+// dengan satu "baris" grid per nomor ayat lintas semua bahasa, supaya
+// ayat 1 selalu sejajar dengan ayat 1 di kolom lain, ayat 2 sejajar
+// dengan ayat 2, dst — walau panjang teksnya beda-beda antar bahasa.
+function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
+  wrap.classList.add("reader-columns-grid");
+
+  columns.forEach((col) => {
+    const head = document.createElement("div");
+    head.className = "reader-column-head grid-head";
+    head.textContent = col.lang ? langLabelFor(col.lang) : "— pilih bahasa —";
+    wrap.appendChild(head);
+  });
+
+  // Gabungan semua nomor ayat yang ada di salah satu kolom, diurutkan —
+  // supaya tetap sejajar walau ada bahasa yang kebetulan tidak punya ayat
+  // tertentu (kolom itu akan tampak kosong di baris tersebut).
+  const verseNumSet = new Set();
+  columns.forEach((col) => col.verses.forEach((v) => verseNumSet.add(v.verse)));
+  const verseNums = Array.from(verseNumSet).sort((a, b) => a - b);
+
+  if (verseNums.length === 0) {
+    const empty = document.createElement("p");
+    empty.style.gridColumn = "1 / -1";
+    empty.style.fontSize = "13px";
+    empty.style.color = "var(--ink-soft)";
+    empty.textContent = "Pasal ini belum tersedia.";
+    wrap.appendChild(empty);
+    return;
+  }
+
+  verseNums.forEach((vnum) => {
+    columns.forEach((col) => {
+      const cell = document.createElement("div");
+      cell.className = "reader-grid-cell";
+      const v = col.verses.find((vv) => vv.verse === vnum);
+      if (v) {
+        cell.appendChild(buildVerseBlock(v, vnum - 1, displayName));
+      } else {
+        cell.classList.add("reader-grid-cell-empty");
+      }
+      wrap.appendChild(cell);
+    });
   });
 }
 
