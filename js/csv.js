@@ -84,6 +84,111 @@ function parseCSV(text) {
   return records;
 }
 
+// ============================================================
+//  PARSER CSV BERTAHAP (chunked / non-blocking)
+// ============================================================
+//  Sama seperti parseCSV() di atas, tapi dipakai khusus untuk file
+//  CSV yang SANGAT BESAR (ratusan ribu baris, puluhan MB — seperti
+//  data Alkitab lengkap dengan banyak bahasa).
+//
+//  Masalah pada parseCSV() biasa: fungsi itu berjalan SEKALIGUS tanpa
+//  jeda dari awal sampai akhir. Untuk file kecil ini tidak masalah,
+//  tapi untuk file besar, browser "membeku" total selama proses itu
+//  berjalan (tidak bisa update tampilan/progress bar sama sekali,
+//  bahkan kadang tab jadi "Not Responding" atau crash di HP dengan
+//  RAM terbatas).
+//
+//  parseCSVChunked() memproses file sedikit demi sedikit (per
+//  `batchSize` baris), lalu setiap kali satu kelompok baris selesai:
+//    1) memanggil onBatch(batchRows) — supaya baris itu bisa langsung
+//       diproses/disimpan sementara batch berikutnya belum diproses
+//    2) memberi jeda sesaat ke browser (setTimeout 0ms) supaya bisa
+//       menggambar ulang layar & progress bar, sebelum lanjut ke
+//       kelompok baris berikutnya.
+//  Hasilnya: proses total mungkin makan waktu yang mirip, TAPI
+//  browser tetap responsif dan progress bar benar-benar akurat,
+//  bukan diam lama lalu tiba-tiba lompat.
+// ============================================================
+async function parseCSVChunked(text, { batchSize = 3000, onBatch, onProgress } = {}) {
+  text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const totalLen = text.length;
+  const firstLineEnd = text.indexOf("\n");
+  const firstLine = firstLineEnd === -1 ? text : text.slice(0, firstLineEnd);
+  const delimiter = detectDelimiter(firstLine);
+
+  let i = 0;
+  let field = "";
+  let row = [];
+  let inQuotes = false;
+  let header = null;
+  let batch = [];
+  let totalRows = 0;
+
+  function finishField() {
+    row.push(field);
+    field = "";
+  }
+  function finishRow() {
+    finishField();
+    if (header === null) {
+      header = row.map((h) => h.trim().toLowerCase());
+    } else if (!row.every((v) => v.trim() === "")) {
+      const obj = {};
+      header.forEach((h, idx) => {
+        obj[h] = (row[idx] || "").trim();
+      });
+      batch.push(obj);
+      totalRows++;
+    }
+    row = [];
+  }
+
+  while (i < totalLen) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i + 1] === '"') {
+        field += '"';
+        i += 2;
+      } else if (c === '"') {
+        inQuotes = false;
+        i++;
+      } else {
+        field += c;
+        i++;
+      }
+    } else {
+      if (c === '"') {
+        inQuotes = true;
+        i++;
+      } else if (c === delimiter) {
+        finishField();
+        i++;
+      } else if (c === "\n") {
+        finishRow();
+        i++;
+        if (batch.length >= batchSize) {
+          if (onProgress) onProgress(i, totalLen);
+          if (onBatch) await onBatch(batch);
+          batch = [];
+          // jeda sesaat: beri kesempatan browser menggambar ulang UI & bernapas
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        continue;
+      } else {
+        field += c;
+        i++;
+      }
+    }
+  }
+  // baris terakhir (kalau file tidak diakhiri baris baru)
+  if (field.length > 0 || row.length > 0) finishRow();
+  if (batch.length > 0) {
+    if (onProgress) onProgress(totalLen, totalLen);
+    if (onBatch) await onBatch(batch);
+  }
+  return totalRows;
+}
+
 // Membersihkan markup teknis yang kadang terselip di teks sumber
 // (mis. nomor Strong {H430}, {(G5590)}, atau penanda catatan kaki <FR><sup>..</sup><Fr>)
 // supaya ayat tampil bersih untuk dibaca.
