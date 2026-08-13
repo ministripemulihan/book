@@ -76,126 +76,6 @@ function availableMediaSheets() {
   return (CONFIG.READING_MEDIA_SHEETS || []).filter((s) => s.csvUrl && s.csvUrl.trim());
 }
 
-async function showMediaPanel() {
-  const sheets = availableMediaSheets();
-  hideAllPanels();
-  const panel = el("mediaPanel");
-  panel.hidden = false;
-
-  if (!sheets.length) {
-    panel.innerHTML = `<h2>🎧 Bacaan Bersuara</h2><p class="media-empty">Belum ada sheet bacaan bersuara yang dikonfigurasi. Tambahkan URL CSV-nya di <code>js/config.js</code> bagian <code>READING_MEDIA_SHEETS</code>.</p>`;
-    return;
-  }
-
-  if (!mediaCurrentSheetKey || !sheets.some((s) => s.key === mediaCurrentSheetKey)) {
-    mediaCurrentSheetKey = sheets[0].key;
-  }
-
-  renderMediaPanelShell(panel, sheets);
-  await loadAndRenderMediaList(sheets.find((s) => s.key === mediaCurrentSheetKey));
-}
-
-function renderMediaPanelShell(panel, sheets) {
-  panel.innerHTML = `
-    <h2>🎧 Bacaan Bersuara</h2>
-    <p class="media-sub">Dengarkan (MP3), tonton (MP4/YouTube), atau buka langsung pasalnya di pembaca.</p>
-    <div class="media-controls">
-      <select id="mediaSheetSelect" class="columns-lang-select"></select>
-      <button type="button" id="mediaResyncBtn" class="chip-btn small">🔄 Sinkronkan ulang</button>
-    </div>
-    <div id="mediaList" class="media-list"></div>
-  `;
-  const sel = el("mediaSheetSelect");
-  sel.innerHTML = sheets.map((s) => `<option value="${s.key}">${s.label}</option>`).join("");
-  sel.value = mediaCurrentSheetKey;
-  sel.addEventListener("change", async () => {
-    mediaCurrentSheetKey = sel.value;
-    await loadAndRenderMediaList(sheets.find((s) => s.key === mediaCurrentSheetKey));
-  });
-  el("mediaResyncBtn").addEventListener("click", async () => {
-    const sheet = sheets.find((s) => s.key === mediaCurrentSheetKey);
-    el("mediaList").innerHTML = `<p class="media-empty">Mengambil data terbaru…</p>`;
-    try {
-      const rows = await fetchMediaSheet(sheet);
-      renderMediaRows(rows);
-    } catch (e) {
-      el("mediaList").innerHTML = `<p class="media-empty">Gagal mengambil data: ${e.message}</p>`;
-    }
-  });
-}
-
-async function loadAndRenderMediaList(sheet) {
-  const listEl = el("mediaList");
-  const cached = loadMediaFromCache(sheet.key);
-  if (cached && cached.rows && cached.rows.length) {
-    renderMediaRows(cached.rows);
-  } else {
-    listEl.innerHTML = `<p class="media-empty">Mengambil data…</p>`;
-    try {
-      const rows = await fetchMediaSheet(sheet);
-      renderMediaRows(rows);
-    } catch (e) {
-      listEl.innerHTML = `<p class="media-empty">Gagal mengambil data: ${e.message}</p>`;
-    }
-  }
-}
-
-function driveOpenUrl(url) {
-  if (!url) return "";
-  // Link "Bagikan" Google Drive standar (…/file/d/ID) tidak selalu langsung
-  // bisa diputar; "/view" membuka pratinjau Drive yang punya tombol putar.
-  if (/drive\.google\.com\/file\/d\//.test(url) && !/\/(view|preview)/.test(url)) {
-    return url.replace(/\/?$/, "/view");
-  }
-  return url;
-}
-
-function renderMediaRows(rows) {
-  const listEl = el("mediaList");
-  if (!rows.length) {
-    listEl.innerHTML = `<p class="media-empty">Sheet ini kosong.</p>`;
-    return;
-  }
-  listEl.innerHTML = "";
-  rows.forEach((row) => {
-    const item = document.createElement("div");
-    item.className = "media-item";
-
-    const refBtn = document.createElement("button");
-    refBtn.type = "button";
-    refBtn.className = "media-ref-btn";
-    refBtn.innerHTML = `<span class="media-no">${row.no}</span><span>${row.pembacaan}</span>`;
-    refBtn.addEventListener("click", () => {
-      const guess = guessReferenceFromPembacaan(row.pembacaan);
-      if (!guess) {
-        alert("Tidak bisa menebak kitab/pasal dari: " + row.pembacaan);
-        return;
-      }
-      if (!bookAvailableInLang(currentLang, guess.book.num)) {
-        showLangUnavailable();
-        return;
-      }
-      renderChapter(guess.book.num, guess.chapter);
-    });
-    item.appendChild(refBtn);
-
-    const linksWrap = document.createElement("div");
-    linksWrap.className = "media-links";
-    if (row.mp3) linksWrap.appendChild(mediaLinkButton("🎵 MP3", row.mp3));
-    if (row.mp4) linksWrap.appendChild(mediaLinkButton("🎬 MP4", row.mp4));
-    if (row.youtube) linksWrap.appendChild(mediaLinkButton("▶️ YouTube", row.youtube));
-    if (!row.mp3 && !row.mp4 && !row.youtube) {
-      const span = document.createElement("span");
-      span.className = "media-none";
-      span.textContent = "Belum ada link";
-      linksWrap.appendChild(span);
-    }
-    item.appendChild(linksWrap);
-
-    listEl.appendChild(item);
-  });
-}
-
 function mediaLinkButton(label, url) {
   const a = document.createElement("a");
   a.href = driveOpenUrl(url);
@@ -206,15 +86,70 @@ function mediaLinkButton(label, url) {
   return a;
 }
 
-function initMediaControl() {
-  const btn = el("mediaToggle");
-  if (!btn) return;
-  if (!availableMediaSheets().length) {
-    btn.hidden = true; // sembunyikan tombol kalau belum ada sheet yang dikonfigurasi
-    return;
-  }
-  btn.addEventListener("click", () => {
-    showMediaPanel();
-    closeSidebarOnMobile();
+// ------------------------------------------------------------
+//  RENCANA BACA BERBASIS BACAAN BERSUARA (digabung ke menu 📅 Rencana
+//  Baca -- lihat js/app.js renderPlanChooser()/renderPlanDetail()).
+//  Sebelumnya ini adalah panel/menu 🎧 terpisah; sekarang tiap sheet di
+//  CONFIG.READING_MEDIA_SHEETS yang sudah diisi URL-nya muncul sebagai
+//  SATU PILIHAN rencana baca, di mana tiap "hari" = satu baris di sheet
+//  itu (label bacaan apa adanya dari kolom Pembacaan, + link MP3/MP4/
+//  YouTube menempel di hari itu).
+// ------------------------------------------------------------
+
+function buildMediaScheduleFromRows(rows) {
+  return rows.map((row) => {
+    const guess = guessReferenceFromPembacaan(row.pembacaan);
+    return [{
+      bookNum: guess ? guess.book.num : null,
+      chapter: guess ? guess.chapter : null,
+      label: row.pembacaan,
+      mp3: row.mp3 || "",
+      mp4: row.mp4 || "",
+      youtube: row.youtube || "",
+    }];
   });
+}
+
+// Menyusun objek "plan" (struktur sama seperti rencana baca biasa, lihat
+// js/plans.js) dari satu sheet Bacaan Bersuara. Memakai data cache lokal
+// dulu kalau ada (instan), baru ambil dari server kalau belum pernah.
+async function buildMediaPlan(sheet) {
+  const cached = loadMediaFromCache(sheet.key);
+  const rows = (cached && cached.rows && cached.rows.length) ? cached.rows : await fetchMediaSheet(sheet);
+  const schedule = buildMediaScheduleFromRows(rows);
+  return {
+    planId: "media_" + sheet.key,
+    label: "🎧 " + sheet.label,
+    days: schedule.length,
+    startDate: new Date().toISOString(),
+    schedule,
+    completed: new Array(schedule.length).fill(false),
+    mediaSheetKey: sheet.key,
+  };
+}
+
+// Menarik ulang data TERBARU dari Google Sheet untuk rencana yang sedang
+// aktif (kalau rencana itu berbasis Bacaan Bersuara), lalu memasang
+// kembali link/labelnya -- progres centang yang sudah ada TETAP dijaga
+// (dicocokkan berdasar urutan/index hari, bukan dihapus dan mulai dari 0).
+async function resyncMediaPlan(plan) {
+  const sheet = (CONFIG.READING_MEDIA_SHEETS || []).find((s) => s.key === plan.mediaSheetKey);
+  if (!sheet || !sheet.csvUrl) throw new Error("Sheet Bacaan Bersuara ini sudah tidak ada di konfigurasi.");
+  const rows = await fetchMediaSheet(sheet); // selalu dari server (bukan cache), ini memang tombol "sinkron ulang"
+  const schedule = buildMediaScheduleFromRows(rows);
+  const oldCompleted = plan.completed || [];
+  plan.schedule = schedule;
+  plan.days = schedule.length;
+  plan.completed = schedule.map((_, i) => !!oldCompleted[i]);
+  return plan;
+}
+
+function driveOpenUrl(url) {
+  if (!url) return "";
+  // Link "Bagikan" Google Drive standar (…/file/d/ID) tidak selalu langsung
+  // bisa diputar; "/view" membuka pratinjau Drive yang punya tombol putar.
+  if (/drive\.google\.com\/file\/d\//.test(url) && !/\/(view|preview)/.test(url)) {
+    return url.replace(/\/?$/, "/view");
+  }
+  return url;
 }
