@@ -74,8 +74,8 @@ const CONFIG = {
   // 4) UKURAN HURUF AYAT (tombol A- / A+ di header)
   // ----------------------------------------------------------
   FONT_SIZE_STORAGE_KEY: "bible_app_font_size_v1",
-  FONT_SIZE_MIN: 14,
-  FONT_SIZE_MAX: 32,
+  FONT_SIZE_MIN: 5,
+  FONT_SIZE_MAX: 500,
   FONT_SIZE_STEP: 2,
   FONT_SIZE_DEFAULT: 19,
 
