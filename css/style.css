@@ -85,6 +85,35 @@ body.theme-10 { /* Ungu Senja */
 .tts-rate-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.9rem; color: var(--ink-soft); }
 .tts-rate-value { min-width: 40px; text-align: center; font-weight: 600; color: var(--ink); }
 .chip-btn.small { padding: 4px 8px; font-size: 0.82rem; }
+.chip-btn.danger-outline { border-color: var(--danger); color: var(--danger); }
+.chip-btn.danger-outline:hover { background: var(--danger); color: #fff; }
+
+/* ============================================================
+   OPSI PENCARIAN (bahasa / cakupan ayat-catatan)
+   ============================================================ */
+.search-options-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0 16px; font-size: 0.85rem; color: var(--ink-soft); }
+.search-options-row label { display: flex; align-items: center; gap: 6px; }
+.search-options-row select { padding: 4px 6px; }
+.result-note-tag { font-size: 0.78em; color: var(--ink-soft); font-weight: 400; }
+
+/* ============================================================
+   PENGUMUMAN
+   ============================================================ */
+.announcement-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
+.announcement-compose { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 14px; background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px; }
+.announcement-compose textarea { width: 100%; resize: vertical; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; font-family: var(--font-ui); background: var(--paper); color: var(--ink); }
+.announcement-list { display: flex; flex-direction: column; gap: 12px; }
+.announcement-item { padding: 14px; background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px; }
+.announcement-text { white-space: pre-wrap; margin-bottom: 6px; }
+.announcement-meta { font-size: 0.78rem; color: var(--ink-soft); }
+.announcement-item .chip-btn { margin-top: 8px; }
+
+/* ============================================================
+   CATATAN SAYA
+   ============================================================ */
+.notes-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
+.notes-menu-list { display: flex; flex-direction: column; gap: 10px; }
+.notes-menu-item .result-item { width: 100%; text-align: left; }
 
 /* ============================================================
    BACAAN BERSUARA (MP3/MP4/YouTube per rentang bacaan)
@@ -110,6 +139,38 @@ body.theme-10 { /* Ungu Senja */
 .media-link-btn { text-decoration: none; }
 .media-none { font-size: 12px; color: var(--ink-soft); font-style: italic; }
 .media-empty { color: var(--ink-soft); font-size: 14px; }
+
+/* ============================================================
+   LOG AKTIVITAS (administrator) & PANTAU PEMBACAAN (gembala dst)
+   ============================================================ */
+.log-panel h2, .monitor-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
+.log-controls {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 12px 14px; background: var(--paper-raised);
+  border: 1px solid var(--rule); border-radius: 10px; font-size: 0.88rem;
+}
+.log-controls label { display: flex; align-items: center; gap: 6px; color: var(--ink-soft); }
+.log-controls input[type="text"], .log-controls select { padding: 5px 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.log-count { font-size: 0.85rem; color: var(--ink-soft); margin: 0 0 8px; }
+.log-table-wrap, .monitor-table-wrap { overflow-x: auto; }
+.log-table, .monitor-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.log-table th, .log-table td, .monitor-table th, .monitor-table td {
+  padding: 7px 10px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap;
+}
+.log-table th, .monitor-table th {
+  background: var(--paper-raised); color: var(--ink-soft); font-family: var(--font-ui);
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; position: sticky; top: 0;
+}
+.log-table td { white-space: normal; }
+.log-table tr:hover, .monitor-table tr:hover { background: var(--paper-raised); }
+
+.monitor-controls { margin-bottom: 14px; }
+.monitor-controls select { padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.monitor-summary { font-weight: 600; margin: 0 0 10px; }
+.monitor-symbol { font-weight: 700; text-align: center; font-family: var(--font-ui); }
+.monitor-row-read .monitor-symbol { color: #1a7a3d; }
+.monitor-row-unread .monitor-symbol { color: var(--danger); }
+.monitor-row-unread td { opacity: 0.72; }
 
 * { box-sizing: border-box; }
 html, body {
