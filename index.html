@@ -50,7 +50,7 @@
         <input
           id="searchInput"
           type="text"
-          placeholder="Cari: kejadian 1:1, yehezkiel 26, atau kata seperti “kasih”"
+          placeholder="Cari: kejadian 1:1, matius 1:1; wahyu 2:2, atau kata seperti “kasih”"
           autocomplete="off"
         />
         <button type="submit" class="icon-btn search-btn" aria-label="Cari">🔍</button>
@@ -64,6 +64,7 @@
         </div>
         <button id="fullscreenToggle" class="icon-btn" title="Layar penuh" aria-label="Layar penuh">⛶</button>
         <button id="planToggle" class="icon-btn" title="Rencana Baca" aria-label="Rencana Baca">📅</button>
+        <button id="mediaToggle" class="icon-btn" title="Bacaan Bersuara (MP3/MP4/YouTube)" aria-label="Bacaan Bersuara" hidden>🎧</button>
         <select id="langSelect" class="lang-select" aria-label="Pilih bahasa"></select>
         <div class="width-control" id="widthControl">
           <button data-width="mobile" class="width-btn" title="Lebar HP">📱</button>
@@ -76,11 +77,69 @@
       </div>
     </header>
 
+    <div id="currentReadingIndicator" class="current-reading-indicator" hidden></div>
+
     <div id="moreMenu" class="more-menu" hidden>
       <div class="more-menu-item" id="userStatus">Memuat status…</div>
       <div class="more-menu-item" id="syncStatus">Memuat status…</div>
       <button id="resyncBtn" class="more-menu-btn">🔄 Sinkronkan ulang Alkitab</button>
       <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
+
+      <div class="more-menu-section">
+        <div class="more-menu-section-title">📐 Tampilan kolom (bahasa berdampingan)</div>
+        <div class="columns-btn-group" id="columnsBtnGroup">
+          <button type="button" class="columns-btn" data-cols="1">1 Kolom</button>
+          <button type="button" class="columns-btn" data-cols="2">2 Kolom</button>
+          <button type="button" class="columns-btn" data-cols="3">3 Kolom</button>
+        </div>
+        <div id="columnLangRow2" class="columns-lang-row" hidden>
+          <label for="columnLang2">Kolom 2:</label>
+          <select id="columnLang2" class="columns-lang-select"></select>
+        </div>
+        <div id="columnLangRow3" class="columns-lang-row" hidden>
+          <label for="columnLang3">Kolom 3:</label>
+          <select id="columnLang3" class="columns-lang-select"></select>
+        </div>
+        <div id="columnDirectionRow" class="columns-lang-row" hidden>
+          <label>Arah:</label>
+          <div class="columns-btn-group" id="columnDirectionBtnGroup">
+            <button type="button" class="columns-btn" data-dir="side">↔️ Menyamping</button>
+            <button type="button" class="columns-btn" data-dir="stacked">↕️ Atas-bawah</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="more-menu-section">
+        <div class="more-menu-section-title">🎨 Tema tampilan</div>
+        <div id="themePicker" class="theme-picker"></div>
+      </div>
+
+      <div class="more-menu-section">
+        <div class="more-menu-section-title">🔊 Pengaturan suara pembacaan</div>
+        <div class="tts-lang-row">
+          <label for="ttsLangSelect">Bahasa suara:</label>
+          <select id="ttsLangSelect" class="columns-lang-select">
+            <option value="id-ID">Indonesia</option>
+            <option value="en-US">Inggris</option>
+            <option value="zh-CN">Mandarin</option>
+          </select>
+        </div>
+        <div class="tts-lang-row">
+          <label for="ttsGenderSelect">Jenis suara:</label>
+          <select id="ttsGenderSelect" class="columns-lang-select">
+            <option value="any">Otomatis</option>
+            <option value="female">Suara wanita</option>
+            <option value="male">Suara pria</option>
+          </select>
+        </div>
+        <div class="tts-rate-row">
+          <span>Kecepatan:</span>
+          <button type="button" id="ttsRateDown" class="chip-btn small">− Lambat</button>
+          <span id="ttsRateValue" class="tts-rate-value">1.0x</span>
+          <button type="button" id="ttsRateUp" class="chip-btn small">+ Cepat</button>
+        </div>
+      </div>
+
       <label class="more-menu-toggle" for="readingAnimToggle">
         <span>🎉 Animasi progres membaca</span>
         <span class="toggle-switch">
@@ -118,6 +177,9 @@
           <!-- panel rencana baca -->
           <div id="planPanel" class="plan-panel" hidden></div>
 
+          <!-- panel bacaan bersuara (MP3/MP4/YouTube per rentang bacaan) -->
+          <div id="mediaPanel" class="media-panel" hidden></div>
+
           <!-- hasil pencarian kata -->
           <div id="searchResults" class="search-results" hidden>
             <h2 id="searchResultsTitle"></h2>
@@ -132,6 +194,11 @@
               <button id="nextChapter" class="chip-btn">Pasal Berikutnya →</button>
             </div>
             <div id="readerVerses" class="reader-verses"></div>
+            <div class="reader-nav reader-nav-bottom">
+              <button id="prevChapterBottom" class="chip-btn">← Pasal Sebelumnya</button>
+              <h2 id="readerTitleBottom"></h2>
+              <button id="nextChapterBottom" class="chip-btn">Pasal Berikutnya →</button>
+            </div>
           </article>
 
           <div id="emptyState" class="empty-state">
@@ -149,11 +216,17 @@
         <span id="noteModalRef" class="note-modal-ref"></span>
         <button id="noteModalClose" class="icon-btn" aria-label="Tutup">✕</button>
       </div>
-      <p id="noteModalVerseText" class="note-modal-verse"></p>
+      <div class="note-modal-verse-row">
+        <p id="noteModalVerseText" class="note-modal-verse"></p>
+        <button id="noteModalCopyVerseBtn" type="button" class="icon-btn note-copy-btn" title="Salin ayat" aria-label="Salin ayat">📋</button>
+      </div>
 
       <div id="noteModalAdminNoteWrap" class="note-modal-admin" hidden>
-        <div class="note-modal-label">📝 Catatan pada ayat ini</div>
-        <p id="noteModalAdminNote" class="note-modal-admin-text"></p>
+        <div class="note-modal-label-row">
+          <div class="note-modal-label">📝 Catatan pada ayat ini</div>
+          <button id="noteModalCopyNoteBtn" type="button" class="icon-btn note-copy-btn" title="Salin catatan" aria-label="Salin catatan">📋</button>
+        </div>
+        <div id="noteModalAdminNote" class="note-modal-admin-text"></div>
       </div>
 
       <div class="note-modal-personal">
@@ -180,6 +253,7 @@
   <script src="js/notes.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/plans.js"></script>
+  <script src="js/media.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
