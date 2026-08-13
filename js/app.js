@@ -11,6 +11,7 @@ let highlightVerse = null;
 let currentUser = null;        // username (huruf kecil) yang sedang login
 let currentUserDisplay = null; // nama tampilan
 let currentChapterVerses = []; // ayat-ayat pasal yang sedang ditampilkan (dipakai TTS & modal catatan)
+let verseById = {};            // id ayat ("lang_verseId") -> objek ayat, dipakai menu "Catatan Saya"
 
 const el = (id) => document.getElementById(id);
 
@@ -203,11 +204,17 @@ async function startApp() {
   // Tarik catatan pribadi & progres rencana baca dari Google Sheet (kalau
   // sudah dikonfigurasi) di latar belakang — tidak menunggu/menghalangi UI.
   if (currentUser) {
+    await resolveCurrentUserLevels(currentUser);
+    if (typeof updateStatusPanel === "function") updateStatusPanel();
     refreshNotesFromRemote(currentUser);
     refreshPlanFromRemote(currentUser);
     refreshSettingsFromRemote(currentUser).then(() => {
       if (el("readingAnimToggle")) el("readingAnimToggle").checked = isReadingProgressEnabled();
     });
+    logActivity("Login");
+    // sedikit jeda supaya tidak "berebut" dengan showEmptyState() yang
+    // dipanggil di akhir afterDataReady() (terutama saat sinkron pertama kali)
+    setTimeout(() => checkAnnouncementsAtStart(), 400);
   }
 }
 
@@ -318,11 +325,22 @@ async function updateStatusPanel() {
   const lastBible = await LocalDB.getMeta("lastSync");
   const lastUsers = await LocalDB.getMeta("lastUserSync");
   const n = bibleData.length;
-  el("userStatus").textContent = `Masuk sebagai: ${currentUserDisplay || currentUser}`;
+  const levelText = typeof levelDisplayLabel === "function" ? levelDisplayLabel() : "";
+  el("userStatus").textContent = `Masuk sebagai: ${currentUserDisplay || currentUser}` + (levelText ? ` · ${levelText}` : "");
   el("syncStatus").textContent =
     `${n.toLocaleString("id-ID")} baris Alkitab tersimpan lokal` +
     (lastBible ? ` — sinkron ${new Date(lastBible).toLocaleString("id-ID")}` : "") +
     (lastUsers ? ` · pengguna sinkron ${new Date(lastUsers).toLocaleString("id-ID")}` : "");
+  updateLevelGatedMenus();
+}
+
+// Tombol menu yang hanya boleh tampil untuk level tertentu:
+//  - "📊 Log Aktivitas": khusus administrator.
+//  - "👀 Pantau Pembacaan": administrator/penatua/gembala distrik/gembala/
+//    pra gembala/inti (bukan "Kaum Saleh"/tanpa level) -- lihat hasAnyLevel().
+function updateLevelGatedMenus() {
+  if (el("logViewerBtn")) el("logViewerBtn").hidden = !isAdministrator();
+  if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
 }
 
 // ------------------------------------------------------------
@@ -331,11 +349,13 @@ async function updateStatusPanel() {
 // ------------------------------------------------------------
 function buildIndexes() {
   verseIndex = {};
+  verseById = {};
   bibleData.forEach((v) => {
     if (!verseIndex[v.lang]) verseIndex[v.lang] = {};
     if (!verseIndex[v.lang][v.bookNumber]) verseIndex[v.lang][v.bookNumber] = {};
     if (!verseIndex[v.lang][v.bookNumber][v.chapter]) verseIndex[v.lang][v.bookNumber][v.chapter] = [];
     verseIndex[v.lang][v.bookNumber][v.chapter].push(v);
+    verseById[v.id] = v;
   });
 
   chaptersByBook = {};
@@ -745,6 +765,7 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
   el("readerTitle").textContent = `${displayName} ${chapter}`;
   if (el("readerTitleBottom")) el("readerTitleBottom").textContent = `${displayName} ${chapter}`;
   updateCurrentReadingIndicator(`${displayName} ${chapter}`);
+  logActivity(`Baca: ${displayName} ${chapter}`);
 
   const wrap = el("readerVerses");
   const columnsCount = getSetting(currentUser, "columns") || 1;
@@ -808,21 +829,71 @@ function parseReference(query) {
   return { book, chapter, verseStart, verseEnd };
 }
 
+// Menyorot SEMUA kemunculan kata/frasa yang ditemukan (bukan cuma yang
+// pertama), supaya sesuai permintaan "kata yang ditemukan di-highlight".
+function highlightAllMatches(text, query) {
+  const q = query.trim();
+  if (!q) return text;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(escaped, "gi");
+  return text.replace(re, (m) => "<mark>" + m + "</mark>");
+}
+// (dipertahankan sebagai alias supaya kode lama yang masih memanggil
+// highlightMatch tidak rusak)
 function highlightMatch(text, query) {
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return text;
-  return (
-    text.slice(0, idx) +
-    "<mark>" + text.slice(idx, idx + query.length) + "</mark>" +
-    text.slice(idx + query.length)
-  );
+  return highlightAllMatches(text, query);
 }
 
-function runKeywordSearch(query) {
+let lastKeywordQuery = ""; // dipakai saat opsi bahasa/cakupan pencarian diubah
+
+// scope: "verse" | "notes" | "both". lang: kode bahasa, atau "__all__" untuk semua bahasa.
+function runKeywordSearch(query, lang, scope) {
   const q = query.trim().toLowerCase();
-  if (q.length < 2) return [];
-  const pool = bibleData.filter((v) => v.lang === currentLang);
-  return pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, 300);
+  if (q.length < 2) return { verseResults: [], noteResults: [] };
+  const useLang = lang || currentLang;
+  const useScope = scope || "verse";
+
+  let verseResults = [];
+  if (useScope === "verse" || useScope === "both") {
+    const pool = useLang === "__all__" ? bibleData : bibleData.filter((v) => v.lang === useLang);
+    verseResults = pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, 300);
+  }
+
+  let noteResults = [];
+  if (useScope === "notes" || useScope === "both") {
+    noteResults = searchInPersonalNotes(q);
+  }
+  return { verseResults, noteResults };
+}
+
+// Mencari di catatan pribadi milik pengguna yang sedang login (js/notes.js).
+function searchInPersonalNotes(q) {
+  const notes = loadLocalNotes(currentUser);
+  const out = [];
+  Object.keys(notes).forEach((verseId) => {
+    const entry = notes[verseId];
+    if (entry && entry.note && entry.note.toLowerCase().includes(q)) {
+      out.push({ verseId, note: entry.note, verse: verseById[verseId] || null });
+    }
+  });
+  return out.slice(0, 300);
+}
+
+function initSearchOptions() {
+  const langSel = el("searchLangSelect");
+  const scopeSel = el("searchScopeSelect");
+  if (!langSel || !scopeSel) return;
+  langSel.innerHTML = '<option value="__all__">Semua Bahasa</option>' +
+    CONFIG.LANGUAGES.filter((l) => verseIndex[l.code])
+      .map((l) => `<option value="${l.code}">${l.label}</option>`)
+      .join("");
+  langSel.value = currentLang || "__all__";
+  scopeSel.value = "verse";
+  const rerun = () => {
+    if (lastKeywordQuery) handleSearch(lastKeywordQuery, true);
+  };
+  langSel.addEventListener("change", rerun);
+  scopeSel.addEventListener("change", rerun);
 }
 
 // Pencarian gabungan beberapa referensi sekaligus, dipisah titik-koma atau
@@ -838,6 +909,7 @@ function handleMultiReferenceSearch(query) {
 
   hideAllPanels();
   el("searchResults").hidden = false;
+  if (el("searchOptionsRow")) el("searchOptionsRow").hidden = true;
   el("searchResultsTitle").textContent = `Hasil untuk ${validCount} referensi (${parts.length - validCount ? (parts.length - validCount) + " tidak dikenali" : "semua ditemukan"})`;
   const list = el("searchResultsList");
   list.innerHTML = "";
@@ -885,47 +957,97 @@ function handleMultiReferenceSearch(query) {
   return true;
 }
 
-function handleSearch(rawQuery) {
+// `isOptionChange` = true kalau dipanggil ulang gara-gara opsi bahasa/cakupan
+// diubah (supaya tidak dianggap query referensi/multi-referensi baru lagi).
+function handleSearch(rawQuery, isOptionChange) {
   const query = rawQuery.trim();
   if (!query) return;
 
-  if (handleMultiReferenceSearch(query)) return;
+  if (!isOptionChange) {
+    if (handleMultiReferenceSearch(query)) return;
 
-  const ref = parseReference(query);
-  if (ref) {
-    if (!bookAvailableInLang(currentLang, ref.book.num)) {
-      showLangUnavailable();
+    const ref = parseReference(query);
+    if (ref) {
+      if (!bookAvailableInLang(currentLang, ref.book.num)) {
+        showLangUnavailable();
+        return;
+      }
+      renderChapter(ref.book.num, ref.chapter, ref.verseStart || null);
+      logActivity("Pencarian", query);
       return;
     }
-    renderChapter(ref.book.num, ref.chapter, ref.verseStart || null);
-    return;
   }
 
-  const results = runKeywordSearch(query);
+  lastKeywordQuery = query;
+  const langSel = el("searchLangSelect");
+  const scopeSel = el("searchScopeSelect");
+  const lang = (langSel && langSel.value) || currentLang;
+  const scope = (scopeSel && scopeSel.value) || "verse";
+
+  const { verseResults, noteResults } = runKeywordSearch(query, lang, scope);
+  const total = verseResults.length + noteResults.length;
+
   hideAllPanels();
   el("searchResults").hidden = false;
-  el("searchResultsTitle").textContent = `Hasil pencarian “${query}” (${results.length}${results.length === 300 ? "+" : ""})`;
+  if (el("searchOptionsRow")) el("searchOptionsRow").hidden = false;
+  if (!isOptionChange) initSearchOptions(); // isi ulang pilihan bahasa (baru diketahui setelah data siap)
+  if (langSel) langSel.value = lang;
+  if (scopeSel) scopeSel.value = scope;
+
+  const cappedNote = total === 300 || verseResults.length === 300 ? "+" : "";
+  el("searchResultsTitle").textContent =
+    `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
+    (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan)` : "");
   const list = el("searchResultsList");
   list.innerHTML = "";
 
-  if (results.length === 0) {
+  if (!isOptionChange) logActivity("Pencarian", query);
+
+  if (total === 0) {
     const p = document.createElement("p");
     p.textContent = "Tidak ditemukan. Coba kata lain, atau gunakan format referensi seperti “kejadian 1:1”.";
     list.appendChild(p);
     return;
   }
 
-  results.forEach((v) => {
+  verseResults.forEach((v) => {
     const book = BOOKS.find((b) => b.num === v.bookNumber);
+    const langLabel = lang === "__all__" ? ` · ${langLabelFor(v.lang)}` : "";
     const btn = document.createElement("button");
     btn.className = "result-item";
     btn.innerHTML = `
-      <div class="result-ref">${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}</div>
-      <div class="result-text">${highlightMatch(v.text, query)}</div>
+      <div class="result-ref">${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}${langLabel}</div>
+      <div class="result-text">${highlightAllMatches(v.text, query)}</div>
     `;
-    btn.addEventListener("click", () => renderChapter(v.bookNumber, v.chapter, v.verse));
+    btn.addEventListener("click", () => {
+      currentLang = v.lang;
+      if (langSelectEl()) langSelectEl().value = v.lang;
+      renderChapter(v.bookNumber, v.chapter, v.verse);
+    });
     list.appendChild(btn);
   });
+
+  noteResults.forEach((n) => {
+    const btn = document.createElement("button");
+    btn.className = "result-item";
+    const ref = n.verse ? `${n.verse.bookName} ${n.verse.chapter}:${n.verse.verse}` : n.verseId;
+    btn.innerHTML = `
+      <div class="result-ref">📝 ${ref} <span class="result-note-tag">(catatan Anda)</span></div>
+      <div class="result-text">${highlightAllMatches(n.note, query)}</div>
+    `;
+    btn.addEventListener("click", () => {
+      if (n.verse) {
+        currentLang = n.verse.lang;
+        if (langSelectEl()) langSelectEl().value = n.verse.lang;
+        renderChapter(n.verse.bookNumber, n.verse.chapter, n.verse.verse);
+      }
+    });
+    list.appendChild(btn);
+  });
+}
+
+function langSelectEl() {
+  return el("langSelect");
 }
 
 // ------------------------------------------------------------
@@ -934,6 +1056,7 @@ function handleSearch(rawQuery) {
 async function showPlanPanel() {
   hideAllPanels();
   el("planPanel").hidden = false;
+  logActivity("Rencana Baca");
   renderPlanPanel();
   // tarik progres terbaru dari Google Sheet (kalau dikonfigurasi) lalu
   // gambar ulang panel kalau ternyata ada versi lebih baru dari perangkat lain
@@ -1060,6 +1183,471 @@ function renderPlanDetail(container, plan) {
 }
 
 // ------------------------------------------------------------
+// 8b) PENGUMUMAN — hanya administrator yang bisa menulis, tampil ke
+//     semua orang yang login (di awal, dan bisa dibuka lagi kapan saja
+//     lewat menu ⋮ → 📢 Pengumuman).
+// ------------------------------------------------------------
+const ANNOUNCEMENT_SEEN_KEY_PREFIX = "bible_app_announcement_last_seen_v1_";
+
+function announcementSeenKey() {
+  return ANNOUNCEMENT_SEEN_KEY_PREFIX + (currentUser || "guest");
+}
+
+async function checkAnnouncementsAtStart() {
+  if (typeof Sync === "undefined" || !Sync.enabled()) return;
+  const list = await Sync.pullAnnouncements();
+  if (!list.length) return;
+  const lastSeen = localStorage.getItem(announcementSeenKey()) || "0";
+  const hasUnseen = list.some((a) => String(a.id) > lastSeen);
+  if (hasUnseen && el("appRoot") && !el("appRoot").hidden) {
+    showAnnouncementPanel(list);
+  }
+}
+
+async function showAnnouncementPanel(preloaded) {
+  hideAllPanels();
+  el("announcementPanel").hidden = false;
+  logActivity("Pengumuman");
+  const list = preloaded || (Sync.enabled() ? await Sync.pullAnnouncements() : []);
+  renderAnnouncementPanel(list);
+  // tandai semua sudah dilihat (per perangkat/akun)
+  if (list.length) {
+    const maxId = list.reduce((m, a) => (String(a.id) > m ? String(a.id) : m), "0");
+    localStorage.setItem(announcementSeenKey(), maxId);
+  }
+}
+
+function renderAnnouncementPanel(list) {
+  const container = el("announcementPanel");
+  container.innerHTML = "";
+
+  const title = document.createElement("h2");
+  title.textContent = "📢 Pengumuman";
+  container.appendChild(title);
+
+  if (isAdministrator()) {
+    const composeWrap = document.createElement("div");
+    composeWrap.className = "announcement-compose";
+    composeWrap.innerHTML = `
+      <textarea id="announcementComposeText" rows="3" placeholder="Tulis pengumuman baru untuk semua pengguna…"></textarea>
+      <button id="announcementComposeBtn" class="chip-btn primary">Kirim Pengumuman</button>
+    `;
+    container.appendChild(composeWrap);
+    composeWrap.querySelector("#announcementComposeBtn").addEventListener("click", async () => {
+      const ta = composeWrap.querySelector("#announcementComposeText");
+      const text = ta.value.trim();
+      if (!text) return;
+      const btn = composeWrap.querySelector("#announcementComposeBtn");
+      btn.disabled = true;
+      btn.textContent = "Mengirim…";
+      const ok = await Sync.pushAnnouncement(currentUser, text);
+      btn.disabled = false;
+      btn.textContent = "Kirim Pengumuman";
+      if (ok) {
+        ta.value = "";
+        showAnnouncementPanel();
+      } else {
+        alert("Gagal mengirim pengumuman. Pastikan Apps Script sudah dikonfigurasi.");
+      }
+    });
+  }
+
+  const listWrap = document.createElement("div");
+  listWrap.className = "announcement-list";
+  if (!list.length) {
+    listWrap.innerHTML = `<p class="media-empty">Belum ada pengumuman.</p>`;
+  }
+  list.forEach((a) => {
+    const item = document.createElement("div");
+    item.className = "announcement-item";
+    const when = a.createdAt ? new Date(a.createdAt).toLocaleString("id-ID") : "";
+    item.innerHTML = `
+      <div class="announcement-text"></div>
+      <div class="announcement-meta">${a.createdBy || ""}${when ? " · " + when : ""}</div>
+    `;
+    item.querySelector(".announcement-text").textContent = a.text; // textContent -> aman dari HTML asing
+    if (isAdministrator()) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "chip-btn small danger-outline";
+      delBtn.textContent = "Hapus";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm("Hapus pengumuman ini?")) return;
+        await Sync.deleteAnnouncement(currentUser, a.id);
+        showAnnouncementPanel();
+      });
+      item.appendChild(delBtn);
+    }
+    listWrap.appendChild(item);
+  });
+  container.appendChild(listWrap);
+}
+
+// ------------------------------------------------------------
+// 8c) CATATAN SAYA — menu tersendiri berisi semua catatan pribadi milik
+//     pengguna yang sedang login (data sama seperti yang tersimpan lewat
+//     modal klik-ayat, lihat js/notes.js — sekarang ada tempat khusus
+//     untuk melihat semuanya sekaligus).
+// ------------------------------------------------------------
+function showNotesMenuPanel() {
+  hideAllPanels();
+  el("notesPanel").hidden = false;
+  logActivity("Catatan Saya");
+  renderNotesMenuPanel();
+}
+
+function renderNotesMenuPanel() {
+  const container = el("notesPanel");
+  container.innerHTML = "";
+  const title = document.createElement("h2");
+  title.textContent = "🗒️ Catatan Saya";
+  container.appendChild(title);
+
+  const notes = loadLocalNotes(currentUser);
+  const entries = Object.keys(notes)
+    .map((verseId) => ({ verseId, ...notes[verseId], verse: verseById[verseId] || null }))
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+  if (!entries.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Anda belum menulis catatan pribadi apa pun. Klik ayat mana pun saat membaca untuk menulis catatan.";
+    container.appendChild(p);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "notes-menu-list";
+  entries.forEach((entryItem) => {
+    const row = document.createElement("div");
+    row.className = "notes-menu-item";
+    const ref = entryItem.verse
+      ? `${entryItem.verse.bookName} ${entryItem.verse.chapter}:${entryItem.verse.verse}`
+      : entryItem.verseId;
+    const when = entryItem.updatedAt ? new Date(entryItem.updatedAt).toLocaleString("id-ID") : "";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "result-item";
+    openBtn.innerHTML = `
+      <div class="result-ref">${ref}</div>
+      <div class="result-text"></div>
+      <div class="announcement-meta">${when}</div>
+    `;
+    openBtn.querySelector(".result-text").textContent = entryItem.note;
+    openBtn.addEventListener("click", () => {
+      if (entryItem.verse) {
+        currentLang = entryItem.verse.lang;
+        if (el("langSelect")) el("langSelect").value = entryItem.verse.lang;
+        renderChapter(entryItem.verse.bookNumber, entryItem.verse.chapter, entryItem.verse.verse);
+      }
+    });
+    row.appendChild(openBtn);
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+}
+
+// ------------------------------------------------------------
+// 8d) LOG AKTIVITAS (khusus administrator) — melihat semua baris log
+//     (menu yang dibuka, pencarian, tanggal/jam, OS, IP) yang sudah
+//     dikumpulkan js/activitylog.js, dengan filter & tombol simpan (CSV).
+// ------------------------------------------------------------
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function saveLogAsCsv(rows) {
+  if (!rows || !rows.length) {
+    alert("Tidak ada data log untuk disimpan.");
+    return;
+  }
+  const header = ["Username", "Tanggal", "Jam", "OS", "IP", "Menu", "Pencarian"];
+  const escCsv = (v) => {
+    const s = String(v == null ? "" : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [header.join(",")].concat(
+    rows.map((l) => [l.username, l.date, l.time, l.os, l.ip, l.menu, l.search].map(escCsv).join(","))
+  );
+  const csv = lines.join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); // BOM supaya Excel baca UTF-8 dgn benar
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `log-aktivitas-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// state filter panel log disimpan di luar fungsi supaya tetap diingat
+// selama sesi ini kalau panel dibuka-tutup berkali-kali
+const _logPanelState = { days: "30", userFilter: "", textFilter: "", rows: [] };
+
+async function showLogPanel() {
+  hideAllPanels();
+  el("logPanel").hidden = false;
+  logActivity("Log Aktivitas (Admin)");
+  await loadAndRenderLogPanel();
+}
+
+async function loadAndRenderLogPanel(daysOverride) {
+  const container = el("logPanel");
+  container.innerHTML = "";
+  const title = document.createElement("h2");
+  title.textContent = "📊 Log Aktivitas";
+  container.appendChild(title);
+
+  if (!isAdministrator()) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Menu ini hanya untuk administrator.";
+    container.appendChild(p);
+    return;
+  }
+  if (!Sync.enabled()) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Sinkronisasi (Apps Script) belum dikonfigurasi, jadi log belum bisa diambil.";
+    container.appendChild(p);
+    return;
+  }
+
+  if (daysOverride !== undefined) _logPanelState.days = daysOverride;
+
+  const controls = document.createElement("div");
+  controls.className = "log-controls";
+  controls.innerHTML = `
+    <label>Rentang:
+      <select id="logDaysSelect">
+        <option value="1">Hari ini</option>
+        <option value="7">7 hari terakhir</option>
+        <option value="30">30 hari terakhir</option>
+        <option value="90">90 hari terakhir</option>
+        <option value="0">Semua</option>
+      </select>
+    </label>
+    <label>Pengguna: <input type="text" id="logUserFilter" placeholder="mis. budi" /></label>
+    <label>Cari menu/kata: <input type="text" id="logTextFilter" placeholder="mis. Kejadian, Pengumuman" /></label>
+    <button id="logApplyBtn" class="chip-btn primary" type="button">Terapkan</button>
+    <button id="logSaveBtn" class="chip-btn" type="button">💾 Simpan sebagai CSV</button>
+  `;
+  container.appendChild(controls);
+  controls.querySelector("#logDaysSelect").value = _logPanelState.days;
+  controls.querySelector("#logUserFilter").value = _logPanelState.userFilter;
+  controls.querySelector("#logTextFilter").value = _logPanelState.textFilter;
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "log-table-wrap";
+  tableWrap.innerHTML = `<p class="media-empty">Memuat log…</p>`;
+  container.appendChild(tableWrap);
+
+  controls.querySelector("#logApplyBtn").addEventListener("click", () => {
+    _logPanelState.userFilter = controls.querySelector("#logUserFilter").value.trim().toLowerCase();
+    _logPanelState.textFilter = controls.querySelector("#logTextFilter").value.trim().toLowerCase();
+    loadAndRenderLogPanel(controls.querySelector("#logDaysSelect").value);
+  });
+  controls.querySelector("#logSaveBtn").addEventListener("click", () => saveLogAsCsv(_logPanelState.rows));
+
+  const daysNum = Number(_logPanelState.days) || 0;
+  const logs = await Sync.pullLogs(currentUser, daysNum);
+  let filtered = logs;
+  if (_logPanelState.userFilter) {
+    filtered = filtered.filter((l) => (l.username || "").toLowerCase().indexOf(_logPanelState.userFilter) !== -1);
+  }
+  if (_logPanelState.textFilter) {
+    filtered = filtered.filter((l) =>
+      (String(l.menu || "") + " " + String(l.search || "")).toLowerCase().indexOf(_logPanelState.textFilter) !== -1
+    );
+  }
+  _logPanelState.rows = filtered;
+
+  tableWrap.innerHTML = "";
+  const count = document.createElement("p");
+  count.className = "log-count";
+  count.textContent = `${filtered.length.toLocaleString("id-ID")} baris log ditemukan (jumlah persis sesuai filter di atas).`;
+  tableWrap.appendChild(count);
+
+  if (!filtered.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Tidak ada log yang cocok.";
+    tableWrap.appendChild(p);
+    return;
+  }
+
+  const shown = filtered.slice(0, 500);
+  const table = document.createElement("table");
+  table.className = "log-table";
+  table.innerHTML =
+    "<thead><tr><th>Tanggal</th><th>Jam</th><th>Pengguna</th><th>OS</th><th>IP</th><th>Menu</th><th>Pencarian</th></tr></thead>" +
+    "<tbody>" +
+    shown.map((l) => `
+      <tr>
+        <td>${escapeHtml(l.date)}</td>
+        <td>${escapeHtml(l.time)}</td>
+        <td>${escapeHtml(l.username)}</td>
+        <td>${escapeHtml(l.os)}</td>
+        <td>${escapeHtml(l.ip)}</td>
+        <td>${escapeHtml(l.menu)}</td>
+        <td>${escapeHtml(l.search)}</td>
+      </tr>`).join("") +
+    "</tbody>";
+  tableWrap.appendChild(table);
+
+  if (filtered.length > shown.length) {
+    const note = document.createElement("p");
+    note.className = "media-empty";
+    note.textContent = `Menampilkan ${shown.length} baris terbaru dari ${filtered.length}. Persempit dengan filter pengguna/kata, atau tekan "💾 Simpan sebagai CSV" untuk mendapat semuanya.`;
+    tableWrap.appendChild(note);
+  }
+}
+
+// ------------------------------------------------------------
+// 8e) PANTAU PEMBACAAN (7 HARI) — untuk level administrator, penatua,
+//     gembala distrik, gembala, pra gembala, inti (bukan Kaum Saleh).
+//     Aturan bertingkat siapa-boleh-lihat-siapa memakai canViewLevel()
+//     dari js/levels.js. "Sudah membaca" dihitung dari log yang menunya
+//     diawali "Baca: " (dicatat tiap kali membuka satu pasal).
+// ------------------------------------------------------------
+async function getMonitorableUsers() {
+  const users = await LocalDB.getAllUsers();
+  return users
+    .filter((u) => u.username === currentUser || canViewLevel(currentUserLevels, u.levels))
+    .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, "id"));
+}
+
+async function showMonitorPanel() {
+  hideAllPanels();
+  el("monitorPanel").hidden = false;
+  logActivity("Pantau Pembacaan");
+  await renderMonitorPanel();
+}
+
+async function renderMonitorPanel(selectedUsername) {
+  const container = el("monitorPanel");
+  container.innerHTML = "";
+  const title = document.createElement("h2");
+  title.textContent = "👀 Pantau Pembacaan Alkitab (7 Hari)";
+  container.appendChild(title);
+
+  if (!hasAnyLevel()) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Menu ini hanya untuk level administrator/penatua/gembala distrik/gembala/pra gembala/inti.";
+    container.appendChild(p);
+    return;
+  }
+  if (!Sync.enabled()) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Sinkronisasi (Apps Script) belum dikonfigurasi, jadi data pembacaan belum bisa diambil.";
+    container.appendChild(p);
+    return;
+  }
+
+  const users = await getMonitorableUsers();
+  if (!users.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Tidak ada pengguna yang bisa dipantau dari akun Anda.";
+    container.appendChild(p);
+    return;
+  }
+
+  const target = (selectedUsername && users.some((u) => u.username === selectedUsername))
+    ? selectedUsername
+    : users[0].username;
+
+  const controls = document.createElement("div");
+  controls.className = "monitor-controls";
+  const select = document.createElement("select");
+  select.id = "monitorUserSelect";
+  users.forEach((u) => {
+    const opt = document.createElement("option");
+    opt.value = u.username;
+    const lvl = (u.levels && u.levels.length) ? u.levels.map(levelLabel).join(", ") : (CONFIG.NO_LEVEL_LABEL || "Kaum Saleh");
+    opt.textContent = `${u.displayName || u.username} — ${lvl}`;
+    select.appendChild(opt);
+  });
+  select.value = target;
+  select.addEventListener("change", () => renderMonitorPanel(select.value));
+  const label = document.createElement("label");
+  label.textContent = "Pantau: ";
+  label.appendChild(select);
+  controls.appendChild(label);
+  container.appendChild(controls);
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "monitor-table-wrap";
+  tableWrap.innerHTML = `<p class="media-empty">Memuat…</p>`;
+  container.appendChild(tableWrap);
+
+  const logs = await Sync.pullLogs(currentUser, 8); // buffer 8 hari supaya aman dari selisih jam/zona
+  const targetUser = users.find((u) => u.username === target);
+  const readLogs = logs.filter(
+    (l) => (l.username || "").toLowerCase() === target && String(l.menu || "").indexOf("Baca: ") === 0
+  );
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push({
+      key: d.toLocaleDateString("id-ID"),
+      label: d.toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" }),
+    });
+  }
+
+  const rows = days.map((day) => {
+    const entries = readLogs.filter((l) => l.date === day.key);
+    if (!entries.length) return { label: day.label, read: false, start: "-", end: "-", count: 0 };
+    const times = entries
+      .map((e) => new Date(e.updatedAt))
+      .filter((d) => !isNaN(d.getTime()))
+      .sort((a, b) => a - b);
+    const fmt = (d) => d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    return {
+      label: day.label,
+      read: true,
+      start: times.length ? fmt(times[0]) : "-",
+      end: times.length ? fmt(times[times.length - 1]) : "-",
+      count: entries.length,
+    };
+  });
+  const readCount = rows.filter((r) => r.read).length;
+
+  tableWrap.innerHTML = "";
+  const summary = document.createElement("p");
+  summary.className = "monitor-summary";
+  summary.textContent = `${targetUser ? (targetUser.displayName || targetUser.username) : target}: membaca ${readCount} dari 7 hari terakhir.`;
+  tableWrap.appendChild(summary);
+
+  const table = document.createElement("table");
+  table.className = "monitor-table";
+  table.innerHTML =
+    "<thead><tr><th>Tanggal</th><th>Baca?</th><th>Jam Awal</th><th>Jam Akhir</th><th>Jml Pasal</th></tr></thead>" +
+    "<tbody>" +
+    rows.map((r) => `
+      <tr class="${r.read ? "monitor-row-read" : "monitor-row-unread"}">
+        <td>${escapeHtml(r.label)}</td>
+        <td class="monitor-symbol">${r.read ? "V" : "X"}</td>
+        <td>${escapeHtml(r.start)}</td>
+        <td>${escapeHtml(r.end)}</td>
+        <td>${r.count || ""}</td>
+      </tr>`).join("") +
+    "</tbody>";
+  tableWrap.appendChild(table);
+
+  const note = document.createElement("p");
+  note.className = "media-empty";
+  note.textContent = `Dihitung dari log "Baca: …" (minimal membuka 1 pasal pada hari itu). Jam mengikuti waktu perangkat yang dipakai membaca.`;
+  tableWrap.appendChild(note);
+}
+
+// ------------------------------------------------------------
 // 9) TAMPILAN / PANEL
 // ------------------------------------------------------------
 function hideAllPanels() {
@@ -1069,6 +1657,10 @@ function hideAllPanels() {
   el("emptyState").hidden = true;
   el("planPanel").hidden = true;
   if (el("mediaPanel")) el("mediaPanel").hidden = true;
+  if (el("announcementPanel")) el("announcementPanel").hidden = true;
+  if (el("notesPanel")) el("notesPanel").hidden = true;
+  if (el("logPanel")) el("logPanel").hidden = true;
+  if (el("monitorPanel")) el("monitorPanel").hidden = true;
 }
 function showEmptyState() {
   hideAllPanels();
@@ -1682,6 +2274,35 @@ function initUIEvents() {
     showPlanPanel();
     closeSidebarOnMobile();
   });
+
+  if (el("announcementBtn")) {
+    el("announcementBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showAnnouncementPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("notesMenuBtn")) {
+    el("notesMenuBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showNotesMenuPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("monitorBtn")) {
+    el("monitorBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showMonitorPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("logViewerBtn")) {
+    el("logViewerBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showLogPanel();
+      closeSidebarOnMobile();
+    });
+  }
 
   el("menuToggle").addEventListener("click", () => {
     el("moreMenu").hidden = !el("moreMenu").hidden;
