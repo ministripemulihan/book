@@ -643,11 +643,12 @@ input { font-family: inherit; }
 
 .plan-day-list { display: flex; flex-direction: column; gap: 6px; }
 .plan-day-row {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; flex-direction: column;
   background: var(--paper-raised); border: 1px solid var(--rule);
   border-radius: 10px; padding: 4px 12px;
 }
 .plan-day-row.done { opacity: .55; }
+.plan-day-row-main { display: flex; align-items: center; gap: 10px; }
 .plan-day-row input[type="checkbox"] {
   width: 18px; height: 18px; accent-color: var(--petrol); flex-shrink: 0;
 }
@@ -659,6 +660,7 @@ input { font-family: inherit; }
 .plan-day-num { font-weight: 700; font-size: 13px; color: var(--brass); min-width: 56px; }
 .plan-day-reading { font-size: 14px; color: var(--ink); }
 .plan-day-row.done .plan-day-reading { text-decoration: line-through; }
+.plan-day-row-media { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 10px 66px; }
 
 .reader-verses {
   font-family: var(--font-body);
