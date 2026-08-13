@@ -14,6 +14,15 @@
 // ============================================================
 const DEFAULT_SETTINGS = {
   readingProgressAnimation: true,
+  // Tampilan kolom paralel (1 = satu bahasa seperti biasa, 2/3 = beberapa
+  // bahasa berdampingan). columnLangs menyimpan kode bahasa untuk kolom
+  // ke-2 dan ke-3 (kolom pertama selalu memakai bahasa aktif / langSelect).
+  columns: 1,
+  columnLangs: [],
+  // Arah tampilan kolom paralel saat columns > 1: "side" = berdampingan
+  // (menyamping, kiri-kanan), "stacked" = atas-bawah (satu di atas yang
+  // lain). Tidak berpengaruh saat columns = 1.
+  columnDirection: "side",
 };
 
 function settingsStorageKey(username) {
