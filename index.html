@@ -82,6 +82,12 @@
     <div id="moreMenu" class="more-menu" hidden>
       <div class="more-menu-item" id="userStatus">Memuat status…</div>
       <div class="more-menu-item" id="syncStatus">Memuat status…</div>
+      <button id="announcementBtn" class="more-menu-btn">📢 Pengumuman</button>
+      <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
+      <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala/pra gembala/inti (lihat updateLevelGatedMenus() di js/app.js) -->
+      <button id="monitorBtn" class="more-menu-btn" hidden>👀 Pantau Pembacaan</button>
+      <!-- Tampil hanya untuk administrator -->
+      <button id="logViewerBtn" class="more-menu-btn" hidden>📊 Log Aktivitas</button>
       <button id="resyncBtn" class="more-menu-btn">🔄 Sinkronkan ulang Alkitab</button>
       <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
 
@@ -181,12 +187,36 @@
           <!-- panel rencana baca -->
           <div id="planPanel" class="plan-panel" hidden></div>
 
+          <!-- panel pengumuman (hanya administrator bisa menulis) -->
+          <div id="announcementPanel" class="announcement-panel" hidden></div>
+
+          <!-- panel catatan pribadi saya (semua ayat yang pernah dicatat) -->
+          <div id="notesPanel" class="notes-panel" hidden></div>
+
           <!-- panel bacaan bersuara (MP3/MP4/YouTube per rentang bacaan) -->
           <div id="mediaPanel" class="media-panel" hidden></div>
+
+          <!-- panel pantau pembacaan 7 hari (level gembala dst) -->
+          <div id="monitorPanel" class="monitor-panel" hidden></div>
+
+          <!-- panel log aktivitas (khusus administrator) -->
+          <div id="logPanel" class="log-panel" hidden></div>
 
           <!-- hasil pencarian kata -->
           <div id="searchResults" class="search-results" hidden>
             <h2 id="searchResultsTitle"></h2>
+            <div id="searchOptionsRow" class="search-options-row" hidden>
+              <label>Bahasa:
+                <select id="searchLangSelect" class="columns-lang-select"></select>
+              </label>
+              <label>Cari di:
+                <select id="searchScopeSelect" class="columns-lang-select">
+                  <option value="verse">Ayat</option>
+                  <option value="notes">Catatan Saya</option>
+                  <option value="both">Ayat &amp; Catatan</option>
+                </select>
+              </label>
+            </div>
             <div id="searchResultsList"></div>
           </div>
 
@@ -254,6 +284,8 @@
   <script src="js/csv.js"></script>
   <script src="js/db.js"></script>
   <script src="js/sync.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/activitylog.js"></script>
   <script src="js/notes.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/plans.js"></script>
