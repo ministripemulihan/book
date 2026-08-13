@@ -23,6 +23,94 @@
   --font-ui: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* ============================================================
+   10 TEMA — dipilih lewat menu ⋮ → Tema. Diterapkan sebagai
+   class pada <body>, mis. body.theme-2. Tema "manuskrip" bawaan
+   (tanpa class) tetap jadi default/tema-1.
+   ============================================================ */
+body.theme-2 { /* Terang Klasik */
+  --paper: #FFFFFF; --paper-raised: #F7F7F9; --ink: #1A1A1A; --ink-soft: #55555B;
+  --rule: #E2E2E8; --petrol: #2554C7; --petrol-dark: #163A8C; --brass: #B08900;
+  --brass-soft: #F0DE9E; --danger: #C0392B;
+}
+body.theme-3 { /* Malam Gelap */
+  --paper: #14161A; --paper-raised: #1D2026; --ink: #EDEDEF; --ink-soft: #A7ACB5;
+  --rule: #2C3038; --petrol: #57C7B0; --petrol-dark: #3B9985; --brass: #E3B84C;
+  --brass-soft: #6B5B2A; --danger: #E5695A; --shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+body.theme-4 { /* Sepia Hangat */
+  --paper: #F4ECD8; --paper-raised: #FBF6E9; --ink: #3A2E1F; --ink-soft: #6E5C43;
+  --rule: #E2D2AC; --petrol: #8A5A2E; --petrol-dark: #613E1D; --brass: #B4842A;
+  --brass-soft: #E7CE9C; --danger: #A3392A;
+}
+body.theme-5 { /* Hitam Pekat (OLED) */
+  --paper: #000000; --paper-raised: #121212; --ink: #F2F2F2; --ink-soft: #9C9C9C;
+  --rule: #262626; --petrol: #58B6A6; --petrol-dark: #3D8B7E; --brass: #D8B04C;
+  --brass-soft: #5A4A22; --danger: #E06456; --shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+body.theme-6 { /* Hijau Zaitun */
+  --paper: #F3F5EC; --paper-raised: #FAFBF6; --ink: #26301F; --ink-soft: #56604A;
+  --rule: #DCE2CC; --petrol: #4E7A34; --petrol-dark: #375823; --brass: #A38A2A;
+  --brass-soft: #DDD298; --danger: #A3392A;
+}
+body.theme-7 { /* Biru Malam */
+  --paper: #0F1B2D; --paper-raised: #16263D; --ink: #E7EEF7; --ink-soft: #9CB0C9;
+  --rule: #223856; --petrol: #6FB6E0; --petrol-dark: #4A8AB3; --brass: #E0B860;
+  --brass-soft: #4C4020; --danger: #E5766A; --shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+body.theme-8 { /* Merah Marun */
+  --paper: #FBF3F1; --paper-raised: #FFFAF9; --ink: #2E1512; --ink-soft: #654742;
+  --rule: #EAD3CE; --petrol: #7C2A2A; --petrol-dark: #5A1D1D; --brass: #B27A2E;
+  --brass-soft: #E9CC9E; --danger: #96271D;
+}
+body.theme-9 { /* Abu-abu Lembut */
+  --paper: #EDEEF0; --paper-raised: #F7F8F9; --ink: #24262B; --ink-soft: #5C5F66;
+  --rule: #DBDDE1; --petrol: #47607A; --petrol-dark: #324458; --brass: #96792F;
+  --brass-soft: #D9CEA3; --danger: #A3392A;
+}
+body.theme-10 { /* Ungu Senja */
+  --paper: #17131F; --paper-raised: #221C30; --ink: #EDE7F5; --ink-soft: #AFA3C4;
+  --rule: #33293F; --petrol: #B695E0; --petrol-dark: #8E6BBE; --brass: #E0B860;
+  --brass-soft: #4C3F26; --danger: #E5766A; --shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.theme-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 4px 0; }
+.theme-swatch {
+  width: 100%; aspect-ratio: 1; border-radius: 8px; border: 2px solid var(--rule);
+  cursor: pointer; padding: 0; position: relative;
+}
+.theme-swatch.active { border-color: var(--petrol); box-shadow: 0 0 0 2px var(--petrol-soft, var(--brass-soft)); }
+
+.tts-lang-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 0.9rem; color: var(--ink-soft); }
+.tts-lang-row select { flex: 1; max-width: 60%; }
+.tts-rate-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.9rem; color: var(--ink-soft); }
+.tts-rate-value { min-width: 40px; text-align: center; font-weight: 600; color: var(--ink); }
+.chip-btn.small { padding: 4px 8px; font-size: 0.82rem; }
+
+/* ============================================================
+   BACAAN BERSUARA (MP3/MP4/YouTube per rentang bacaan)
+   ============================================================ */
+.media-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 6px; }
+.media-sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 14px; }
+.media-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.media-controls select { flex: 1; min-width: 180px; }
+.media-list { display: flex; flex-direction: column; gap: 8px; }
+.media-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 10px; padding: 10px 14px;
+}
+.media-ref-btn {
+  background: transparent; border: none; cursor: pointer; text-align: left;
+  display: flex; align-items: baseline; gap: 8px; color: var(--ink);
+  font-family: var(--font-body); font-size: 15px;
+}
+.media-ref-btn:hover { color: var(--petrol); }
+.media-no { color: var(--brass); font-family: var(--font-ui); font-size: 12px; font-weight: 700; }
+.media-links { display: flex; gap: 6px; flex-wrap: wrap; }
+.media-link-btn { text-decoration: none; }
+.media-none { font-size: 12px; color: var(--ink-soft); font-style: italic; }
+.media-empty { color: var(--ink-soft); font-size: 14px; }
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
@@ -41,7 +129,7 @@ input { font-family: inherit; }
 /* ============================================================
    LAYAR LOGIN
    ============================================================ */
-[hidden] { display: none !important; }
+[hidden] { display: none !important; }   
 .login-screen {
   min-height: 100vh;
   display: flex;
@@ -254,6 +342,24 @@ input { font-family: inherit; }
   font-size: 14px; color: var(--ink); cursor: pointer;
 }
 .more-menu-toggle:hover { background: var(--rule); }
+
+.more-menu-section {
+  padding: 10px; margin-bottom: 6px; border-radius: 8px;
+  border: 1px solid var(--rule);
+}
+.more-menu-section-title { font-size: 12px; font-weight: 600; color: var(--brass); margin-bottom: 8px; }
+.columns-btn-group { display: flex; gap: 6px; margin-bottom: 6px; }
+.columns-btn {
+  flex: 1; background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 7px 4px; font-size: 12px; color: var(--ink);
+}
+.columns-btn:hover { border-color: var(--petrol); }
+.columns-btn.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+.columns-lang-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--ink-soft); }
+.columns-lang-select {
+  flex: 1; border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  border-radius: 6px; padding: 5px 6px; font-size: 12px; font-family: var(--font-ui);
+}
 .toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
@@ -351,6 +457,29 @@ input { font-family: inherit; }
 }
 @media (min-width: 860px) {
   .sidebar-backdrop { display: none !important; }
+}
+
+/* Sidebar disembunyikan (tombol ☰ di layar lebar) */
+@media (min-width: 860px) {
+  body.sidebar-hidden .sidebar {
+    width: 0; padding: 0; border-right: none; overflow: hidden;
+  }
+}
+.sidebar { transition: width .18s ease, padding .18s ease; }
+
+/* ============================================================
+   INDIKATOR "SEDANG MEMBACA" — melekat di atas layar saat digulir
+   ============================================================ */
+.current-reading-indicator {
+  position: sticky; top: 57px; z-index: 30;
+  display: flex; justify-content: center;
+  margin: 0 auto; width: fit-content;
+  padding: 6px 16px; font-size: 12px; font-weight: 600;
+  font-family: var(--font-ui); letter-spacing: .02em;
+  color: var(--petrol); background: var(--paper-raised);
+  border: 1px solid var(--rule); border-radius: 999px;
+  box-shadow: var(--shadow);
+  transform: translateY(6px);
 }
 
 .content-wrap {
@@ -519,6 +648,57 @@ input { font-family: inherit; }
   margin-left: 6px; font-size: 12px; vertical-align: middle;
   color: var(--brass);
 }
+.verse-copy-btn {
+  flex-shrink: 0; align-self: flex-start; margin-top: 4px;
+  background: transparent; border: none; font-size: 13px;
+  opacity: 0; transition: opacity .15s ease, transform .15s ease;
+  color: var(--ink-soft); padding: 4px;
+}
+.verse-block:hover .verse-copy-btn,
+.verse-block:focus-within .verse-copy-btn { opacity: .65; }
+.verse-copy-btn:hover { opacity: 1 !important; color: var(--petrol); }
+.verse-copy-btn.copied { opacity: 1 !important; color: var(--petrol); transform: scale(1.15); }
+/* Di HP (tanpa hover), tombol salin tetap sedikit terlihat */
+@media (max-width: 859px) {
+  .verse-copy-btn { opacity: .45; }
+}
+
+.reader-nav-bottom { margin-top: 22px; margin-bottom: 0; }
+.reader-nav-bottom h2 { font-size: 16px; opacity: .7; }
+
+/* ============================================================
+   TAMPILAN KOLOM PARALEL (1/2/3 bahasa berdampingan)
+   ============================================================ */
+.reader-columns {
+  display: grid;
+  gap: 28px;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.reader-columns[data-cols="1"] { grid-template-columns: minmax(0, 1fr); }
+.reader-columns[data-cols="2"] { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
+.reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(260px, 1fr)); }
+/* Arah "atas-bawah" (stacked) — satu kolom lebar penuh per bahasa,
+   ditumpuk vertikal, dipisah garis, bukannya berdampingan. */
+.reader-columns[data-direction="stacked"] { grid-template-columns: minmax(0, 1fr) !important; }
+.reader-columns[data-direction="stacked"] .reader-column {
+  padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px dashed var(--rule);
+}
+.reader-columns[data-direction="stacked"] .reader-column:last-child {
+  border-bottom: none; margin-bottom: 0; padding-bottom: 0;
+}
+.reader-column { min-width: 0; }
+.reader-column-head {
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--brass);
+  margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+}
+.reader-column .reader-verses { margin-top: 0; }
+@media (max-width: 859px) {
+  .reader-columns[data-cols="2"] { grid-template-columns: repeat(2, minmax(240px, 82vw)); }
+  .reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(220px, 80vw)); }
+}
 
 /* ============================================================
    MODAL CATATAN AYAT — tampil saat ayat diklik
@@ -575,11 +755,23 @@ input { font-family: inherit; }
   text-transform: uppercase; letter-spacing: .04em;
   color: var(--brass); margin-bottom: 6px;
 }
+.note-modal-verse-row { display: flex; align-items: flex-start; gap: 6px; }
+.note-modal-verse-row .note-modal-verse { flex: 1; }
+.note-copy-btn { flex-shrink: 0; font-size: 14px; margin-top: 2px; }
+.note-modal-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.note-modal-label-row .note-modal-label { margin-bottom: 0; }
+
 .note-modal-admin { margin-bottom: 18px; }
 .note-modal-admin-text {
   font-size: 14px; font-style: italic; color: var(--ink-soft); margin: 0;
   line-height: 1.6;
+  max-height: 40vh; overflow-y: auto; padding-right: 4px;
 }
+/* Catatan bisa berisi markup HTML dasar (mis. <p>, <sup>) — beri jarak
+   antar paragraf & rapikan superscript supaya tetap enak dibaca. */
+.note-modal-admin-text p { margin: 0 0 10px; }
+.note-modal-admin-text p:last-child { margin-bottom: 0; }
+.note-modal-admin-text sup { font-size: 10px; color: var(--brass); }
 .note-modal-personal textarea {
   width: 100%; resize: vertical;
   font-family: var(--font-ui); font-size: 14px; color: var(--ink);
@@ -600,6 +792,35 @@ input { font-family: inherit; }
 
 @media (max-width: 480px) {
   .search-form input { font-size: 13px; }
+}
+
+/* ============================================================
+   HEADER DI HP — kotak pencarian sering terlalu sempit karena
+   berbagi satu baris dengan banyak ikon. Di layar sempit, kotak
+   pencarian dipindah ke barisnya sendiri (lebar penuh), dan
+   ikon-ikon lain (▶️ TTS, ⛶, 📅, bahasa, ⋮) digeser jadi satu
+   baris yang bisa digulir ke samping (geser kanan/kiri).
+   ============================================================ */
+@media (max-width: 640px) {
+  .app-header { flex-wrap: wrap; row-gap: 8px; }
+  .brand { order: 1; }
+  #sidebarToggle { order: 0; }
+  .header-actions {
+    order: 2;
+    margin-left: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: calc(100vw - 120px);
+  }
+  .header-actions::-webkit-scrollbar { display: none; }
+  .header-actions > * { flex-shrink: 0; }
+  .search-form {
+    order: 3;
+    flex-basis: 100%;
+    width: 100%;
+  }
+  .search-form input { font-size: 15px; padding: 10px 4px; }
 }
 
 /* ============================================================
