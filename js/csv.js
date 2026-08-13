@@ -240,5 +240,27 @@ function normalizeUserRecord(rec) {
     username: rawUsername.toLowerCase(), // kunci pencocokan tidak peka huruf besar/kecil
     displayName: (get("nama", "name", "display name", "nama tampilan") || rawUsername).trim(),
     password: get("password", "sandi", "kata sandi"),
+    levels: parseLevelsField(get("level", "levels", "jenjang", "jabatan")),
   };
+}
+
+// Mengubah isi kolom "Level" (boleh lebih dari satu, dipisah koma / titik
+// koma / garis miring / " dan ") menjadi larik key level yang baku (sesuai
+// CONFIG.LEVEL_DEFINITIONS). Nilai yang tidak dikenali diabaikan (jangan
+// sampai typo di sheet membuat orang salah dapat hak akses). Kosong -> [].
+function parseLevelsField(raw) {
+  const text = (raw || "").trim();
+  if (!text) return [];
+  const defs = (typeof CONFIG !== "undefined" && CONFIG.LEVEL_DEFINITIONS) || [];
+  const parts = text
+    .split(/[,;/]|(?:\bdan\b)/i)
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  const out = [];
+  parts.forEach((p) => {
+    const norm = p.replace(/\s+/g, " ");
+    const match = defs.find((d) => d.key === norm || d.label.toLowerCase() === norm);
+    if (match && !out.includes(match.key)) out.push(match.key);
+  });
+  return out;
 }
