@@ -147,4 +147,40 @@ const Sync = {
       return [];
     }
   },
+
+  // ---------------- Kumpulan Ayat (lihat js/collections.js) ----------------
+  async pullCollections(username) {
+    try {
+      const data = await this._get({ type: "collections", username });
+      return (data && data.ok && data.collections) || {};
+    } catch (e) {
+      return {};
+    }
+  },
+
+  async pushCollection(username, id, col) {
+    try {
+      await this._post({
+        type: "collection",
+        username,
+        id,
+        name: col.name,
+        verseIds: col.verseIds || [],
+        createdAt: col.createdAt || new Date().toISOString(),
+        updatedAt: col.updatedAt || new Date().toISOString(),
+      });
+      return true;
+    } catch (e) {
+      return false; // offline / belum dikonfigurasi -- tetap tersimpan lokal
+    }
+  },
+
+  async deleteCollectionRemote(username, id) {
+    try {
+      await this._post({ type: "collection_delete", username, id: String(id) });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
 };
