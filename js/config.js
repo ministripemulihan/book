@@ -40,7 +40,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwnx2vtYgxD4mK7YgPvJQ4RMA2tuaJJ6-1EV4mfJcGYRiIQClAEynLTo0aREUKA2Emk/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyO2GVmZ_DgHjlmb9soz1hoEoZJixL6CiAjp0-AEVEyh3xiSyTC3K44KhUyimjmYnSp/exec",
 
   // Daftar bahasa yang ada di kolom "Bahasa" pada sheet Alkitab, dengan label yang
   // tampil di tombol pemilih bahasa. Sesuaikan "label" jika kurang tepat — kode
@@ -56,6 +56,31 @@ const CONFIG = {
     { code: "jawa", label: "Jawa (Perjanjian Baru)" },
   ],
   DEFAULT_LANGUAGE: "ind",
+
+  // ----------------------------------------------------------
+  // 6) JENJANG LEVEL PENGGUNA (opsional, kolom "Level" di Sheet Pengguna)
+  // ----------------------------------------------------------
+  // Tambahkan kolom "Level" di Sheet Pengguna (Sheet #2). Satu akun boleh
+  // punya LEBIH DARI SATU level, dipisah koma/titik koma, mis isi kolom:
+  //   "administrator, gembala distrik"
+  // Kalau kolom kosong / tidak ada levelnya sama sekali -> dianggap
+  // "Kaum Saleh" (level paling dasar, tanpa hak akses menu tingkat gembala).
+  //
+  // Urutan array di bawah = URUTAN JENJANG (dari paling tinggi wewenangnya
+  // ke paling bawah). "rank" dipakai untuk aturan bertingkat: seseorang
+  // hanya bisa melihat/memantau orang dengan rank SAMA atau LEBIH RENDAH
+  // (angka rank lebih besar) dari rank tertinggi yang ia punya sendiri.
+  // administrator (rank 0) selalu bisa melihat semua level.
+  LEVEL_DEFINITIONS: [
+    { key: "administrator", label: "Administrator", rank: 0 },
+    { key: "penatua", label: "Penatua", rank: 1 },
+    { key: "gembala distrik", label: "Gembala Distrik", rank: 2 },
+    { key: "gembala", label: "Gembala", rank: 3 },
+    { key: "pra gembala", label: "Pra Gembala", rank: 4 },
+    { key: "inti", label: "Inti", rank: 5 },
+  ],
+  // Label untuk akun tanpa level sama sekali (kolom Level kosong)
+  NO_LEVEL_LABEL: "Kaum Saleh",
 
   // localStorage key tempat menyimpan username yang sedang login, supaya
   // besok-besoknya langsung masuk tanpa mengetik ulang, sampai tekan Keluar.
@@ -75,7 +100,7 @@ const CONFIG = {
   // ----------------------------------------------------------
   FONT_SIZE_STORAGE_KEY: "bible_app_font_size_v1",
   FONT_SIZE_MIN: 5,
-  FONT_SIZE_MAX: 500,
+  FONT_SIZE_MAX: 200,
   FONT_SIZE_STEP: 2,
   FONT_SIZE_DEFAULT: 19,
 
