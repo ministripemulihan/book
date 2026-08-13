@@ -140,6 +140,28 @@ function setLoadingProgress(pct) {
   el("loadingProgress").style.width = pct + "%";
 }
 
+// fetch() biasa yang menunggu tanpa batas kalau server tidak pernah merespons.
+// Untuk file Alkitab yang besar, kalau server Google benar-benar macet/lambat
+// sekali, lebih baik tampilkan pesan error yang jelas setelah beberapa saat
+// daripada layar loading diam selamanya tanpa keterangan apa-apa.
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw new Error(
+        `Waktu tunggu habis (lebih dari ${Math.round(timeoutMs / 1000)} detik) saat mengambil data dari server. ` +
+        `Periksa koneksi internet Anda, atau coba lagi.`
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function syncFromServer(isFirstTime) {
   const overlay = el("loadingOverlay");
   overlay.hidden = false;
@@ -148,34 +170,45 @@ async function syncFromServer(isFirstTime) {
       ? "Mengambil seluruh data Alkitab (semua bahasa) dari server — hanya sekali ini saja, mungkin perlu waktu karena datanya besar…"
       : "Menyinkronkan ulang data Alkitab dari server…"
   );
-  setLoadingProgress(5);
+  setLoadingProgress(3);
 
   try {
-    const res = await fetch(CONFIG.BIBLE_SHEET_CSV_URL, { cache: "no-store" });
+    // Ambil file CSV. Timeout 2 menit — cukup longgar untuk file besar (puluhan MB),
+    // tapi tetap akan menampilkan pesan error yang jelas kalau server benar-benar macet,
+    // bukan layar loading diam tanpa penjelasan.
+    const res = await fetchWithTimeout(CONFIG.BIBLE_SHEET_CSV_URL, { cache: "no-store" }, 120000);
     if (!res.ok) throw new Error("Gagal mengambil data (" + res.status + ")");
-    setLoadingProgress(25);
+    setLoadingProgress(10);
     const csvText = await res.text();
-    setLoadingProgress(45);
-
-    setLoadingText("Membaca data…");
-    const records = parseCSV(csvText).map(normalizeVerseRecord).filter((v) => v.verseId);
-    setLoadingProgress(55);
+    setLoadingProgress(18);
 
     if (!isFirstTime) await LocalDB.clearAll();
 
-    const chunkSize = 4000;
-    for (let i = 0; i < records.length; i += chunkSize) {
-      const chunk = records.slice(i, i + chunkSize);
-      await LocalDB.bulkPut(chunk);
-      const done = Math.min(i + chunkSize, records.length);
-      setLoadingProgress(55 + Math.round((done / records.length) * 40));
-      setLoadingText(`Menyimpan ke perangkat… (${done.toLocaleString("id-ID")} / ${records.length.toLocaleString("id-ID")} ayat)`);
-    }
+    // Baca & simpan bertahap (per ~3000 baris), supaya browser tidak membeku dan
+    // progress bar benar-benar mengikuti proses asli — bukan lompat tiba-tiba.
+    const allRecords = [];
+    let savedCount = 0;
+
+    await parseCSVChunked(csvText, {
+      batchSize: 3000,
+      onProgress: (done, total) => {
+        // 18%–95% dialokasikan untuk tahap membaca + menyimpan data
+        const pct = 18 + Math.round((done / total) * 77);
+        setLoadingProgress(pct);
+      },
+      onBatch: async (rawBatch) => {
+        const normalized = rawBatch.map(normalizeVerseRecord).filter((v) => v.verseId);
+        allRecords.push(...normalized);
+        await LocalDB.bulkPut(normalized);
+        savedCount += normalized.length;
+        setLoadingText(`Membaca & menyimpan data Alkitab… (${savedCount.toLocaleString("id-ID")} ayat)`);
+      },
+    });
 
     await LocalDB.setMeta("lastSync", new Date().toISOString());
     setLoadingProgress(100);
 
-    bibleData = records;
+    bibleData = allRecords;
     setTimeout(() => {
       overlay.hidden = true;
       afterDataReady();
