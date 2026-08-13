@@ -47,10 +47,10 @@ const CONFIG = {
   // ("code") HARUS SAMA PERSIS dengan nilai di kolom Bahasa pada Google Sheet Anda.
   LANGUAGES: [
     { code: "ind", label: "Indonesia (TB)" },
-    { code: "rvind", label: "Indonesia (Revisi)" },
+    { code: "rvind", label: "Indonesia (Recovery)" },
     { code: "kjv", label: "Inggris (King James)" },
     { code: "eng", label: "Inggris (English)" },
-    { code: "rveng", label: "Inggris (Revisi)" },
+    { code: "rveng", label: "Inggris (Recovery)" },
     { code: "chs", label: "Tionghoa (中文)" },
     { code: "chssmp", label: "Tionghoa Sederhana" },
     { code: "jawa", label: "Jawa (Perjanjian Baru)" },
