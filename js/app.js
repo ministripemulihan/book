@@ -15,6 +15,84 @@ let currentChapterVerses = []; // ayat-ayat pasal yang sedang ditampilkan (dipak
 const el = (id) => document.getElementById(id);
 
 // ------------------------------------------------------------
+// 0b) UTIL: catatan HTML aman (whitelist tag) + salin ke clipboard
+// ------------------------------------------------------------
+// Beberapa versi (mis. rvind/rveng) menyimpan catatan kaki panjang berisi
+// markup HTML dasar (<p>, <sup>, <b>, dst). Fungsi ini merender markup itu
+// apa adanya (bukan teks mentah "<p>...</p>"), tapi tetap membuang tag/atribut
+// yang tidak ada dalam daftar putih supaya aman (tidak ada <script>, event
+// handler, dsb).
+const NOTE_HTML_ALLOWED_TAGS = new Set([
+  "P", "BR", "B", "STRONG", "I", "EM", "U", "SUP", "SUB", "SPAN", "DIV", "A",
+]);
+function sanitizeNoteHtml(html) {
+  if (!html) return "";
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const walk = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        if (!NOTE_HTML_ALLOWED_TAGS.has(child.tagName)) {
+          // ganti elemen yang tidak diizinkan dengan isi teksnya saja
+          const text = document.createTextNode(child.textContent);
+          child.replaceWith(text);
+          return;
+        }
+        [...child.attributes].forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          const isSafeHref = child.tagName === "A" && name === "href" && /^https?:\/\//i.test(attr.value);
+          if (!isSafeHref) child.removeAttribute(attr.name);
+        });
+        if (child.tagName === "A") child.setAttribute("target", "_blank");
+        walk(child);
+      }
+    });
+  };
+  walk(template.content);
+  return template.innerHTML;
+}
+
+// Ubah catatan (yang mungkin berisi tag HTML dasar) menjadi teks polos —
+// dipakai saat menyalin catatan ke clipboard.
+function noteHtmlToPlainText(html) {
+  if (!html) return "";
+  const template = document.createElement("template");
+  template.innerHTML = sanitizeNoteHtml(html).replace(/<\/p>/gi, "\n\n").replace(/<br\s*\/?>/gi, "\n");
+  return (template.content.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// Salin teks ke clipboard, lalu beri umpan-balik singkat pada tombol (ikon
+// berubah jadi ✓ sesaat) supaya pengguna tahu penyalinan berhasil.
+function copyTextWithFeedback(text, btn) {
+  const done = () => {
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.textContent = "✓";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove("copied");
+    }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) { /* diabaikan */ }
+  document.body.removeChild(ta);
+  if (done) done();
+}
+
+// ------------------------------------------------------------
 // 1) AUTENTIKASI — dua Google Sheet berbeda:
 //    Sheet #1 = teks Alkitab, Sheet #2 = daftar username/password.
 //    Login hanya diminta sekali; tersimpan sampai logout.
@@ -419,6 +497,8 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
   el("reader").hidden = false;
   const displayName = verses[0].bookName || book.name;
   el("readerTitle").textContent = `${displayName} ${chapter}`;
+  if (el("readerTitleBottom")) el("readerTitleBottom").textContent = `${displayName} ${chapter}`;
+  updateCurrentReadingIndicator(`${displayName} ${chapter}`);
 
   const wrap = el("readerVerses");
   wrap.innerHTML = "";
@@ -447,18 +527,44 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
       textWrap.appendChild(badge);
     }
 
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "verse-copy-btn";
+    copyBtn.title = "Salin ayat (kitab, pasal:ayat, teks)";
+    copyBtn.setAttribute("aria-label", "Salin ayat");
+    copyBtn.textContent = "📋";
+    copyBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const bookLabel = v.bookName || displayName;
+      const refText = `${bookLabel} ${v.chapter}:${v.verse}\n${v.text}`;
+      copyTextWithFeedback(refText, copyBtn);
+    });
+
     block.appendChild(num);
     block.appendChild(textWrap);
+    block.appendChild(copyBtn);
     block.addEventListener("click", () => openNoteModal(v));
     wrap.appendChild(block);
   });
 
   const chapters = getChaptersForBook(currentLang, bookNum);
   const idx = chapters.indexOf(chapter);
-  el("prevChapter").disabled = idx <= 0;
-  el("nextChapter").disabled = idx === -1 || idx >= chapters.length - 1;
+  const atStart = idx <= 0;
+  const atEnd = idx === -1 || idx >= chapters.length - 1;
+  el("prevChapter").disabled = atStart;
+  el("nextChapter").disabled = atEnd;
   el("prevChapter").onclick = () => renderChapter(bookNum, chapters[idx - 1]);
   el("nextChapter").onclick = () => renderChapter(bookNum, chapters[idx + 1]);
+  // Tombol yang sama, diulang di bagian bawah pasal (supaya tidak perlu
+  // gulir ke atas untuk pindah pasal setelah selesai membaca).
+  if (el("prevChapterBottom")) {
+    el("prevChapterBottom").disabled = atStart;
+    el("prevChapterBottom").onclick = () => renderChapter(bookNum, chapters[idx - 1]);
+  }
+  if (el("nextChapterBottom")) {
+    el("nextChapterBottom").disabled = atEnd;
+    el("nextChapterBottom").onclick = () => renderChapter(bookNum, chapters[idx + 1]);
+  }
 
   window.scrollTo({ top: 0 });
   if (highlightVerse) {
@@ -890,15 +996,29 @@ function openNoteModal(verse) {
   noteModalCurrentVerse = verse;
   const book = BOOKS.find((b) => b.num === verse.bookNumber);
   const displayName = verse.bookName || (book ? book.name : "");
-  el("noteModalRef").textContent = `${displayName} ${verse.chapter}:${verse.verse}`;
+  const refLabel = `${displayName} ${verse.chapter}:${verse.verse}`;
+  el("noteModalRef").textContent = refLabel;
   el("noteModalVerseText").textContent = verse.text;
 
   const hasAdminNote = !!(verse.note && verse.note.trim());
   el("noteModalAdminNoteWrap").hidden = !hasAdminNote;
-  el("noteModalAdminNote").textContent = hasAdminNote ? verse.note : "";
+  // Catatan bisa berisi markup HTML dasar (mis. <p>, <sup>) dari sumbernya
+  // (mis. rvind/rveng) — dirender sebagai HTML (disaring dulu supaya aman),
+  // bukan ditampilkan sebagai teks tag mentah.
+  el("noteModalAdminNote").innerHTML = hasAdminNote ? sanitizeNoteHtml(verse.note) : "";
 
   el("noteModalTextarea").value = getPersonalNote(currentUser, verse.id);
   el("noteModalSavedHint").hidden = true;
+
+  const copyVerseBtn = el("noteModalCopyVerseBtn");
+  if (copyVerseBtn) {
+    copyVerseBtn.onclick = () => copyTextWithFeedback(`${refLabel}\n${verse.text}`, copyVerseBtn);
+  }
+  const copyNoteBtn = el("noteModalCopyNoteBtn");
+  if (copyNoteBtn) {
+    copyNoteBtn.hidden = !hasAdminNote;
+    copyNoteBtn.onclick = () => copyTextWithFeedback(`${refLabel} — Catatan:\n${noteHtmlToPlainText(verse.note)}`, copyNoteBtn);
+  }
 
   el("noteModalBackdrop").hidden = false;
 }
@@ -1113,14 +1233,49 @@ function closeSidebarOnMobile() {
   }
 }
 
-function initUIEvents() {
-  initNoteModalEvents();
-
-  el("sidebarToggle").addEventListener("click", () => {
+// Tombol ☰ di header: di HP membuka/menutup laci sidebar (perilaku lama),
+// di layar lebar (komputer/tablet besar) menyembunyikan/menampilkan kolom
+// daftar kitab supaya area baca lebih lebar — pilihan ini diingat untuk
+// kunjungan berikutnya (localStorage).
+const SIDEBAR_HIDDEN_KEY = "bible_app_sidebar_hidden_v1";
+function toggleSidebar() {
+  if (window.innerWidth <= 859) {
     el("sidebar").classList.toggle("open");
     el("sidebarBackdrop").hidden = !el("sidebar").classList.contains("open");
-  });
+  } else {
+    const hidden = document.body.classList.toggle("sidebar-hidden");
+    localStorage.setItem(SIDEBAR_HIDDEN_KEY, hidden ? "1" : "0");
+  }
+}
+function initSidebarCollapsedState() {
+  if (localStorage.getItem(SIDEBAR_HIDDEN_KEY) === "1") {
+    document.body.classList.add("sidebar-hidden");
+  }
+}
+
+// Indikator kecil yang tampil melekat (sticky) di bagian atas layar saat
+// pengguna menggulir ke bawah, menunjukkan kitab & pasal yang sedang dibaca
+// sekarang (berguna di pasal panjang supaya tidak lupa sedang membaca apa).
+let currentReadingLabel = "";
+function updateCurrentReadingIndicator(label) {
+  currentReadingLabel = label || "";
+  const indEl = el("currentReadingIndicator");
+  if (indEl) indEl.textContent = "📖 " + currentReadingLabel;
+}
+function handleScrollForReadingIndicator() {
+  const indEl = el("currentReadingIndicator");
+  if (!indEl || !currentReadingLabel) return;
+  const readerVisible = !el("reader").hidden;
+  indEl.hidden = !readerVisible || window.scrollY < 260;
+}
+
+function initUIEvents() {
+  initNoteModalEvents();
+  initSidebarCollapsedState();
+
+  el("sidebarToggle").addEventListener("click", toggleSidebar);
   el("sidebarBackdrop").addEventListener("click", closeSidebarOnMobile);
+  window.addEventListener("scroll", handleScrollForReadingIndicator, { passive: true });
 
   el("searchForm").addEventListener("submit", (e) => {
     e.preventDefault();
