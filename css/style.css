@@ -801,6 +801,8 @@ input { font-family: inherit; }
 .inline-media-slot:empty { margin: 0; }
 .inline-media-player { width: 100%; max-width: 480px; display: block; border-radius: 8px; }
 .inline-media-youtube { aspect-ratio: 16 / 9; height: auto; border: none; }
+.inline-media-drive-video { aspect-ratio: 16 / 9; height: auto; border: none; }
+.inline-media-drive-audio { height: 120px; border: none; }
 .inline-media-close { margin-top: 4px; }
 .reader-media-slot { margin: 4px 0 14px; }
 .plan-day-row-media, .collection-verse-actions { margin-top: 6px; }
@@ -885,9 +887,8 @@ input { font-family: inherit; }
   transition: font-size .15s ease;
 }
 .verse-block {
-  display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 12px; border-radius: 10px;
   scroll-margin-top: 90px;
-  cursor: pointer;
   border: 1px solid transparent;
   transition: background .15s ease, box-shadow .15s ease, border-color .15s ease, transform .15s ease;
 
@@ -919,6 +920,13 @@ input { font-family: inherit; }
   flex-shrink: 0; margin-top: 6px;
   position: relative;
 }
+.verse-num-btn {
+  border: none; padding: 0; font-family: inherit; cursor: pointer;
+  transition: transform .12s ease, background .15s ease;
+}
+.verse-num-btn:hover { transform: scale(1.12); }
+.verse-num-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.verse-block.note-open .verse-num-btn { background: var(--brass); }
 .verse-block.speaking .verse-num { background: var(--brass); }
 .verse-text-wrap { flex: 1; }
 .verse-note-badge {
@@ -940,6 +948,43 @@ input { font-family: inherit; }
 @media (max-width: 859px) {
   .verse-copy-btn { opacity: .45; }
 }
+
+/* ------------------------------------------------------------
+   CATATAN AYAT SEBARIS (dulu jendela/modal terapung -- sekarang
+   muncul DI BAWAH ayatnya sendiri, di dalam blok ayat yang sama,
+   supaya lebarnya otomatis sama persis dengan lebar ayat dan tidak
+   menutupi/menumpuk ayat lain). Buka/tutup: tekan DUA KALI nomor
+   ayat (lihat .verse-num-btn di atas).
+------------------------------------------------------------ */
+.verse-inline-note {
+  flex: 1 1 100%;
+  margin-top: 8px;
+  padding: 14px 16px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--brass);
+  border-radius: 8px;
+  animation: inlineNoteOpen .18s ease;
+  cursor: default;
+}
+@keyframes inlineNoteOpen {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.inline-note-admin { margin-bottom: 14px; }
+.inline-note-personal-label { margin-top: 4px; }
+.inline-note-textarea {
+  width: 100%; min-height: 72px; resize: vertical;
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  box-sizing: border-box;
+}
+.inline-note-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.inline-note-actions .chip-btn.small { padding: 5px 10px; font-size: 0.82rem; }
 
 .reader-nav-bottom { margin-top: 22px; margin-bottom: 0; }
 .reader-nav-bottom h2 { font-size: 16px; opacity: .7; }
@@ -988,97 +1033,30 @@ input { font-family: inherit; }
 }
 
 /* ============================================================
-   MODAL CATATAN AYAT — tampil saat ayat diklik
+   CATATAN AYAT — kelas ini masih dipakai oleh panel catatan SEBARIS
+   (lihat .verse-inline-note & .inline-note-* di atas) walau namanya
+   masih "note-modal-*" -- dulu dipakai jendela/modal terapung yang
+   sekarang sudah dilepas (diganti sebaris di bawah ayat masing-masing).
    ============================================================ */
-.note-modal-backdrop {
-  position: fixed; inset: 0; z-index: 200;
-  background: rgba(43, 33, 24, 0.45);
-  display: flex; align-items: flex-end; justify-content: center;
-  padding: 0;
-  animation: noteBackdropFade .15s ease;
-}
-@keyframes noteBackdropFade { from { opacity: 0; } to { opacity: 1; } }
-@media (min-width: 640px) {
-  .note-modal-backdrop { align-items: center; padding: 24px; }
-}
-.note-modal {
-  width: 100%; max-width: 520px;
-  max-height: 88vh; overflow-y: auto;
-  background: var(--paper-raised);
-  border: 1px solid var(--rule);
-  border-radius: 18px 18px 0 0;
-  box-shadow: 0 -8px 30px rgba(43,33,24,0.25);
-  padding: 20px 22px 24px;
-  animation: noteModalUp .22s cubic-bezier(.2,.7,.3,1);
-}
-/* Di layar komputer (bukan HP), lebar catatan dilebarkan supaya tidak
-   kelihatan kecil di tengah-tengah layar besar. */
-@media (min-width: 900px) {
-  .note-modal { max-width: min(920px, 92vw); }
-}
-@keyframes noteModalUp {
-  from { transform: translateY(24px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-@media (min-width: 640px) {
-  .note-modal { border-radius: 18px; }
-  @keyframes noteModalUp {
-    from { transform: translateY(12px) scale(.98); opacity: 0; }
-    to { transform: translateY(0) scale(1); opacity: 1; }
-  }
-}
-.note-modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
-}
-.note-modal-ref {
-  font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--petrol);
-}
-.note-modal-verse {
-  font-family: var(--font-body); font-size: var(--verse-font-size, 18px); line-height: 1.7;
-  color: var(--ink); margin: 0 0 16px;
-  padding: 12px 14px;
-  background: var(--paper);
-  border-left: 3px solid var(--brass);
-  border-radius: 6px;
-}
 .note-modal-label {
   font-family: var(--font-ui); font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .04em;
   color: var(--brass); margin-bottom: 6px;
 }
-.note-modal-verse-row { display: flex; align-items: flex-start; gap: 6px; }
-.note-modal-verse-row .note-modal-verse { flex: 1; }
-.note-copy-btn { flex-shrink: 0; font-size: 14px; margin-top: 2px; }
-.note-modal-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.note-modal-label-row .note-modal-label { margin-bottom: 0; }
 
 .note-modal-admin { margin-bottom: 18px; }
-/* Ukuran huruf catatan (Note) sekarang mengikuti pengaturan A+/A- ukuran
-   huruf ayat (--verse-font-size) supaya di komputer tidak kelihatan kecil
-   dibanding teks ayat, dan tetap bisa diperbesar/diperkecil dari tombol
-   A+/A- yang sama. */
+/* Ukuran huruf catatan (Note) mengikuti pengaturan A+/A- ukuran huruf
+   ayat (--verse-font-size) supaya tidak kelihatan kecil dibanding teks
+   ayat, dan tetap bisa diperbesar/diperkecil dari tombol A+/A- yang sama. */
 .note-modal-admin-text {
   font-size: var(--verse-font-size, 16px); font-style: italic; color: var(--ink-soft); margin: 0;
   line-height: 1.6;
-  max-height: 40vh; overflow-y: auto; padding-right: 4px;
 }
 /* Catatan bisa berisi markup HTML dasar (mis. <p>, <sup>) — beri jarak
    antar paragraf & rapikan superscript supaya tetap enak dibaca. */
 .note-modal-admin-text p { margin: 0 0 10px; }
 .note-modal-admin-text p:last-child { margin-bottom: 0; }
 .note-modal-admin-text sup { font-size: 10px; color: var(--brass); }
-.note-modal-personal textarea {
-  width: 100%; resize: vertical;
-  font-family: var(--font-ui); font-size: 14px; color: var(--ink);
-  background: var(--paper); border: 1px solid var(--rule); border-radius: 10px;
-  padding: 10px 12px; line-height: 1.5;
-}
-.note-modal-personal textarea:focus { outline: 2px solid var(--petrol); outline-offset: 1px; }
-.note-modal-actions {
-  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
-  margin-top: 10px;
-}
 .note-modal-hint { font-size: 12px; color: var(--petrol); font-weight: 600; }
 
 .empty-state {
