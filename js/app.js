@@ -802,6 +802,28 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
     el("nextChapterBottom").onclick = () => renderChapter(bookNum, chapters[idx + 1]);
   }
 
+  // Tombol BULAT 🎵MP3/🎬MP4/▶️YouTube kalau pasal ini ada di salah satu
+  // sheet Bacaan Bersuara (CONFIG.READING_MEDIA_SHEETS) -- pemutarnya
+  // muncul LANGSUNG di halaman baca ini (bukan tab baru), jadi ayat &
+  // catatan tetap kelihatan sambil didengarkan/ditonton. Dicari di latar
+  // belakang supaya pasal tetap tampil instan; disembunyikan lagi kalau
+  // pindah pasal sebelum hasil pencarian media selesai (lihat token di
+  // bawah, mencegah pemutar pasal LAMA nempel di pasal yang baru dibuka).
+  const mediaSlot = el("readerMediaSlot");
+  if (mediaSlot) {
+    mediaSlot.hidden = true;
+    mediaSlot.innerHTML = "";
+    const requestToken = (renderChapter._mediaToken = (renderChapter._mediaToken || 0) + 1);
+    if (typeof findMediaLinkForReference === "function") {
+      findMediaLinkForReference(bookNum, chapter).then((media) => {
+        if (renderChapter._mediaToken !== requestToken) return; // pasal sudah berpindah lagi
+        if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
+        mediaSlot.appendChild(buildInlineMediaBlock(media, `${displayName} ${chapter}`));
+        mediaSlot.hidden = false;
+      }).catch(() => {});
+    }
+  }
+
   window.scrollTo({ top: 0 });
   if (highlightVerse) {
     setTimeout(() => {
@@ -854,15 +876,25 @@ function highlightMatch(text, query) {
 let lastKeywordQuery = ""; // dipakai saat opsi bahasa/cakupan pencarian diubah
 
 // scope: "verse" | "notes" | "both". lang: kode bahasa, atau "__all__" untuk semua bahasa.
-function runKeywordSearch(query, lang, scope) {
+// testament: "__all__" | "PL" | "PB" -- menyaring hasil AYAT saja berdasar Perjanjian
+// Lama/Baru kitabnya (lihat BOOKS di js/books.js, field "testament"); tidak berlaku
+// untuk hasil catatan pribadi (catatan tidak selalu terikat satu kitab tertentu).
+function runKeywordSearch(query, lang, scope, testament) {
   const q = query.trim().toLowerCase();
   if (q.length < 2) return { verseResults: [], noteResults: [] };
   const useLang = lang || currentLang;
   const useScope = scope || "verse";
+  const useTestament = testament || "__all__";
 
   let verseResults = [];
   if (useScope === "verse" || useScope === "both") {
-    const pool = useLang === "__all__" ? bibleData : bibleData.filter((v) => v.lang === useLang);
+    let pool = useLang === "__all__" ? bibleData : bibleData.filter((v) => v.lang === useLang);
+    if (useTestament === "PL" || useTestament === "PB") {
+      pool = pool.filter((v) => {
+        const book = BOOKS.find((b) => b.num === v.bookNumber);
+        return book && book.testament === useTestament;
+      });
+    }
     verseResults = pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, 300);
   }
 
@@ -889,6 +921,7 @@ function searchInPersonalNotes(q) {
 function initSearchOptions() {
   const langSel = el("searchLangSelect");
   const scopeSel = el("searchScopeSelect");
+  const testamentSel = el("searchTestamentSelect");
   if (!langSel || !scopeSel) return;
   langSel.innerHTML = '<option value="__all__">Semua Bahasa</option>' +
     CONFIG.LANGUAGES.filter((l) => verseIndex[l.code])
@@ -896,11 +929,13 @@ function initSearchOptions() {
       .join("");
   langSel.value = currentLang || "__all__";
   scopeSel.value = "verse";
+  if (testamentSel) testamentSel.value = "__all__";
   const rerun = () => {
     if (lastKeywordQuery) handleSearch(lastKeywordQuery, true);
   };
   langSel.addEventListener("change", rerun);
   scopeSel.addEventListener("change", rerun);
+  if (testamentSel) testamentSel.addEventListener("change", rerun);
 }
 
 // Pencarian gabungan beberapa referensi sekaligus, dipisah titik-koma atau
@@ -988,10 +1023,12 @@ function handleSearch(rawQuery, isOptionChange) {
   lastKeywordQuery = query;
   const langSel = el("searchLangSelect");
   const scopeSel = el("searchScopeSelect");
+  const testamentSel = el("searchTestamentSelect");
   const lang = (langSel && langSel.value) || currentLang;
   const scope = (scopeSel && scopeSel.value) || "verse";
+  const testament = (testamentSel && testamentSel.value) || "__all__";
 
-  const { verseResults, noteResults } = runKeywordSearch(query, lang, scope);
+  const { verseResults, noteResults } = runKeywordSearch(query, lang, scope, testament);
   const total = verseResults.length + noteResults.length;
 
   hideAllPanels();
@@ -1000,6 +1037,7 @@ function handleSearch(rawQuery, isOptionChange) {
   if (!isOptionChange) initSearchOptions(); // isi ulang pilihan bahasa (baru diketahui setelah data siap)
   if (langSel) langSel.value = lang;
   if (scopeSel) scopeSel.value = scope;
+  if (testamentSel) testamentSel.value = testament;
 
   const cappedNote = total === 300 || verseResults.length === 300 ? "+" : "";
   el("searchResultsTitle").textContent =
@@ -1266,9 +1304,7 @@ function renderPlanDetail(container, plan) {
     if (first.mp3 || first.mp4 || first.youtube) {
       const mediaRow = document.createElement("div");
       mediaRow.className = "plan-day-row-media";
-      if (first.mp3) mediaRow.appendChild(mediaLinkButton("🎵 MP3", first.mp3));
-      if (first.mp4) mediaRow.appendChild(mediaLinkButton("🎬 MP4", first.mp4));
-      if (first.youtube) mediaRow.appendChild(mediaLinkButton("▶️ YouTube", first.youtube));
+      mediaRow.appendChild(buildInlineMediaBlock(first, `${plan.label} — Hari ${idx + 1}: ${readingLabel}`));
       row.appendChild(mediaRow);
     }
 
@@ -1303,13 +1339,45 @@ async function showAnnouncementPanel(preloaded) {
   hideAllPanels();
   el("announcementPanel").hidden = false;
   logActivity("Pengumuman");
-  const list = preloaded || (Sync.enabled() ? await Sync.pullAnnouncements() : []);
-  renderAnnouncementPanel(list);
-  // tandai semua sudah dilihat (per perangkat/akun)
-  if (list.length) {
-    const maxId = list.reduce((m, a) => (String(a.id) > m ? String(a.id) : m), "0");
-    localStorage.setItem(announcementSeenKey(), maxId);
+  if (preloaded) {
+    renderAnnouncementPanel(preloaded);
+    markAnnouncementsSeen(preloaded);
+    return;
   }
+  if (!Sync.enabled()) {
+    renderAnnouncementPanel([]);
+    return;
+  }
+  const container = el("announcementPanel");
+  container.innerHTML = `<h2>📢 Pengumuman</h2><p class="media-empty">Memuat…</p>`;
+  const { ok, list } = await Sync.pullAnnouncementsChecked();
+  if (!ok) {
+    // GAGAL mengambil data (bukan berarti kosong!) -- tampilkan jelas +
+    // tombol coba lagi, supaya tidak disangka "memang belum ada pengumuman"
+    // padahal sebenarnya cuma gagal tersambung (lihat catatan di js/sync.js).
+    container.innerHTML = "";
+    const title = document.createElement("h2");
+    title.textContent = "📢 Pengumuman";
+    container.appendChild(title);
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Gagal memuat pengumuman. Periksa sambungan internet Anda, lalu coba lagi.";
+    container.appendChild(p);
+    const retryBtn = document.createElement("button");
+    retryBtn.className = "chip-btn primary";
+    retryBtn.textContent = "🔄 Coba Lagi";
+    retryBtn.addEventListener("click", () => showAnnouncementPanel());
+    container.appendChild(retryBtn);
+    return;
+  }
+  renderAnnouncementPanel(list);
+  markAnnouncementsSeen(list);
+}
+
+function markAnnouncementsSeen(list) {
+  if (!list || !list.length) return;
+  const maxId = list.reduce((m, a) => (String(a.id) > m ? String(a.id) : m), "0");
+  localStorage.setItem(announcementSeenKey(), maxId);
 }
 
 function renderAnnouncementPanel(list) {
@@ -1585,18 +1653,17 @@ function renderCollectionDetailInto(container, id, col) {
       renderCollectionsPanel(id);
     });
 
-    // Link 🎵MP3/🎬MP4/▶️YouTube (kalau kitab+pasal ayat ini ada di salah
-    // satu sheet Bacaan Bersuara) -- dicari di latar belakang supaya
+    // Tombol BULAT 🎵MP3/🎬MP4/▶️YouTube (kalau kitab+pasal ayat ini ada di
+    // salah satu sheet Bacaan Bersuara) -- dicari di latar belakang supaya
     // daftar kumpulan tetap tampil instan, tombolnya menyusul begitu
-    // ketemu. Lihat findMediaLinkForReference() di js/media.js.
+    // ketemu. Lihat findMediaLinkForReference()/buildInlineMediaBlock() di
+    // js/media.js -- pemutarnya muncul LANGSUNG di sini, bukan tab baru.
     if (v && typeof findMediaLinkForReference === "function") {
       findMediaLinkForReference(v.bookNumber, v.chapter).then((media) => {
         if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
         const actions = item.querySelector(".collection-verse-actions");
         if (!actions) return;
-        if (media.mp3) actions.appendChild(mediaLinkButton("🎵 MP3", media.mp3));
-        if (media.mp4) actions.appendChild(mediaLinkButton("🎬 MP4", media.mp4));
-        if (media.youtube) actions.appendChild(mediaLinkButton("▶️ YouTube", media.youtube));
+        actions.appendChild(buildInlineMediaBlock(media, `${v.bookName} ${v.chapter}:${v.verse}`));
       }).catch(() => {});
     }
 
@@ -1770,12 +1837,33 @@ async function loadAndRenderLogPanel(daysOverride) {
 //     Aturan bertingkat siapa-boleh-lihat-siapa memakai canViewLevel()
 //     dari js/levels.js. "Sudah membaca" dihitung dari log yang menunya
 //     diawali "Baca: " (dicatat tiap kali membuka satu pasal).
+//
+//     "Domba-domba pilihan": tiap pemantau (administrator/gembala dst.)
+//     bisa memilih SEBAGIAN SAJA dari orang yang boleh ia pantau untuk
+//     dijadikan daftar pendek yang lebih rapi (mis. gembala distrik yang
+//     hanya mau fokus ke jemaat wilayahnya sendiri). Ini murni penyaring
+//     TAMPILAN di atas hak akses yang sudah ada -- tidak pernah menambah
+//     orang yang boleh dilihat di luar aturan canViewLevel().
 // ------------------------------------------------------------
 async function getMonitorableUsers() {
   const users = await LocalDB.getAllUsers();
   return users
     .filter((u) => u.username === currentUser || canViewLevel(currentUserLevels, u.levels))
     .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, "id"));
+}
+
+function monitorPinsKey() {
+  return "bible_app_monitor_pins_v1_" + (currentUser || "guest");
+}
+function loadMonitorPins() {
+  try {
+    return JSON.parse(localStorage.getItem(monitorPinsKey()) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+function saveMonitorPins(usernames) {
+  localStorage.setItem(monitorPinsKey(), JSON.stringify(usernames));
 }
 
 async function showMonitorPanel() {
@@ -1785,7 +1873,7 @@ async function showMonitorPanel() {
   await renderMonitorPanel();
 }
 
-async function renderMonitorPanel(selectedUsername) {
+async function renderMonitorPanel(selectedUsername, showPinEditor) {
   const container = el("monitorPanel");
   container.innerHTML = "";
   const title = document.createElement("h2");
@@ -1807,14 +1895,54 @@ async function renderMonitorPanel(selectedUsername) {
     return;
   }
 
-  const users = await getMonitorableUsers();
-  if (!users.length) {
+  const allUsers = await getMonitorableUsers();
+  if (!allUsers.length) {
     const p = document.createElement("p");
     p.className = "media-empty";
     p.textContent = "Tidak ada pengguna yang bisa dipantau dari akun Anda.";
     container.appendChild(p);
     return;
   }
+
+  const pins = loadMonitorPins().filter((u) => allUsers.some((au) => au.username === u));
+  const pinEditorWrap = document.createElement("div");
+  pinEditorWrap.className = "monitor-pin-editor";
+  const pinToggleBtn = document.createElement("button");
+  pinToggleBtn.className = "chip-btn small";
+  pinToggleBtn.type = "button";
+  pinToggleBtn.textContent = showPinEditor ? "✓ Selesai Memilih" : "⭐ Pilih Domba-domba yang Dipantau";
+  pinToggleBtn.addEventListener("click", () => renderMonitorPanel(selectedUsername, !showPinEditor));
+  container.appendChild(pinToggleBtn);
+
+  if (showPinEditor) {
+    pinEditorWrap.innerHTML = `<p class="media-empty">Centang siapa saja yang mau dijadikan daftar pendek pantauan Anda. Kosongkan semua centang untuk kembali menampilkan SEMUA orang yang boleh Anda pantau.</p>`;
+    allUsers.forEach((u) => {
+      if (u.username === currentUser) return;
+      const row = document.createElement("label");
+      row.className = "monitor-pin-row";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = pins.includes(u.username);
+      cb.addEventListener("change", () => {
+        let next = loadMonitorPins();
+        if (cb.checked) {
+          if (!next.includes(u.username)) next.push(u.username);
+        } else {
+          next = next.filter((x) => x !== u.username);
+        }
+        saveMonitorPins(next);
+      });
+      const lvl = (u.levels && u.levels.length) ? u.levels.map(levelLabel).join(", ") : (CONFIG.NO_LEVEL_LABEL || "Kaum Saleh");
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(` ${u.displayName || u.username} — ${lvl}`));
+      pinEditorWrap.appendChild(row);
+    });
+    container.appendChild(pinEditorWrap);
+  }
+
+  // Daftar yang ditampilkan di dropdown: daftar pilihan (domba-domba) kalau
+  // ada isinya, atau semua orang yang boleh dipantau kalau belum memilih.
+  const users = pins.length ? allUsers.filter((u) => pins.includes(u.username) || u.username === currentUser) : allUsers;
 
   const target = (selectedUsername && users.some((u) => u.username === selectedUsername))
     ? selectedUsername
@@ -1832,11 +1960,17 @@ async function renderMonitorPanel(selectedUsername) {
     select.appendChild(opt);
   });
   select.value = target;
-  select.addEventListener("change", () => renderMonitorPanel(select.value));
+  select.addEventListener("change", () => renderMonitorPanel(select.value, showPinEditor));
   const label = document.createElement("label");
   label.textContent = "Pantau: ";
   label.appendChild(select);
   controls.appendChild(label);
+  if (pins.length) {
+    const countNote = document.createElement("span");
+    countNote.className = "monitor-pin-count";
+    countNote.textContent = ` (menampilkan ${users.length} dari ${allUsers.length} yang boleh Anda pantau — daftar pendek Anda)`;
+    controls.appendChild(countNote);
+  }
   container.appendChild(controls);
 
   const tableWrap = document.createElement("div");
