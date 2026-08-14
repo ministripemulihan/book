@@ -57,6 +57,19 @@ function addVerseToCollection(username, collectionName, verseId) {
   return targetId;
 }
 
+// Mengganti nama kumpulan yang sudah ada (mis. kalau salah ketik).
+function renameCollection(username, collectionId, newName) {
+  const collections = loadCollections(username);
+  if (!collections[collectionId]) return false;
+  const trimmed = (newName || "").trim();
+  if (!trimmed) return false;
+  collections[collectionId].name = trimmed;
+  collections[collectionId].updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  pushCollectionToRemote(username, collectionId, collections[collectionId]);
+  return true;
+}
+
 function removeVerseFromCollection(username, collectionId, verseId) {
   const collections = loadCollections(username);
   if (!collections[collectionId]) return;
