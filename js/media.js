@@ -142,6 +142,38 @@ function roundMediaButton(icon, title) {
   return b;
 }
 
+// Tombol kecil "🔗 Share" di sebelah tombol bulat MP3/MP4/YouTube -- memakai
+// Web Share API kalau didukung (muncul pilihan WhatsApp/Telegram dst bawaan
+// HP), atau fallback menyalin link ke clipboard di komputer/browser yang
+// tidak mendukung Web Share.
+function shareMediaButton(url, label) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "round-media-btn share-variant";
+  b.textContent = "🔗";
+  b.title = "Bagikan link " + label;
+  b.setAttribute("aria-label", "Bagikan link " + label);
+  b.addEventListener("click", async () => {
+    const shareUrl = driveOpenUrl(url);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: label, url: shareUrl });
+        return;
+      } catch (e) {
+        /* dibatalkan pengguna atau tidak didukung -- lanjut ke fallback salin */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      b.textContent = "✅";
+      setTimeout(() => { b.textContent = "🔗"; }, 1500);
+    } catch (e) {
+      window.prompt("Salin link ini:", shareUrl);
+    }
+  });
+  return b;
+}
+
 // Memasang metadata & tombol kontrol MediaSession (kalau didukung browser)
 // supaya OS memperlakukan halaman ini sebagai "sedang memutar media" --
 // muncul di kontrol layar kunci, dan cenderung TIDAK dihentikan paksa saat
@@ -196,8 +228,18 @@ function buildInlineMediaBlock(media, titleForSession) {
   playerSlot.className = "inline-media-slot";
   wrap.appendChild(playerSlot);
 
+  let holdingWakeLock = false;
   function closePlayer() {
+    if (holdingWakeLock && typeof releaseWakeLock === "function") { releaseWakeLock(); holdingWakeLock = false; }
     playerSlot.innerHTML = "";
+  }
+  // Menjaga layar tetap menyala selama audio/video ini sedang diputar --
+  // pakai helper yang sama dengan pembacaan suara (TTS), lihat js/app.js.
+  function wireWakeLockToMediaEl(mediaEl) {
+    if (typeof requestWakeLock !== "function") return;
+    mediaEl.addEventListener("play", () => { if (!holdingWakeLock) { requestWakeLock(); holdingWakeLock = true; } });
+    mediaEl.addEventListener("pause", () => { if (holdingWakeLock) { releaseWakeLock(); holdingWakeLock = false; } });
+    mediaEl.addEventListener("ended", () => { if (holdingWakeLock) { releaseWakeLock(); holdingWakeLock = false; } });
   }
 
   function openPlayer(kind) {
@@ -211,6 +253,7 @@ function buildInlineMediaBlock(media, titleForSession) {
       audio.src = driveOpenUrl(media.mp3);
       playerSlot.appendChild(audio);
       wireMediaSession(audio, titleForSession);
+      wireWakeLockToMediaEl(audio);
     } else if (kind === "mp4") {
       const video = document.createElement("video");
       video.controls = true;
@@ -220,6 +263,7 @@ function buildInlineMediaBlock(media, titleForSession) {
       video.src = driveOpenUrl(media.mp4);
       playerSlot.appendChild(video);
       wireMediaSession(video, titleForSession);
+      wireWakeLockToMediaEl(video);
     } else if (kind === "youtube") {
       const embedUrl = youTubeEmbedUrl(media.youtube);
       if (embedUrl) {
@@ -247,16 +291,19 @@ function buildInlineMediaBlock(media, titleForSession) {
     const b = roundMediaButton("🎵", "Dengar MP3 (langsung di halaman ini, tanpa tab baru)");
     b.addEventListener("click", () => openPlayer("mp3"));
     btnRow.appendChild(b);
+    btnRow.appendChild(shareMediaButton(media.mp3, "MP3"));
   }
   if (media.mp4) {
     const b = roundMediaButton("🎬", "Tonton MP4 (langsung di halaman ini, tanpa tab baru)");
     b.addEventListener("click", () => openPlayer("mp4"));
     btnRow.appendChild(b);
+    btnRow.appendChild(shareMediaButton(media.mp4, "MP4"));
   }
   if (media.youtube) {
     const b = roundMediaButton("▶️", "Tonton YouTube (langsung di halaman ini, tanpa tab baru)");
     b.addEventListener("click", () => openPlayer("youtube"));
     btnRow.appendChild(b);
+    btnRow.appendChild(shareMediaButton(media.youtube, "YouTube"));
   }
   return wrap;
 }
