@@ -699,6 +699,152 @@ hosting Anda (Vercel dsb).
      Deploy) supaya tab `PasswordOverrides` & endpoint barunya aktif —
      kalau lupa, tombol Ganti Password akan selalu gagal menyimpan.
 
+## Update lanjutan (Agustus 2026, tahap 7)
+
+1. **4 URL Rencana Baca (PL 2 Tahun & PB 1 Tahun x 3 bahasa) sudah diisi
+   semua** — sebelumnya cuma `pl_ind` yang terisi (lihat "Belum termasuk"
+   versi README sebelumnya). Sekarang keempat `gid=` yang dikirim sudah
+   dicek satu-satu (fetch langsung ke tiap URL, dicocokkan nama kolomnya)
+   dan cocok persis dengan yang sudah dikenali `js/media.js` sebelumnya:
+   - `pl_ind` → "Perjanjian Lama 2 Tahun (Indonesia)" — sekarang memakai
+     URL `gid=441167880` (tab PL Bahasa Indonesia yang benar; sebelumnya
+     memakai URL default tanpa `gid`, yang kebetulan sama karena itu tab
+     pertama, tapi sekarang eksplisit).
+   - `pb_ind` → "Perjanjian Baru 1 Tahun (Indonesia)" — `gid=1009569139`.
+   - `pb_mandarin` → "Perjanjian Baru 1 Tahun (Mandarin)" — `gid=346929572`
+     (kolom rentang bacaannya memakai nama kitab Inggris seperti "Matthew
+     1:1 - 25", bukan aksara Mandarin — ini otomatis tetap terbaca oleh
+     `guessReferenceFromPembacaan()` untuk buka pasalnya, karena fungsi
+     itu memang mencari pola huruf Latin + nomor pasal).
+   - `pb_inggris` → "Perjanjian Baru 1 Tahun (Inggris)" — `gid=1522606854`.
+   - Berkas yang berubah: **`js/config.js`** saja (bagian
+     `READING_MEDIA_SHEETS`, label juga dirapikan jadi konsisten
+     "... 1/2 Tahun (Bahasa)").
+   - **Tidak perlu** ubah `apps-script/Code.gs` atau file lain — cukup
+     unggah ulang `js/config.js` (atau seluruh paket) ke hosting Anda.
+   - Semua fitur yang Anda minta terkait tombol MP3/MP4/YouTube bulat,
+     tombol 🔗 Bagikan link, tampilan ayat+catatan sebaris, dan opsi TTS
+     ikut membaca Catatan — **sudah ada semua** dari update-update
+     sebelumnya (lihat tahap 3 & 4 di atas), otomatis berlaku juga untuk
+     3 rencana baru ini begitu dipilih dari menu 📅 Rencana Baca, tidak
+     perlu kerjaan tambahan.
+
+2. **Fitur "Garis Besar / Pokok Alkitab" + 2 baris tambahan di menu
+   kitab (Pokok, Peta+Gambar) — lihat "Update lanjutan tahap 8" di
+   bawah, SEBAGIAN sudah dikerjakan** (bagian tampil/baca sudah jalan;
+   bagian edit-dari-dalam-aplikasi khusus administrator belum).
+
+## Update lanjutan (Agustus 2026, tahap 8) — Pokok Kitab / Garis Besar / Peta+Gambar
+
+Bagian **tampil/baca** dari fitur ini **sudah dikerjakan** (5 fitur utama
+di bawah). Bagian **edit dari dalam aplikasi khusus administrator**
+**belum** — lihat poin "Belum dikerjakan" di akhir bagian ini.
+
+### 5 fitur utama yang sudah dikerjakan
+
+1. **`js/outlines.js` (berkas BARU)** — fetch + cache (localStorage,
+   pola sama seperti `js/media.js`) untuk 3 sheet baru: Pokok Kitab,
+   Garis Besar Ayat, Peta+Gambar. Otomatis disembunyikan kalau URL
+   sheet-nya kosong, tidak bikin error.
+2. **"📌 Pokok Kitab"** — tampil sebagai kotak khusus di **pasal 1**
+   tiap kitab (awal mula pembacaan kitab itu), dan ada tombol "📌
+   Pokok" tersendiri di daftar pasal (`chapterPickerExtra`, sebelum
+   tombol nomor pasal) untuk membukanya kapan saja tanpa harus di
+   pasal 1.
+3. **"📋 Garis Besar" berjenjang di layar baca** — ringkasan level 1
+   (besar) sampai level 3+ (kecil) disisipkan **tepat sebelum ayat
+   pertama** dari rentangnya, ditumpuk besar→kecil, persis seperti
+   contoh yang diminta:
+   ```
+   Tentang Penciptaan (Kejadian 1:1-1:20)
+   Cerita awal penciptaan (Kejadian 1:1-1:3)
+   1  Pada mulanya Allah menciptakan langit dan bumi.
+   Ciptaan Pertama (Kejadian 1:2)
+   2  Bumi belum berbentuk dan kosong...
+   ```
+   **Catatan**: untuk saat ini hanya berlaku di tampilan **satu kolom**
+   (bukan tampilan berdampingan/multi-bahasa) — cukup wajar karena
+   ringkasan per rentang ayat memang 1 alur per bahasa.
+4. **"📋 Garis Besar Kitab" (tombol tersendiri sebelum tombol pasal 1)**
+   — membuka panel daftar-isi seluruh kitab (semua level ditumpuk
+   berjenjang), tiap barisnya bisa diklik untuk langsung lompat ke
+   pasal:ayat itu di layar baca.
+5. **"🗺️ Peta+Gambar"** — tombol tersendiri di daftar pasal, membuka
+   galeri yang bisa digulir berisi semua peta/gambar kitab itu dari
+   Google Drive, tiap gambar ada tombol "⬇️ Unduh" sendiri.
+
+Berkas yang **baru dibuat**: `js/outlines.js`.
+Berkas yang **diupdate**: `js/config.js` (bagian `OUTLINE_SHEETS` baru),
+`js/app.js` (`renderChapterPickerExtra()`, `openBookInfoPanel()`,
+`insertOutlineHeaders()`, `renderChapter()`/`renderSingleColumn()`
+dirombak sedikit, `hideAllPanels()`), `index.html` (`#chapterPickerExtra`,
+`#bookInfoPanel`, `#readerPokokSlot` baru + tag `<script>` untuk
+`js/outlines.js`), `css/style.css` (gaya untuk semua elemen baru di
+atas).
+
+### Skema 3 Google Sheet yang dipakai (field per sheet)
+
+Nama kolom **tidak peduli huruf besar/kecil**; boleh pakai salah satu
+nama alternatif di bawah (aplikasi mengecek semuanya).
+
+**Sheet A — "Pokok Kitab"** (1 baris = 1 kitab + 1 bahasa):
+
+| Book Number | Book Name | Bahasa | Pokok Kitab |
+|---|---|---|---|
+| 1 | Kejadian | ind | Allah Menciptakan, iblis merusak, manusia Jatuh, dan Tuhan menjanjikan keselamatan |
+| 1 | Genesis | eng | God creates, the devil corrupts, man falls, and God promises salvation |
+
+- **Status: URL CSV-nya BELUM ada** (`OUTLINE_SHEETS.pokokKitabCsvUrl`
+  di `js/config.js` masih dikosongkan `""`) — sheet baru yang Anda
+  buat belum dikirim link publikasi CSV-nya. Setelah dipublikasikan
+  ke web (format CSV, sama caranya seperti sheet lain), tempel URL-nya
+  ke `pokokKitabCsvUrl` di `js/config.js` (atau kirim ke saya URL-nya).
+  Sampai saat itu, tombol "📌 Pokok" otomatis tidak muncul di aplikasi
+  (tidak error).
+
+**Sheet B — "Garis Besar Ayat"** (1 baris = 1 rentang ayat + 1
+ringkasan, BOLEH bersarang/tumpang tindih untuk level besar vs kecil)
+— **sudah diisi URL-nya** (`gid` dari link yang Anda kirim):
+
+| Book Number | Bahasa | Chapter Start | Verse Start | Chapter End | Verse End | Level | Ringkasan |
+|---|---|---|---|---|---|---|---|
+| 1 | ind | 1 | 1 | 1 | 20 | 1 | Tentang Penciptaan |
+| 1 | ind | 1 | 1 | 1 | 3 | 2 | Cerita awal penciptaan |
+| 1 | ind | 1 | 2 | 1 | 2 | 3 | Ciptaan Pertama |
+
+- `Level` = 1 (paling besar) → makin besar angkanya makin kecil/detail
+  cakupannya. Bebas tambah level 4, 5, dst.
+- Sheet ini **kosong saat dicek** (belum ada baris data) — silakan
+  mulai isi barisnya kapan saja, aplikasi akan otomatis membacanya
+  begitu sheet-nya berisi (cukup sinkron ulang / buka lagi di HP,
+  tidak perlu update kode apa pun).
+
+**Sheet C — "Info Kitab" (Peta & Gambar)** (1 kitab boleh > 1 baris)
+— **sudah diisi URL-nya**:
+
+| Book Number | Book Name | Link Peta/Gambar (Google Drive) |
+|---|---|---|
+| 1 | Kejadian | https://drive.google.com/file/d/xxxxx/view |
+| 1 | Kejadian | https://drive.google.com/file/d/yyyyy/view |
+
+- Link **harus** link berbagi Google Drive biasa (`.../file/d/ID/...`
+  atau `...?id=ID`) — aplikasi otomatis mengubahnya jadi link
+  pratinjau gambar & link unduh langsung.
+- Sheet ini juga **kosong saat dicek** — silakan mulai isi.
+
+### Belum dikerjakan (perlu tahap terpisah berikutnya)
+
+- **Edit dari DALAM APLIKASI, khusus level administrator** (menyimpan
+  langsung ke sheet lewat aplikasi, bukan buka Google Sheet manual) —
+  ini perlu tab + endpoint baru di `apps-script/Code.gs` (pola sama
+  seperti Pengumuman/Ganti Password yang sudah ada) plus form edit
+  yang cuma muncul kalau `isAdministrator()` true. **Untuk sekarang**,
+  isi/ubah ketiga sheet di atas langsung di Google Sheet-nya masing-
+  masing (sama seperti cara mengisi sheet Alkitab utama) — perubahan
+  otomatis muncul di aplikasi setelah sinkron ulang.
+- Kalau ingin lanjut ke tahap edit-dari-aplikasi ini, kabari saya,
+  sudah ada rancangannya (mengikuti pola Pengumuman yang sudah ada).
+
 ## Sudah dikerjakan sebelumnya (jangan dikerjakan ulang)
 
 Supaya tidak dobel, ini daftar hal yang **SUDAH ADA** di paket ini walau
@@ -717,31 +863,15 @@ sempat ditanyakan ulang:
 
 ## Belum termasuk / perlu info tambahan dari Anda dulu
 
-- **Data Rencana Baca "PB 1 Tahun" & "PL 2 Tahun" sesuai isi sheet yang
-  Anda kirim** — link CSV yang Anda berikan kali ini **sama persis**
-  dengan yang sudah terisi di `CONFIG.READING_MEDIA_SHEETS` sebagai
-  `pl_ind` (Perjanjian Lama Indonesia), dan **satu link CSV publikasi
-  Google Sheet hanya berisi SATU tab/sheet** (bukan keempatnya
-  sekaligus: PL Bahasa Indonesia, PB Bahasa Indonesia, PB Bahasa
-  Inggris, PB Bahasa Mandarin). Supaya keempatnya bisa tampil sebagai 4
-  pilihan rencana baca terpisah, mohon buka tiap TAB itu satu-satu di
-  Google Sheets → **File → Bagikan → Publikasikan ke web** → pilih tab
-  yang benar → format CSV → salin URL-nya (URL tiap tab akan beda di
-  parameter `gid=` pada akhirnya) — kirim 4 URL itu (atau minimal yang
-  PB 1 Tahun Indonesia dulu), nanti langsung saya isikan ke 3 slot yang
-  masih kosong di `js/config.js` (`pb_ind`, `pb_mandarin`, `pb_inggris`).
-- **Fitur "Garis Besar"/Pokok Alkitab per kitab** (rangkuman per rentang
-  ayat + pokok satu kitab, ditampilkan sebelum ayatnya, bisa diedit
-  khusus administrator, 3 bahasa) dan **2 baris tambahan di menu kitab
-  (Pokok, Peta+Gambar)** — ini fitur BESAR yang perlu dirancang dulu
-  sebelum dikerjakan, karena perlu: (1) skema Google Sheet BARU (kolom
-  kitab/pasal/rentang ayat/bahasa/isi rangkuman — belum ada sheet-nya),
-  (2) tambahan endpoint di `apps-script/Code.gs` supaya administrator
-  bisa menyimpan/mengedit dari aplikasi (bukan dari Sheet langsung), dan
-  (3) menu edit admin + logika tampilan baru bersarang per rentang ayat
-  di layar baca pasal. Ini realistis dikerjakan sebagai **tahap
-  terpisah berikutnya** — kalau Anda mau lanjutkan, beri tahu, nanti
-  saya siapkan dulu rancangan struktur Sheet-nya sebelum mulai coding.
+- ✅ **Data Rencana Baca "PB 1 Tahun" & "PL 2 Tahun" 4 bahasa/tab** —
+  SUDAH SELESAI, lihat "Update lanjutan tahap 7" poin 1 di atas.
+- ✅ **Fitur "Garis Besar"/Pokok Alkitab per kitab + 2 baris tambahan di
+  menu kitab (Pokok, Peta+Gambar)** — bagian TAMPIL/BACA sudah
+  dikerjakan, lihat "Update lanjutan tahap 8" di atas. Yang **masih
+  belum**: (1) sheet "Pokok Kitab" belum ada URL CSV-nya (perlu
+  dipublikasikan & dikirim linknya), (2) edit dari DALAM APLIKASI
+  khusus administrator (untuk sekarang, edit ketiga sheet langsung di
+  Google Sheet-nya).
 - **Notifikasi awal soal unduh data lewat WiFi** — SUDAH ada (lihat
   "Update lanjutan tahap 4", poin 2) — sebelumnya salah tercatat belum
   dikerjakan di versi README ini, sudah diperbaiki.
@@ -762,6 +892,8 @@ bible-app/
 ├── js/notes.js           catatan pribadi per ayat (lokal + gabung dengan data server)
 ├── js/settings.js        pengaturan pribadi per pengguna, mis. animasi progres membaca (lokal + server)
 ├── js/plans.js           definisi rencana baca, pembuatan jadwal, penyimpanan progres
+├── js/media.js           bacaan bersuara harian (MP3/MP4/YouTube per rentang ayat) + rencana baca darinya
+├── js/outlines.js        Pokok Kitab / Garis Besar berjenjang / Peta+Gambar per kitab (fetch+cache+helper tampilan)
 ├── js/app.js             logika utama aplikasi (login, baca, cari, rencana baca, TTS, progres membaca, dll)
 ├── apps-script/Code.gs   backend Google Apps Script untuk sinkronisasi (opsional, lihat di atas)
 ├── sample-data.csv       contoh data Alkitab untuk uji coba lokal
