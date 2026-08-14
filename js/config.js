@@ -122,23 +122,23 @@ const CONFIG = {
   READING_MEDIA_SHEETS: [
     {
       key: "pl_ind",
-      label: "Perjanjian Lama (Indonesia)",
-      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?output=csv",
+      label: "Perjanjian Lama 2 Tahun (Indonesia)",
+      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?gid=441167880&single=true&output=csv",
     },
     {
       key: "pb_ind",
-      label: "Perjanjian Baru (Indonesia)",
-      csvUrl: "",
+      label: "Perjanjian Baru 1 Tahun (Indonesia)",
+      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?gid=1009569139&single=true&output=csv",
     },
     {
       key: "pb_mandarin",
-      label: "Perjanjian Baru (Mandarin)",
-      csvUrl: "",
+      label: "Perjanjian Baru 1 Tahun (Mandarin)",
+      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?gid=346929572&single=true&output=csv",
     },
     {
       key: "pb_inggris",
-      label: "Perjanjian Baru (Inggris)",
-      csvUrl: "",
+      label: "Perjanjian Baru 1 Tahun (Inggris)",
+      csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?gid=1522606854&single=true&output=csv",
     },
   ],
 };
