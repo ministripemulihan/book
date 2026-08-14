@@ -185,6 +185,13 @@
     <div class="app-body">
       <!-- ===================== SIDEBAR DAFTAR KITAB ===================== -->
       <aside id="sidebar" class="sidebar">
+        <!-- Pintasan global -- "Pokok Alkitab" seluruh kitab sekaligus,
+             beda dari tombol "📌 Pokok" per-kitab yang ada di dalam
+             daftar pasal. Otomatis disembunyikan kalau sheet Pokok
+             Kitab belum diisi URL-nya (lihat initGlobalOutlineSidebarButtons()). -->
+        <div class="sidebar-section sidebar-section-shortcut">
+          <button type="button" id="allPokokBtn" class="sidebar-wide-btn" hidden>📌 Pokok Alkitab</button>
+        </div>
         <div class="sidebar-section">
           <h3>Perjanjian Lama</h3>
           <div id="bookListPL" class="book-list"></div>
@@ -192,6 +199,12 @@
         <div class="sidebar-section">
           <h3>Perjanjian Baru</h3>
           <div id="bookListPB" class="book-list"></div>
+        </div>
+        <!-- Pintasan global -- galeri semua Peta+Gambar dari SELURUH
+             kitab, ditaruh paling bawah sidebar. Otomatis disembunyikan
+             kalau sheet Peta+Gambar belum diisi URL-nya. -->
+        <div class="sidebar-section sidebar-section-shortcut">
+          <button type="button" id="allMapsBtn" class="sidebar-wide-btn" hidden>🗺️ Peta + Gambar</button>
         </div>
       </aside>
       <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
@@ -210,6 +223,11 @@
 
           <!-- panel "Garis Besar Kitab" (daftar isi berjenjang) / "Pokok Kitab" / "Peta+Gambar" -->
           <div id="bookInfoPanel" class="book-info-panel" hidden></div>
+
+          <!-- panel global "Pokok Alkitab" (semua kitab sekaligus, dibuka dari sidebar) -->
+          <div id="allPokokPanel" class="book-info-panel" hidden></div>
+          <!-- panel global "Peta + Gambar" (semua kitab sekaligus, dibuka dari sidebar) -->
+          <div id="allMapsPanel" class="book-info-panel" hidden></div>
 
           <!-- panel rencana baca -->
           <div id="planPanel" class="plan-panel" hidden></div>
