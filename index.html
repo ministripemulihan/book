@@ -203,8 +203,13 @@
           <!-- daftar pasal untuk kitab terpilih -->
           <div id="chapterPicker" class="chapter-picker" hidden>
             <h2 id="chapterPickerTitle"></h2>
+            <!-- baris tambahan: Garis Besar Kitab / Pokok / Peta+Gambar (kalau datanya ada) -->
+            <div id="chapterPickerExtra" class="chapter-picker-extra" hidden></div>
             <div id="chapterGrid" class="chapter-grid"></div>
           </div>
+
+          <!-- panel "Garis Besar Kitab" (daftar isi berjenjang) / "Pokok Kitab" / "Peta+Gambar" -->
+          <div id="bookInfoPanel" class="book-info-panel" hidden></div>
 
           <!-- panel rencana baca -->
           <div id="planPanel" class="plan-panel" hidden></div>
@@ -266,6 +271,8 @@
               <button id="nextChapter" class="chip-btn">Pasal Berikutnya →</button>
             </div>
             <div id="readerMediaSlot" class="reader-media-slot" hidden></div>
+            <!-- kotak "📌 Pokok Kitab" -- hanya tampil di pasal 1 kalau datanya ada -->
+            <div id="readerPokokSlot" class="reader-pokok-slot" hidden></div>
             <div id="readerVerses" class="reader-verses"></div>
             <div class="reader-nav reader-nav-bottom">
               <button id="prevChapterBottom" class="chip-btn">← Pasal Sebelumnya</button>
@@ -331,6 +338,7 @@
   <script src="js/settings.js"></script>
   <script src="js/plans.js"></script>
   <script src="js/media.js"></script>
+  <script src="js/outlines.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
