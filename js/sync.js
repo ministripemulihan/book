@@ -19,8 +19,15 @@ const Sync = {
 
   async _get(params) {
     if (!this.enabled()) return null;
-    const url = CONFIG.APPS_SCRIPT_URL + "?" + new URLSearchParams(params).toString();
-    const res = await fetch(url, { method: "GET" });
+    // "_ts" cache-buster + "cache: no-store": beberapa browser HP (terutama
+    // dalam mode PWA/"Add to Home Screen") dan sebagian jaringan operator
+    // seluler di Indonesia suka menyimpan cache respons GET yang URL-nya
+    // identik -- akibatnya HP bisa terus menampilkan hasil LAMA (mis. daftar
+    // pengumuman kosong) walau di Sheet datanya sudah ada & di komputer
+    // sudah muncul. Parameter acak ini memaksa permintaan selalu baru.
+    const withBuster = Object.assign({}, params, { _ts: String(Date.now()) });
+    const url = CONFIG.APPS_SCRIPT_URL + "?" + new URLSearchParams(withBuster).toString();
+    const res = await fetch(url, { method: "GET", cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
   },
@@ -110,6 +117,22 @@ const Sync = {
       return (data && data.ok && data.announcements) || [];
     } catch (e) {
       return [];
+    }
+  },
+
+  // Sama seperti pullAnnouncements(), tapi TIDAK menyamarkan kegagalan
+  // jaringan sebagai "daftar kosong" -- dipakai saat panel Pengumuman
+  // dibuka secara eksplisit oleh pengguna, supaya kalau gagal ambil data
+  // (mis. tidak ada sinyal saat itu), pesannya jelas "gagal memuat" +
+  // tombol coba lagi, BUKAN diam-diam menampilkan "belum ada pengumuman"
+  // padahal sebenarnya di Sheet sudah ada isinya.
+  async pullAnnouncementsChecked() {
+    try {
+      const data = await this._get({ type: "announcements" });
+      if (data && data.ok) return { ok: true, list: data.announcements || [] };
+      return { ok: false, list: [] };
+    } catch (e) {
+      return { ok: false, list: [] };
     }
   },
 
