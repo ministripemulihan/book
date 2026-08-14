@@ -113,22 +113,58 @@ async function syncUsersFromServer() {
   return records;
 }
 
+// Kunci localStorage tempat menyimpan CADANGAN LOKAL password pengganti
+// (kalau pernah diganti lewat menu ⋮ > Ganti Password) -- dipakai supaya
+// login tetap bisa dilakukan OFFLINE dengan password terbaru di perangkat
+// yang sama, walau tidak sedang tersambung internet untuk mengeceknya ke
+// Google Sheet. Lihat readPasswordOverride_()/setPasswordOverride_() di
+// apps-script/Code.gs untuk sisi servernya.
+function passwordOverrideCacheKey(uname) {
+  return "bible_app_pw_override_v1_" + uname;
+}
+
+// Password yang SEHARUSNYA dipakai untuk login: kalau pengguna ini pernah
+// ganti password lewat aplikasi, itu yang dipakai (dicoba ambil dari
+// server dulu supaya selalu yang terbaru walau ganti dari HP lain;
+// kalau gagal/offline, pakai cadangan lokal di perangkat ini); kalau belum
+// pernah ganti sama sekali, password dari Sheet Pengguna (Sheet #2) yang
+// tetap dipakai apa adanya seperti sebelumnya.
+async function getEffectivePassword(uname, sheetPassword) {
+  const cacheKey = passwordOverrideCacheKey(uname);
+  let override = localStorage.getItem(cacheKey) || "";
+  if (typeof Sync !== "undefined" && Sync.enabled()) {
+    try {
+      const remote = await Sync.pullPasswordOverride(uname);
+      if (remote) {
+        override = remote;
+        localStorage.setItem(cacheKey, remote);
+      }
+    } catch (e) {
+      /* offline -- tetap pakai cadangan lokal (override) kalau ada */
+    }
+  }
+  return override || sheetPassword;
+}
+
 async function validateLogin(usernameRaw, password) {
   const uname = (usernameRaw || "").trim().toLowerCase();
   if (!uname || !password) return null;
 
   let users = await LocalDB.getAllUsers();
-  let match = users.find((u) => u.username === uname && u.password === password);
-  if (match) return match;
-
-  // Belum cocok di data lokal -> coba sinkron ulang (mungkin akun baru / belum pernah sinkron)
-  try {
-    users = await syncUsersFromServer();
-    match = users.find((u) => u.username === uname && u.password === password);
-    return match || null;
-  } catch (e) {
-    return null; // kemungkinan sedang offline dan akun belum ada di cache lokal
+  let match = users.find((u) => u.username === uname);
+  if (!match) {
+    // Belum ada di data lokal -> coba sinkron ulang (mungkin akun baru / belum pernah sinkron)
+    try {
+      users = await syncUsersFromServer();
+      match = users.find((u) => u.username === uname);
+    } catch (e) {
+      return null; // kemungkinan sedang offline dan akun belum ada di cache lokal
+    }
   }
+  if (!match) return null;
+
+  const effectivePassword = await getEffectivePassword(uname, match.password);
+  return password === effectivePassword ? match : null;
 }
 
 function initAuth() {
@@ -1542,10 +1578,52 @@ function announcementStatusLabel(a) {
   return "⌛ Expired (lewat tanggal berakhir)";
 }
 
+// Apakah pengumuman ini ditujukan untuk PENGGUNA YANG SEDANG LOGIN (bukan
+// soal tanggal/status -- itu urusan announcementIsLive()). "all" (atau
+// kosong, untuk baris lama sebelum kolom ini ada) = semua orang. Kalau
+// diisi tag @username tertentu (lihat parseAnnouncementTags()), hanya
+// username yang disebut yang bisa melihatnya.
+function announcementVisibleToMe(a) {
+  const vt = (a.visibleTo || "all").trim().toLowerCase();
+  if (!vt || vt === "all") return true;
+  const list = vt.split(",").map((s) => s.trim()).filter(Boolean);
+  return list.includes((currentUser || "").toLowerCase());
+}
+
+// Gabungan syarat lengkap supaya tampil ke PENGGUNA BIASA: sedang berlaku
+// (tanggal + status) DAN memang ditujukan untuk dia (tag @username / @all).
+function announcementShouldShow(a) {
+  return announcementIsLive(a) && announcementVisibleToMe(a);
+}
+
+// ------------------------------------------------------------
+// Tag @username / @all di teks pengumuman -- ditulis administrator
+// dengan mengetik "@" lalu memilih dari daftar (lihat buildAnnouncementTagPicker()),
+// atau ketik manual. Fungsi ini memisahkan teks BERSIH (tanpa tulisan
+// "@nama" sama sekali, supaya "tidak bisa tampil tulisan @" seperti
+// diminta) dari daftar username yang dituju (`visibleTo`, dipakai
+// announcementVisibleToMe() di atas). Token yang TIDAK cocok dengan
+// username asli mana pun (dan bukan "all") dibiarkan apa adanya di teks
+// (supaya "@" yang kebetulan dipakai untuk hal lain, mis. alamat e-mail,
+// tidak ikut terpotong).
+function parseAnnouncementTags(rawText, knownUsernamesLower) {
+  const found = new Set();
+  let sawAll = false;
+  const cleanText = rawText.replace(/@([a-zA-Z0-9_.-]+)/g, (whole, name) => {
+    const lower = name.toLowerCase();
+    if (lower === "all") { sawAll = true; return ""; }
+    if (knownUsernamesLower.has(lower)) { found.add(lower); return ""; }
+    return whole; // bukan tag yang dikenal -- biarkan apa adanya
+  }).replace(/[ \t]{2,}/g, " ").replace(/\s+\n/g, "\n").trim();
+
+  const visibleTo = sawAll || found.size === 0 ? "all" : Array.from(found).join(",");
+  return { cleanText, visibleTo };
+}
+
 async function checkAnnouncementsAtStart() {
   if (typeof Sync === "undefined" || !Sync.enabled()) return;
   const list = await Sync.pullAnnouncements();
-  const live = list.filter(announcementIsLive);
+  const live = list.filter(announcementShouldShow);
   if (!live.length) return;
   const lastSeen = localStorage.getItem(announcementSeenKey()) || "0";
   const hasUnseen = live.some((a) => String(a.id) > lastSeen);
@@ -1609,7 +1687,7 @@ async function showAnnouncementPanel(preloaded) {
   logActivity("Pengumuman");
   if (preloaded) {
     renderAnnouncementPanel(preloaded);
-    markAnnouncementsSeen(preloaded.filter(announcementIsLive));
+    markAnnouncementsSeen(preloaded.filter(announcementShouldShow));
     return;
   }
   if (!Sync.enabled()) {
@@ -1639,7 +1717,7 @@ async function showAnnouncementPanel(preloaded) {
     return;
   }
   renderAnnouncementPanel(list);
-  markAnnouncementsSeen(list.filter(announcementIsLive));
+  markAnnouncementsSeen(list.filter(announcementShouldShow));
 }
 
 function markAnnouncementsSeen(list) {
@@ -1660,7 +1738,14 @@ function renderAnnouncementPanel(list) {
     const composeWrap = document.createElement("div");
     composeWrap.className = "announcement-compose";
     composeWrap.innerHTML = `
-      <textarea id="announcementComposeText" rows="3" placeholder="Tulis pengumuman baru untuk semua pengguna…"></textarea>
+      <textarea id="announcementComposeText" rows="3" placeholder="Tulis pengumuman baru untuk semua pengguna… (opsional: tag @username tertentu supaya hanya dia yang lihat)"></textarea>
+      <div class="announcement-tag-row">
+        <label>Tandai (@tag) untuk:<br>
+          <select id="announcementTagSelect"><option value="">Memuat daftar pengguna…</option></select>
+        </label>
+        <button type="button" id="announcementTagAddBtn" class="chip-btn small">+ Tambah Tag</button>
+      </div>
+      <p class="announcement-compose-hint">Kosongkan tag (atau pilih "Semua Pengguna (@all)") supaya pengumuman tampil ke semua orang. Tulisan "@nama" TIDAK ikut tampil di pengumuman jadinya -- hanya dipakai untuk menyaring siapa yang boleh melihat.</p>
       <div class="announcement-compose-dates">
         <label>Tanggal aktif<br><input type="date" id="announcementActiveFrom"></label>
         <label>Tanggal berakhir<br><input type="date" id="announcementActiveUntil"></label>
@@ -1676,10 +1761,34 @@ function renderAnnouncementPanel(list) {
       <button id="announcementComposeBtn" class="chip-btn primary">Kirim Pengumuman</button>
     `;
     container.appendChild(composeWrap);
+
+    // Isi dropdown tag dengan semua username AKTIF (dari cache lokal daftar
+    // pengguna) + pilihan "Semua Pengguna (@all)" paling atas. "all" adalah
+    // kata terlarang dipakai sebagai username asli (lihat catatan di
+    // js/config.js) supaya tidak pernah bentrok dengan tag broadcast ini.
+    const tagSelect = composeWrap.querySelector("#announcementTagSelect");
+    let knownUsernamesLower = new Set();
+    LocalDB.getAllUsers().then((users) => {
+      knownUsernamesLower = new Set(users.map((u) => u.username.toLowerCase()));
+      const sorted = users.slice().sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, "id"));
+      tagSelect.innerHTML = '<option value="all">🌐 Semua Pengguna (@all)</option>' +
+        sorted.map((u) => `<option value="${u.username}">${u.displayName || u.username} (@${u.username})</option>`).join("");
+    });
+    composeWrap.querySelector("#announcementTagAddBtn").addEventListener("click", () => {
+      const uname = tagSelect.value;
+      if (!uname) return;
+      const ta = composeWrap.querySelector("#announcementComposeText");
+      const insertion = `@${uname} `;
+      const pos = ta.selectionStart != null ? ta.selectionStart : ta.value.length;
+      ta.value = ta.value.slice(0, pos) + insertion + ta.value.slice(pos);
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = pos + insertion.length;
+    });
+
     composeWrap.querySelector("#announcementComposeBtn").addEventListener("click", async () => {
       const ta = composeWrap.querySelector("#announcementComposeText");
-      const text = ta.value.trim();
-      if (!text) return;
+      const rawText = ta.value.trim();
+      if (!rawText) return;
       const activeFrom = composeWrap.querySelector("#announcementActiveFrom").value || "";
       const activeUntil = composeWrap.querySelector("#announcementActiveUntil").value || "";
       const status = composeWrap.querySelector("#announcementStatus").value || "draft";
@@ -1687,10 +1796,15 @@ function renderAnnouncementPanel(list) {
         alert("Tanggal aktif tidak boleh setelah tanggal berakhir.");
         return;
       }
+      const { cleanText, visibleTo } = parseAnnouncementTags(rawText, knownUsernamesLower);
+      if (!cleanText) {
+        alert("Isi pengumuman kosong setelah tag @ dihapus -- tulis pesannya juga, bukan cuma tag.");
+        return;
+      }
       const btn = composeWrap.querySelector("#announcementComposeBtn");
       btn.disabled = true;
       btn.textContent = "Mengirim…";
-      const ok = await Sync.pushAnnouncement(currentUser, text, activeFrom, activeUntil, status);
+      const ok = await Sync.pushAnnouncement(currentUser, cleanText, activeFrom, activeUntil, status, visibleTo);
       btn.disabled = false;
       btn.textContent = "Kirim Pengumuman";
       if (ok) {
@@ -1703,10 +1817,13 @@ function renderAnnouncementPanel(list) {
   }
 
   // Pengguna biasa (bukan administrator) hanya boleh melihat pengumuman
-  // yang SEDANG BERLAKU (live) -- draft & yang belum/sudah lewat tanggal
-  // disembunyikan total supaya tidak membingungkan. Administrator melihat
-  // semuanya (termasuk draft & yang terjadwal) supaya bisa mengelola.
-  const visibleList = isAdministrator() ? list : list.filter(announcementIsLive);
+  // yang SEDANG BERLAKU (live) DAN memang ditujukan untuknya (tag @username/
+  // @all, lihat announcementShouldShow()) -- draft, yang belum/sudah lewat
+  // tanggal, dan yang ditujukan untuk orang lain semuanya disembunyikan
+  // total supaya tidak membingungkan. Administrator melihat SEMUANYA
+  // (termasuk draft, terjadwal, & yang ditujukan ke orang lain) supaya bisa
+  // mengelola dari satu tempat.
+  const visibleList = isAdministrator() ? list : list.filter(announcementShouldShow);
 
   const listWrap = document.createElement("div");
   listWrap.className = "announcement-list";
@@ -1720,10 +1837,11 @@ function renderAnnouncementPanel(list) {
     const rangeTxt = (a.activeFrom || a.activeUntil)
       ? `📅 ${a.activeFrom || "…"} s/d ${a.activeUntil || "…"}`
       : "📅 Tanpa batas tanggal";
+    const targetTxt = (!a.visibleTo || a.visibleTo === "all") ? "🌐 Semua pengguna" : `🎯 ${a.visibleTo}`;
     item.innerHTML = `
       <div class="announcement-text"></div>
       <div class="announcement-meta">${a.createdBy || ""}${when ? " · " + when : ""}</div>
-      ${isAdministrator() ? `<div class="announcement-meta">${rangeTxt} · ${announcementStatusLabel(a)}</div>` : ""}
+      ${isAdministrator() ? `<div class="announcement-meta">${rangeTxt} · ${announcementStatusLabel(a)} · ${targetTxt}</div>` : ""}
     `;
     item.querySelector(".announcement-text").textContent = a.text; // textContent -> aman dari HTML asing
     if (isAdministrator()) {
@@ -3340,8 +3458,76 @@ function initUIEvents() {
     setSetting(currentUser, "readingProgressAnimation", e.target.checked);
     resetReadingProgressFlags(); // supaya tidak langsung "nembak" toast kalau baru dinyalakan lagi
   });
+  initChangePasswordUI();
   el("logoutBtn").addEventListener("click", () => {
     if (confirm("Keluar dari aplikasi? Anda perlu memasukkan username & password lagi saat kembali.")) logout();
+  });
+}
+
+// ------------------------------------------------------------
+// GANTI PASSWORD (menu ⋮) — kosongkan kedua kolom = tidak diganti sama
+// sekali (tidak melakukan apa-apa, bukan error). Kalau diisi, harus diisi
+// KEDUANYA dan harus SAMA PERSIS sebelum disimpan. Password baru dikirim
+// ke Apps Script (tab "PasswordOverrides") supaya berlaku di HP/komputer
+// lain juga, dan sekaligus disimpan cadangannya secara lokal di perangkat
+// ini supaya bisa langsung dipakai login lagi walau sedang offline.
+// ------------------------------------------------------------
+function initChangePasswordUI() {
+  const btn = el("changePasswordBtn");
+  if (!btn) return;
+  const newEl = el("changePasswordNew");
+  const confirmEl = el("changePasswordConfirm");
+  const msgEl = el("changePasswordMsg");
+
+  function showMsg(text, isError) {
+    msgEl.hidden = false;
+    msgEl.textContent = text;
+    msgEl.style.color = isError ? "var(--danger)" : "var(--petrol)";
+  }
+
+  btn.addEventListener("click", async () => {
+    const a = newEl.value;
+    const b = confirmEl.value;
+    msgEl.hidden = true;
+
+    // Kosong semua -> tidak ada perubahan sama sekali, bukan error.
+    if (!a && !b) {
+      showMsg("Kolom dikosongkan, password TIDAK diganti.", false);
+      return;
+    }
+    if (!a || !b) {
+      showMsg("Isi kedua kolom (password baru & pengulangannya) untuk mengganti password.", true);
+      return;
+    }
+    if (a !== b) {
+      showMsg("Password baru dan pengulangannya tidak sama. Coba lagi.", true);
+      return;
+    }
+    if (a.length < 4) {
+      showMsg("Password baru minimal 4 karakter.", true);
+      return;
+    }
+    if (!Sync.enabled()) {
+      showMsg("Sinkronisasi (Apps Script) belum dikonfigurasi, jadi password tidak bisa diganti dari sini.", true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Menyimpan…";
+    const ok = await Sync.pushPasswordOverride(currentUser, a);
+    btn.disabled = false;
+    btn.textContent = "Simpan Password Baru";
+
+    if (ok) {
+      // Simpan cadangan lokal juga supaya login berikutnya di perangkat ini
+      // langsung bisa pakai password baru walau lagi offline.
+      localStorage.setItem(passwordOverrideCacheKey(currentUser), a);
+      newEl.value = "";
+      confirmEl.value = "";
+      showMsg("✓ Password berhasil diganti. Dipakai mulai login berikutnya.", false);
+    } else {
+      showMsg("Gagal menyimpan password baru. Periksa sambungan internet Anda, lalu coba lagi.", true);
+    }
   });
 }
 
