@@ -228,6 +228,13 @@ function normalizeVerseRecord(rec) {
 }
 
 // Mengubah baris CSV dari Google Sheet PENGGUNA (username/password) menjadi objek akun.
+// Selain Username/Password/Nama/Level, sheet ini (mengikuti contoh "Login
+// awal" yang dikirim) boleh punya kolom tambahan seputar rencana baca &
+// data jemaat -- disimpan apa adanya di `extra` (tidak dipakai wajib oleh
+// aplikasi, tapi tersedia untuk fitur berikutnya tanpa perlu ubah csv.js
+// lagi): Plan, Start_Date, Last_Read_Day, Bahasa, Language, No Efata ID,
+// Saudara/i, Digembalakan, PB_Aktif, PB_Tanggal_Mulai, PB_Bahasa,
+// PB_History, PL_Aktif, PL_Tanggal_Mulai, PL_Bahasa, PL_History.
 function normalizeUserRecord(rec) {
   const get = (...keys) => {
     for (const k of keys) {
@@ -241,6 +248,24 @@ function normalizeUserRecord(rec) {
     displayName: (get("nama", "name", "display name", "nama tampilan") || rawUsername).trim(),
     password: get("password", "sandi", "kata sandi"),
     levels: parseLevelsField(get("level", "levels", "jenjang", "jabatan")),
+    extra: {
+      plan: get("plan"),
+      startDate: get("start_date", "start date", "tanggal mulai"),
+      lastReadDay: get("last_read_day", "last read day", "pembacaan terakhir"),
+      bahasa: get("bahasa"),
+      language: get("language"),
+      efataId: get("no efata id", "efata id", "no_efata_id"),
+      saudara: get("saudara/i", "saudara", "saudara i"),
+      digembalakan: get("digembalakan"),
+      pbAktif: get("pb_aktif", "pb aktif"),
+      pbTanggalMulai: get("pb_tanggal_mulai", "pb tanggal mulai"),
+      pbBahasa: get("pb_bahasa", "pb bahasa"),
+      pbHistory: get("pb_history", "pb history"),
+      plAktif: get("pl_aktif", "pl aktif"),
+      plTanggalMulai: get("pl_tanggal_mulai", "pl tanggal mulai"),
+      plBahasa: get("pl_bahasa", "pl bahasa"),
+      plHistory: get("pl_history", "pl history"),
+    },
   };
 }
 
