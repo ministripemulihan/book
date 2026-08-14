@@ -136,9 +136,20 @@ const Sync = {
     }
   },
 
-  async pushAnnouncement(username, text) {
+  // activeFrom/activeUntil: teks "yyyy-MM-dd" (boleh kosong = tanpa batas
+  // tanggal). status: "draft" (belum tayang, hanya kelihatan administrator)
+  // / "done" (aktif, siap tayang sesuai tanggal) / "expired" (ditutup manual).
+  async pushAnnouncement(username, text, activeFrom, activeUntil, status) {
     try {
-      const data = await this._post({ type: "announcement", username, text, updatedAt: new Date().toISOString() });
+      const data = await this._post({
+        type: "announcement",
+        username,
+        text,
+        activeFrom: activeFrom || "",
+        activeUntil: activeUntil || "",
+        status: status || "draft",
+        updatedAt: new Date().toISOString(),
+      });
       return (data && data.ok) || false;
     } catch (e) {
       return false;
