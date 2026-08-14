@@ -122,6 +122,146 @@ function mediaLinkButton(label, url) {
 }
 
 // ------------------------------------------------------------
+//  PEMUTAR MEDIA "SEBARIS" (inline) -- dulu tombol MP3/MP4/YouTube
+//  membuka TAB BARU (target="_blank"), yang di HP suka tertutup sendiri
+//  atau suaranya berhenti begitu berpindah aplikasi/kunci layar (tab
+//  baru gampang dihentikan paksa oleh sistem HP untuk hemat baterai).
+//  Sekarang tombolnya BULAT (mis. 🎵/🎬/▶️) dan saat ditekan, pemutarnya
+//  langsung muncul DI HALAMAN YANG SAMA (tanpa tab baru) -- supaya ayat
+//  & catatan tetap kelihatan sambil mendengarkan/menonton. MediaSession
+//  API juga dipasang (lihat wireMediaSession()) supaya pemutaran audio/
+//  video lebih tahan saat layar dikunci.
+// ------------------------------------------------------------
+function roundMediaButton(icon, title) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "round-media-btn";
+  b.textContent = icon;
+  b.title = title;
+  b.setAttribute("aria-label", title);
+  return b;
+}
+
+// Memasang metadata & tombol kontrol MediaSession (kalau didukung browser)
+// supaya OS memperlakukan halaman ini sebagai "sedang memutar media" --
+// muncul di kontrol layar kunci, dan cenderung TIDAK dihentikan paksa saat
+// layar dikunci / berpindah aplikasi sebentar. CATATAN JUJUR: ini bukan
+// jaminan mutlak -- kalau HP benar-benar dikunci dalam-dalam atau aplikasi
+// ditutup total (bukan cuma dikunci layarnya), sebagian besar browser HP
+// tetap akan menghentikan audio/video biasa (ini batasan sistem operasi,
+// bukan sesuatu yang bisa "diperbaiki" penuh dari sisi web biasa). Yang
+// paling andal tetap terus jalan walau layar dikunci adalah audio MP3
+// (elemen <audio> asli) selama TAB/APLIKASI-nya tidak ditutup total.
+function wireMediaSession(mediaEl, title) {
+  if (!("mediaSession" in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: title || "Bacaan Alkitab",
+      artist: (typeof CONFIG !== "undefined" && CONFIG.APP_TITLE) || "Alkitab",
+    });
+    navigator.mediaSession.setActionHandler("play", () => mediaEl.play());
+    navigator.mediaSession.setActionHandler("pause", () => mediaEl.pause());
+    navigator.mediaSession.setActionHandler("stop", () => { mediaEl.pause(); });
+    mediaEl.addEventListener("play", () => { try { navigator.mediaSession.playbackState = "playing"; } catch (e) {} });
+    mediaEl.addEventListener("pause", () => { try { navigator.mediaSession.playbackState = "paused"; } catch (e) {} });
+  } catch (e) {
+    /* browser lama/tidak mendukung -- diabaikan, tombol putar tetap jalan normal */
+  }
+}
+
+function youTubeEmbedUrl(url) {
+  if (!url) return null;
+  let id = null;
+  let m = url.match(/[?&]v=([^&]+)/);
+  if (m) id = m[1];
+  if (!id) { m = url.match(/youtu\.be\/([^?&]+)/); if (m) id = m[1]; }
+  if (!id) { m = url.match(/youtube\.com\/embed\/([^?&]+)/); if (m) id = m[1]; }
+  if (!id) { m = url.match(/youtube\.com\/shorts\/([^?&]+)/); if (m) id = m[1]; }
+  return id ? "https://www.youtube.com/embed/" + id : null;
+}
+
+// Membangun blok tombol BULAT + pemutar sebaris untuk satu `media`
+// ({mp3,mp4,youtube,label}). Dipakai di Rencana Baca, layar baca pasal,
+// dan panel Kumpulan Ayat -- SATU implementasi dipakai di mana-mana
+// supaya perilakunya konsisten.
+function buildInlineMediaBlock(media, titleForSession) {
+  const wrap = document.createElement("div");
+  wrap.className = "inline-media-block";
+
+  const btnRow = document.createElement("div");
+  btnRow.className = "round-media-row";
+  wrap.appendChild(btnRow);
+
+  const playerSlot = document.createElement("div");
+  playerSlot.className = "inline-media-slot";
+  wrap.appendChild(playerSlot);
+
+  function closePlayer() {
+    playerSlot.innerHTML = "";
+  }
+
+  function openPlayer(kind) {
+    closePlayer();
+    if (kind === "mp3") {
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.autoplay = true;
+      audio.setAttribute("playsinline", "");
+      audio.className = "inline-media-player";
+      audio.src = driveOpenUrl(media.mp3);
+      playerSlot.appendChild(audio);
+      wireMediaSession(audio, titleForSession);
+    } else if (kind === "mp4") {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.autoplay = true;
+      video.setAttribute("playsinline", "");
+      video.className = "inline-media-player";
+      video.src = driveOpenUrl(media.mp4);
+      playerSlot.appendChild(video);
+      wireMediaSession(video, titleForSession);
+    } else if (kind === "youtube") {
+      const embedUrl = youTubeEmbedUrl(media.youtube);
+      if (embedUrl) {
+        const iframe = document.createElement("iframe");
+        iframe.className = "inline-media-player inline-media-youtube";
+        iframe.src = embedUrl + (embedUrl.indexOf("?") === -1 ? "?" : "&") + "autoplay=1&playsinline=1";
+        iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+        iframe.allowFullscreen = true;
+        playerSlot.appendChild(iframe);
+      } else {
+        // Bukan URL YouTube yang dikenali -- tetap buka apa adanya (fallback tab baru)
+        window.open(media.youtube, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "chip-btn small inline-media-close";
+    closeBtn.textContent = "✕ Tutup pemutar";
+    closeBtn.addEventListener("click", closePlayer);
+    playerSlot.appendChild(closeBtn);
+  }
+
+  if (media.mp3) {
+    const b = roundMediaButton("🎵", "Dengar MP3 (langsung di halaman ini, tanpa tab baru)");
+    b.addEventListener("click", () => openPlayer("mp3"));
+    btnRow.appendChild(b);
+  }
+  if (media.mp4) {
+    const b = roundMediaButton("🎬", "Tonton MP4 (langsung di halaman ini, tanpa tab baru)");
+    b.addEventListener("click", () => openPlayer("mp4"));
+    btnRow.appendChild(b);
+  }
+  if (media.youtube) {
+    const b = roundMediaButton("▶️", "Tonton YouTube (langsung di halaman ini, tanpa tab baru)");
+    b.addEventListener("click", () => openPlayer("youtube"));
+    btnRow.appendChild(b);
+  }
+  return wrap;
+}
+
+// ------------------------------------------------------------
 //  RENCANA BACA BERBASIS BACAAN BERSUARA (digabung ke menu 📅 Rencana
 //  Baca -- lihat js/app.js renderPlanChooser()/renderPlanDetail()).
 //  Sebelumnya ini adalah panel/menu 🎧 terpisah; sekarang tiap sheet di
