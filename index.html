@@ -202,16 +202,29 @@
 
           <!-- hasil pencarian kata -->
           <div id="searchResults" class="search-results" hidden>
-            <h2 id="searchResultsTitle"></h2>
+            <div class="search-results-head">
+              <h2 id="searchResultsTitle"></h2>
+              <div class="font-size-control search-font-size-control" id="searchFontSizeControl">
+                <button id="searchFontDecrease" type="button" class="icon-btn font-btn" title="Perkecil huruf hasil pencarian" aria-label="Perkecil huruf hasil pencarian">A-</button>
+                <button id="searchFontIncrease" type="button" class="icon-btn font-btn" title="Perbesar huruf hasil pencarian" aria-label="Perbesar huruf hasil pencarian">A+</button>
+              </div>
+            </div>
             <div id="searchOptionsRow" class="search-options-row" hidden>
               <label>Bahasa:
                 <select id="searchLangSelect" class="columns-lang-select"></select>
               </label>
               <label>Cari di:
                 <select id="searchScopeSelect" class="columns-lang-select">
-                  <option value="verse">Ayat</option>
-                  <option value="notes">Catatan Saya</option>
-                  <option value="both">Ayat &amp; Catatan</option>
+                  <option value="verse">1. Ayat</option>
+                  <option value="both">2. Ayat &amp; Catatan</option>
+                  <option value="notes">3. Catatan Saya</option>
+                </select>
+              </label>
+              <label>Kitab:
+                <select id="searchTestamentSelect" class="columns-lang-select">
+                  <option value="__all__">Semua Alkitab</option>
+                  <option value="PL">Perjanjian Lama</option>
+                  <option value="PB">Perjanjian Baru</option>
                 </select>
               </label>
             </div>
@@ -225,6 +238,7 @@
               <h2 id="readerTitle"></h2>
               <button id="nextChapter" class="chip-btn">Pasal Berikutnya →</button>
             </div>
+            <div id="readerMediaSlot" class="reader-media-slot" hidden></div>
             <div id="readerVerses" class="reader-verses"></div>
             <div class="reader-nav reader-nav-bottom">
               <button id="prevChapterBottom" class="chip-btn">← Pasal Sebelumnya</button>
