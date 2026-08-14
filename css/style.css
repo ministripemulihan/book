@@ -171,6 +171,8 @@ body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
   background: var(--paper); color: var(--ink); font-family: var(--font-ui);
 }
 .announcement-compose-hint { font-size: 0.76rem; color: var(--ink-soft); margin: 0; }
+.announcement-tag-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.announcement-tag-row select { padding: 6px 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); font-family: var(--font-ui); max-width: 240px; }
 
 /* ============================================================
    PENGUMUMAN BESAR — muncul otomatis & mencolok saat ada pengumuman
