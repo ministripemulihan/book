@@ -217,7 +217,7 @@ async function getOutlineHeadersForVerse(bookNum, lang, chapter, verse) {
 }
 
 // Label rentang ayat, mis. "Kejadian 1:1-1:20" atau "Kejadian 1:2" kalau
-// rentangnya cuma 1 ayat.
+// rentangnya cuma 1 ayat. 
 function outlineRangeLabel(bookName, entry) {
   const start = `${entry.chapterStart}:${entry.verseStart}`;
   const end = `${entry.chapterEnd}:${entry.verseEnd}`;
