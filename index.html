@@ -161,6 +161,17 @@
             <span class="toggle-slider"></span>
           </span>
         </label>
+        <label class="more-menu-toggle tts-note-toggle" for="ttsParseArticulationToggle">
+          <span>🔤 Rapikan artikulasi (buang "(a)", ubah "Psa_74:16" jadi "Mazmur 74 ayat 16")</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="ttsParseArticulationToggle" />
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+        <div class="tts-rate-row">
+          <button type="button" id="ttsRecordBtn" class="chip-btn small">🎙️ Rekam MP3</button>
+        </div>
+        <p class="announcement-compose-hint">Rekam MP3: kotak pilih tab akan muncul — pilih tab ini, lalu WAJIB centang "Bagikan audio tab". Paling didukung di Chrome versi komputer.</p>
       </div>
 
       <div class="more-menu-section">
@@ -261,8 +272,8 @@
               <label>Cari di:
                 <select id="searchScopeSelect" class="columns-lang-select">
                   <option value="verse">1. Ayat</option>
-                  <option value="both">2. Ayat &amp; Catatan (Alkitab)</option>
-                  <option value="notes">3. Catatan Saya</option>
+                  <option value="both">2. Ayat + Catatan Kaki</option>
+                  <option value="notes">3. Catatan Kaki</option>
                 </select>
               </label>
               <label>Kitab:
