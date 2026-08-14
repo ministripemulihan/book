@@ -206,7 +206,7 @@ function initAuth() {
 
 function logout() {
   if (typeof stopTTS === "function") stopTTS();
-  if (typeof closeNoteModal === "function") closeNoteModal();
+  // (catatan ayat sekarang sebaris, tidak ada lagi modal terpisah untuk ditutup)
   localStorage.removeItem(CONFIG.AUTH_STORAGE_KEY);
   localStorage.removeItem(CONFIG.AUTH_DISPLAY_KEY);
   location.reload();
@@ -291,19 +291,49 @@ async function handleInitialBibleDownload() {
     );
     return;
   }
-  const connType = detectConnectionType();
-  if (connType === "wifi" || connType === "ethernet") {
-    // Terdeteksi WiFi/kabel dengan pasti -- langsung unduh seperti biasa,
-    // tidak perlu mengganggu dengan dialog tambahan.
-    await syncFromServer(true);
-    return;
-  }
-  // connType === "cellular"/"none"/dst, ATAU tidak diketahui sama sekali
-  // (null) -- tanya dulu supaya tidak menyedot kuota data seluler tanpa izin.
-  showWifiDownloadPrompt(connType);
+  // Selalu tampilkan info dulu untuk unduhan PERTAMA KALI (walaupun sudah
+  // pasti WiFi) -- supaya pengguna baru tahu SEBELUM loading panjang
+  // dimulai bahwa ini memang wajar (data ~51 MB, sekali saja), bukan
+  // aplikasi macet/lambat. Ini yang membedakan dari sinkron ulang biasa
+  // (lihat confirmAndSync()), yang tidak perlu info sepanjang ini karena
+  // penggunanya sendiri yang menekan tombolnya dengan sadar.
+  showBibleSyncPrompt({ isFirstTime: true });
 }
 
-function showWifiDownloadPrompt(connType) {
+// Dipakai tombol menu ⋮ → 🔄 Sinkronkan ulang Alkitab / 📥 Unduh Data
+// Alkitab -- tetap diberi info kalau sedang TIDAK terdeteksi WiFi (supaya
+// tidak tiba-tiba menyedot kuota data seluler tanpa sadar), tapi kalau
+// terdeteksi WiFi/kabel dengan pasti, langsung jalan tanpa dialog
+// tambahan (penggunanya sendiri yang memilih untuk sinkron).
+function confirmAndSync(isFirstTime) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    alert("Tidak ada sambungan internet saat ini. Coba lagi setelah tersambung.");
+    return;
+  }
+  const connType = detectConnectionType();
+  if (connType === "wifi" || connType === "ethernet") {
+    syncFromServer(isFirstTime);
+    return;
+  }
+  showBibleSyncPrompt({ isFirstTime, connType });
+}
+
+// Network Information API -- HANYA didukung sebagian browser (terutama
+// Chrome/Android). Kalau tidak didukung (mis. Safari/iOS), fungsi ini
+// mengembalikan null (artinya: "tidak diketahui", BUKAN "bukan wifi").
+function detectConnectionType() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!conn) return null;
+  if (conn.type) return conn.type; // "wifi" | "ethernet" | "cellular" | "none" | "unknown" | dst
+  return null;
+}
+
+// Dialog gabungan: dipakai baik untuk unduhan PERTAMA KALI (opts.isFirstTime
+// true, selalu muncul supaya tidak membingungkan) maupun sinkron ulang biasa
+// saat WiFi tidak/tidak-bisa dipastikan (opts.isFirstTime false).
+function showBibleSyncPrompt(opts) {
+  const { isFirstTime, connType } = opts || {};
+  const sizeMB = (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 51;
   let overlay = el("wifiPromptOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -317,42 +347,64 @@ function showWifiDownloadPrompt(connType) {
 
   const title = document.createElement("div");
   title.className = "announcement-big-title";
-  title.textContent = "📶 Belum terdeteksi WiFi";
+  title.textContent = isFirstTime && (connType === "wifi" || connType === "ethernet" || !connType && navigator.onLine)
+    ? "📥 Unduh Data Alkitab (Pertama Kali)"
+    : "📶 Belum terdeteksi WiFi";
   box.appendChild(title);
 
   const msg = document.createElement("div");
   msg.className = "announcement-big-text";
-  msg.textContent = connType === "cellular"
-    ? "Perangkat ini sepertinya sedang memakai data seluler. Data Alkitab (semua bahasa) cukup besar — unduh sekarang bisa memakai banyak kuota."
-    : "Aplikasi tidak bisa memastikan Anda sedang tersambung WiFi atau data seluler. Data Alkitab (semua bahasa) cukup besar — kalau sedang memakai data seluler, unduh sekarang bisa memakai banyak kuota.";
+  if (isFirstTime) {
+    msg.textContent =
+      `Aplikasi ini perlu mengunduh seluruh teks Alkitab (semua bahasa) ke perangkat Anda — sekitar ${sizeMB} MB, HANYA SEKALI ini saja. ` +
+      `Setelah selesai, semua bacaan tersimpan di perangkat dan bisa dibuka lagi kapan pun tanpa perlu unduh ulang / tanpa internet — jadi loading panjang di awal ini WAJAR, bukan aplikasi macet. ` +
+      `Prosesnya bisa memakan waktu beberapa menit tergantung kecepatan internet.` +
+      (connType === "cellular" ? " Perangkat ini sepertinya sedang memakai DATA SELULER — unduhan sebesar ini bisa memakai banyak kuota." : "");
+  } else {
+    msg.textContent = connType === "cellular"
+      ? "Perangkat ini sepertinya sedang memakai data seluler. Data Alkitab (semua bahasa) cukup besar — melanjutkan sekarang bisa memakai banyak kuota."
+      : "Aplikasi tidak bisa memastikan Anda sedang tersambung WiFi atau data seluler. Data Alkitab (semua bahasa) cukup besar — kalau sedang memakai data seluler, melanjutkan sekarang bisa memakai banyak kuota.";
+  }
   box.appendChild(msg);
 
-  const msg2 = document.createElement("div");
-  msg2.className = "announcement-big-meta";
-  msg2.textContent = "Anda tetap bisa masuk dulu; data Alkitab belum tersedia sampai diunduh (nanti dari menu ⋮ → 📥 Unduh Data Alkitab, ada info progresnya).";
-  box.appendChild(msg2);
+  if (!isFirstTime || connType === "cellular" || !connType) {
+    const msg2 = document.createElement("div");
+    msg2.className = "announcement-big-meta";
+    msg2.textContent = isFirstTime
+      ? "Anda tetap bisa masuk dulu; data Alkitab belum tersedia sampai diunduh (nanti dari menu ⋮ → 📥 Unduh Data Alkitab, ada info progresnya)."
+      : "Sebaiknya tunggu sampai tersambung WiFi, atau lanjutkan sekarang kalau memang tidak masalah memakai kuota.";
+    box.appendChild(msg2);
+  }
 
   const btnRow = document.createElement("div");
   btnRow.className = "round-media-row";
   btnRow.style.marginTop = "12px";
 
-  const laterBtn = document.createElement("button");
-  laterBtn.className = "chip-btn small";
-  laterBtn.textContent = "⏭️ Masuk Dulu (hemat kuota)";
-  laterBtn.addEventListener("click", () => {
-    overlay.hidden = true;
-    showBibleNotDownloadedState(
-      "Data Alkitab belum diunduh (supaya tidak memakai kuota data seluler tanpa izin). Buka menu ⋮ → 📥 Unduh Data Alkitab kapan saja, idealnya saat sudah tersambung WiFi."
-    );
-  });
-  btnRow.appendChild(laterBtn);
+  if (isFirstTime) {
+    const laterBtn = document.createElement("button");
+    laterBtn.className = "chip-btn small";
+    laterBtn.textContent = "⏭️ Masuk Dulu (unduh nanti)";
+    laterBtn.addEventListener("click", () => {
+      overlay.hidden = true;
+      showBibleNotDownloadedState(
+        "Data Alkitab belum diunduh. Buka menu ⋮ → 📥 Unduh Data Alkitab kapan saja untuk mulai mengunduh."
+      );
+    });
+    btnRow.appendChild(laterBtn);
+  } else {
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "chip-btn small";
+    cancelBtn.textContent = "Batal";
+    cancelBtn.addEventListener("click", () => { overlay.hidden = true; });
+    btnRow.appendChild(cancelBtn);
+  }
 
   const nowBtn = document.createElement("button");
   nowBtn.className = "chip-btn primary";
-  nowBtn.textContent = "📥 Unduh Sekarang Juga";
+  nowBtn.textContent = isFirstTime ? `📥 Mulai Unduh (~${sizeMB} MB)` : "📥 Lanjutkan Sekarang";
   nowBtn.addEventListener("click", () => {
     overlay.hidden = true;
-    syncFromServer(true);
+    syncFromServer(!!isFirstTime);
   });
   btnRow.appendChild(nowBtn);
 
@@ -418,7 +470,7 @@ async function syncFromServer(isFirstTime) {
   overlay.hidden = false;
   setLoadingText(
     isFirstTime
-      ? "Mengambil seluruh data Alkitab (semua bahasa) dari server — hanya sekali ini saja, mungkin perlu waktu karena datanya besar…"
+      ? `Mengambil seluruh data Alkitab (semua bahasa, ~${(CONFIG.BIBLE_DATA_APPROX_SIZE_MB || 51)} MB) dari server — hanya sekali ini saja, mohon tunggu…`
       : "Menyinkronkan ulang data Alkitab dari server…"
   );
   setLoadingProgress(3);
@@ -918,6 +970,144 @@ function driveDownloadUrl(url) {
   return url;
 }
 
+// ------------------------------------------------------------
+//  CATATAN AYAT — TAMPIL SEBARIS (inline) di bawah teks ayatnya sendiri,
+//  BUKAN sebagai jendela/modal terapung menutupi ayat lain (dulu begitu,
+//  dan bikin tampilan "ketumpuk-tumpuk"). Cara buka/tutup: TEKAN DUA KALI
+//  nomor ayatnya (bukan sekali -- supaya tidak "salah tekan" cuma karena
+//  menggulir/scroll biasa di dekat nomor ayat).
+// ------------------------------------------------------------
+
+// Menambah/menghapus lencana 📝 kecil di ayat, sesuai ada-tidaknya catatan
+// (admin ATAU pribadi) setelah catatan pribadi disimpan/dihapus.
+function updateVerseNoteBadge(v, block, personalText) {
+  const textWrap = block.querySelector(".verse-text-wrap");
+  if (!textWrap) return;
+  const existingBadge = textWrap.querySelector(".verse-note-badge");
+  const hasAnyNote = !!(v.note && v.note.trim()) || !!(personalText || "").trim();
+  if (hasAnyNote && !existingBadge) {
+    const badge = document.createElement("span");
+    badge.className = "verse-note-badge";
+    badge.title = "Ada catatan pada ayat ini — tekan dua kali nomor ayat untuk membaca";
+    badge.textContent = "📝";
+    textWrap.appendChild(badge);
+  } else if (!hasAnyNote && existingBadge) {
+    existingBadge.remove();
+  }
+}
+
+// Membangun panel catatan SEBARIS untuk satu ayat (catatan dari sheet/admin
+// kalau ada, + kotak catatan pribadi + tombol aksi) -- ditaruh sebagai anak
+// TERAKHIR di dalam blok ayat itu sendiri, jadi lebarnya otomatis SAMA
+// PERSIS dengan lebar teks ayat (tidak perlu diatur lebar terpisah lagi).
+function buildInlineNoteCardEl(v, block) {
+  const wrap = document.createElement("div");
+  wrap.className = "verse-inline-note";
+  wrap.hidden = true;
+
+  const hasAdminNote = !!(v.note && v.note.trim());
+  const book = BOOKS.find((b) => b.num === v.bookNumber);
+  const displayName = v.bookName || (book ? book.name : "");
+  const refLabel = `${displayName} ${v.chapter}:${v.verse}`;
+
+  if (hasAdminNote) {
+    const adminWrap = document.createElement("div");
+    adminWrap.className = "inline-note-admin";
+    const label = document.createElement("div");
+    label.className = "note-modal-label";
+    label.textContent = "📝 Catatan pada ayat ini";
+    adminWrap.appendChild(label);
+    const adminText = document.createElement("div");
+    adminText.className = "note-modal-admin-text";
+    adminText.innerHTML = sanitizeNoteHtml(v.note);
+    adminWrap.appendChild(adminText);
+    wrap.appendChild(adminWrap);
+  }
+
+  const personalLabel = document.createElement("div");
+  personalLabel.className = "note-modal-label inline-note-personal-label";
+  personalLabel.textContent = "🖊️ Catatan pribadi Anda";
+  wrap.appendChild(personalLabel);
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "inline-note-textarea";
+  textarea.rows = 3;
+  textarea.placeholder = "Tulis renungan atau catatan pribadi Anda untuk ayat ini…";
+  textarea.value = getPersonalNote(currentUser, v.id);
+  textarea.addEventListener("click", (e) => e.stopPropagation());
+  wrap.appendChild(textarea);
+
+  const actions = document.createElement("div");
+  actions.className = "inline-note-actions";
+
+  const savedHint = document.createElement("span");
+  savedHint.className = "note-modal-hint";
+  savedHint.textContent = "Tersimpan ✓";
+  savedHint.hidden = true;
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "chip-btn small primary";
+  saveBtn.textContent = "💾 Simpan Catatan";
+  saveBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setPersonalNote(currentUser, v.id, textarea.value);
+    updateVerseNoteBadge(v, block, textarea.value);
+    savedHint.hidden = false;
+    setTimeout(() => { savedHint.hidden = true; }, 2000);
+  });
+  actions.appendChild(saveBtn);
+
+  const copyVerseBtn = document.createElement("button");
+  copyVerseBtn.type = "button";
+  copyVerseBtn.className = "chip-btn small";
+  copyVerseBtn.textContent = "📋 Salin Ayat";
+  copyVerseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    copyTextWithFeedback(`${refLabel}\n${v.text}`, copyVerseBtn);
+  });
+  actions.appendChild(copyVerseBtn);
+
+  if (hasAdminNote) {
+    const copyNoteBtn = document.createElement("button");
+    copyNoteBtn.type = "button";
+    copyNoteBtn.className = "chip-btn small";
+    copyNoteBtn.textContent = "📋 Salin Catatan";
+    copyNoteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      copyTextWithFeedback(`${refLabel} — Catatan:\n${noteHtmlToPlainText(v.note)}`, copyNoteBtn);
+    });
+    actions.appendChild(copyNoteBtn);
+  }
+
+  const addCollBtn = document.createElement("button");
+  addCollBtn.type = "button";
+  addCollBtn.className = "chip-btn small";
+  addCollBtn.textContent = "📚 Kumpulan";
+  addCollBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handleAddToCollection(v);
+  });
+  actions.appendChild(addCollBtn);
+  actions.appendChild(savedHint);
+
+  wrap.appendChild(actions);
+  return wrap;
+}
+
+// Buka/tutup panel catatan sebaris milik satu ayat. Panel ayat LAIN yang
+// mungkin sedang terbuka TIDAK ikut ditutup otomatis -- boleh lebih dari
+// satu terbuka sekaligus, sesuai ayat mana saja yang ditekan dua kali.
+function toggleInlineNote(block) {
+  const panel = block.querySelector(".verse-inline-note");
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+  block.classList.toggle("note-open", !panel.hidden);
+  if (!panel.hidden) {
+    panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
 // Membuat satu blok ayat (nomor, teks, badge catatan, tombol salin) —
 // dipakai baik untuk tampilan satu kolom (biasa) maupun tampilan
 // beberapa-kolom-berdampingan (lihat renderColumnsView).
@@ -928,9 +1118,21 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   block.style.animationDelay = Math.min(idx * 35, 700) + "ms";
   if (highlightVerse && v.verse === highlightVerse) block.classList.add("highlight");
 
-  const num = document.createElement("div");
-  num.className = "verse-num";
+  // Nomor ayat sekarang TOMBOL sungguhan (bukan cuma teks) -- TEKAN DUA
+  // KALI untuk buka/tutup catatan ayat ini. Sekali tekan sengaja tidak
+  // melakukan apa-apa supaya tidak "salah tekan" waktu menggulir layar.
+  const num = document.createElement("button");
+  num.type = "button";
+  num.className = "verse-num verse-num-btn";
   num.textContent = v.verse;
+  num.title = "Tekan dua kali untuk buka/tutup catatan ayat ini";
+  num.setAttribute("aria-label", "Ayat " + v.verse + " — tekan dua kali untuk catatan");
+  num.addEventListener("click", (e) => e.stopPropagation()); // sekali tekan: sengaja tidak apa-apa
+  num.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleInlineNote(block);
+  });
 
   const textWrap = document.createElement("div");
   textWrap.className = "verse-text-wrap";
@@ -941,7 +1143,7 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   if (hasAdminNote || hasPersonalNote) {
     const badge = document.createElement("span");
     badge.className = "verse-note-badge";
-    badge.title = "Ada catatan pada ayat ini — klik ayat untuk membaca";
+    badge.title = "Ada catatan pada ayat ini — tekan dua kali nomor ayat untuk membaca";
     badge.textContent = "📝";
     textWrap.appendChild(badge);
   }
@@ -962,7 +1164,17 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   block.appendChild(num);
   block.appendChild(textWrap);
   block.appendChild(copyBtn);
-  block.addEventListener("click", () => openNoteModal(v));
+  const notePanel = buildInlineNoteCardEl(v, block);
+  block.appendChild(notePanel);
+
+  // Kalau ayat ini sedang di-highlight (mis. datang dari menu "Catatan
+  // Saya" atau hasil pencarian) DAN memang punya catatan, langsung buka
+  // panel catatannya supaya tidak perlu tekan dua kali lagi.
+  if (highlightVerse && v.verse === highlightVerse && (hasAdminNote || hasPersonalNote)) {
+    notePanel.hidden = false;
+    block.classList.add("note-open");
+  }
+
   return block;
 }
 
@@ -3298,83 +3510,9 @@ function toggleTTS() {
 //     catatan pribadi milik pengguna (bisa ditulis & disimpan,
 //     tersinkron ke Google Sheet lewat js/sync.js + js/notes.js).
 // ------------------------------------------------------------
-let noteModalCurrentVerse = null;
-
-function openNoteModal(verse) {
-  noteModalCurrentVerse = verse;
-  const book = BOOKS.find((b) => b.num === verse.bookNumber);
-  const displayName = verse.bookName || (book ? book.name : "");
-  const refLabel = `${displayName} ${verse.chapter}:${verse.verse}`;
-  el("noteModalRef").textContent = refLabel;
-  el("noteModalVerseText").textContent = verse.text;
-
-  const hasAdminNote = !!(verse.note && verse.note.trim());
-  el("noteModalAdminNoteWrap").hidden = !hasAdminNote;
-  // Catatan bisa berisi markup HTML dasar (mis. <p>, <sup>) dari sumbernya
-  // (mis. rvind/rveng) — dirender sebagai HTML (disaring dulu supaya aman),
-  // bukan ditampilkan sebagai teks tag mentah.
-  el("noteModalAdminNote").innerHTML = hasAdminNote ? sanitizeNoteHtml(verse.note) : "";
-
-  el("noteModalTextarea").value = getPersonalNote(currentUser, verse.id);
-  el("noteModalSavedHint").hidden = true;
-
-  const copyVerseBtn = el("noteModalCopyVerseBtn");
-  if (copyVerseBtn) {
-    copyVerseBtn.onclick = () => copyTextWithFeedback(`${refLabel}\n${verse.text}`, copyVerseBtn);
-  }
-  const copyNoteBtn = el("noteModalCopyNoteBtn");
-  if (copyNoteBtn) {
-    copyNoteBtn.hidden = !hasAdminNote;
-    copyNoteBtn.onclick = () => copyTextWithFeedback(`${refLabel} — Catatan:\n${noteHtmlToPlainText(verse.note)}`, copyNoteBtn);
-  }
-
-  el("noteModalBackdrop").hidden = false;
-}
-
-function closeNoteModal() {
-  el("noteModalBackdrop").hidden = true;
-  noteModalCurrentVerse = null;
-}
-
-function saveNoteFromModal() {
-  if (!noteModalCurrentVerse) return;
-  const text = el("noteModalTextarea").value;
-  setPersonalNote(currentUser, noteModalCurrentVerse.id, text);
-
-  // perbarui badge 📝 pada ayat yang sedang tampil, kalau ada
-  const block = el("v-" + noteModalCurrentVerse.id);
-  if (block) {
-    const textWrap = block.querySelector(".verse-text-wrap");
-    const existingBadge = textWrap.querySelector(".verse-note-badge");
-    const hasAnyNote = !!(noteModalCurrentVerse.note && noteModalCurrentVerse.note.trim()) || !!text.trim();
-    if (hasAnyNote && !existingBadge) {
-      const badge = document.createElement("span");
-      badge.className = "verse-note-badge";
-      badge.title = "Ada catatan pada ayat ini — klik ayat untuk membaca";
-      badge.textContent = "📝";
-      textWrap.appendChild(badge);
-    } else if (!hasAnyNote && existingBadge) {
-      existingBadge.remove();
-    }
-  }
-
-  el("noteModalSavedHint").hidden = false;
-  setTimeout(() => { el("noteModalSavedHint").hidden = true; }, 2000);
-}
-
-function initNoteModalEvents() {
-  el("noteModalClose").addEventListener("click", closeNoteModal);
-  el("noteModalBackdrop").addEventListener("click", (e) => {
-    if (e.target === el("noteModalBackdrop")) closeNoteModal();
-  });
-  el("noteModalSaveBtn").addEventListener("click", saveNoteFromModal);
-  if (el("noteModalAddCollectionBtn")) {
-    el("noteModalAddCollectionBtn").addEventListener("click", () => handleAddToCollection(noteModalCurrentVerse));
-  }
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !el("noteModalBackdrop").hidden) closeNoteModal();
-  });
-}
+// (Catatan ayat sekarang ditampilkan SEBARIS di dalam blok ayatnya --
+// lihat buildInlineNoteCardEl()/toggleInlineNote() di bagian atas file
+// ini. Modal/jendela terapung yang dulu dipakai untuk ini sudah dilepas.)
 
 // ------------------------------------------------------------
 // 15) ANIMASI PROGRES MEMBACA — notifikasi otomatis (tanpa perlu
@@ -3595,7 +3733,6 @@ function handleScrollForReadingIndicator() {
 }
 
 function initUIEvents() {
-  initNoteModalEvents();
   initSidebarCollapsedState();
 
   updateHeaderHeightVar();
@@ -3671,14 +3808,14 @@ function initUIEvents() {
 
   el("resyncBtn").addEventListener("click", () => {
     el("moreMenu").hidden = true;
-    syncFromServer(false);
+    confirmAndSync(false);
   });
   el("downloadBibleBtn").addEventListener("click", () => {
     el("moreMenu").hidden = true;
     // Kalau memang belum ada data sama sekali (baru saja "masuk dulu" tanpa
     // unduh), perlakukan sebagai unduhan PERTAMA (pesan & progres sesuai);
     // kalau sudah ada data, ini jadi sinkron ulang biasa.
-    syncFromServer(!bibleData.length);
+    confirmAndSync(!bibleData.length);
   });
   el("resyncUsersBtn").addEventListener("click", async () => {
     el("moreMenu").hidden = true;
