@@ -16,6 +16,13 @@ const CONFIG = {
   //  4. Klik "Publikasikan", salin URL yang muncul, tempel di bawah ini
   BIBLE_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQokT8ny0sgFBuYfzBAMBBNJDhcH6Mif31q3oBRM_pFPBQq-qXg3xiiy1A_5nApeSow_1bn1WExHOrk/pub?output=csv",
 
+  // Perkiraan ukuran file data Alkitab (semua bahasa), dalam MB -- HANYA
+  // dipakai untuk teks info di layar unduhan pertama kali ("Data ini
+  // sekitar ... MB"), supaya pengguna baru tidak bingung kenapa loading
+  // di awal cukup lama. Ubah angka ini kalau ukuran datanya berubah
+  // banyak (tidak perlu presisi, cukup perkiraan).
+  BIBLE_DATA_APPROX_SIZE_MB: 51,
+
   // ----------------------------------------------------------
   // 2) SUMBER DATA PENGGUNA — Google Sheet #2 (BERBEDA dari sheet Alkitab)
   // ----------------------------------------------------------
@@ -154,8 +161,6 @@ const CONFIG = {
   OUTLINE_SHEETS: {
     // Sheet A -- "Pokok Kitab": 1 baris = 1 kitab + 1 bahasa.
     // Kolom: Book Number | Book Name | Bahasa | Pokok Kitab
-    // BELUM diisi URL-nya (sheet baru dibuat pengguna, tapi belum
-    // dikirim link CSV publikasinya) -- tempel URL-nya di sini nanti.
     pokokKitabCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQV8rxG6tlAEuFC_OViDoKe6cQFW188PLwVUlxNfvOMu-1vTv0FeYxsRaGI_DBguBL1Q-aLBs6ei68s/pub?output=csv",
 
     // Sheet B -- "Garis Besar Ayat": 1 baris = 1 rentang ayat + 1
