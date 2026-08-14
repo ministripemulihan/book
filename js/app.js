@@ -945,6 +945,143 @@ async function openBookInfoPanel(bookNum, mode) {
   panel.appendChild(list);
 }
 
+// ------------------------------------------------------------
+//  PANEL GLOBAL "📌 Pokok Alkitab" -- dibuka dari tombol sidebar (bukan
+//  per-kitab lagi), menampilkan Pokok Kitab dari SEMUA kitab yang punya
+//  isinya sekaligus dalam satu layar yang bisa digulir, dikelompokkan
+//  Perjanjian Lama / Perjanjian Baru, urut sesuai urutan kitab di Alkitab.
+// ------------------------------------------------------------
+async function showAllPokokPanel() {
+  hideAllPanels();
+  logActivity("Pokok Alkitab (Semua Kitab)");
+  const panel = el("allPokokPanel");
+  if (!panel) return;
+  panel.hidden = false;
+  panel.innerHTML = "<p>Memuat…</p>";
+
+  const results = await Promise.all(
+    BOOKS.map((b) => getPokokKitabFor(b.num, currentLang).then((pokok) => ({ book: b, pokok })).catch(() => ({ book: b, pokok: null })))
+  );
+  const withPokok = results.filter((r) => r.pokok);
+
+  panel.innerHTML = "";
+  const h = document.createElement("h2");
+  h.textContent = "📌 Pokok Alkitab — Semua Kitab";
+  panel.appendChild(h);
+
+  if (!withPokok.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Belum ada isi Pokok Kitab sama sekali (sheet-nya masih kosong / belum disinkron).";
+    panel.appendChild(p);
+    return;
+  }
+
+  ["PL", "PB"].forEach((testament) => {
+    const group = withPokok.filter((r) => r.book.testament === testament);
+    if (!group.length) return;
+    const groupTitle = document.createElement("h3");
+    groupTitle.className = "all-pokok-group-title";
+    groupTitle.textContent = testament === "PL" ? "Perjanjian Lama" : "Perjanjian Baru";
+    panel.appendChild(groupTitle);
+    group.forEach(({ book, pokok }) => {
+      const box = document.createElement("div");
+      box.className = "pokok-box pokok-box-list-item";
+      const label = document.createElement("div");
+      label.className = "pokok-box-label";
+      label.textContent = book.name;
+      const text = document.createElement("div");
+      text.textContent = pokok;
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "chip-btn small";
+      openBtn.textContent = "Buka kitab ini →";
+      openBtn.addEventListener("click", () => renderChapter(book.num, 1));
+      box.appendChild(label);
+      box.appendChild(text);
+      box.appendChild(openBtn);
+      panel.appendChild(box);
+    });
+  });
+}
+
+// ------------------------------------------------------------
+//  PANEL GLOBAL "🗺️ Peta + Gambar" -- dibuka dari tombol sidebar (bukan
+//  per-kitab lagi), menampilkan SEMUA peta/gambar dari SELURUH kitab
+//  sekaligus, dikelompokkan per kitab, dengan tombol unduh per gambar
+//  (sama seperti galeri per-kitab yang sudah ada).
+// ------------------------------------------------------------
+async function showAllMapsPanel() {
+  hideAllPanels();
+  logActivity("Peta + Gambar (Semua Kitab)");
+  const panel = el("allMapsPanel");
+  if (!panel) return;
+  panel.hidden = false;
+  panel.innerHTML = "<p>Memuat…</p>";
+
+  const results = await Promise.all(
+    BOOKS.map((b) => getMapImagesForBook(b.num).then((rows) => ({ book: b, rows })).catch(() => ({ book: b, rows: [] })))
+  );
+  const withMaps = results.filter((r) => r.rows.length);
+
+  panel.innerHTML = "";
+  const h = document.createElement("h2");
+  h.textContent = "🗺️ Peta + Gambar — Semua Kitab";
+  panel.appendChild(h);
+
+  if (!withMaps.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Belum ada peta/gambar sama sekali (sheet-nya masih kosong / belum disinkron).";
+    panel.appendChild(p);
+    return;
+  }
+
+  withMaps.forEach(({ book, rows }) => {
+    const groupTitle = document.createElement("h3");
+    groupTitle.className = "all-pokok-group-title";
+    groupTitle.textContent = book.name;
+    panel.appendChild(groupTitle);
+    const gallery = document.createElement("div");
+    gallery.className = "map-gallery";
+    rows.forEach((r) => {
+      const item = document.createElement("div");
+      item.className = "map-gallery-item";
+      const img = document.createElement("img");
+      img.src = driveImagePreviewUrl(r.link);
+      img.alt = "Peta/gambar " + book.name;
+      img.loading = "lazy";
+      const dl = document.createElement("a");
+      dl.className = "chip-btn small";
+      dl.href = driveDownloadUrl(r.link);
+      dl.target = "_blank";
+      dl.rel = "noopener noreferrer";
+      dl.textContent = "⬇️ Unduh";
+      item.appendChild(img);
+      item.appendChild(dl);
+      gallery.appendChild(item);
+    });
+    panel.appendChild(gallery);
+  });
+}
+
+// Tombol sidebar "📌 Pokok Alkitab" / "🗺️ Peta + Gambar" otomatis
+// disembunyikan kalau sheet yang bersangkutan belum diisi URL-nya di
+// CONFIG.OUTLINE_SHEETS -- konsisten dengan perilaku fitur per-kitab.
+function initGlobalOutlineSidebarButtons() {
+  const cfg = (typeof CONFIG !== "undefined" && CONFIG.OUTLINE_SHEETS) || {};
+  const pokokBtn = el("allPokokBtn");
+  const mapsBtn = el("allMapsBtn");
+  if (pokokBtn) {
+    pokokBtn.hidden = !(cfg.pokokKitabCsvUrl && cfg.pokokKitabCsvUrl.trim());
+    pokokBtn.addEventListener("click", () => { closeSidebarOnMobile(); showAllPokokPanel(); });
+  }
+  if (mapsBtn) {
+    mapsBtn.hidden = !(cfg.petaGambarCsvUrl && cfg.petaGambarCsvUrl.trim());
+    mapsBtn.addEventListener("click", () => { closeSidebarOnMobile(); showAllMapsPanel(); });
+  }
+}
+
 function backToChapterPickerBtn(bookNum) {
   const back = document.createElement("button");
   back.type = "button";
@@ -2856,6 +2993,70 @@ async function getMonitorableUsers() {
     .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username, "id"));
 }
 
+// ------------------------------------------------------------
+//  KUNCI TANGGAL KANONIS (dateKey) -- PERBAIKAN BUG "hasil pembacaan
+//  tidak tampil di level atas".
+//
+//  Sebelumnya, hari dicocokkan dengan MEMBANDINGKAN TEKS hasil
+//  `date.toLocaleDateString("id-ID")` antara log yang tersimpan (ditulis
+//  dari HP/komputer orang yang membaca) dan tanggal yang dihitung ulang
+//  di layar orang yang memantau. Masalahnya: format tanggal locale
+//  "id-ID" TIDAK dijamin identik di semua browser/OS (mis. sebagian
+//  Safari/iPhone bisa menulis "14/08/2026" sementara Chrome/Android
+//  menulis "14/8/2026" -- beda satu karakter "0" saja sudah membuat
+//  perbandingan teks gagal cocok), sehingga baris yang sebenarnya ADA
+//  di data server jadi terlihat "belum membaca" (X) di panel pemantauan.
+//
+//  Perbaikannya: turunkan kunci tanggal SELALU dari `updatedAt` (jam
+//  server, format ISO -- sudah pasti sama persis di semua perangkat),
+//  lalu format ulang jadi "YYYY-MM-DD" dengan zona waktu TETAP
+//  Asia/Jakarta (WIB) untuk SEMUA orang, siapa pun yang memantau atau
+//  yang dipantau -- supaya satu hari kalender selalu berarti hari yang
+//  sama untuk semua orang, tidak tergantung locale/zona waktu perangkat
+//  masing-masing.
+// ------------------------------------------------------------
+function dateKeyFromDate(d) {
+  try {
+    // "en-CA" kebetulan format bawaannya persis YYYY-MM-DD -- dipakai
+    // murni sebagai trik format, BUKAN berarti tanggalnya "orang Kanada".
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(d);
+  } catch (e) {
+    // Fallback kalau timeZone Asia/Jakarta entah kenapa tidak didukung
+    // (sangat jarang) -- lebih baik tetap jalan pakai waktu lokal
+    // perangkat daripada gagal total.
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+}
+function dateKeyFromLog(l) {
+  const d = new Date(l.updatedAt);
+  return isNaN(d.getTime()) ? null : dateKeyFromDate(d);
+}
+function dateKeyLabel(key) {
+  // key = "YYYY-MM-DD" -> label ramah dibaca, mis. "Kam, 14 Agu"
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(y, m - 1, d, 12); // jam 12 siang supaya aman dari pergeseran zona waktu lokal browser saat format label
+  return dt.toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" });
+}
+// Menghasilkan 7 dateKey berturutan untuk satu jendela minggu, MUNDUR
+// dari hari ini. weekOffset 0 = 7 hari terakhir (termasuk hari ini),
+// weekOffset 1 = 7 hari sebelum itu, dst -- tidak terbatas ("unlimited"
+// mundur ke belakang, sesuai permintaan tombol "berikutnya").
+function monitorWindowDateKeys(weekOffset) {
+  const todayKey = dateKeyFromDate(new Date());
+  const [ty, tm, td] = todayKey.split("-").map(Number);
+  const todayNoon = new Date(ty, tm - 1, td, 12);
+  const keys = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(todayNoon);
+    d.setDate(d.getDate() - (weekOffset * 7 + i));
+    keys.push(dateKeyFromDate(d));
+  }
+  return keys; // urut dari HARI PALING BARU ke paling lama di jendela ini
+}
+
 function monitorPinsKey() {
   return "bible_app_monitor_pins_v1_" + (currentUser || "guest");
 }
@@ -2877,11 +3078,70 @@ async function showMonitorPanel() {
   await renderMonitorPanel();
 }
 
+// Format detik jadi teks ramah dibaca, mis. 125 -> "2 menit 5 detik",
+// 40 -> "40 detik". Dipakai untuk kolom "Total Waktu" (selisih jam akhir
+// - jam awal baca pada hari itu).
+function formatDurationSeconds(totalSec) {
+  if (!totalSec || totalSec <= 0) return "-";
+  const m = Math.floor(totalSec / 60);
+  const s = Math.round(totalSec % 60);
+  if (m <= 0) return `${s} detik`;
+  return `${m} menit${s ? " " + s + " detik" : ""}`;
+}
+
+// Menyusun ringkasan pembacaan (per tanggal dalam jendela minggu yang
+// diminta) dari daftar log mentah SATU orang. Dipakai baik oleh tabel
+// Ringkasan (hanya butuh V/X) maupun tabel Detail (butuh jam+durasi juga).
+function buildReadRowsForUser(logsForUser, dateKeys) {
+  return dateKeys.map((key) => {
+    const entries = logsForUser.filter((l) => dateKeyFromLog(l) === key);
+    if (!entries.length) return { key, read: false, start: "-", end: "-", count: 0, durationSec: 0 };
+    const times = entries
+      .map((e) => new Date(e.updatedAt))
+      .filter((d) => !isNaN(d.getTime()))
+      .sort((a, b) => a - b);
+    const fmt = (d) => d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    const durationSec = times.length > 1 ? (times[times.length - 1] - times[0]) / 1000 : 0;
+    return {
+      key,
+      read: true,
+      start: times.length ? fmt(times[0]) : "-",
+      end: times.length ? fmt(times[times.length - 1]) : "-",
+      count: entries.length,
+      durationSec,
+    };
+  });
+}
+
+// Judul jendela minggu yang sedang ditampilkan, mis. "8 Agu - 14 Agu 2026".
+function monitorWindowTitle(dateKeys) {
+  // dateKeys[0] = paling baru, dateKeys[6] = paling lama di jendela ini.
+  const oldest = dateKeys[dateKeys.length - 1];
+  const newest = dateKeys[0];
+  const label = (key) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(y, m - 1, d, 12).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+  };
+  return `${label(oldest)} – ${label(newest)}`;
+}
+
+// state jendela minggu & mode tampilan diingat di luar fungsi supaya tetap
+// sama selama panel dibuka-tutup/ganti orang (tidak balik ke minggu ini
+// terus tiap kali ganti dropdown).
+const _monitorState = { weekOffset: 0, view: "summary" };
+
+async function showMonitorPanel() {
+  hideAllPanels();
+  el("monitorPanel").hidden = false;
+  logActivity("Pantau Pembacaan");
+  await renderMonitorPanel();
+}
+
 async function renderMonitorPanel(selectedUsername, showPinEditor) {
   const container = el("monitorPanel");
   container.innerHTML = "";
   const title = document.createElement("h2");
-  title.textContent = "👀 Pantau Pembacaan Alkitab (7 Hari)";
+  title.textContent = "👀 Pantau Pembacaan Alkitab";
   container.appendChild(title);
 
   if (!hasAnyLevel()) {
@@ -2944,10 +3204,121 @@ async function renderMonitorPanel(selectedUsername, showPinEditor) {
     container.appendChild(pinEditorWrap);
   }
 
-  // Daftar yang ditampilkan di dropdown: daftar pilihan (domba-domba) kalau
-  // ada isinya, atau semua orang yang boleh dipantau kalau belum memilih.
+  // Daftar "domba" yang ditampilkan: daftar pilihan (kalau ada isinya),
+  // atau semua orang yang boleh dipantau kalau belum memilih.
   const users = pins.length ? allUsers.filter((u) => pins.includes(u.username) || u.username === currentUser) : allUsers;
 
+  // ---------------- Tab Ringkasan / Detail ----------------
+  const viewTabs = document.createElement("div");
+  viewTabs.className = "monitor-view-tabs";
+  const summaryTabBtn = document.createElement("button");
+  summaryTabBtn.type = "button";
+  summaryTabBtn.className = "chip-btn small" + (_monitorState.view === "summary" ? " active" : "");
+  summaryTabBtn.textContent = "📋 Ringkasan (Semua Domba)";
+  summaryTabBtn.addEventListener("click", () => { _monitorState.view = "summary"; renderMonitorPanel(selectedUsername, showPinEditor); });
+  const detailTabBtn = document.createElement("button");
+  detailTabBtn.type = "button";
+  detailTabBtn.className = "chip-btn small" + (_monitorState.view === "detail" ? " active" : "");
+  detailTabBtn.textContent = "🔍 Detail 1 Orang";
+  detailTabBtn.addEventListener("click", () => { _monitorState.view = "detail"; renderMonitorPanel(selectedUsername, showPinEditor); });
+  viewTabs.appendChild(summaryTabBtn);
+  viewTabs.appendChild(detailTabBtn);
+  container.appendChild(viewTabs);
+
+  // ---------------- Navigasi jendela minggu (mundur/maju, tanpa batas) ----------------
+  const dateKeys = monitorWindowDateKeys(_monitorState.weekOffset);
+  const nav = document.createElement("div");
+  nav.className = "monitor-week-nav";
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "chip-btn small";
+  prevBtn.textContent = "◀ 7 Hari Sebelumnya";
+  prevBtn.title = "Lihat 7 hari lebih lama lagi ke belakang";
+  prevBtn.addEventListener("click", () => { _monitorState.weekOffset += 1; renderMonitorPanel(selectedUsername, showPinEditor); });
+  const windowLabel = document.createElement("span");
+  windowLabel.className = "monitor-week-label";
+  windowLabel.textContent = monitorWindowTitle(dateKeys) + (_monitorState.weekOffset === 0 ? " (7 hari terakhir)" : "");
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.className = "chip-btn small";
+  nextBtn.textContent = "7 Hari Berikutnya ▶";
+  nextBtn.title = "Lihat 7 hari lebih baru (menuju hari ini)";
+  nextBtn.disabled = _monitorState.weekOffset === 0;
+  nextBtn.addEventListener("click", () => { _monitorState.weekOffset = Math.max(0, _monitorState.weekOffset - 1); renderMonitorPanel(selectedUsername, showPinEditor); });
+  nav.appendChild(prevBtn);
+  nav.appendChild(windowLabel);
+  nav.appendChild(nextBtn);
+  if (_monitorState.weekOffset !== 0) {
+    const todayBtn = document.createElement("button");
+    todayBtn.type = "button";
+    todayBtn.className = "chip-btn small";
+    todayBtn.textContent = "⏱️ Kembali ke Hari Ini";
+    todayBtn.addEventListener("click", () => { _monitorState.weekOffset = 0; renderMonitorPanel(selectedUsername, showPinEditor); });
+    nav.appendChild(todayBtn);
+  }
+  container.appendChild(nav);
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "monitor-table-wrap";
+  tableWrap.innerHTML = `<p class="media-empty">Memuat…</p>`;
+  container.appendChild(tableWrap);
+
+  // Ambil buffer log secukupnya dari server sesuai seberapa jauh jendela
+  // minggu yang sedang dilihat (bukan selalu 8 hari tetap seperti dulu --
+  // supaya tombol "7 Hari Sebelumnya" bisa terus mundur "unlimited").
+  const daysNeeded = (_monitorState.weekOffset + 1) * 7 + 2; // +2 hari buffer aman
+  const logs = await Sync.pullLogs(currentUser, daysNeeded);
+  const readLogsByUser = {};
+  users.forEach((u) => {
+    readLogsByUser[u.username] = logs.filter(
+      (l) => (l.username || "").toLowerCase() === u.username && String(l.menu || "").indexOf("Baca: ") === 0
+    );
+  });
+
+  tableWrap.innerHTML = "";
+
+  if (_monitorState.view === "summary") {
+    // ---------------- MODE RINGKASAN: semua domba x tanggal, 1 layar ----------------
+    const info = document.createElement("p");
+    info.className = "media-empty";
+    info.textContent = pins.length
+      ? `Menampilkan ${users.length} dari ${allUsers.length} yang boleh Anda pantau — daftar pendek Anda.`
+      : `Menampilkan semua ${users.length} orang yang boleh Anda pantau.`;
+    tableWrap.appendChild(info);
+
+    const table = document.createElement("table");
+    table.className = "monitor-table monitor-summary-table";
+    const headCells = dateKeys.slice().reverse().map((key) => `<th>${escapeHtml(dateKeyLabel(key))}</th>`).join("");
+    const bodyRows = users.map((u) => {
+      const rows = buildReadRowsForUser(readLogsByUser[u.username] || [], dateKeys.slice().reverse());
+      const readCount = rows.filter((r) => r.read).length;
+      const cells = rows.map((r) => `<td class="monitor-symbol ${r.read ? "monitor-cell-read" : "monitor-cell-unread"}">${r.read ? "V" : "X"}</td>`).join("");
+      const lvl = (u.levels && u.levels.length) ? u.levels.map(levelLabel).join(", ") : (CONFIG.NO_LEVEL_LABEL || "Kaum Saleh");
+      return `<tr data-username="${escapeHtml(u.username)}" class="monitor-summary-row" title="Klik untuk lihat detail ${escapeHtml(u.displayName || u.username)}">
+        <td class="monitor-summary-name">${escapeHtml(u.displayName || u.username)}<span class="monitor-summary-level">${escapeHtml(lvl)}</span></td>
+        ${cells}
+        <td class="monitor-summary-count">${readCount}/7</td>
+      </tr>`;
+    }).join("");
+    table.innerHTML =
+      `<thead><tr><th>Nama Domba</th>${headCells}<th>Total</th></tr></thead><tbody>${bodyRows}</tbody>`;
+    tableWrap.appendChild(table);
+
+    table.querySelectorAll("tr[data-username]").forEach((row) => {
+      row.addEventListener("click", () => {
+        _monitorState.view = "detail";
+        renderMonitorPanel(row.getAttribute("data-username"), showPinEditor);
+      });
+    });
+
+    const note = document.createElement("p");
+    note.className = "media-empty";
+    note.textContent = `Klik salah satu baris nama untuk melihat detail pasal, jam awal/akhir, dan total waktu baca orang itu. Dihitung dari log "Baca: …" (minimal membuka 1 pasal pada hari itu).`;
+    tableWrap.appendChild(note);
+    return;
+  }
+
+  // ---------------- MODE DETAIL: 1 orang, lengkap dengan jam & durasi ----------------
   const target = (selectedUsername && users.some((u) => u.username === selectedUsername))
     ? selectedUsername
     : users[0].username;
@@ -2975,57 +3346,24 @@ async function renderMonitorPanel(selectedUsername, showPinEditor) {
     countNote.textContent = ` (menampilkan ${users.length} dari ${allUsers.length} yang boleh Anda pantau — daftar pendek Anda)`;
     controls.appendChild(countNote);
   }
-  container.appendChild(controls);
+  tableWrap.appendChild(controls);
 
-  const tableWrap = document.createElement("div");
-  tableWrap.className = "monitor-table-wrap";
-  tableWrap.innerHTML = `<p class="media-empty">Memuat…</p>`;
-  container.appendChild(tableWrap);
-
-  const logs = await Sync.pullLogs(currentUser, 8); // buffer 8 hari supaya aman dari selisih jam/zona
   const targetUser = users.find((u) => u.username === target);
-  const readLogs = logs.filter(
-    (l) => (l.username || "").toLowerCase() === target && String(l.menu || "").indexOf("Baca: ") === 0
-  );
-
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push({
-      key: d.toLocaleDateString("id-ID"),
-      label: d.toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" }),
-    });
-  }
-
-  const rows = days.map((day) => {
-    const entries = readLogs.filter((l) => l.date === day.key);
-    if (!entries.length) return { label: day.label, read: false, start: "-", end: "-", count: 0 };
-    const times = entries
-      .map((e) => new Date(e.updatedAt))
-      .filter((d) => !isNaN(d.getTime()))
-      .sort((a, b) => a - b);
-    const fmt = (d) => d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-    return {
-      label: day.label,
-      read: true,
-      start: times.length ? fmt(times[0]) : "-",
-      end: times.length ? fmt(times[times.length - 1]) : "-",
-      count: entries.length,
-    };
-  });
+  const rows = buildReadRowsForUser(readLogsByUser[target] || [], dateKeys).map((r) => ({
+    ...r,
+    label: dateKeyLabel(r.key),
+  }));
   const readCount = rows.filter((r) => r.read).length;
 
-  tableWrap.innerHTML = "";
   const summary = document.createElement("p");
   summary.className = "monitor-summary";
-  summary.textContent = `${targetUser ? (targetUser.displayName || targetUser.username) : target}: membaca ${readCount} dari 7 hari terakhir.`;
+  summary.textContent = `${targetUser ? (targetUser.displayName || targetUser.username) : target}: membaca ${readCount} dari 7 hari pada jendela ini.`;
   tableWrap.appendChild(summary);
 
   const table = document.createElement("table");
   table.className = "monitor-table";
   table.innerHTML =
-    "<thead><tr><th>Tanggal</th><th>Baca?</th><th>Jam Awal</th><th>Jam Akhir</th><th>Jml Pasal</th></tr></thead>" +
+    "<thead><tr><th>Tanggal</th><th>Baca?</th><th>Jam Awal</th><th>Jam Akhir</th><th>Jml Pasal</th><th>Total Waktu</th></tr></thead>" +
     "<tbody>" +
     rows.map((r) => `
       <tr class="${r.read ? "monitor-row-read" : "monitor-row-unread"}">
@@ -3034,13 +3372,14 @@ async function renderMonitorPanel(selectedUsername, showPinEditor) {
         <td>${escapeHtml(r.start)}</td>
         <td>${escapeHtml(r.end)}</td>
         <td>${r.count || ""}</td>
+        <td>${escapeHtml(formatDurationSeconds(r.durationSec))}</td>
       </tr>`).join("") +
     "</tbody>";
   tableWrap.appendChild(table);
 
   const note = document.createElement("p");
   note.className = "media-empty";
-  note.textContent = `Dihitung dari log "Baca: …" (minimal membuka 1 pasal pada hari itu). Jam mengikuti waktu perangkat yang dipakai membaca.`;
+  note.textContent = `Dihitung dari log "Baca: …" (minimal membuka 1 pasal pada hari itu). "Total Waktu" = selisih jam log TERAKHIR dikurangi jam log PERTAMA pada hari itu (perkiraan lama membaca, bukan pengukuran per detik yang presisi). Jam mengikuti waktu perangkat yang dipakai membaca, tanggal sudah dicocokkan pakai zona waktu tetap (WIB) supaya tidak meleset lintas perangkat.`;
   tableWrap.appendChild(note);
 }
 
@@ -3059,6 +3398,8 @@ function hideAllPanels() {
   if (el("logPanel")) el("logPanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
   if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
+  if (el("allPokokPanel")) el("allPokokPanel").hidden = true;
+  if (el("allMapsPanel")) el("allMapsPanel").hidden = true;
 }
 function showEmptyState() {
   hideAllPanels();
@@ -3583,6 +3924,17 @@ function handleReadingProgressCheckpoint(threshold) {
     readingProgressFlags.complete = true;
     showReadingToast("🎉 Selamat! Anda sudah menyelesaikan pembacaan pasal ini.", true);
     launchFireworks();
+    // Catat KHUSUS event "selesai membaca" (bukan cuma "dibuka") -- supaya
+    // laporan Pantau Pembacaan bisa membedakan pasal yang benar-benar
+    // digulir sampai akhir dari yang sekadar dibuka sebentar lalu
+    // ditinggal. "Baca: " (dicatat saat pasal dibuka) tetap dipakai untuk
+    // menghitung V/X harian seperti sebelumnya (README/pola lama tidak
+    // diubah supaya kompatibel); ini catatan TAMBAHAN untuk detail.
+    if (currentBookNum && currentChapter) {
+      const book = BOOKS.find((b) => b.num === currentBookNum);
+      const displayName = book ? book.name : "";
+      logActivity(`Selesai Baca: ${displayName} ${currentChapter}`);
+    }
   }
 }
 
@@ -3734,6 +4086,7 @@ function handleScrollForReadingIndicator() {
 
 function initUIEvents() {
   initSidebarCollapsedState();
+  initGlobalOutlineSidebarButtons();
 
   updateHeaderHeightVar();
   window.addEventListener("resize", updateHeaderHeightVar);
