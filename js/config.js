@@ -47,7 +47,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxg42WRw6knj93QI13SNZNTFaO8v1klrRIU8HJZ_c3D0Knpq20H02Tnn_r54ubOHPEn/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby0xsYVxCSlHYHj8CymI9JzA6C66RKuP1ww_dO9KK7vxwFrdplcpppvG5MOic36AGlo/exec",
 
   // Daftar bahasa yang ada di kolom "Bahasa" pada sheet Alkitab, dengan label yang
   // tampil di tombol pemilih bahasa. Sesuaikan "label" jika kurang tepat — kode
