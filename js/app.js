@@ -320,6 +320,7 @@ function afterDataReady() {
   initWidthControl();
   initFontSizeControl();
   initThemeControl();
+  initFontFamilyControl();
   initFullscreenControl();
   initTTS();
   initReadingProgressControl();
@@ -867,6 +868,19 @@ function highlightAllMatches(text, query) {
   const re = new RegExp(escaped, "gi");
   return text.replace(re, (m) => "<mark>" + m + "</mark>");
 }
+
+// Menghitung berapa kali `query` PERSIS muncul di dalam `text` (bisa lebih
+// dari satu kali dalam satu ayat/catatan yang sama) -- dipakai supaya hasil
+// pencarian bisa menampilkan "jumlah kata persis ditemukan", bukan cuma
+// jumlah ayat/baris yang mengandungnya.
+function countExactOccurrences(text, query) {
+  const q = query.trim();
+  if (!q || !text) return 0;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(escaped, "gi");
+  const m = text.match(re);
+  return m ? m.length : 0;
+}
 // (dipertahankan sebagai alias supaya kode lama yang masih memanggil
 // highlightMatch tidak rusak)
 function highlightMatch(text, query) {
@@ -1040,9 +1054,15 @@ function handleSearch(rawQuery, isOptionChange) {
   if (testamentSel) testamentSel.value = testament;
 
   const cappedNote = total === 300 || verseResults.length === 300 ? "+" : "";
+  // Jumlah kata PERSIS "query" muncul, dijumlahkan dari semua ayat + catatan
+  // yang ketemu (satu ayat/catatan bisa mengandung kata itu lebih dari sekali).
+  const exactWordCount =
+    verseResults.reduce((sum, v) => sum + countExactOccurrences(v.text, query), 0) +
+    noteResults.reduce((sum, n) => sum + countExactOccurrences(n.note, query), 0);
   el("searchResultsTitle").textContent =
     `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
-    (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan)` : "");
+    (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan)` : "") +
+    ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali`;
   const list = el("searchResultsList");
   list.innerHTML = "";
 
@@ -1317,6 +1337,19 @@ function renderPlanDetail(container, plan) {
 // 8b) PENGUMUMAN — hanya administrator yang bisa menulis, tampil ke
 //     semua orang yang login (di awal, dan bisa dibuka lagi kapan saja
 //     lewat menu ⋮ → 📢 Pengumuman).
+//
+//     Setiap pengumuman punya: tanggal dibuat (otomatis), tanggal AKTIF
+//     & tanggal BERAKHIR (diisi administrator), dan STATUS:
+//       - "draft"   : belum ditayangkan -- HANYA administrator yang
+//                     melihatnya (dipakai sebelum siap disebar).
+//       - "done"    : siap tayang -- akan tampil ke SEMUA pengguna,
+//                     tapi HANYA pada rentang tanggal aktif s/d berakhir
+//                     (di luar rentang itu, otomatis tidak tampil sama
+//                     sekali buat pengguna biasa, walau datanya tetap ada).
+//       - "expired" : ditutup manual oleh administrator (tidak tampil
+//                     lagi ke siapa pun walau tanggalnya masih berlaku).
+//     Saat pengumuman sedang berlaku (live), ditampilkan BESAR & mencolok
+//     otomatis begitu pengguna masuk (lihat renderBigAnnouncementBanner).
 // ------------------------------------------------------------
 const ANNOUNCEMENT_SEEN_KEY_PREFIX = "bible_app_announcement_last_seen_v1_";
 
@@ -1324,15 +1357,95 @@ function announcementSeenKey() {
   return ANNOUNCEMENT_SEEN_KEY_PREFIX + (currentUser || "guest");
 }
 
+// yyyy-MM-dd hari ini, dipakai untuk membandingkan tanggal aktif/berakhir
+// (dibandingkan sebagai teks, bukan objek Date, supaya tidak terpengaruh zona waktu jam).
+function todayDateStr() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Apakah pengumuman ini SEDANG BERLAKU untuk pengguna biasa (bukan administrator):
+// status harus "done" (siap tayang, bukan draft/expired), DAN hari ini ada di
+// antara ActiveFrom..ActiveUntil (kosong = tidak dibatasi ke arah itu).
+function announcementIsLive(a) {
+  const status = a.status || "done"; // baris lama (sebelum kolom Status ada) dianggap aktif
+  if (status !== "done") return false;
+  const today = todayDateStr();
+  if (a.activeFrom && today < a.activeFrom) return false;
+  if (a.activeUntil && today > a.activeUntil) return false;
+  return true;
+}
+
+function announcementStatusLabel(a) {
+  const status = a.status || "done";
+  if (status === "draft") return "📝 Draft";
+  if (status === "expired") return "⛔ Expired (ditutup manual)";
+  if (announcementIsLive(a)) return "🟢 Aktif sekarang";
+  const today = todayDateStr();
+  if (a.activeFrom && today < a.activeFrom) return "⏳ Belum waktunya (dijadwalkan)";
+  return "⌛ Expired (lewat tanggal berakhir)";
+}
+
 async function checkAnnouncementsAtStart() {
   if (typeof Sync === "undefined" || !Sync.enabled()) return;
   const list = await Sync.pullAnnouncements();
-  if (!list.length) return;
+  const live = list.filter(announcementIsLive);
+  if (!live.length) return;
   const lastSeen = localStorage.getItem(announcementSeenKey()) || "0";
-  const hasUnseen = list.some((a) => String(a.id) > lastSeen);
+  const hasUnseen = live.some((a) => String(a.id) > lastSeen);
   if (hasUnseen && el("appRoot") && !el("appRoot").hidden) {
-    showAnnouncementPanel(list);
+    showBigAnnouncementBanner(live);
+    markAnnouncementsSeen(live);
   }
+}
+
+// Tampilan BESAR & mencolok yang otomatis muncul begitu ada pengumuman
+// sedang berlaku yang belum pernah dilihat pengguna ini -- terpisah dari
+// panel Pengumuman biasa (menu ⋮) supaya benar-benar tidak terlewat.
+function showBigAnnouncementBanner(liveList) {
+  let overlay = el("announcementBigOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "announcementBigOverlay";
+    overlay.className = "announcement-big-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = "";
+  const box = document.createElement("div");
+  box.className = "announcement-big-box";
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "announcement-big-close";
+  closeBtn.textContent = "✕";
+  closeBtn.setAttribute("aria-label", "Tutup pengumuman");
+  closeBtn.addEventListener("click", () => { overlay.hidden = true; });
+  box.appendChild(closeBtn);
+
+  const title = document.createElement("div");
+  title.className = "announcement-big-title";
+  title.textContent = "📢 Pengumuman";
+  box.appendChild(title);
+
+  liveList.forEach((a) => {
+    const item = document.createElement("div");
+    item.className = "announcement-big-text";
+    item.textContent = a.text;
+    box.appendChild(item);
+    const meta = document.createElement("div");
+    meta.className = "announcement-big-meta";
+    const when = a.createdAt ? new Date(a.createdAt).toLocaleDateString("id-ID") : "";
+    meta.textContent = [a.createdBy, when].filter(Boolean).join(" · ");
+    box.appendChild(meta);
+  });
+
+  const okBtn = document.createElement("button");
+  okBtn.className = "chip-btn primary";
+  okBtn.textContent = "Mengerti";
+  okBtn.addEventListener("click", () => { overlay.hidden = true; });
+  box.appendChild(okBtn);
+
+  overlay.appendChild(box);
+  overlay.hidden = false;
 }
 
 async function showAnnouncementPanel(preloaded) {
@@ -1341,7 +1454,7 @@ async function showAnnouncementPanel(preloaded) {
   logActivity("Pengumuman");
   if (preloaded) {
     renderAnnouncementPanel(preloaded);
-    markAnnouncementsSeen(preloaded);
+    markAnnouncementsSeen(preloaded.filter(announcementIsLive));
     return;
   }
   if (!Sync.enabled()) {
@@ -1371,7 +1484,7 @@ async function showAnnouncementPanel(preloaded) {
     return;
   }
   renderAnnouncementPanel(list);
-  markAnnouncementsSeen(list);
+  markAnnouncementsSeen(list.filter(announcementIsLive));
 }
 
 function markAnnouncementsSeen(list) {
@@ -1393,6 +1506,18 @@ function renderAnnouncementPanel(list) {
     composeWrap.className = "announcement-compose";
     composeWrap.innerHTML = `
       <textarea id="announcementComposeText" rows="3" placeholder="Tulis pengumuman baru untuk semua pengguna…"></textarea>
+      <div class="announcement-compose-dates">
+        <label>Tanggal aktif<br><input type="date" id="announcementActiveFrom"></label>
+        <label>Tanggal berakhir<br><input type="date" id="announcementActiveUntil"></label>
+        <label>Status<br>
+          <select id="announcementStatus">
+            <option value="draft">Draft (belum tayang)</option>
+            <option value="done" selected>Done (siap tayang sesuai tanggal)</option>
+            <option value="expired">Expired (tutup sekarang)</option>
+          </select>
+        </label>
+      </div>
+      <p class="announcement-compose-hint">Pengumuman hanya tampil ke pengguna lain kalau Status = "Done" DAN hari ini ada di antara tanggal aktif s/d tanggal berakhir. Kosongkan tanggal kalau tidak ingin dibatasi.</p>
       <button id="announcementComposeBtn" class="chip-btn primary">Kirim Pengumuman</button>
     `;
     container.appendChild(composeWrap);
@@ -1400,10 +1525,17 @@ function renderAnnouncementPanel(list) {
       const ta = composeWrap.querySelector("#announcementComposeText");
       const text = ta.value.trim();
       if (!text) return;
+      const activeFrom = composeWrap.querySelector("#announcementActiveFrom").value || "";
+      const activeUntil = composeWrap.querySelector("#announcementActiveUntil").value || "";
+      const status = composeWrap.querySelector("#announcementStatus").value || "draft";
+      if (activeFrom && activeUntil && activeFrom > activeUntil) {
+        alert("Tanggal aktif tidak boleh setelah tanggal berakhir.");
+        return;
+      }
       const btn = composeWrap.querySelector("#announcementComposeBtn");
       btn.disabled = true;
       btn.textContent = "Mengirim…";
-      const ok = await Sync.pushAnnouncement(currentUser, text);
+      const ok = await Sync.pushAnnouncement(currentUser, text, activeFrom, activeUntil, status);
       btn.disabled = false;
       btn.textContent = "Kirim Pengumuman";
       if (ok) {
@@ -1415,18 +1547,28 @@ function renderAnnouncementPanel(list) {
     });
   }
 
+  // Pengguna biasa (bukan administrator) hanya boleh melihat pengumuman
+  // yang SEDANG BERLAKU (live) -- draft & yang belum/sudah lewat tanggal
+  // disembunyikan total supaya tidak membingungkan. Administrator melihat
+  // semuanya (termasuk draft & yang terjadwal) supaya bisa mengelola.
+  const visibleList = isAdministrator() ? list : list.filter(announcementIsLive);
+
   const listWrap = document.createElement("div");
   listWrap.className = "announcement-list";
-  if (!list.length) {
+  if (!visibleList.length) {
     listWrap.innerHTML = `<p class="media-empty">Belum ada pengumuman.</p>`;
   }
-  list.forEach((a) => {
+  visibleList.forEach((a) => {
     const item = document.createElement("div");
-    item.className = "announcement-item";
+    item.className = "announcement-item" + (announcementIsLive(a) ? " is-live" : "");
     const when = a.createdAt ? new Date(a.createdAt).toLocaleString("id-ID") : "";
+    const rangeTxt = (a.activeFrom || a.activeUntil)
+      ? `📅 ${a.activeFrom || "…"} s/d ${a.activeUntil || "…"}`
+      : "📅 Tanpa batas tanggal";
     item.innerHTML = `
       <div class="announcement-text"></div>
       <div class="announcement-meta">${a.createdBy || ""}${when ? " · " + when : ""}</div>
+      ${isAdministrator() ? `<div class="announcement-meta">${rangeTxt} · ${announcementStatusLabel(a)}</div>` : ""}
     `;
     item.querySelector(".announcement-text").textContent = a.text; // textContent -> aman dari HTML asing
     if (isAdministrator()) {
@@ -1597,9 +1739,19 @@ function renderCollectionDetailInto(container, id, col) {
   backBtn.addEventListener("click", () => renderCollectionsPanel());
   container.appendChild(backBtn);
 
+  const titleRow = document.createElement("div");
+  titleRow.className = "collection-title-row";
   const title = document.createElement("h2");
   title.textContent = "📚 " + col.name;
-  container.appendChild(title);
+  titleRow.appendChild(title);
+  if (col.verseIds.length) {
+    const fsBtn = document.createElement("button");
+    fsBtn.className = "chip-btn primary";
+    fsBtn.textContent = "⛶ Mode Layar Penuh";
+    fsBtn.addEventListener("click", () => openCollectionFullscreen(col, 0));
+    titleRow.appendChild(fsBtn);
+  }
+  container.appendChild(titleRow);
 
   if (!col.verseIds.length) {
     const p = document.createElement("p");
@@ -1673,7 +1825,139 @@ function renderCollectionDetailInto(container, id, col) {
 }
 
 // ------------------------------------------------------------
-// 8d) LOG AKTIVITAS (khusus administrator) — melihat semua baris log
+// 8c-3) MODE LAYAR PENUH — KUMPULAN AYAT
+//     Membuka satu ayat per layar (besar & fokus), dengan:
+//       - tombol A+/A- sendiri (tidak ikut ukuran huruf pembaca biasa,
+//         supaya bisa dibuat jauh lebih besar khusus di sini)
+//       - navigasi panah ⬅️➡️ di layar, ATAU tombol panah kiri/kanan
+//         di papan ketik (keyboard) untuk pindah ke ayat berikutnya/
+//         sebelumnya di kumpulan yang sama
+//       - catatan pribadi (kalau ada) ikut ditampilkan di bawah ayatnya
+// ------------------------------------------------------------
+const COLLECTION_FS_FONT_KEY = "bible_app_collection_fs_font_v1";
+const COLLECTION_FS_FONT_MIN = 16;
+const COLLECTION_FS_FONT_MAX = 96;
+const COLLECTION_FS_FONT_STEP = 4;
+const COLLECTION_FS_FONT_DEFAULT = 32;
+
+function openCollectionFullscreen(col, startIndex) {
+  let overlay = el("collectionFsOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "collectionFsOverlay";
+    overlay.className = "collection-fs-overlay";
+    document.body.appendChild(overlay);
+  }
+
+  let idx = startIndex || 0;
+  const total = col.verseIds.length;
+
+  function currentFontSize() {
+    return parseInt(localStorage.getItem(COLLECTION_FS_FONT_KEY), 10) || COLLECTION_FS_FONT_DEFAULT;
+  }
+
+  function setFontSize(px) {
+    const clamped = Math.max(COLLECTION_FS_FONT_MIN, Math.min(COLLECTION_FS_FONT_MAX, px));
+    localStorage.setItem(COLLECTION_FS_FONT_KEY, String(clamped));
+    const textEl = overlay.querySelector(".collection-fs-text");
+    if (textEl) textEl.style.fontSize = clamped + "px";
+  }
+
+  function render() {
+    overlay.innerHTML = "";
+    const verseId = col.verseIds[idx];
+    const v = verseById[verseId];
+    const noteText = v ? getPersonalNote(currentUser, verseId) : "";
+    const ref = v ? `${v.bookName} ${v.chapter}:${v.verse}` : verseId;
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "collection-fs-close";
+    closeBtn.textContent = "✕ Tutup";
+    closeBtn.addEventListener("click", closeOverlay);
+    overlay.appendChild(closeBtn);
+
+    const fontRow = document.createElement("div");
+    fontRow.className = "collection-fs-font-row";
+    const minusBtn = document.createElement("button");
+    minusBtn.className = "chip-btn small";
+    minusBtn.textContent = "A-";
+    minusBtn.addEventListener("click", () => setFontSize(currentFontSize() - COLLECTION_FS_FONT_STEP));
+    const plusBtn = document.createElement("button");
+    plusBtn.className = "chip-btn small";
+    plusBtn.textContent = "A+";
+    plusBtn.addEventListener("click", () => setFontSize(currentFontSize() + COLLECTION_FS_FONT_STEP));
+    fontRow.appendChild(minusBtn);
+    fontRow.appendChild(plusBtn);
+    overlay.appendChild(fontRow);
+
+    const box = document.createElement("div");
+    box.className = "collection-fs-box";
+
+    const refEl = document.createElement("div");
+    refEl.className = "collection-fs-ref";
+    refEl.textContent = `${ref}  ·  ${idx + 1} / ${total}`;
+    box.appendChild(refEl);
+
+    const textEl = document.createElement("div");
+    textEl.className = "collection-fs-text";
+    textEl.style.fontSize = currentFontSize() + "px";
+    textEl.textContent = v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
+    box.appendChild(textEl);
+
+    if (noteText) {
+      const noteEl = document.createElement("div");
+      noteEl.className = "collection-fs-note";
+      noteEl.innerHTML = `<div class="collection-fs-note-label">📝 Catatan Anda</div>`;
+      const noteBody = document.createElement("div");
+      noteBody.textContent = noteText;
+      noteEl.appendChild(noteBody);
+      box.appendChild(noteEl);
+    }
+    overlay.appendChild(box);
+
+    const navRow = document.createElement("div");
+    navRow.className = "collection-fs-nav";
+    const prevBtn = document.createElement("button");
+    prevBtn.className = "chip-btn primary";
+    prevBtn.textContent = "⬅️ Sebelumnya";
+    prevBtn.disabled = idx <= 0;
+    prevBtn.addEventListener("click", goPrev);
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "chip-btn primary";
+    nextBtn.textContent = "Selanjutnya ➡️";
+    nextBtn.disabled = idx >= total - 1;
+    nextBtn.addEventListener("click", goNext);
+    navRow.appendChild(prevBtn);
+    navRow.appendChild(nextBtn);
+    overlay.appendChild(navRow);
+
+    const hint = document.createElement("div");
+    hint.className = "collection-fs-hint";
+    hint.textContent = "Gunakan tombol panah kiri/kanan di papan ketik untuk pindah ayat.";
+    overlay.appendChild(hint);
+  }
+
+  function goPrev() {
+    if (idx > 0) { idx -= 1; render(); }
+  }
+  function goNext() {
+    if (idx < total - 1) { idx += 1; render(); }
+  }
+  function onKeyDown(e) {
+    if (e.key === "ArrowLeft") goPrev();
+    else if (e.key === "ArrowRight") goNext();
+    else if (e.key === "Escape") closeOverlay();
+  }
+  function closeOverlay() {
+    overlay.hidden = true;
+    overlay.innerHTML = "";
+    document.removeEventListener("keydown", onKeyDown);
+  }
+
+  document.addEventListener("keydown", onKeyDown);
+  overlay.hidden = false;
+  render();
+}
 //     (menu yang dibuka, pencarian, tanggal/jam, OS, IP) yang sudah
 //     dikumpulkan js/activitylog.js, dengan filter & tombol simpan (CSV).
 // ------------------------------------------------------------
@@ -2145,10 +2429,13 @@ const THEMES = [
   { id: 8, name: "Merah Marun", swatch: "#FBF3F1", ink: "#2E1512" },
   { id: 9, name: "Abu-abu Lembut", swatch: "#EDEEF0", ink: "#24262B" },
   { id: 10, name: "Ungu Senja", swatch: "#17131F", ink: "#EDE7F5" },
+  { id: 11, name: "Putih - Biru", swatch: "#FFFFFF", ink: "#1846C4" },
+  { id: 12, name: "Hitam - Kuning", swatch: "#000000", ink: "#FFE55A" },
+  { id: 13, name: "Pink Pastel", swatch: "#FFEAF3", ink: "#A3225F" },
 ];
 
 function applyTheme(id) {
-  for (let i = 2; i <= 10; i++) document.body.classList.remove("theme-" + i);
+  for (let i = 2; i <= 13; i++) document.body.classList.remove("theme-" + i);
   if (id && id !== 1) document.body.classList.add("theme-" + id);
   localStorage.setItem(THEME_STORAGE_KEY, id);
   document.querySelectorAll("#themePicker .theme-swatch").forEach((btn) => {
@@ -2174,6 +2461,48 @@ function initThemeControl() {
   });
   const saved = parseInt(localStorage.getItem(THEME_STORAGE_KEY), 10) || 1;
   applyTheme(saved);
+}
+
+// ------------------------------------------------------------
+// 11c) JENIS HURUF (Roboto / tebal ala Arial Black / Comic Sans anak-anak)
+//     — mengubah --font-body (dipakai teks ayat) & --font-ui di seluruh
+//     app, tersimpan per perangkat lewat localStorage.
+// ------------------------------------------------------------
+const FONT_FAMILY_STORAGE_KEY = "bible_app_font_family_v1";
+const FONT_FAMILIES = [
+  { id: "default", name: "Bawaan (Literata)", body: '"Literata", Georgia, serif', ui: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif', weight: "400" },
+  { id: "roboto", name: "Roboto", body: '"Roboto", Arial, sans-serif', ui: '"Roboto", Arial, sans-serif', weight: "400" },
+  { id: "tebal", name: "Tebal (ala Arial Black)", body: '"Arial Black", "Arial Bold", Arial, sans-serif', ui: '"Arial Black", "Arial Bold", Arial, sans-serif', weight: "900" },
+  { id: "comic", name: "Comic Sans (huruf lucu anak-anak)", body: '"Comic Sans MS", "Comic Neue", cursive', ui: '"Comic Sans MS", "Comic Neue", cursive', weight: "400" },
+];
+
+function applyFontFamily(id) {
+  const f = FONT_FAMILIES.find((x) => x.id === id) || FONT_FAMILIES[0];
+  document.documentElement.style.setProperty("--font-body", f.body);
+  document.documentElement.style.setProperty("--font-ui", f.ui);
+  document.documentElement.style.setProperty("--font-body-weight", f.weight);
+  localStorage.setItem(FONT_FAMILY_STORAGE_KEY, f.id);
+  document.querySelectorAll("#fontFamilyPicker .font-family-option").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.font === f.id);
+  });
+}
+
+function initFontFamilyControl() {
+  const picker = el("fontFamilyPicker");
+  if (!picker) return;
+  picker.innerHTML = "";
+  FONT_FAMILIES.forEach((f) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "font-family-option";
+    btn.dataset.font = f.id;
+    btn.style.fontFamily = f.body;
+    btn.textContent = "Aa — " + f.name;
+    btn.addEventListener("click", () => applyFontFamily(f.id));
+    picker.appendChild(btn);
+  });
+  const saved = localStorage.getItem(FONT_FAMILY_STORAGE_KEY) || "default";
+  applyFontFamily(saved);
 }
 
 // ------------------------------------------------------------
@@ -2623,6 +2952,20 @@ function initReadingProgressControl() {
   window.addEventListener("scroll", handleScrollForReadingProgress, { passive: true });
 }
 
+// Header di HP bisa melipat jadi 2-3 baris (lihat @media 640px di CSS)
+// tergantung lebar layar/besar huruf antarmuka, jadi tingginya TIDAK selalu
+// sama. Sidebar (laci daftar kitab) dulunya diset mulai dari paling atas
+// layar (top:0) padahal header ada DI ATASNYA dengan z-index lebih tinggi
+// -- akibatnya kitab pertama ("Kejadian") & judul "Perjanjian Lama" suka
+// ketutup header dan tidak kelihatan/tidak bisa ditekan. Perbaikannya:
+// ukur tinggi header sebenarnya lewat JS, simpan sebagai CSS variable
+// --header-h, lalu sidebar (khusus tampilan HP) mulai persis di bawahnya.
+function updateHeaderHeightVar() {
+  const header = document.querySelector(".app-header");
+  if (!header) return;
+  document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+}
+
 // ------------------------------------------------------------
 // 16) EVENT UI UMUM
 // ------------------------------------------------------------
@@ -2673,7 +3016,18 @@ function initUIEvents() {
   initNoteModalEvents();
   initSidebarCollapsedState();
 
-  el("sidebarToggle").addEventListener("click", toggleSidebar);
+  updateHeaderHeightVar();
+  window.addEventListener("resize", updateHeaderHeightVar);
+  window.addEventListener("orientationchange", () => setTimeout(updateHeaderHeightVar, 200));
+  // Header bisa berubah tinggi setelah font antarmuka/tema diganti atau
+  // sesaat setelah halaman selesai memuat gambar/font web -- ukur ulang
+  // sesaat kemudian supaya --header-h selalu akurat.
+  setTimeout(updateHeaderHeightVar, 500);
+
+  el("sidebarToggle").addEventListener("click", () => {
+    toggleSidebar();
+    updateHeaderHeightVar();
+  });
   el("sidebarBackdrop").addEventListener("click", closeSidebarOnMobile);
   window.addEventListener("scroll", handleScrollForReadingIndicator, { passive: true });
 
