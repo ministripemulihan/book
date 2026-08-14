@@ -743,6 +743,179 @@ function openChapterPicker(bookNum) {
     btn.addEventListener("click", () => renderChapter(bookNum, ch));
     grid.appendChild(btn);
   });
+  renderChapterPickerExtra(bookNum);
+}
+
+// ------------------------------------------------------------
+//  Baris tambahan di atas daftar nomor pasal: "📋 Garis Besar Kitab"
+//  (tombol tersendiri sebelum tombol pasal 1, sesuai permintaan),
+//  lalu "📌 Pokok" & "🗺️ Peta+Gambar" -- masing-masing hanya muncul
+//  kalau sheet-nya sudah diisi URL & ada datanya untuk kitab ini.
+//  Cek dilakukan di latar belakang (async) supaya daftar pasal tetap
+//  tampil instan; baris ini menyusul begitu datanya siap.
+// ------------------------------------------------------------
+async function renderChapterPickerExtra(bookNum) {
+  const box = el("chapterPickerExtra");
+  if (!box) return;
+  box.hidden = true;
+  box.innerHTML = "";
+  if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) return;
+
+  const book = BOOKS.find((b) => b.num === bookNum);
+  const [outline, pokok, maps] = await Promise.all([
+    getOutlineForBook(bookNum, currentLang).catch(() => []),
+    getPokokKitabFor(bookNum, currentLang).catch(() => null),
+    getMapImagesForBook(bookNum).catch(() => []),
+  ]);
+  // Kalau kitab yang dibuka sudah berpindah lagi selama menunggu, batalkan.
+  if (!el("chapterPicker") || el("chapterPicker").hidden) return;
+  if (el("chapterPickerTitle").textContent !== book.name) return;
+
+  if (outline.length) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip-btn small book-info-btn";
+    b.textContent = "📋 Garis Besar Kitab";
+    b.title = "Lihat daftar isi/garis besar seluruh kitab " + book.name;
+    b.addEventListener("click", () => openBookInfoPanel(bookNum, "outline"));
+    box.appendChild(b);
+  }
+  if (pokok) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip-btn small book-info-btn";
+    b.textContent = "📌 Pokok";
+    b.title = "Lihat pokok/inti kitab " + book.name;
+    b.addEventListener("click", () => openBookInfoPanel(bookNum, "pokok"));
+    box.appendChild(b);
+  }
+  if (maps.length) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip-btn small book-info-btn";
+    b.textContent = "🗺️ Peta+Gambar";
+    b.title = "Lihat peta/gambar kitab " + book.name;
+    b.addEventListener("click", () => openBookInfoPanel(bookNum, "maps"));
+    box.appendChild(b);
+  }
+  box.hidden = box.children.length === 0;
+}
+
+// ------------------------------------------------------------
+//  Panel "Garis Besar Kitab" (daftar isi berjenjang, bisa diklik utk
+//  langsung buka pasal:ayat) / "Pokok Kitab" / "Peta+Gambar" (galeri
+//  bisa digulir + tombol unduh per gambar).
+// ------------------------------------------------------------
+async function openBookInfoPanel(bookNum, mode) {
+  const book = BOOKS.find((b) => b.num === bookNum);
+  if (!book) return;
+  hideAllPanels();
+  const panel = el("bookInfoPanel");
+  panel.hidden = false;
+  panel.innerHTML = "<p>Memuat…</p>";
+
+  if (mode === "pokok") {
+    const pokok = await getPokokKitabFor(bookNum, currentLang);
+    panel.innerHTML = "";
+    const back = backToChapterPickerBtn(bookNum);
+    const h = document.createElement("h2");
+    h.textContent = "📌 Pokok Kitab " + book.name;
+    const box = document.createElement("div");
+    box.className = "pokok-box";
+    box.textContent = pokok || "Belum ada isinya untuk kitab ini.";
+    panel.appendChild(back);
+    panel.appendChild(h);
+    panel.appendChild(box);
+    return;
+  }
+
+  if (mode === "maps") {
+    const rows = await getMapImagesForBook(bookNum);
+    panel.innerHTML = "";
+    const back = backToChapterPickerBtn(bookNum);
+    const h = document.createElement("h2");
+    h.textContent = "🗺️ Peta+Gambar " + book.name;
+    panel.appendChild(back);
+    panel.appendChild(h);
+    const gallery = document.createElement("div");
+    gallery.className = "map-gallery";
+    if (!rows.length) {
+      const p = document.createElement("p");
+      p.textContent = "Belum ada peta/gambar untuk kitab ini.";
+      gallery.appendChild(p);
+    } else {
+      rows.forEach((r) => {
+        const item = document.createElement("div");
+        item.className = "map-gallery-item";
+        const img = document.createElement("img");
+        img.src = driveImagePreviewUrl(r.link);
+        img.alt = "Peta/gambar " + book.name;
+        img.loading = "lazy";
+        const dl = document.createElement("a");
+        dl.className = "chip-btn small";
+        dl.href = driveDownloadUrl(r.link);
+        dl.target = "_blank";
+        dl.rel = "noopener noreferrer";
+        dl.textContent = "⬇️ Unduh";
+        item.appendChild(img);
+        item.appendChild(dl);
+        gallery.appendChild(item);
+      });
+    }
+    panel.appendChild(gallery);
+    return;
+  }
+
+  // mode === "outline" -> daftar isi berjenjang, klik = langsung buka pasal
+  const entries = await getOutlineForBook(bookNum, currentLang);
+  panel.innerHTML = "";
+  const back = backToChapterPickerBtn(bookNum);
+  const h = document.createElement("h2");
+  h.textContent = "📋 Garis Besar Kitab " + book.name;
+  panel.appendChild(back);
+  panel.appendChild(h);
+  const list = document.createElement("div");
+  list.className = "outline-toc-list";
+  if (!entries.length) {
+    const p = document.createElement("p");
+    p.textContent = "Belum ada garis besar untuk kitab ini.";
+    list.appendChild(p);
+  } else {
+    entries.forEach((entry) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "outline-toc-item level-" + entry.level;
+      item.innerHTML = `<span class="outline-toc-ref">${outlineRangeLabel(book.name, entry)}</span> ${escapeHtml(entry.ringkasan)}`;
+      item.addEventListener("click", () => renderChapter(bookNum, entry.chapterStart, entry.verseStart));
+      list.appendChild(item);
+    });
+  }
+  panel.appendChild(list);
+}
+
+function backToChapterPickerBtn(bookNum) {
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "chip-btn small";
+  back.textContent = "← Kembali ke daftar pasal";
+  back.addEventListener("click", () => openChapterPicker(bookNum));
+  return back;
+}
+
+// Link Google Drive "…/file/d/ID/…" -> URL pratinjau gambar langsung
+// (bisa dipakai sebagai src <img>, beda dari driveOpenUrl() di media.js
+// yang untuk dibuka/diputar, bukan ditampilkan sebagai gambar).
+function driveImagePreviewUrl(url) {
+  if (!url) return "";
+  const m = url.match(/\/file\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
+  if (m) return "https://drive.google.com/thumbnail?id=" + m[1] + "&sz=w1000";
+  return url;
+}
+function driveDownloadUrl(url) {
+  if (!url) return url;
+  const m = url.match(/\/file\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
+  if (m) return "https://drive.google.com/uc?export=download&id=" + m[1];
+  return url;
 }
 
 // Membuat satu blok ayat (nomor, teks, badge catatan, tombol salin) —
@@ -801,11 +974,47 @@ function langLabelFor(code) {
 }
 
 // Tampilan kolom tunggal (perilaku lama / default).
-function renderSingleColumn(wrap, verses, displayName) {
+function renderSingleColumn(wrap, verses, displayName, bookNum, chapter) {
   wrap.classList.remove("reader-columns");
   wrap.removeAttribute("data-cols");
   wrap.innerHTML = "";
   verses.forEach((v, idx) => wrap.appendChild(buildVerseBlock(v, idx, displayName)));
+  insertOutlineHeaders(wrap, bookNum, chapter, verses);
+}
+
+// ------------------------------------------------------------
+//  Menyisipkan judul "Garis Besar" berjenjang (level 1 = besar, 2 =
+//  sedang, 3 = kecil, dst) TEPAT SEBELUM blok ayat pertama dari
+//  rentangnya, mis. sebelum Kejadian 1:1:
+//    Tentang Penciptaan (Kejadian 1:1-1:20)
+//    Cerita awal penciptaan (Kejadian 1:1-1:3)
+//  lalu baru teks ayat 1:1 -- level besar ditulis lebih dulu (di
+//  atas), level kecil di bawahnya, tepat seperti contoh yang diminta.
+//  Dikerjakan ASYNC (data outline dari cache/server) supaya ayat tetap
+//  tampil instan; judul menyusul begitu siap. Dibatalkan otomatis kalau
+//  pasal sudah berpindah lagi sebelum selesai (lihat token).
+// ------------------------------------------------------------
+async function insertOutlineHeaders(wrap, bookNum, chapter, verses) {
+  if (!bookNum || !chapter || typeof getOutlineForBook !== "function") return;
+  const token = (insertOutlineHeaders._token = (insertOutlineHeaders._token || 0) + 1);
+  const all = await getOutlineForBook(bookNum, currentLang).catch(() => []);
+  if (insertOutlineHeaders._token !== token || !all.length || !wrap.isConnected) return;
+  const book = BOOKS.find((b) => b.num === bookNum);
+  const bookName = book ? book.name : "";
+  verses.forEach((v) => {
+    const entries = all
+      .filter((e) => e.chapterStart === chapter && e.verseStart === v.verse)
+      .sort((a, b) => a.level - b.level);
+    if (!entries.length) return;
+    const verseBlock = document.getElementById("v-" + v.id);
+    if (!verseBlock || verseBlock.parentNode !== wrap) return;
+    entries.forEach((entry) => {
+      const h = document.createElement("div");
+      h.className = "outline-heading level-" + entry.level;
+      h.innerHTML = `${escapeHtml(entry.ringkasan)} <span class="outline-heading-ref">(${outlineRangeLabel(bookName, entry)})</span>`;
+      wrap.insertBefore(h, verseBlock);
+    });
+  });
 }
 
 // Tampilan beberapa kolom berdampingan (bahasa berbeda per kolom), untuk
@@ -939,7 +1148,33 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
   if (columnsCount > 1) {
     renderColumnsView(wrap, bookNum, chapter, verses, displayName, columnsCount, columnLangs);
   } else {
-    renderSingleColumn(wrap, verses, displayName);
+    renderSingleColumn(wrap, verses, displayName, bookNum, chapter);
+  }
+
+  // "📌 Pokok Kitab" -- hanya di pasal 1 (awal mula pembacaan kitab ini),
+  // & "📋 Garis Besar" berjenjang disisipkan langsung di dalam
+  // renderSingleColumn() di atas (per rentang ayat, lihat insertOutlineHeaders()).
+  const pokokSlot = el("readerPokokSlot");
+  if (pokokSlot) {
+    pokokSlot.hidden = true;
+    pokokSlot.innerHTML = "";
+    if (chapter === 1 && typeof getPokokKitabFor === "function") {
+      const pokokToken = (renderChapter._pokokToken = (renderChapter._pokokToken || 0) + 1);
+      getPokokKitabFor(bookNum, currentLang).then((pokok) => {
+        if (renderChapter._pokokToken !== pokokToken || !pokok) return;
+        const box = document.createElement("div");
+        box.className = "pokok-box pokok-box-inline";
+        const label = document.createElement("div");
+        label.className = "pokok-box-label";
+        label.textContent = "📌 Pokok Kitab " + displayName;
+        const text = document.createElement("div");
+        text.textContent = pokok;
+        box.appendChild(label);
+        box.appendChild(text);
+        pokokSlot.appendChild(box);
+        pokokSlot.hidden = false;
+      }).catch(() => {});
+    }
   }
 
   const chapters = getChaptersForBook(currentLang, bookNum);
@@ -2611,6 +2846,7 @@ function hideAllPanels() {
   if (el("collectionsPanel")) el("collectionsPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
+  if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
 }
 function showEmptyState() {
   hideAllPanels();
