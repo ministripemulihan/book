@@ -625,8 +625,42 @@ input { font-family: inherit; }
   color: var(--brass); text-transform: uppercase; letter-spacing: .04em;
   margin-bottom: 4px;
 }
-.result-text { font-size: 15px; line-height: 1.55; color: var(--ink); }
+/* Memakai variabel yang sama dengan tombol A-/A+ di header (js/app.js
+   applyFontSize()), supaya hasil pencarian juga ikut membesar/mengecil,
+   bukan cuma teks di layar baca pasal. */
+.result-text { font-size: var(--verse-font-size, 15px); line-height: 1.55; color: var(--ink); }
 .result-text mark { background: var(--brass-soft); color: var(--ink); border-radius: 3px; }
+
+.search-results-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.search-results-head h2 { margin: 0; }
+/* Tombol A-/A+ khusus panel pencarian: SELALU tampil (beda dari
+   .font-size-control di header yang baru muncul mulai lebar 600px),
+   supaya di HP pun ada cara memperbesar/memperkecil huruf saat mencari. */
+.monitor-pin-editor { background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px; margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.monitor-pin-row { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.monitor-pin-count { font-size: 12px; color: var(--ink-soft); }
+.search-font-size-control { display: flex !important; flex-shrink: 0; }
+
+/* ---------------- Pemutar media sebaris (tombol bulat) ---------------- */
+.inline-media-block { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.round-media-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.round-media-btn {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--petrol); color: #fff; border: none;
+  font-size: 19px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  transition: transform .12s ease;
+}
+.round-media-btn:hover { transform: scale(1.07); }
+.round-media-btn:active { transform: scale(.96); }
+.inline-media-slot:empty { margin: 0; }
+.inline-media-player { width: 100%; max-width: 480px; display: block; border-radius: 8px; }
+.inline-media-youtube { aspect-ratio: 16 / 9; height: auto; border: none; }
+.inline-media-close { margin-top: 4px; }
+.reader-media-slot { margin: 4px 0 14px; }
+.plan-day-row-media, .collection-verse-actions { margin-top: 6px; }
 
 /* ============================================================
    PEMBACAAN AYAT / PASAL
