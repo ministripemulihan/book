@@ -62,6 +62,54 @@ function noteHtmlToPlainText(html) {
   return (template.content.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Mengubah referensi silang gaya OSIS (mis. "Psa_74:16", "Gen_1:8") yang ada
+// di dalam teks Catatan menjadi TOMBOL yang bisa diklik -- saat diklik, ayat
+// yang dirujuk langsung tampil SEBARIS di bawahnya (lihat
+// toggleInlineVerseRefPreview()), TIDAK membuka tab/jendela baru. Dijalankan
+// SETELAH sanitizeNoteHtml() supaya hanya beroperasi pada HTML yang sudah
+// aman (tag & atribut liar sudah dibuang).
+function linkifyOsisReferences(safeHtml) {
+  if (!safeHtml) return safeHtml;
+  return safeHtml.replace(/\b([1-3]?[A-Za-z]{2,4})_(\d+):(\d+)\b/g, (m, abbr, chapter, verse) => {
+    const book = OSIS_ABBR_INDEX[abbr.toLowerCase()];
+    if (!book) return m;
+    const label = `${book.name} ${chapter}:${verse}`;
+    return `<button type="button" class="note-verse-ref" data-book="${book.num}" data-chapter="${chapter}" data-verse="${verse}">📖 ${label}</button>`;
+  });
+}
+
+// Menampilkan/menyembunyikan ayat yang dirujuk TEPAT DI BAWAH tombol
+// referensinya (di dalam panel catatan yang sama) -- bahasanya SAMA dengan
+// bahasa ayat/catatan yang sedang dibuka (`lang`), bukan bahasa lain, dan
+// TIDAK membuka tab/jendela/pembaca baru.
+function toggleInlineVerseRefPreview(btn, lang) {
+  const existing = btn.nextElementSibling;
+  if (existing && existing.classList && existing.classList.contains("note-verse-ref-preview")) {
+    existing.remove();
+    btn.classList.remove("active");
+    return;
+  }
+  const bookNum = parseInt(btn.dataset.book, 10);
+  const chapter = parseInt(btn.dataset.chapter, 10);
+  const verseNum = parseInt(btn.dataset.verse, 10);
+  const found = getChapterVerses(lang, bookNum, chapter).find((x) => x.verse === verseNum);
+  const book = BOOKS.find((b) => b.num === bookNum);
+
+  const preview = document.createElement("div");
+  preview.className = "note-verse-ref-preview";
+  const refEl = document.createElement("div");
+  refEl.className = "note-verse-ref-preview-ref";
+  refEl.textContent = `${book ? book.name : bookNum} ${chapter}:${verseNum}`;
+  preview.appendChild(refEl);
+  const textEl = document.createElement("div");
+  textEl.className = "note-verse-ref-preview-text";
+  textEl.textContent = found ? found.text : `(ayat tidak ditemukan di bahasa ini — ${langLabelFor(lang)})`;
+  preview.appendChild(textEl);
+
+  btn.classList.add("active");
+  btn.insertAdjacentElement("afterend", preview);
+}
+
 // Salin teks ke clipboard, lalu beri umpan-balik singkat pada tombol (ikon
 // berubah jadi ✓ sesaat) supaya pengguna tahu penyalinan berhasil.
 function copyTextWithFeedback(text, btn) {
@@ -1156,7 +1204,13 @@ function buildInlineNoteCardEl(v, block) {
     adminWrap.appendChild(label);
     const adminText = document.createElement("div");
     adminText.className = "note-modal-admin-text";
-    adminText.innerHTML = sanitizeNoteHtml(v.note);
+    adminText.innerHTML = linkifyOsisReferences(sanitizeNoteHtml(v.note));
+    adminText.addEventListener("click", (e) => {
+      const btn = e.target.closest(".note-verse-ref");
+      if (!btn) return;
+      e.stopPropagation();
+      toggleInlineVerseRefPreview(btn, v.lang);
+    });
     adminWrap.appendChild(adminText);
     wrap.appendChild(adminWrap);
   }
@@ -4067,8 +4121,8 @@ function cleanArticulationForSpeech(text) {
   if (!text) return text;
   let out = text.replace(/\([a-zA-Z]{1,2}\)/g, " ");
   out = out.replace(/\b([1-3]?[A-Za-z]{2,4})_(\d+):(\d+)\b/g, (m, abbr, chapter, verse) => {
-    const fullName = OSIS_ABBR_INDEX[abbr.toLowerCase()];
-    return fullName ? `${fullName} ${chapter} ayat ${verse}` : `${abbr} ${chapter} ayat ${verse}`;
+    const book = OSIS_ABBR_INDEX[abbr.toLowerCase()];
+    return book ? `${book.name} ${chapter} ayat ${verse}` : `${abbr} ${chapter} ayat ${verse}`;
   });
   return out.replace(/\s{2,}/g, " ").trim();
 }
