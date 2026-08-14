@@ -177,19 +177,27 @@ paket lama akan dihapus).
 > jadi kalau dikonfigurasi, progres yang sama akan muncul saat dibuka dari
 > HP maupun komputer lain dengan akun yang sama.
 
-## Klik ayat untuk melihat & menulis catatan
+## Catatan ayat — tekan DUA KALI nomor ayat (sejak Agustus 2026: sebaris, bukan jendela lagi)
 
-Setiap ayat sekarang **bisa diklik** — akan muncul jendela kecil (mirip
-aplikasi catatan) berisi:
+Setiap **nomor ayat** sekarang tombol bulat — **tekan dua kali** untuk buka/tutup
+panel catatannya. Sekali tekan sengaja **tidak** melakukan apa-apa (supaya
+tidak "salah tekan" cuma karena menggulir/scroll dekat nomor ayat). Panel
+catatan muncul **di bawah ayat itu sendiri** (sebaris, mendorong ayat di
+bawahnya turun) — BUKAN lagi jendela/modal terapung yang menutupi ayat lain.
+Lebarnya otomatis sama persis dengan lebar teks ayat, di HP maupun komputer.
 
-- Teks ayat yang dipilih.
-- **Catatan dari Sheet Alkitab** (kolom `Note`), kalau kolom itu diisi
-  untuk ayat tersebut — ditandai ikon 📝 kecil pada ayat yang punya catatan.
+Isi panelnya:
+- **Catatan dari Sheet Alkitab** (kolom `Note`), kalau kolom itu diisi untuk
+  ayat tersebut — ditandai ikon 📝 kecil pada ayat yang punya catatan.
 - **Kotak catatan pribadi** — setiap pengguna bisa menulis renungan/catatan
-  sendiri untuk ayat mana pun, lalu klik **Simpan Catatan**. Catatan ini
+  sendiri untuk ayat mana pun, lalu tekan **💾 Simpan Catatan**. Catatan ini
   tersimpan lokal secara instan, dan (kalau sinkronisasi Google Sheet
   dikonfigurasi) juga tersimpan ke Google Sheet supaya bisa dibaca lagi dari
   perangkat lain.
+- Tombol salin ayat, salin catatan, dan simpan ke Kumpulan Ayat.
+
+Kalau datang dari menu "🗒️ Catatan Saya" (ayat yang sudah punya catatan),
+panel catatannya langsung terbuka otomatis — tidak perlu tekan dua kali lagi.
 
 ## Pembacaan suara (▶️ / ⏸ di header)
 
@@ -861,6 +869,67 @@ sempat ditanyakan ulang:
 - Tag **@username / @all** & **Ganti Password** — lihat "Update lanjutan
   tahap 6" di atas.
 
+## Update lanjutan (Agustus 2026, tahap 9) — perbaikan MP3/MP4 Drive, Pokok/Garis Besar tidak tampil, loading awal, & catatan ayat sebaris
+
+1. **MP3/MP4 dari Google Drive akhirnya bisa diputar langsung di halaman**
+   — sebelumnya link Drive (`open?id=...`, `file/d/.../view`, dst) dipasang
+   LANGSUNG sebagai `src` elemen `<audio>`/`<video>`, padahal itu halaman
+   HTML Drive, bukan berkas mentah, jadi browser gagal memutarnya (diam
+   saja, tanpa pesan error). Sekarang link Drive ditanam lewat **iframe
+   pratinjau resmi Drive** (`.../preview`), yang memang didukung Google
+   untuk ditanam di halaman lain dan langsung memutar audio/videonya.
+   Link BUKAN Drive (dihosting sendiri/tempat lain) tetap memakai elemen
+   `<audio>`/`<video>` asli seperti sebelumnya.
+   - Berkas: `js/media.js`, `css/style.css`.
+
+2. **Pokok Kitab / Garis Besar / Peta+Gambar tidak tampil** — dugaan kuat
+   penyebabnya: pencocokan kolom & kode bahasa yang sebelumnya HARUS PERSIS
+   SAMA (termasuk spasi/tanda baca di judul kolom, dan kode bahasa harus
+   persis "ind"/"eng"/dst, bukan "Indonesia"/"Inggris"). Sekarang:
+   - Nama kolom dicocokkan LONGGAR (dibuang semua spasi/tanda baca, huruf
+     kecil semua) — `findFieldLoose()`.
+   - Nilai kolom "Bahasa" diterjemahkan lewat kamus alias umum
+     ("Indonesia"/"ID"/"Indo" → `ind`, "Inggris"/"English" → `eng`, dst) —
+     `normalizeLangValue()` & `LANG_NAME_ALIASES`.
+   - Ada fallback bertingkat: bahasa aktif → bahasa Indonesia → bahasa
+     apa saja yang tersedia untuk kitab itu (lebih baik tampil salah
+     bahasa daripada tidak tampil sama sekali).
+   - **Catatan jujur**: ini perbaikan berdasar dugaan paling mungkin (tidak
+     bisa memastikan 100% tanpa mengakses sheet Anda langsung) — kalau
+     masih belum tampil setelah update ini, kemungkinan ada sebab lain
+     (mis. sheet belum dipublikasikan ulang, atau kolom Book Number kosong).
+   - Berkas: `js/outlines.js`.
+
+3. **Loading awal yang membingungkan** — sekarang SETIAP unduhan data
+   Alkitab pertama kali (termasuk saat WiFi) menampilkan info singkat dulu
+   sebelum loading dimulai: ukuran perkiraan (~51 MB, bisa diubah di
+   `CONFIG.BIBLE_DATA_APPROX_SIZE_MB`), kenapa cuma sekali, dan kira-kira
+   berapa lama. Tombol menu ⋮ → 🔄 Sinkronkan ulang Alkitab / 📥 Unduh Data
+   Alkitab sekarang juga sadar WiFi vs data seluler (`confirmAndSync()`),
+   jadi kalau ada data baru di sheet nanti dan Anda sinkron ulang saat
+   tidak yakin sedang WiFi, tetap akan diberi tahu dulu.
+   - Berkas: `js/app.js`, `js/config.js`.
+
+4. **Catatan ayat: dari jendela/modal → sebaris di bawah ayatnya sendiri**
+   — sebelumnya klik ayat (di mana saja pada bloknya) membuka jendela
+   melayang yang menutupi ayat-ayat lain ("ketumpuk-tumpuk"), dan lebarnya
+   di komputer cuma sebagian layar. Sekarang:
+   - **Nomor ayat** jadi tombol bulat — **tekan SEKALI tidak melakukan
+     apa-apa** (supaya tidak "salah tekan" waktu menggulir/scroll), **tekan
+     DUA KALI** untuk buka/tutup panel catatannya.
+   - Panel catatan muncul **sebaris di bawah ayat itu sendiri** (mendorong
+     ayat di bawahnya, bukan menutupi) — lebarnya otomatis sama persis
+     dengan lebar teks ayat, di HP maupun komputer, tidak perlu diatur
+     lebar terpisah lagi.
+   - Jendela/modal lama (`#noteModalBackdrop` dkk di `index.html`, dan
+     `openNoteModal()`/`closeNoteModal()`/`saveNoteFromModal()`/
+     `initNoteModalEvents()` di `js/app.js`) sudah dilepas total, diganti
+     `buildInlineNoteCardEl()` / `toggleInlineNote()` /
+     `updateVerseNoteBadge()`.
+   - Kalau datang dari menu "🗒️ Catatan Saya", panel catatan ayat yang
+     dituju langsung terbuka otomatis (tidak perlu tekan dua kali lagi).
+   - Berkas: `js/app.js`, `index.html`, `css/style.css`.
+
 ## Belum termasuk / perlu info tambahan dari Anda dulu
 
 - ✅ **Data Rencana Baca "PB 1 Tahun" & "PL 2 Tahun" 4 bahasa/tab** —
@@ -900,3 +969,73 @@ bible-app/
 ├── sample-users.csv      contoh data pengguna untuk uji coba lokal
 └── vercel.json           konfigurasi hosting Vercel
 ```
+
+## Update lanjutan (Agustus 2026, tahap 10) — pencarian catatan, ganti password terpusat, Last_Read_Day
+
+1. **Pencarian "Ayat & Catatan" sekarang benar-benar mencari di kolom Note
+   Sheet Alkitab** — sebelumnya opsi "2. Ayat & Catatan" salah memakai
+   fungsi pencarian **catatan pribadi** (padahal itu seharusnya untuk
+   opsi "3. Catatan Saya"), jadi hasil catatannya kosong/salah kalau
+   belum pernah menulis catatan pribadi. Sekarang "Ayat & Catatan"
+   mencari di field **Note** yang datang dari Sheet Alkitab sendiri
+   (kolom terakhir: `Bahasa;Verse ID;Book Name;Book Number;Chapter;
+   Verse;Text;Note` — yang tampil sebagai badge 📝 saat membaca), ikut
+   disaring bahasa & Perjanjian Lama/Baru sama seperti pencarian ayat.
+   "3. Catatan Saya" TIDAK berubah — tetap mencari catatan pribadi Anda
+   sendiri seperti sebelumnya.
+   - Berkas: `js/app.js` (`runKeywordSearch()` dirombak, `searchInBibleNotes()`
+     baru), `index.html` (label opsi diperjelas jadi "Ayat & Catatan (Alkitab)").
+
+2. **"Kumpulan Ayat" — sudah lebih dulu ada, dicek ulang & dikonfirmasi
+   sesuai permintaan**: daftar kumpulan sudah terurut terbaru dulu
+   (`renderCollectionsPanel()`, diurutkan dari `createdAt`), dan tombol
+   hapus (🗑️) per kumpulan sudah ada (`deleteCollection()`). Tidak ada
+   perubahan kode di bagian ini — tidak dikerjakan ulang.
+
+3. **Ganti Password sekarang menyimpan LANGSUNG ke Sheet Pengguna asli
+   (satu sumber data yang sama dengan login)** — sebelumnya password baru
+   disimpan di tab terpisah "PasswordOverrides" pada Sheet Sinkron. Sesuai
+   permintaan, `apps-script/Code.gs` sekarang punya `USER_DB_ID` (ID
+   Spreadsheet Sheet Pengguna) di bagian atas file — begitu diisi, Ganti
+   Password langsung membaca/menulis kolom **Password** pada Sheet
+   Pengguna itu sendiri (dicari lewat nama header & baris username,
+   longgar terhadap variasi spasi/huruf besar-kecil). Kalau `USER_DB_ID`
+   dikosongkan atau gagal dibuka (mis. sheet dihapus/izin beda akun),
+   otomatis kembali memakai tab "PasswordOverrides" lama supaya fitur
+   tetap jalan.
+   - Berkas: `apps-script/Code.gs` (`USER_DB_ID`, `BIBLE_DB_ID`,
+     `getUserSheet_()`, `findUserColumn_()`, `findUserRow_()` baru;
+     `readPasswordOverride_()`/`setPasswordOverride_()` dirombak).
+   - **PENTING — WAJIB DILAKUKAN AGAR INI AKTIF**: buka
+     `apps-script/Code.gs` di Apps Script editor Anda, deploy ulang
+     lewat **Deploy → Manage deployments → ikon pensil → Version: New
+     version → Deploy** (URL tetap sama, tidak perlu ganti di
+     `config.js`). Skrip Apps Script Anda (akun yang menjalankan "Execute
+     as: Me") juga harus punya akses EDIT ke Spreadsheet `USER_DB_ID` itu
+     (biasanya otomatis kalau pemilik sheet-nya akun yang sama).
+
+4. **Kolom tambahan Sheet Pengguna ("Login awal") mulai dikenali
+   aplikasi**, mengikuti contoh xlsx yang dikirim: `Plan, Start_Date,
+   Last_Read_Day, Bahasa, Language, No Efata ID, Saudara/i,
+   Digembalakan, PB_Aktif, PB_Tanggal_Mulai, PB_Bahasa, PB_History,
+   PL_Aktif, PL_Tanggal_Mulai, PL_Bahasa, PL_History` — semuanya
+   opsional, dibaca longgar (nama kolom boleh pakai spasi atau
+   underscore), disimpan di `user.extra.*` untuk dipakai fitur
+   berikutnya (belum ada tampilan UI khusus untuk field ini, hanya
+   dibaca/disiapkan dulu — beri tahu field mana yang mau ditampilkan
+   di mana kalau mau dilanjutkan).
+   - **Pembacaan terakhir (Last_Read_Day) SUDAH aktif**: setiap kali
+     membuka pasal baru, aplikasi mengirim label ringkas (mis.
+     "Kejadian 1") ke kolom `Last_Read_Day` pada Sheet Pengguna asli
+     (lewat endpoint baru `last_read` di Code.gs) — best-effort, diam-diam
+     diabaikan kalau offline/kolom belum ada di sheet Anda.
+   - Berkas: `js/csv.js` (`normalizeUserRecord()` dirombak), `js/app.js`
+     (`pushLastReadPosition()` baru, dipanggil dari `renderChapter()`),
+     `js/sync.js` (`pushLastRead()` baru), `apps-script/Code.gs`
+     (`saveLastRead_()` baru, tipe `last_read` di `doPost()`),
+     `sample-users.csv` (header diperbarui jadi contoh lengkap).
+   - **Catatan**: kolom `Username` pada Sheet Pengguna Anda **harus ada di
+     kolom paling kiri yang dikenali sebagai header "Username"** (posisi
+     kolom bebas, dicari lewat nama header, bukan harus kolom A) —
+     kalau Sheet Anda memakai nama header persis seperti daftar di atas,
+     semuanya otomatis ketemu tanpa perlu ubah apa pun lagi.
