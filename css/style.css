@@ -91,6 +91,26 @@ body.theme-10 { /* Ungu Senja */
   --rule: #33293F; --petrol: #B695E0; --petrol-dark: #8E6BBE; --brass: #E0B860;
   --brass-soft: #4C3F26; --danger: #E5766A; --shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
+body.theme-14 { /* Biru Pastel Muda (sesuai permintaan: latar biru muda pastel, tulisan biru pastel tua) */
+  --paper: #DCEBFF; --paper-raised: #EAF3FF; --ink: #1F3E7A; --ink-soft: #3E5C9E;
+  --rule: #C3D9F7; --petrol: #1F3E7A; --petrol-dark: #14295A; --brass: #3E5C9E;
+  --brass-soft: #C3D9F7; --danger: #C0392B;
+}
+body.theme-15 { /* Merah Tua (sesuai permintaan: latar merah tua, tulisan putih) */
+  --paper: #6E1414; --paper-raised: #7E1C1C; --ink: #FFFFFF; --ink-soft: #F3CFCF;
+  --rule: #8F2C2C; --petrol: #FFFFFF; --petrol-dark: #F0DADA; --brass: #FFE0B2;
+  --brass-soft: #4A0D0D; --danger: #FFB4A8; --shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+body.theme-16 { /* Hijau Tua Pastel (sesuai permintaan: latar hijau tua pastel, tulisan kuning pastel) */
+  --paper: #1F3A28; --paper-raised: #274732; --ink: #FFE98A; --ink-soft: #E8D488;
+  --rule: #33553F; --petrol: #FFE98A; --petrol-dark: #D8C060; --brass: #FFE98A;
+  --brass-soft: #3A5A32; --danger: #FF9E80; --shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tulisan oranye pastel) */
+  --paper: #FFF3B0; --paper-raised: #FFF8CE; --ink: #C6712B; --ink-soft: #D48F52;
+  --rule: #F5E08A; --petrol: #C6712B; --petrol-dark: #9C551E; --brass: #D48F52;
+  --brass-soft: #F5E08A; --danger: #C0392B;
+}
 .theme-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 4px 0; }
 
 /* Pemilih jenis huruf (Roboto / tebal ala Arial Black / Comic Sans anak-anak) */
@@ -111,7 +131,9 @@ body.theme-10 { /* Ungu Senja */
 .tts-lang-row select { flex: 1; max-width: 60%; }
 .tts-rate-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.9rem; color: var(--ink-soft); }
 .tts-rate-value { min-width: 40px; text-align: center; font-weight: 600; color: var(--ink); }
+.tts-note-toggle { margin-top: 4px; }
 .chip-btn.small { padding: 4px 8px; font-size: 0.82rem; }
+.chip-btn.small.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
 .chip-btn.danger-outline { border-color: var(--danger); color: var(--danger); }
 .chip-btn.danger-outline:hover { background: var(--danger); color: #fff; }
 
@@ -121,6 +143,7 @@ body.theme-10 { /* Ungu Senja */
 .search-options-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0 16px; font-size: 0.85rem; color: var(--ink-soft); }
 .search-options-row label { display: flex; align-items: center; gap: 6px; }
 .search-options-row select { padding: 4px 6px; }
+.search-mode-row { display: flex; align-items: center; gap: 6px; }
 .result-note-tag { font-size: 0.78em; color: var(--ink-soft); font-weight: 400; }
 
 /* ============================================================
@@ -768,6 +791,11 @@ input { font-family: inherit; }
 }
 .round-media-btn:hover { transform: scale(1.07); }
 .round-media-btn:active { transform: scale(.96); }
+.round-media-btn.share-variant {
+  width: 36px; height: 36px; font-size: 15px;
+  background: var(--paper-raised); color: var(--petrol);
+  border: 1px solid var(--rule); box-shadow: none;
+}
 .inline-media-slot:empty { margin: 0; }
 .inline-media-player { width: 100%; max-width: 480px; display: block; border-radius: 8px; }
 .inline-media-youtube { aspect-ratio: 16 / 9; height: auto; border: none; }
@@ -981,6 +1009,11 @@ input { font-family: inherit; }
   padding: 20px 22px 24px;
   animation: noteModalUp .22s cubic-bezier(.2,.7,.3,1);
 }
+/* Di layar komputer (bukan HP), lebar catatan dilebarkan supaya tidak
+   kelihatan kecil di tengah-tengah layar besar. */
+@media (min-width: 900px) {
+  .note-modal { max-width: min(920px, 92vw); }
+}
 @keyframes noteModalUp {
   from { transform: translateY(24px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
@@ -1000,7 +1033,7 @@ input { font-family: inherit; }
   font-family: var(--font-display); font-weight: 600; font-size: 18px; color: var(--petrol);
 }
 .note-modal-verse {
-  font-family: var(--font-body); font-size: 18px; line-height: 1.7;
+  font-family: var(--font-body); font-size: var(--verse-font-size, 18px); line-height: 1.7;
   color: var(--ink); margin: 0 0 16px;
   padding: 12px 14px;
   background: var(--paper);
@@ -1019,8 +1052,12 @@ input { font-family: inherit; }
 .note-modal-label-row .note-modal-label { margin-bottom: 0; }
 
 .note-modal-admin { margin-bottom: 18px; }
+/* Ukuran huruf catatan (Note) sekarang mengikuti pengaturan A+/A- ukuran
+   huruf ayat (--verse-font-size) supaya di komputer tidak kelihatan kecil
+   dibanding teks ayat, dan tetap bisa diperbesar/diperkecil dari tombol
+   A+/A- yang sama. */
 .note-modal-admin-text {
-  font-size: 14px; font-style: italic; color: var(--ink-soft); margin: 0;
+  font-size: var(--verse-font-size, 16px); font-style: italic; color: var(--ink-soft); margin: 0;
   line-height: 1.6;
   max-height: 40vh; overflow-y: auto; padding-right: 4px;
 }
@@ -1046,6 +1083,7 @@ input { font-family: inherit; }
   text-align: center; color: var(--ink-soft); font-family: var(--font-body);
   font-size: 16px; margin-top: 60px;
 }
+.empty-state .chip-btn { margin-top: 12px; }
 
 @media (max-width: 480px) {
   .search-form input { font-size: 13px; }
