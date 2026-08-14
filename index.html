@@ -89,6 +89,7 @@
       <!-- Tampil hanya untuk administrator -->
       <button id="logViewerBtn" class="more-menu-btn" hidden>📊 Log Aktivitas</button>
       <button id="resyncBtn" class="more-menu-btn">🔄 Sinkronkan ulang Alkitab</button>
+      <button id="downloadBibleBtn" class="more-menu-btn">📥 Unduh Data Alkitab</button>
       <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
 
       <div class="more-menu-section">
@@ -153,6 +154,13 @@
           <span id="ttsRateValue" class="tts-rate-value">1.0x</span>
           <button type="button" id="ttsRateUp" class="chip-btn small">+ Cepat</button>
         </div>
+        <label class="more-menu-toggle tts-note-toggle" for="ttsReadNotesToggle">
+          <span>📝 Ikut baca Catatan (Note)</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="ttsReadNotesToggle" />
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
       </div>
 
       <label class="more-menu-toggle" for="readingAnimToggle">
@@ -232,6 +240,11 @@
                   <option value="PB">Perjanjian Baru</option>
                 </select>
               </label>
+              <div class="search-mode-row">
+                <span>Mode:</span>
+                <button type="button" id="searchModeNormal" class="chip-btn small active" title="Pencarian cepat, dibatasi supaya tidak lambat">Normal</button>
+                <button type="button" id="searchModeMax" class="chip-btn small" title="Cari semua hasil tanpa batas — bisa lambat kalau katanya sangat umum">⚡ Maks</button>
+              </div>
             </div>
             <div id="searchResultsList"></div>
           </div>
