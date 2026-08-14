@@ -248,4 +248,24 @@ const Sync = {
       return false;
     }
   },
+
+  // ---------------- Pembacaan terakhir (Last_Read_Day) ----------------
+  // Mengirim posisi bacaan terakhir (label ringkas, mis. "Kejadian 1") ke
+  // kolom "Last_Read_Day" pada Sheet Pengguna asli -- best-effort, tidak
+  // memblokir tampilan (dipanggil dari js/app.js pushLastReadPosition()
+  // setiap kali pasal baru dibuka, sudah dibatasi supaya tidak terlalu
+  // sering lewat throttle di sisi pemanggil).
+  async pushLastRead(username, label) {
+    try {
+      const data = await this._post({
+        type: "last_read",
+        username,
+        label,
+        updatedAt: new Date().toISOString(),
+      });
+      return (data && data.ok) || false;
+    } catch (e) {
+      return false; // offline -- diam-diam diabaikan, bukan fitur penting
+    }
+  },
 };
