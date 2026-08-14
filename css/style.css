@@ -255,6 +255,34 @@ body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 }
 .collection-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
 .collection-title-row h2 { margin: 0; }
+.collection-title-row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ============================================================
+   DIALOG KECIL GENERIK -- dipakai a.l. oleh pemilihan/penggantian
+   nama Kumpulan Ayat (menggantikan prompt() lama yang cuma kotak
+   ketik polos)
+   ============================================================ */
+.simple-dialog-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(20, 15, 10, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.simple-dialog-box {
+  background: var(--paper); color: var(--ink);
+  border-radius: 14px; padding: 20px; width: 100%; max-width: 420px;
+  max-height: 85vh; overflow-y: auto;
+  border: 1px solid var(--rule); box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+.simple-dialog-box h3 { margin: 0 0 14px; font-family: var(--font-ui); }
+.simple-dialog-field { margin-bottom: 14px; }
+.simple-dialog-field label { display: block; margin-bottom: 6px; font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); }
+.simple-dialog-field select,
+.simple-dialog-field input[type="text"] {
+  width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
+}
+.simple-dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 
 /* ============================================================
    MODE LAYAR PENUH — KUMPULAN AYAT (satu ayat per layar, besar,
@@ -270,12 +298,19 @@ body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
   align-self: flex-end; background: transparent; border: 1px solid var(--rule);
   border-radius: 8px; padding: 6px 12px; color: var(--ink); font-size: 14px; margin-bottom: 8px;
 }
-.collection-fs-font-row { display: flex; gap: 8px; margin-bottom: 18px; }
+.collection-fs-font-row { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
 .collection-fs-box {
   max-width: 760px; width: 100%; flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; gap: 18px; margin: auto 0;
+  transition: max-width 0.15s ease;
 }
+/* Tombol toggle lebar (⛶ lebar HP <-> lebar komputer) -- default sempit
+   (nyaman dibaca di HP), tekan sekali untuk memakai lebar penuh layar
+   komputer. Dipilih tetap tersimpan (lihat COLLECTION_FS_WIDTH_KEY). */
+.collection-fs-overlay.fs-wide .collection-fs-box { max-width: min(1400px, 96vw); }
+.collection-fs-font-select { max-width: 220px; }
+#ttsRecordBtn.recording { background: var(--danger); color: #fff; border-color: var(--danger); }
 .collection-fs-ref { font-family: var(--font-ui); font-weight: 700; color: var(--brass); font-size: 16px; }
 .collection-fs-text { font-family: var(--font-body); font-weight: var(--font-body-weight, 400); line-height: 1.6; }
 .collection-fs-note {
