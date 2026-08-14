@@ -1656,8 +1656,19 @@ const SEARCH_CAP_MAX = 100000;
 
 // scope: "verse" | "notes" | "both". lang: kode bahasa, atau "__all__" untuk semua bahasa.
 // testament: "__all__" | "PL" | "PB" -- menyaring hasil AYAT saja berdasar Perjanjian
-// Lama/Baru kitabnya (lihat BOOKS di js/books.js, field "testament"); tidak berlaku
-// untuk hasil catatan pribadi (catatan tidak selalu terikat satu kitab tertentu).
+// Lama/Baru kitabnya (lihat BOOKS di js/books.js, field "testament").
+//
+// PENTING (diperbaiki): field pencarian "catatan" di sini SELALU mengacu ke
+// kolom Note pada SHEET ALKITAB -- field TERAKHIR dari 8 kolom sheet "Isi
+// Alkitab" (Bahasa; Verse ID; Book Name; Book Number; Chapter; Verse; Text;
+// Note) -- yaitu catatan kaki bawaan Alkitab itu sendiri, BUKAN catatan
+// pribadi pengguna (catatan pribadi punya menu & pencarian sendiri lewat
+// "🗒️ Catatan Saya"). Dulu opsi ke-3 keliru mencari di catatan pribadi
+// (searchInPersonalNotes), sehingga kata yang jelas ADA di kolom Note sheet
+// tidak pernah ketemu -- sekarang dibetulkan supaya ketiga opsi konsisten:
+//   1. Ayat                -> hanya teks ayat
+//   2. Ayat + Catatan Kaki -> teks ayat DAN kolom Note
+//   3. Catatan Kaki        -> hanya kolom Note
 function runKeywordSearch(query, lang, scope, testament, mode) {
   const q = query.trim().toLowerCase();
   if (q.length < 2) return { verseResults: [], noteResults: [] };
@@ -1683,15 +1694,10 @@ function runKeywordSearch(query, lang, scope, testament, mode) {
   }
 
   let noteResults = [];
-  if (useScope === "both") {
-    // "Ayat & Catatan" -- catatan di sini adalah kolom Note dari SHEET ALKITAB
-    // (catatan admin/penjelasan per ayat, mis. footnote rvind), BUKAN catatan
-    // pribadi pengguna. Dicari di teks polosnya (tag HTML dibuang dulu) supaya
-    // markup <p>/<FR> dst tidak mengganggu pencocokan kata.
+  if (useScope === "both" || useScope === "notes") {
+    // Dicari di teks polosnya (tag HTML dibuang dulu) supaya markup <p>/<FR>
+    // dst dari kolom Note tidak mengganggu pencocokan kata.
     noteResults = searchInBibleNotes(filteredPool(), q, cap);
-  } else if (useScope === "notes") {
-    // "Catatan Saya" -- catatan pribadi milik pengguna yang sedang login.
-    noteResults = searchInPersonalNotes(q, cap);
   }
   return { verseResults, noteResults, cap };
 }
@@ -1715,6 +1721,10 @@ function searchInBibleNotes(pool, q, cap) {
 }
 
 // Mencari di catatan pribadi milik pengguna yang sedang login (js/notes.js).
+// Catatan: TIDAK dipakai lagi oleh kotak pencarian utama (lihat penjelasan
+// di runKeywordSearch() di atas) -- catatan pribadi sudah punya tempatnya
+// sendiri di menu "🗒️ Catatan Saya" (semua catatan langsung terlihat di
+// sana tanpa perlu dicari). Fungsi ini dibiarkan ada kalau-kalau dibutuhkan lagi nanti.
 function searchInPersonalNotes(q, cap) {
   const notes = loadLocalNotes(currentUser);
   const out = [];
@@ -1880,7 +1890,7 @@ function handleSearch(rawQuery, isOptionChange) {
     : "";
   el("searchResultsTitle").textContent =
     `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
-    (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan)` : "") +
+    (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan kaki)` : "") +
     ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali` + modeHint;
   const list = el("searchResultsList");
   list.innerHTML = "";
@@ -1915,7 +1925,7 @@ function handleSearch(rawQuery, isOptionChange) {
     const btn = document.createElement("button");
     btn.className = "result-item";
     const ref = n.verse ? `${n.verse.bookName} ${n.verse.chapter}:${n.verse.verse}` : n.verseId;
-    const tag = n.isPersonal ? "(catatan Anda)" : "(catatan)";
+    const tag = "(catatan kaki)";
     btn.innerHTML = `
       <div class="result-ref">📝 ${ref} <span class="result-note-tag">${tag}</span></div>
       <div class="result-text">${highlightAllMatches(n.note, query)}</div>
@@ -2558,18 +2568,150 @@ function renderNotesMenuPanel() {
 //     nama (mis. "SPR 17 Agustus 2026"), ditambahkan dari modal catatan
 //     (tombol "📚 Simpan ke Kumpulan Ayat"), dibuka lagi dari menu ini.
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// Dialog kecil generik (pengganti prompt()/confirm() bawaan browser yang
+// polos) -- dipakai untuk memilih/menambah Kumpulan Ayat & mengganti
+// namanya, supaya kumpulan yang sudah ada bisa langsung DIPILIH dari daftar
+// (bukan diketik ulang manual & rawan salah ketik/beda kapital).
+// ------------------------------------------------------------
+function closeSimpleDialog() {
+  const existing = el("simpleDialogOverlay");
+  if (existing) existing.remove();
+}
+// bodyBuilderFn(box) -> harus mengembalikan fungsi getValue() yang dipanggil
+// saat tombol konfirmasi ditekan; getValue() mengembalikan null/undefined
+// untuk membatalkan penutupan (mis. validasi belum lolos), atau nilai apa
+// pun untuk diteruskan ke onConfirm(value).
+function showSimpleDialog(title, bodyBuilderFn, onConfirm, confirmLabel) {
+  closeSimpleDialog();
+  const overlay = document.createElement("div");
+  overlay.id = "simpleDialogOverlay";
+  overlay.className = "simple-dialog-overlay";
+  const box = document.createElement("div");
+  box.className = "simple-dialog-box";
+  const h = document.createElement("h3");
+  h.textContent = title;
+  box.appendChild(h);
+
+  const getValue = bodyBuilderFn(box);
+
+  const actions = document.createElement("div");
+  actions.className = "simple-dialog-actions";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "chip-btn small";
+  cancelBtn.textContent = "Batal";
+  cancelBtn.addEventListener("click", closeSimpleDialog);
+  const okBtn = document.createElement("button");
+  okBtn.type = "button";
+  okBtn.className = "chip-btn small primary";
+  okBtn.textContent = confirmLabel || "Simpan";
+  okBtn.addEventListener("click", () => {
+    const val = getValue();
+    if (val === null || val === undefined) return;
+    closeSimpleDialog();
+    onConfirm(val);
+  });
+  actions.appendChild(cancelBtn);
+  actions.appendChild(okBtn);
+  box.appendChild(actions);
+
+  overlay.appendChild(box);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSimpleDialog(); });
+  document.addEventListener("keydown", function escHandler(e) {
+    if (e.key === "Escape") { closeSimpleDialog(); document.removeEventListener("keydown", escHandler); }
+  });
+  document.body.appendChild(overlay);
+  return box;
+}
+
+// Dulu pakai prompt() polos (ketik nama, rawan salah ketik/beda kapital
+// dari kumpulan yang sudah ada). Sekarang: kumpulan yang sudah ada tampil
+// sebagai KUMPULAN YANG BISA DIPILIH (dropdown) -- kalau mau kumpulan lain,
+// tinggal pilih dari daftar; kalau memang beda/baru, pilih "Buat kumpulan
+// baru…" lalu ketik namanya.
 function handleAddToCollection(verse) {
   if (!verse) return;
   const collections = loadCollections(currentUser);
-  const names = Object.values(collections).map((c) => c.name);
-  const hint = names.length
-    ? `Kumpulan yang sudah ada: ${names.join(", ")}.\n\nKetik salah satu nama di atas untuk menambah ke situ, atau ketik nama baru untuk membuat kumpulan baru:`
-    : 'Nama kumpulan ayat (mis. "SPR 17 Agustus 2026"):';
-  const name = prompt(hint);
-  if (!name || !name.trim()) return;
-  addVerseToCollection(currentUser, name.trim(), verse.id);
-  logActivity("Simpan ke Kumpulan Ayat");
-  alert(`Ayat disimpan ke kumpulan "${name.trim()}".`);
+  const ids = Object.keys(collections).sort((a, b) => collections[a].name.localeCompare(collections[b].name));
+
+  showSimpleDialog("📚 Simpan ke Kumpulan Ayat", (box) => {
+    const field1 = document.createElement("div");
+    field1.className = "simple-dialog-field";
+    const label1 = document.createElement("label");
+    label1.textContent = "Kumpulan ayat:";
+    field1.appendChild(label1);
+    const select = document.createElement("select");
+    ids.forEach((id) => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = `${collections[id].name} (${collections[id].verseIds.length} ayat)`;
+      select.appendChild(opt);
+    });
+    const newOpt = document.createElement("option");
+    newOpt.value = "__new__";
+    newOpt.textContent = "+ Buat kumpulan baru…";
+    select.appendChild(newOpt);
+    field1.appendChild(select);
+    box.appendChild(field1);
+
+    const field2 = document.createElement("div");
+    field2.className = "simple-dialog-field";
+    const label2 = document.createElement("label");
+    label2.textContent = "Nama kumpulan baru:";
+    field2.appendChild(label2);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = 'mis. "SPR 17 Agustus 2026"';
+    field2.appendChild(input);
+    box.appendChild(field2);
+
+    function syncFieldVisibility() {
+      field2.hidden = select.value !== "__new__";
+      if (!field2.hidden) input.focus();
+    }
+    if (!ids.length) select.value = "__new__";
+    select.addEventListener("change", syncFieldVisibility);
+    syncFieldVisibility();
+
+    return () => {
+      if (select.value === "__new__") {
+        const name = input.value.trim();
+        if (!name) { input.focus(); return null; }
+        return name;
+      }
+      return collections[select.value].name;
+    };
+  }, (name) => {
+    addVerseToCollection(currentUser, name, verse.id);
+    logActivity("Simpan ke Kumpulan Ayat");
+    alert(`Ayat disimpan ke kumpulan "${name}".`);
+  }, "Simpan");
+}
+
+// Mengganti nama kumpulan (mis. kalau salah ketik) lewat dialog kecil,
+// bukan prompt() polos, supaya nama lama tetap terlihat sebagai isian awal.
+function handleRenameCollection(id, col) {
+  showSimpleDialog("✏️ Ganti Nama Kumpulan", (box) => {
+    const field = document.createElement("div");
+    field.className = "simple-dialog-field";
+    const label = document.createElement("label");
+    label.textContent = "Nama baru:";
+    field.appendChild(label);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = col.name;
+    field.appendChild(input);
+    box.appendChild(field);
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+    return () => {
+      const val = input.value.trim();
+      return val ? val : null;
+    };
+  }, (newName) => {
+    renameCollection(currentUser, id, newName);
+    renderCollectionsPanel(id);
+  }, "Ganti Nama");
 }
 
 function showCollectionsPanel() {
@@ -2616,6 +2758,12 @@ function renderCollectionsPanel(openId) {
       openBtn.innerHTML = `<div class="plan-option-title">${escapeHtml(col.name)}</div><div class="plan-option-sub">${col.verseIds.length} ayat</div>`;
       openBtn.addEventListener("click", () => renderCollectionsPanel(id));
 
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "icon-btn";
+      renameBtn.title = "Ganti nama kumpulan ini";
+      renameBtn.textContent = "✏️";
+      renameBtn.addEventListener("click", () => handleRenameCollection(id, col));
+
       const delBtn = document.createElement("button");
       delBtn.className = "icon-btn";
       delBtn.title = "Hapus kumpulan ini";
@@ -2628,6 +2776,7 @@ function renderCollectionsPanel(openId) {
       });
 
       row.appendChild(openBtn);
+      row.appendChild(renameBtn);
       row.appendChild(delBtn);
       list.appendChild(row);
     });
@@ -2646,13 +2795,21 @@ function renderCollectionDetailInto(container, id, col) {
   const title = document.createElement("h2");
   title.textContent = "📚 " + col.name;
   titleRow.appendChild(title);
+  const titleBtns = document.createElement("div");
+  titleBtns.className = "collection-title-row-btns";
+  const renameBtn = document.createElement("button");
+  renameBtn.className = "chip-btn small";
+  renameBtn.textContent = "✏️ Ganti Nama";
+  renameBtn.addEventListener("click", () => handleRenameCollection(id, col));
+  titleBtns.appendChild(renameBtn);
   if (col.verseIds.length) {
     const fsBtn = document.createElement("button");
     fsBtn.className = "chip-btn primary";
     fsBtn.textContent = "⛶ Mode Layar Penuh";
     fsBtn.addEventListener("click", () => openCollectionFullscreen(col, 0));
-    titleRow.appendChild(fsBtn);
+    titleBtns.appendChild(fsBtn);
   }
+  titleRow.appendChild(titleBtns);
   container.appendChild(titleRow);
 
   if (!col.verseIds.length) {
@@ -2741,6 +2898,14 @@ const COLLECTION_FS_FONT_MIN = 16;
 const COLLECTION_FS_FONT_MAX = 96;
 const COLLECTION_FS_FONT_STEP = 4;
 const COLLECTION_FS_FONT_DEFAULT = 32;
+// Lebar mode layar penuh: "narrow" (lebar HP, teks di tengah, nyaman
+// dibaca) atau "wide" (memakai lebar penuh layar komputer). Tersimpan
+// supaya pilihan terakhir tetap dipakai lain kali dibuka.
+const COLLECTION_FS_WIDTH_KEY = "bible_app_collection_fs_width_v1";
+// Jenis huruf khusus mode layar penuh Kumpulan Ayat -- terpisah dari jenis
+// huruf pembaca biasa (FONT_FAMILIES di bagian 11), supaya bisa diganti
+// bebas di sini tanpa mengubah tampilan baca pasal biasa.
+const COLLECTION_FS_FONT_FAMILY_KEY = "bible_app_collection_fs_font_family_v1";
 
 function openCollectionFullscreen(col, startIndex) {
   let overlay = el("collectionFsOverlay");
@@ -2765,8 +2930,33 @@ function openCollectionFullscreen(col, startIndex) {
     if (textEl) textEl.style.fontSize = clamped + "px";
   }
 
+  function currentWidthMode() {
+    return localStorage.getItem(COLLECTION_FS_WIDTH_KEY) === "wide" ? "wide" : "narrow";
+  }
+  function setWidthMode(mode) {
+    localStorage.setItem(COLLECTION_FS_WIDTH_KEY, mode);
+    overlay.classList.toggle("fs-wide", mode === "wide");
+    if (widthBtnRef) {
+      widthBtnRef.textContent = mode === "wide" ? "📱 Lebar HP" : "🖥️ Lebar Komputer";
+      widthBtnRef.title = mode === "wide" ? "Pakai lebar sempit (ala HP)" : "Pakai lebar penuh layar komputer";
+    }
+  }
+  let widthBtnRef = null;
+
+  function currentFontFamily() {
+    const id = localStorage.getItem(COLLECTION_FS_FONT_FAMILY_KEY) || "default";
+    return FONT_FAMILIES.find((f) => f.id === id) || FONT_FAMILIES[0];
+  }
+  function setFontFamily(id) {
+    localStorage.setItem(COLLECTION_FS_FONT_FAMILY_KEY, id);
+    const f = FONT_FAMILIES.find((x) => x.id === id) || FONT_FAMILIES[0];
+    const textEl = overlay.querySelector(".collection-fs-text");
+    if (textEl) { textEl.style.fontFamily = f.body; textEl.style.fontWeight = f.weight; }
+  }
+
   function render() {
     overlay.innerHTML = "";
+    overlay.classList.toggle("fs-wide", currentWidthMode() === "wide");
     const verseId = col.verseIds[idx];
     const v = verseById[verseId];
     const noteText = v ? getPersonalNote(currentUser, verseId) : "";
@@ -2790,6 +2980,31 @@ function openCollectionFullscreen(col, startIndex) {
     plusBtn.addEventListener("click", () => setFontSize(currentFontSize() + COLLECTION_FS_FONT_STEP));
     fontRow.appendChild(minusBtn);
     fontRow.appendChild(plusBtn);
+
+    // Toggle lebar layar penuh: lebar HP (sempit, di tengah) <-> lebar
+    // penuh layar komputer -- supaya di komputer tidak lagi terlihat
+    // sempit/tidak maksimal.
+    const widthBtn = document.createElement("button");
+    widthBtn.className = "chip-btn small";
+    widthBtnRef = widthBtn;
+    widthBtn.addEventListener("click", () => setWidthMode(currentWidthMode() === "wide" ? "narrow" : "wide"));
+    setWidthMode(currentWidthMode());
+    fontRow.appendChild(widthBtn);
+
+    // Ganti jenis huruf khusus tampilan ini.
+    const fontSel = document.createElement("select");
+    fontSel.className = "columns-lang-select collection-fs-font-select";
+    fontSel.title = "Ganti jenis huruf";
+    FONT_FAMILIES.forEach((f) => {
+      const opt = document.createElement("option");
+      opt.value = f.id;
+      opt.textContent = f.name;
+      fontSel.appendChild(opt);
+    });
+    fontSel.value = currentFontFamily().id;
+    fontSel.addEventListener("change", () => setFontFamily(fontSel.value));
+    fontRow.appendChild(fontSel);
+
     overlay.appendChild(fontRow);
 
     const box = document.createElement("div");
@@ -2803,6 +3018,8 @@ function openCollectionFullscreen(col, startIndex) {
     const textEl = document.createElement("div");
     textEl.className = "collection-fs-text";
     textEl.style.fontSize = currentFontSize() + "px";
+    textEl.style.fontFamily = currentFontFamily().body;
+    textEl.style.fontWeight = currentFontFamily().weight;
     textEl.textContent = v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
     box.appendChild(textEl);
 
@@ -3714,9 +3931,14 @@ function loadTTSSettings() {
       gender: raw.gender || "any",
       rate: typeof raw.rate === "number" ? raw.rate : 1.0,
       readNotes: !!raw.readNotes,
+      // "Rapikan artikulasi" -- membersihkan tanda kurung penanda footnote
+      // (mis. "(a)") & merapikan referensi ayat gaya OSIS (mis. "Psa_74:16"
+      // -> "Mazmur 74:16") supaya lebih enak didengar. Default AKTIF karena
+      // tanpa ini pembacaan catatan kaki jadi aneh (huruf per huruf).
+      parseArticulation: raw.parseArticulation === undefined ? true : !!raw.parseArticulation,
     };
   } catch (e) {
-    return { lang: CONFIG.TTS_LANG || "id-ID", gender: "any", rate: 1.0, readNotes: false };
+    return { lang: CONFIG.TTS_LANG || "id-ID", gender: "any", rate: 1.0, readNotes: false, parseArticulation: true };
   }
 }
 function saveTTSSettings(settings) {
@@ -3785,6 +4007,27 @@ function initTTSControls() {
       if (ttsPlaying) { stopTTS(); playTTS(); }
     });
   }
+
+  const parseToggle = el("ttsParseArticulationToggle");
+  if (parseToggle) {
+    parseToggle.checked = !!ttsSettings.parseArticulation;
+    parseToggle.addEventListener("change", () => {
+      ttsSettings.parseArticulation = parseToggle.checked;
+      saveTTSSettings(ttsSettings);
+      if (ttsPlaying) { stopTTS(); playTTS(); }
+    });
+  }
+
+  const recordBtn = el("ttsRecordBtn");
+  if (recordBtn && !recordBtn.dataset.wired) {
+    recordBtn.dataset.wired = "1";
+    if (!("mediaDevices" in navigator) || !navigator.mediaDevices.getDisplayMedia || typeof MediaRecorder === "undefined") {
+      recordBtn.disabled = true;
+      recordBtn.title = "Rekam ke MP3 tidak didukung di perangkat/browser ini (coba Chrome di komputer)";
+    } else {
+      recordBtn.addEventListener("click", toggleTTSRecording);
+    }
+  }
 }
 
 function pickVoice() {
@@ -3809,6 +4052,25 @@ function pickVoice() {
     pool.find((v) => /google/i.test(v.name)) ||
     pool[0]
   );
+}
+
+// "Rapikan artikulasi" -- dipakai khusus untuk teks CATATAN KAKI (kolom
+// Note) sebelum dibacakan TTS, supaya markup penanda footnote & referensi
+// silang gaya OSIS tidak dibaca huruf per huruf / tanda baca per tanda
+// baca. Contoh isi Note asli (setelah noteHtmlToPlainText membuang tag
+// <p>/<br> dst): "(a)siang,  Psa_74:16; Jer_33:20 (b)jadilah,  Gen_1:8, …"
+//   - "(a)" / "(b)" dst -> dibuang (cuma penanda huruf footnote, tidak
+//     berarti apa-apa kalau dibaca "buka kurung a tutup kurung").
+//   - "Psa_74:16" -> "Mazmur 74:16" (nama kitab Indonesia + tanpa garis
+//     bawah), dicocokkan lewat OSIS_ABBR_INDEX di js/books.js.
+function cleanArticulationForSpeech(text) {
+  if (!text) return text;
+  let out = text.replace(/\([a-zA-Z]{1,2}\)/g, " ");
+  out = out.replace(/\b([1-3]?[A-Za-z]{2,4})_(\d+):(\d+)\b/g, (m, abbr, chapter, verse) => {
+    const fullName = OSIS_ABBR_INDEX[abbr.toLowerCase()];
+    return fullName ? `${fullName} ${chapter} ayat ${verse}` : `${abbr} ${chapter} ayat ${verse}`;
+  });
+  return out.replace(/\s{2,}/g, " ").trim();
 }
 
 function setSpeakingHighlight(block) {
@@ -3845,7 +4107,9 @@ function playTTS() {
   currentChapterVerses.forEach((v, idx) => {
     let spoken = `Ayat ${v.verse}. ${v.text}`;
     if (ttsSettings.readNotes && v.note && v.note.trim()) {
-      spoken += ` Catatan. ${noteHtmlToPlainText(v.note)}`;
+      let noteSpoken = noteHtmlToPlainText(v.note);
+      if (ttsSettings.parseArticulation) noteSpoken = cleanArticulationForSpeech(noteSpoken);
+      spoken += ` Catatan. ${noteSpoken}`;
     }
     const utter = new SpeechSynthesisUtterance(spoken);
     if (voice) utter.voice = voice;
@@ -3888,6 +4152,161 @@ function stopTTS() {
 function toggleTTS() {
   if (ttsPlaying) pauseTTS();
   else playTTS();
+}
+
+// ------------------------------------------------------------
+// 13b) REKAM PEMBACAAN SUARA -> MP3 (eksperimental)
+//   Web Speech API TIDAK punya cara resmi memberi berkas audio mentahnya
+//   (suaranya diputar langsung oleh sistem operasi/browser, bukan lewat
+//   berkas yang bisa diambil). Satu-satunya cara merekamnya dari sisi web
+//   adalah lewat izin "rekam audio tab ini" (getDisplayMedia) -- makanya
+//   tombol ini akan memunculkan kotak pilih tab/layar dari browser; pilih
+//   TAB INI dan WAJIB centang "Bagikan audio tab" supaya suaranya ikut
+//   terekam. Paling didukung di Chrome versi komputer.
+//   Rekaman mentahnya (webm) lalu diubah ke MP3 di perangkat sendiri
+//   memakai encoder lamejs (dimuat dari CDN hanya saat tombol ini dipakai).
+// ------------------------------------------------------------
+let ttsRecordState = null; // { recorder, stream } selama sedang merekam
+
+function loadLamejs() {
+  if (window.lamejs) return Promise.resolve(window.lamejs);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js";
+    s.onload = () => resolve(window.lamejs);
+    s.onerror = () => reject(new Error("Gagal memuat encoder MP3 (perlu koneksi internet)"));
+    document.head.appendChild(s);
+  });
+}
+
+function floatTo16BitPCM(float32Array) {
+  const out = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
+async function encodeBlobToMp3(webmBlob) {
+  const lamejs = await loadLamejs();
+  const arrayBuffer = await webmBlob.arrayBuffer();
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioCtx();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  const sampleRate = audioBuffer.sampleRate;
+  const samples = floatTo16BitPCM(audioBuffer.getChannelData(0));
+  const encoder = new lamejs.Mp3Encoder(1, sampleRate, 128);
+  const blockSize = 1152;
+  const mp3Chunks = [];
+  for (let i = 0; i < samples.length; i += blockSize) {
+    const chunk = samples.subarray(i, i + blockSize);
+    const buf = encoder.encodeBuffer(chunk);
+    if (buf.length > 0) mp3Chunks.push(new Int8Array(buf));
+  }
+  const end = encoder.flush();
+  if (end.length > 0) mp3Chunks.push(new Int8Array(end));
+  audioCtx.close();
+  return new Blob(mp3Chunks, { type: "audio/mp3" });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+function updateTTSRecordButton(recording, busy) {
+  const btn = el("ttsRecordBtn");
+  if (!btn) return;
+  btn.classList.toggle("recording", !!recording);
+  btn.textContent = busy ? "⏳" : recording ? "⏺️ Berhenti" : "🎙️ Rekam MP3";
+  btn.title = busy
+    ? "Sedang memproses rekaman menjadi MP3…"
+    : recording
+    ? "Berhenti merekam"
+    : "Rekam pembacaan pasal ini & unduh sebagai MP3";
+}
+
+function toggleTTSRecording() {
+  if (ttsRecordState) stopTTSRecording();
+  else startTTSRecording();
+}
+
+async function startTTSRecording() {
+  if (!currentChapterVerses.length) {
+    alert("Buka pasal yang mau dibaca dulu.");
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  } catch (e) {
+    return; // dibatalkan pengguna di kotak pilih tab -- diamkan saja
+  }
+  const audioTracks = stream.getAudioTracks();
+  if (!audioTracks.length) {
+    alert('Tidak ada audio yang terekam. Ulangi, lalu pastikan mencentang "Bagikan audio tab/sistem" saat memilih tab.');
+    stream.getTracks().forEach((t) => t.stop());
+    return;
+  }
+  stream.getVideoTracks().forEach((t) => t.stop()); // video tidak dipakai, cukup ditutup
+
+  const audioOnlyStream = new MediaStream(audioTracks);
+  let recorder;
+  try {
+    recorder = new MediaRecorder(audioOnlyStream);
+  } catch (e) {
+    alert("Perekaman tidak didukung di browser ini.");
+    stream.getTracks().forEach((t) => t.stop());
+    return;
+  }
+  const chunks = [];
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    updateTTSRecordButton(false, true);
+    try {
+      const webmBlob = new Blob(chunks, { type: "audio/webm" });
+      const mp3Blob = await encodeBlobToMp3(webmBlob);
+      downloadBlob(mp3Blob, `bacaan-${new Date().toISOString().slice(0, 10)}.mp3`);
+    } catch (err) {
+      alert("Gagal mengubah rekaman ke MP3: " + err.message);
+    } finally {
+      updateTTSRecordButton(false, false);
+    }
+  };
+  // Kalau pengguna menutup kotak share dari UI browser (bukan tombol kita)
+  audioTracks[0].addEventListener("ended", () => stopTTSRecording());
+
+  ttsRecordState = { recorder, stream };
+  recorder.start();
+  updateTTSRecordButton(true);
+  stopTTS();
+  playTTS();
+
+  const watchInterval = setInterval(() => {
+    if (!ttsPlaying) {
+      clearInterval(watchInterval);
+      setTimeout(() => stopTTSRecording(), 600); // jeda kecil biar ekor suara ikut rekam
+    }
+  }, 300);
+  ttsRecordState.watchInterval = watchInterval;
+}
+
+function stopTTSRecording() {
+  if (!ttsRecordState) return;
+  if (ttsRecordState.watchInterval) clearInterval(ttsRecordState.watchInterval);
+  if (ttsRecordState.recorder && ttsRecordState.recorder.state !== "inactive") {
+    ttsRecordState.recorder.stop();
+  }
+  ttsRecordState = null;
+  stopTTS();
 }
 
 // ------------------------------------------------------------
