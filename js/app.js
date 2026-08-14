@@ -2694,6 +2694,55 @@ function initFullscreenControl() {
 }
 
 // ------------------------------------------------------------
+// 12b) WAKE LOCK — mencegah layar HP mati sendiri (yang otomatis
+//     menghentikan suara: TTS Google Voice maupun audio/video MP3/MP4
+//     sebaris) selama sedang memutar sesuatu. Dipakai bareng oleh TTS
+//     (bagian 13 di bawah) dan pemutar media sebaris (js/media.js).
+//     CATATAN JUJUR: Wake Lock API hanya menjaga LAYAR TETAP MENYALA
+//     (tidak mengunci sendiri) selama tab ini aktif di depan -- ini
+//     BUKAN solusi supaya suara tetap jalan kalau pengguna sendiri yang
+//     menekan tombol kunci layar HP atau berpindah ke aplikasi lain;
+//     itu tetap batasan sistem operasi HP yang tidak bisa dijamin penuh
+//     dari sisi web biasa. Didukung sebagian besar Chrome/Android &
+//     Safari/iOS versi baru; browser yang tidak mendukung akan otomatis
+//     dilewati tanpa error.
+// ------------------------------------------------------------
+let activeWakeLock = null;
+let wakeLockWantedCount = 0; // berapa pemutar (TTS/media) yang sedang minta layar tetap menyala
+
+async function requestWakeLock() {
+  wakeLockWantedCount++;
+  if (activeWakeLock || !("wakeLock" in navigator)) return;
+  try {
+    activeWakeLock = await navigator.wakeLock.request("screen");
+    activeWakeLock.addEventListener("release", () => { activeWakeLock = null; });
+  } catch (e) {
+    activeWakeLock = null; // ditolak (mis. tab tidak aktif di depan) -- diabaikan, pemutaran tetap jalan seperti biasa
+  }
+}
+
+function releaseWakeLock() {
+  wakeLockWantedCount = Math.max(0, wakeLockWantedCount - 1);
+  if (wakeLockWantedCount === 0 && activeWakeLock) {
+    activeWakeLock.release().catch(() => {});
+    activeWakeLock = null;
+  }
+}
+
+// Wake Lock otomatis dilepas browser saat tab disembunyikan (pindah app
+// sebentar/layar dikunci) -- begitu tab terlihat lagi DAN masih ada yang
+// minta (TTS/media sedang jalan), coba minta ulang otomatis.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && wakeLockWantedCount > 0 && !activeWakeLock) {
+      navigator.wakeLock && navigator.wakeLock.request("screen")
+        .then((wl) => { activeWakeLock = wl; wl.addEventListener("release", () => { activeWakeLock = null; }); })
+        .catch(() => {});
+    }
+  });
+}
+
+// ------------------------------------------------------------
 // 13) PEMBACAAN SUARA (Web Speech API — memakai suara Google
 //     bawaan browser/Android bila tersedia). Tombol Play/Pause
 //     membacakan pasal yang sedang terbuka, ayat demi ayat, sambil
@@ -2832,6 +2881,7 @@ function playTTS() {
   if (window.speechSynthesis.paused && window.speechSynthesis.pending === false && window.speechSynthesis.speaking) {
     window.speechSynthesis.resume();
     ttsPlaying = true;
+    requestWakeLock();
     updateTTSButton();
     return;
   }
@@ -2853,6 +2903,7 @@ function playTTS() {
     if (idx === currentChapterVerses.length - 1) {
       utter.onend = () => {
         ttsPlaying = false;
+        releaseWakeLock();
         setSpeakingHighlight(null);
         updateTTSButton();
       };
@@ -2861,12 +2912,14 @@ function playTTS() {
   });
 
   ttsPlaying = true;
+  requestWakeLock();
   updateTTSButton();
 }
 
 function pauseTTS() {
   if (!ttsSupported) return;
   if (window.speechSynthesis.speaking) window.speechSynthesis.pause();
+  if (ttsPlaying) releaseWakeLock();
   ttsPlaying = false;
   updateTTSButton();
 }
@@ -2874,6 +2927,7 @@ function pauseTTS() {
 function stopTTS() {
   if (!ttsSupported) return;
   window.speechSynthesis.cancel();
+  if (ttsPlaying) releaseWakeLock();
   ttsPlaying = false;
   setSpeakingHighlight(null);
   updateTTSButton();
