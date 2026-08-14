@@ -1,4 +1,4 @@
-# Aplikasi Baca Alkitab (2 Google Sheet, multi-bahasa, rencana baca)
+# Aplikasi Baca Alkitab (Multi-Google Sheet, multi-bahasa, rencana baca)
 
 Aplikasi web statis (tanpa build/backend) untuk membaca Alkitab, mencari ayat
 (mis. `kejadian 1:1`), mencari kata di seluruh isi Alkitab, membaca satu pasal
@@ -217,10 +217,21 @@ browser/OS masing-masing perangkat.
 
 Selain dua Sheet utama (Alkitab & Pengguna), Anda bisa **opsional**
 menambahkan satu Google Sheet lagi khusus untuk menyimpan **catatan
-pribadi per ayat**, **progres rencana baca**, dan **pengaturan pribadi**
-(mis. nyala/mati animasi progres membaca), supaya semuanya bisa dibuka
-sama persis dari HP maupun komputer lain (bukan cuma tersimpan di satu
-perangkat).
+pribadi per ayat**, **progres rencana baca**, **pengaturan pribadi**
+(mis. nyala/mati animasi progres membaca), dan **📚 Kumpulan Ayat**,
+supaya semuanya bisa dibuka sama persis dari HP maupun komputer lain
+(bukan cuma tersimpan di satu perangkat).
+
+> **Kumpulan Ayat & link 🎵MP3/🎬MP4/▶️YouTube**: yang disinkronkan untuk
+> tiap kumpulan hanyalah NAMA kumpulan + daftar ayatnya. Link
+> MP3/MP4/YouTube-nya sendiri TIDAK ikut disimpan di kumpulan — setiap
+> kali kumpulan dibuka, aplikasi mencocokkan kitab+pasal tiap ayat ke
+> sheet **Bacaan Bersuara** (`CONFIG.READING_MEDIA_SHEETS`, lihat bagian
+> di bawah) dan menampilkan tombolnya kalau ketemu. Jadi: (1) kumpulan
+> ayat ikut sama di HP lain manapun selama Apps Script di bawah sudah
+> diisi, dan (2) kalau link di sheet Bacaan Bersuara diganti/diperbarui,
+> kumpulan yang sudah ada otomatis ikut memakai link terbaru itu, tanpa
+> perlu diedit ulang.
 
 > **Kenapa bukan di Sheet Pengguna (login/password)?** Sheet Pengguna
 > dipublikasikan sebagai CSV read-only supaya bisa dibaca aplikasi untuk
@@ -321,33 +332,286 @@ kiri-kanan, seperti sebelumnya) atau **↕️ Atas-bawah** (tiap bahasa
 ditumpuk vertikal, dipisah garis putus-putus) — sesuai selera masing-masing.
 Tetap bisa kembali ke **1 Kolom** biasa kapan saja lewat tombol yang sama.
 
-## Bacaan Bersuara harian (ikon 🎧 di header — MP3/MP4/YouTube)
+## Bacaan Bersuara harian (MP3/MP4/YouTube — sejak Agustus 2026 tergabung di menu 📅 Rencana Baca)
 
-Panel terpisah yang menampilkan daftar rentang bacaan harian beserta link
-dengar (MP3), tonton (MP4), dan YouTube — diambil dari sheet **terpisah**
-dari sheet Alkitab utama (kolom: `No/Nomor | Pembacaan | Link MP3 | Link MP4
-| Youtube`). **Teks Alkitab yang dibaca tetap dari sheet Alkitab utama
-seperti biasa** — sheet ini hanya menyumbang rentang referensi + link
-dengar/tonton untuk tiap rentang itu.
+> ⚠️ **Bagian ini sudah usang** — sebelumnya ikon 🎧 terpisah di header
+> membuka panel sendiri; sejak update di bawah (poin 8), fitur ini
+> **digabung menjadi salah satu pilihan di menu 📅 Rencana Baca**. Lihat
+> poin 8 di bagian "Update terbaru" untuk cara pakainya yang sekarang.
+> Bagian ini dibiarkan untuk referensi kolom sheet-nya saja.
+
+Menampilkan daftar rentang bacaan harian beserta link dengar (MP3), tonton
+(MP4), dan YouTube — diambil dari sheet **terpisah** dari sheet Alkitab
+utama (kolom: `No/Nomor | Pembacaan | Link MP3 | Link MP4 | Youtube`).
+**Teks Alkitab yang dibaca tetap dari sheet Alkitab utama seperti biasa**
+— sheet ini hanya menyumbang rentang referensi + link dengar/tonton untuk
+tiap rentang itu.
 
 Atur di `js/config.js` bagian `READING_MEDIA_SHEETS` — 4 slot sudah
 disediakan (PL Indonesia, PB Indonesia, PB Mandarin, PB Inggris), isi
-`csvUrl` untuk tiap tab yang sudah dipublikasikan (kosongkan yang belum ada;
-otomatis disembunyikan, ikon 🎧 di header ikut tersembunyi kalau belum ada
-satupun yang terisi). Saat ini baru **PL Indonesia** yang terisi (dari link
-yang Anda kirim). Klik nomor/rentang bacaan untuk membuka pasalnya di
-pembaca; klik 🎵/🎬/▶️ untuk membuka link dengar/tontonnya di tab baru.
-Data di-cache di perangkat, ada tombol "🔄 Sinkronkan ulang" per sheet kalau
-isinya berubah di Google Sheet.
+`csvUrl` untuk tiap tab yang sudah dipublikasikan (kosongkan yang belum
+ada; sheet yang belum diisi otomatis tidak muncul sebagai pilihan rencana
+baca). Saat ini baru **PL Indonesia** yang terisi.
 
-## Belum termasuk (bisa ditambahkan lain waktu)
+## Update terbaru: level pengguna, log aktivitas, pengumuman, pencarian, catatan (Agustus 2026)
 
-- URL CSV untuk 3 sheet **Bacaan Bersuara** lainnya (PB Indonesia, PB
-  Mandarin, PB Inggris) — publikasikan tiap tab itu ke web sebagai CSV
-  (sama seperti sheet Alkitab), lalu kirim URL-nya untuk diisi ke
-  `READING_MEDIA_SHEETS`.
-- Leaderboard dari sheet asli — belum dimasukkan (beri tahu jika masih
-  diperlukan, dan jelaskan seperti apa tampilannya).
+Lima hal di bawah ini baru ditambahkan. Ringkasan **di file mana saja
+perubahannya**, supaya mudah dilacak:
+
+1. **Jenjang level pengguna** (administrator, penatua, gembala distrik,
+   gembala, pra gembala, inti, atau kosong = "Kaum Saleh"; satu akun boleh
+   punya 1-2 level sekaligus, dipisah koma di Sheet Pengguna kolom `Level`).
+   - `js/config.js` → `CONFIG.LEVEL_DEFINITIONS` (urutan & rank jenjang).
+   - `js/csv.js` → `normalizeUserRecord()` + `parseLevelsField()` (membaca
+     kolom `Level` dari Sheet Pengguna).
+   - `js/levels.js` (**berkas baru**) → helper level (`isAdministrator()`,
+     `levelDisplayLabel()`, `canViewLevel()` untuk fitur pemantauan nanti).
+   - `sample-users.csv` → contoh kolom `Level`.
+   - Tampil di menu ⋮ (status "Masuk sebagai…").
+   - **Cara pakai**: tambahkan kolom `Level` di Sheet Pengguna Anda, isi
+     mis. `administrator` atau `gembala distrik, inti`, publikasikan ulang
+     ke web (Sheet Pengguna sudah dipublikasikan sebagai CSV, jadi cukup
+     re-publish/republish setelah menambah kolom), lalu di aplikasi tekan
+     menu ⋮ → **👥 Sinkronkan ulang daftar pengguna**.
+
+2. **Log aktivitas** (menu yang dibuka, kata yang dicari, tanggal, jam, OS,
+   IP perkiraan) — tersimpan ke Google Sheet lewat Apps Script yang sama
+   dengan catatan/rencana baca.
+   - `js/activitylog.js` (**berkas baru**) → deteksi OS, ambil IP publik
+     (lewat layanan gratis `api.ipify.org`, dipanggil dari browser
+     pengguna — **BUKAN** dari server, karena Google Apps Script tidak
+     memberi tahu IP pengunjung web app-nya; baca catatan jujur di bagian
+     atas berkas ini soal batasan IP: bisa sama untuk 1 jaringan/rumah, dan
+     bisa gagal/kosong kalau offline).
+   - `js/sync.js` → `Sync.pushLog()`.
+   - `apps-script/Code.gs` → tab baru **ActivityLog**, `doPost type=log`.
+   - Dipanggil otomatis saat: login, buka pasal, pencarian, buka Rencana
+     Baca, buka Bacaan Bersuara, buka Pengumuman, buka Catatan Saya.
+   - ✅ **Update Agustus 2026 (tahap 2)**: sekarang sudah ada tampilannya —
+     lihat poin 6 & 7 di bawah (📊 Log Aktivitas & 👀 Pantau Pembacaan).
+
+3. **Pengumuman** — hanya administrator yang bisa menulis, tampil otomatis
+   ke semua orang saat pertama login (kalau ada yang belum dibaca), dan
+   bisa dibuka lagi kapan saja lewat menu ⋮ → **📢 Pengumuman**.
+   - `apps-script/Code.gs` → tab baru **Announcements**,
+     `doGet type=announcements`, `doPost type=announcement` /
+     `announcement_delete`.
+   - `js/sync.js` → `pullAnnouncements()`, `pushAnnouncement()`,
+     `deleteAnnouncement()`.
+   - `js/app.js` → `showAnnouncementPanel()`, `renderAnnouncementPanel()`,
+     `checkAnnouncementsAtStart()` (dipanggil dari `startApp()`).
+   - `index.html` → `#announcementPanel`, tombol `#announcementBtn` di
+     menu ⋮. `css/style.css` → gaya `.announcement-*`.
+   - Tombol "Tulis pengumuman" & "Hapus" hanya muncul kalau level akun
+     yang login mengandung `administrator`.
+
+4. **Pencarian ditingkatkan**: pilih bahasa (termasuk "Semua Bahasa"), cari
+   di Ayat / Catatan Saya / keduanya, jumlah hasil ditampilkan persis, dan
+   **semua** kemunculan kata yang cocok di-highlight (sebelumnya cuma
+   kemunculan pertama).
+   - `js/app.js` → `highlightAllMatches()`, `runKeywordSearch()`,
+     `searchInPersonalNotes()`, `initSearchOptions()`, `handleSearch()`
+     dirombak.
+   - `index.html` → `#searchOptionsRow` (pilihan bahasa & cakupan) di
+     dalam panel `#searchResults`. `css/style.css` → `.search-options-row`.
+
+5. **Menu Catatan Saya** — daftar semua catatan pribadi (yang sebelumnya
+   cuma bisa dilihat satu-satu lewat klik ayat) sekarang punya menu
+   tersendiri: ⋮ → **🗒️ Catatan Saya**, urut dari yang terakhir diubah,
+   klik untuk langsung lompat ke ayatnya.
+   - `js/app.js` → `showNotesMenuPanel()`, `renderNotesMenuPanel()`,
+     `verseById` (index baru di `buildIndexes()` untuk mencari ayat dari
+     ID catatan).
+   - `index.html` → `#notesPanel`, tombol `#notesMenuBtn` di menu ⋮.
+     `css/style.css` → `.notes-panel`, `.notes-menu-*`.
+   - Catatan tetap tersimpan di tempat yang **sama seperti sebelumnya**
+     (lokal di perangkat + Google Sheet tab `Notes` lewat Apps Script) —
+     ini cuma menambah **cara melihatnya**, bukan lokasi penyimpanan baru.
+
+6. **📊 Log Aktivitas (khusus administrator)** — panel baru lewat menu
+   ⋮ → **📊 Log Aktivitas**, menampilkan SEMUA baris log yang sudah
+   terkumpul (Tanggal, Jam, Pengguna, OS, IP, Menu, Pencarian), dengan:
+   - Filter rentang tanggal (Hari ini / 7 / 30 / 90 hari / Semua), filter
+     nama pengguna, dan filter kata di kolom Menu/Pencarian — tombol
+     **Terapkan**.
+   - Jumlah baris hasil ditampilkan persis (sesuai filter yang aktif).
+   - Tombol **💾 Simpan sebagai CSV** — mengunduh hasil yang sedang
+     tampil (sesuai filter) sebagai berkas `.csv` ke perangkat, bisa
+     dibuka di Excel/Google Sheets.
+   - Tabel di layar dibatasi 500 baris terbaru supaya browser tetap
+     ringan (kalau hasil lebih banyak, ada catatan untuk mempersempit
+     filter atau langsung memakai tombol Simpan CSV yang mengambil
+     semuanya sesuai filter tanggal/pengguna/kata yang dipilih).
+   - Berkas yang berubah: `apps-script/Code.gs` (`readLogs_()`,
+     `doGet type=logs`), `js/sync.js` (`Sync.pullLogs()`), `js/app.js`
+     (`showLogPanel()`, `loadAndRenderLogPanel()`, `saveLogAsCsv()`,
+     `escapeHtml()`), `index.html` (`#logPanel`, tombol `#logViewerBtn`
+     — otomatis disembunyikan kalau bukan administrator, lihat
+     `updateLevelGatedMenus()` di `js/app.js`), `css/style.css`
+     (`.log-*`).
+
+7. **👀 Pantau Pembacaan (7 hari, level gembala ke atas)** — panel baru
+   lewat menu ⋮ → **👀 Pantau Pembacaan** (tombol otomatis tersembunyi
+   untuk akun tanpa level / "Kaum Saleh"). Pilih satu orang dari dropdown
+   (daftar berisi hanya orang yang **boleh** dipantau akun Anda, memakai
+   aturan bertingkat `canViewLevel()` di `js/levels.js` — administrator
+   lihat semua, level lain hanya lihat rank sama/di bawahnya, termasuk
+   "Kaum Saleh"), lalu tampil tabel 7 hari terakhir (hari ini mundur ke
+   belakang) dengan kolom: Tanggal, **Baca? (V/X)**, Jam Awal, Jam Akhir,
+   Jumlah Pasal. "Sudah membaca" dihitung dari log yang menunya diawali
+   `"Baca: "` (dicatat otomatis tiap kali membuka satu pasal) — kalau
+   perhitungan ini ingin diubah (mis. minimal 2 pasal, atau hanya
+   menghitung Rencana Baca yang ditandai selesai), tinggal ganti syarat
+   di `renderMonitorPanel()`.
+   - Berkas yang berubah: `js/app.js` (`getMonitorableUsers()`,
+     `showMonitorPanel()`, `renderMonitorPanel()`), `index.html`
+     (`#monitorPanel`, tombol `#monitorBtn`), `css/style.css`
+     (`.monitor-*`). Memakai endpoint `logs` yang sama dengan poin 6 di
+     atas (tidak ada tab Sheet baru).
+
+8. **🎧 Bacaan Bersuara digabung ke 📅 Rencana Baca (jadi satu menu)** —
+   sebelumnya dua menu terpisah (ikon 📅 dan ikon 🎧 di header). Sekarang
+   ikon 🎧 & panelnya **dihapus**; tiap sheet Bacaan Bersuara yang sudah
+   diisi URL-nya di `CONFIG.READING_MEDIA_SHEETS` (`js/config.js`) muncul
+   sebagai **satu pilihan rencana baca tambahan** (kartu "🎧 …") di layar
+   pemilihan menu ⋮ → **📅 Rencana Baca**, di samping paket-paket biasa
+   (Seluruh Alkitab 1 bulan, dst).
+   - Kalau dipilih: tiap "hari" dalam rencana itu = satu baris di sheet
+     Bacaan Bersuara-nya, labelnya **persis** teks kolom Pembacaan (mis.
+     "Kejadian 1:1-2:3"), dan link **🎵 MP3 / 🎬 MP4 / ▶️ YouTube**-nya
+     (kalau ada) tampil menempel langsung di bawah baris hari itu — klik
+     baris untuk membuka pasalnya di pembaca (ditebak dari kitab/pasal
+     AWAL rentang bacaan, sama seperti sebelumnya), klik tombol
+     🎵/🎬/▶️ untuk dengar/tonton di tab baru.
+   - Progres (centang selesai/belum) jalan sama seperti rencana baca
+     biasa — tersimpan lokal + tersinkron ke Google Sheet.
+   - Ada tombol **🔄 Sinkronkan ulang link audio/video** khusus di rencana
+     jenis ini (di layar detail rencana), untuk menarik link terbaru dari
+     Google Sheet kalau ada yang ditambah/diperbaiki — progres centang
+     yang sudah ada TIDAK terhapus (dicocokkan berdasar urutan hari).
+   - Ganti ke rencana lain (dan balik lagi) tetap lewat tombol **Ganti
+     Rencana** yang sudah ada — sama seperti pindah rencana biasa.
+   - **Masih terisi baru PL Indonesia** (di `READING_MEDIA_SHEETS`); 3
+     sheet lainnya (PB Indonesia/Mandarin/Inggris) baru muncul sebagai
+     pilihan begitu URL CSV-nya diisi di `js/config.js` (setelah
+     dipublikasikan ke web dari Google Sheet Anda).
+   - Berkas yang berubah: `js/media.js` (fungsi UI panel lama
+     `showMediaPanel()`/`renderMediaPanelShell()`/`loadAndRenderMediaList()`/
+     `renderMediaRows()`/`initMediaControl()` **dihapus**; fungsi baru
+     `buildMediaScheduleFromRows()`, `buildMediaPlan()`,
+     `resyncMediaPlan()`; fungsi lama yang dipakai ulang tetap ada:
+     `fetchMediaSheet()`, `loadMediaFromCache()`, `guessReferenceFromPembacaan()`,
+     `availableMediaSheets()`, `mediaLinkButton()`, `driveOpenUrl()`).
+     `js/app.js` → `renderPlanChooser()` (tambah kartu rencana dari
+     `availableMediaSheets()`), `renderPlanDetail()` (tampilkan label +
+     link media per hari, tombol sinkron ulang khusus rencana media).
+     `index.html` → tombol `#mediaToggle` & `<div id="mediaPanel">`
+     **dihapus**. `css/style.css` → `.plan-day-row` diubah jadi 2 baris
+     (`.plan-day-row-main` + `.plan-day-row-media`); gaya lama
+     `.media-panel`/`.media-controls`/`.media-list`/dst dibiarkan ada
+     (tidak dipakai lagi, tidak mengganggu) kalau-kalau masih dipakai di
+     pengembangan lain nanti.
+
+**Setelah update ini, jangan lupa**: TIDAK perlu apa-apa di Apps Script
+untuk poin 8 ini (tidak ada tab Sheet baru, tidak ada endpoint baru) —
+cukup unggah ulang berkas web statisnya (index.html, css/, js/) ke
+hosting Anda (Vercel dsb).
+
+## Update lanjutan (Agustus 2026, tahap 3)
+
+1. **Perbaikan: Pengumuman tidak tampil di HP** — permintaan GET ke Apps
+   Script sekarang selalu memakai `cache: "no-store"` + parameter acak
+   `_ts=` (cache-buster), karena kemungkinan besar penyebabnya HP/jaringan
+   operator seluler menyimpan cache respons GET yang URL-nya identik.
+   Panel Pengumuman sekarang juga membedakan **"gagal memuat"** (tombol
+   🔄 Coba Lagi muncul) dari **"memang belum ada pengumuman"** — sebelumnya
+   dua situasi ini terlihat sama persis di layar.
+   - Berkas: `js/sync.js` (`_get()`, `pullAnnouncementsChecked()` baru),
+     `js/app.js` (`showAnnouncementPanel()` dirombak, `markAnnouncementsSeen()` baru).
+   - **Kalau setelah update ini masih tidak muncul di HP tertentu**: coba
+     hapus cache browser HP itu / buka di jendela penyamaran (incognito)
+     untuk memastikan bukan cache LAMA yang tersimpan dari sebelum
+     perbaikan ini, lalu beri tahu saya detail browser & HP-nya (kadang
+     ada browser bawaan pabrikan HP tertentu yang perilakunya beda).
+
+2. **Filter Perjanjian Lama / Perjanjian Baru / Semua** ditambahkan di
+   panel hasil pencarian (di samping pilihan bahasa & cakupan Ayat/Ayat &
+   Catatan/Catatan Saya yang sudah ada sebelumnya).
+   - Berkas: `js/app.js` (`runKeywordSearch()`, `initSearchOptions()`,
+     `handleSearch()`), `index.html` (`#searchTestamentSelect`). Memakai
+     field `testament` ("PL"/"PB") yang sudah ada di `js/books.js`.
+
+3. **"⭐ Pilih Domba-domba yang Dipantau"** di panel 👀 Pantau Pembacaan —
+   tiap pemantau (administrator/gembala dst.) sekarang bisa mencentang
+   sebagian orang saja dari daftar yang **boleh** ia pantau, supaya
+   dropdown-nya lebih ringkas/fokus (mis. gembala distrik yang hanya mau
+   fokus ke jemaat wilayahnya). Ini murni penyaring tampilan di atas hak
+   akses `canViewLevel()` yang sudah ada — tidak pernah menambah orang di
+   luar aturan jenjang level. Tersimpan per akun di perangkat itu
+   (localStorage), kosongkan semua centang untuk kembali melihat semua
+   yang boleh dipantau.
+   - Berkas: `js/app.js` (`loadMonitorPins()`, `saveMonitorPins()`,
+     `renderMonitorPanel()` dirombak), `css/style.css` (`.monitor-pin-*`).
+
+4. **Pemutar media SEBARIS (tombol bulat 🎵🎬▶️), tanpa tab baru** —
+   sebelumnya tombol MP3/MP4/YouTube membuka **tab baru**
+   (`target="_blank"`), yang di HP sering tertutup sendiri / suaranya
+   berhenti begitu berpindah aplikasi atau layar dikunci (tab baru gampang
+   dihentikan paksa oleh sistem HP untuk hemat baterai). Sekarang
+   tombolnya **bulat**, dan begitu ditekan, pemutarnya (audio/video/
+   YouTube) langsung muncul **di halaman yang sama** — jadi ayat & catatan
+   tetap kelihatan sambil mendengarkan/menonton, plus MediaSession API
+   dipasang (metadata judul + kontrol) supaya diperlakukan sistem sebagai
+   "sedang memutar media" (kontrol muncul di layar kunci).
+   - Dipasang di **3 tempat**: baris hari di 📅 Rencana Baca (rencana
+     Bacaan Bersuara), panel 📚 Kumpulan Ayat, dan **layar baca pasal**
+     (tombol muncul otomatis di atas ayat kalau pasal yang sedang dibuka
+     kebetulan ada di salah satu sheet Bacaan Bersuara — dicari di latar
+     belakang, tidak memperlambat tampilnya ayat).
+   - Berkas: `js/media.js` (`roundMediaButton()`, `wireMediaSession()`,
+     `buildInlineMediaBlock()`, `youTubeEmbedUrl()` — semuanya baru; fungsi
+     lama `mediaLinkButton()` dibiarkan ada untuk kompatibilitas tapi
+     sudah tidak dipakai), `js/app.js` (`renderPlanDetail()`,
+     `renderCollectionDetailInto()`, `renderChapter()` dirombak bagian
+     medianya), `index.html` (`#readerMediaSlot` baru di layar baca
+     pasal), `css/style.css` (`.round-media-btn`, `.inline-media-*`).
+   - **Catatan jujur soal "suara tetap jalan walau layar dikunci total"**:
+     ini batasan sistem operasi HP, bukan sesuatu yang bisa dijamin 100%
+     dari sisi web biasa (beda dengan aplikasi native). Yang paling andal
+     tetap berjalan di latar belakang adalah **audio MP3** (elemen
+     `<audio>` asli) selama tab/aplikasi browsernya tidak ditutup total —
+     MediaSession API di atas membantu, tapi bukan jaminan mutlak,
+     terutama untuk pembacaan suara robot (Google Voice/TTS) yang memang
+     punya batasan lebih ketat lagi di kebanyakan browser HP (belum
+     dikerjakan di tahap ini — lihat "Belum termasuk" di bawah).
+
+## Belum termasuk (dikerjakan lain waktu, sudah diberi tahu ke pemesan)
+
+- **Opsi TTS "baca juga catatannya"** — sekarang pembacaan suara (Google
+  Voice) hanya membaca teks ayat, belum ada pilihan supaya ikut membaca
+  isi kolom Note (field terakhir di sheet Alkitab: `Bahasa; Verse ID;
+  Book Name; Book Number; Chapter; Verse; Text; Note`).
+- **Suara TTS (Google Voice) tetap jalan saat layar HP dikunci total** —
+  perlu Wake Lock API + workaround "keep-alive" untuk bug bawaan Chrome/
+  Android yang menghentikan `speechSynthesis` setelah beberapa saat tidak
+  aktif di layar depan.
+- **Notifikasi awal soal unduh data lewat WiFi** — kalau dibuka pertama
+  kali tanpa WiFi, tetap bisa masuk tapi diberi tahu data Alkitab belum
+  terunduh, lalu bisa diunduh nanti dari menu Setting dengan info progres.
+- **Fitur "Garis Besar"/Pokok Alkitab per kitab** (rangkuman per rentang
+  ayat, ditampilkan sebelum ayatnya, bisa diedit khusus administrator,
+  3 bahasa) — fitur besar, perlu skema Google Sheet baru + menu edit
+  admin + logika tampilan baru di layar baca pasal.
+- **Verifikasi pemetaan sheet PB 1 Tahun & PL 2 Tahun** — dua URL Google
+  Sheet yang Anda kirim untuk kedua rencana ini **identik**
+  (`2PACX-1vQGlRBfxjNK7R_...`), padahal biasanya tiap TAB/rencana beda
+  punya link CSV publikasi sendiri-sendiri (beda parameter `gid=` di
+  akhir URL). Saya tidak bisa membuka Google Sheet Anda langsung dari
+  sini untuk mengecek isi tab-nya — mohon konfirmasi/salin URL CSV
+  **khusus untuk tab PB 1 Tahun** dan **khusus untuk tab PL 2 Tahun**
+  secara terpisah (File → Bagikan → Publikasikan ke web → pilih tab yang
+  benar → format CSV), lalu saya tambahkan sebagai 2 slot baru di
+  `CONFIG.READING_MEDIA_SHEETS`.
 
 ## Struktur berkas
 
@@ -359,7 +623,9 @@ bible-app/
 ├── js/books.js           daftar 66 kitab + alias singkatan
 ├── js/csv.js             pengubah CSV → objek ayat / objek pengguna
 ├── js/db.js              lapisan penyimpanan lokal (IndexedDB): ayat + pengguna
-├── js/sync.js            komunikasi ke Google Apps Script (simpan/ambil catatan, progres, pengaturan)
+├── js/sync.js            komunikasi ke Google Apps Script (simpan/ambil catatan, progres, pengaturan, log, pengumuman)
+├── js/levels.js          jenjang level pengguna (administrator…inti) + helper hak akses
+├── js/activitylog.js     pencatat log aktivitas (menu, pencarian, OS, IP perkiraan)
 ├── js/notes.js           catatan pribadi per ayat (lokal + gabung dengan data server)
 ├── js/settings.js        pengaturan pribadi per pengguna, mis. animasi progres membaca (lokal + server)
 ├── js/plans.js           definisi rencana baca, pembuatan jadwal, penyimpanan progres
