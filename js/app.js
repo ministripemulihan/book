@@ -198,7 +198,7 @@ async function startApp() {
     el("loadingOverlay").hidden = true;
     afterDataReady();
   } else {
-    await syncFromServer(true);
+    await handleInitialBibleDownload();
   }
 
   // Tarik catatan pribadi & progres rencana baca dari Google Sheet (kalau
@@ -224,6 +224,128 @@ async function startApp() {
     // dipanggil di akhir afterDataReady() (terutama saat sinkron pertama kali)
     setTimeout(() => checkAnnouncementsAtStart(), 400);
   }
+}
+
+// ------------------------------------------------------------
+// 2b) NOTIFIKASI UNDUH DATA LEWAT WIFI — kunjungan PERTAMA KALI (belum ada
+//     data Alkitab tersimpan lokal sama sekali) TIDAK langsung menyedot data
+//     besar dari server begitu saja kalau kemungkinan sedang memakai data
+//     seluler (kuota) — hanya langsung unduh otomatis kalau TERDETEKSI WiFi/
+//     Ethernet. Selain itu (data seluler terdeteksi, ATAU browser tidak bisa
+//     mendeteksi jenis koneksi sama sekali -- mis. kebanyakan browser di
+//     iPhone), pengguna ditanya dulu lewat dialog, dan tetap boleh MASUK
+//     tanpa mengunduh (data diunduh belakangan dari menu ⋮ → Unduh Data
+//     Alkitab, lengkap dengan info progres yang sama seperti sinkron biasa).
+// ------------------------------------------------------------
+
+// Network Information API -- HANYA didukung sebagian browser (terutama
+// Chrome/Android). Kalau tidak didukung (mis. Safari/iOS), fungsi ini
+// mengembalikan null (artinya: "tidak diketahui", BUKAN "bukan wifi").
+function detectConnectionType() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!conn) return null;
+  if (conn.type) return conn.type; // "wifi" | "ethernet" | "cellular" | "none" | "unknown" | dst
+  return null;
+}
+
+async function handleInitialBibleDownload() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    showBibleNotDownloadedState(
+      "Tidak ada sambungan internet saat ini. Data Alkitab belum bisa diunduh — silakan sambungkan internet lalu buka menu ⋮ → 📥 Unduh Data Alkitab."
+    );
+    return;
+  }
+  const connType = detectConnectionType();
+  if (connType === "wifi" || connType === "ethernet") {
+    // Terdeteksi WiFi/kabel dengan pasti -- langsung unduh seperti biasa,
+    // tidak perlu mengganggu dengan dialog tambahan.
+    await syncFromServer(true);
+    return;
+  }
+  // connType === "cellular"/"none"/dst, ATAU tidak diketahui sama sekali
+  // (null) -- tanya dulu supaya tidak menyedot kuota data seluler tanpa izin.
+  showWifiDownloadPrompt(connType);
+}
+
+function showWifiDownloadPrompt(connType) {
+  let overlay = el("wifiPromptOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "wifiPromptOverlay";
+    overlay.className = "announcement-big-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = "";
+  const box = document.createElement("div");
+  box.className = "announcement-big-box";
+
+  const title = document.createElement("div");
+  title.className = "announcement-big-title";
+  title.textContent = "📶 Belum terdeteksi WiFi";
+  box.appendChild(title);
+
+  const msg = document.createElement("div");
+  msg.className = "announcement-big-text";
+  msg.textContent = connType === "cellular"
+    ? "Perangkat ini sepertinya sedang memakai data seluler. Data Alkitab (semua bahasa) cukup besar — unduh sekarang bisa memakai banyak kuota."
+    : "Aplikasi tidak bisa memastikan Anda sedang tersambung WiFi atau data seluler. Data Alkitab (semua bahasa) cukup besar — kalau sedang memakai data seluler, unduh sekarang bisa memakai banyak kuota.";
+  box.appendChild(msg);
+
+  const msg2 = document.createElement("div");
+  msg2.className = "announcement-big-meta";
+  msg2.textContent = "Anda tetap bisa masuk dulu; data Alkitab belum tersedia sampai diunduh (nanti dari menu ⋮ → 📥 Unduh Data Alkitab, ada info progresnya).";
+  box.appendChild(msg2);
+
+  const btnRow = document.createElement("div");
+  btnRow.className = "round-media-row";
+  btnRow.style.marginTop = "12px";
+
+  const laterBtn = document.createElement("button");
+  laterBtn.className = "chip-btn small";
+  laterBtn.textContent = "⏭️ Masuk Dulu (hemat kuota)";
+  laterBtn.addEventListener("click", () => {
+    overlay.hidden = true;
+    showBibleNotDownloadedState(
+      "Data Alkitab belum diunduh (supaya tidak memakai kuota data seluler tanpa izin). Buka menu ⋮ → 📥 Unduh Data Alkitab kapan saja, idealnya saat sudah tersambung WiFi."
+    );
+  });
+  btnRow.appendChild(laterBtn);
+
+  const nowBtn = document.createElement("button");
+  nowBtn.className = "chip-btn primary";
+  nowBtn.textContent = "📥 Unduh Sekarang Juga";
+  nowBtn.addEventListener("click", () => {
+    overlay.hidden = true;
+    syncFromServer(true);
+  });
+  btnRow.appendChild(nowBtn);
+
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  overlay.hidden = false;
+}
+
+// Dipakai kalau pengguna memilih masuk dulu tanpa mengunduh -- aplikasi tetap
+// terbuka (kosong, belum ada ayat sama sekali) dengan info jelas + tombol
+// unduh langsung di tengah layar, bukan cuma disembunyikan di menu ⋮ saja.
+function showBibleNotDownloadedState(message) {
+  bibleData = [];
+  afterDataReady();
+  const empty = el("emptyState");
+  empty.innerHTML = "";
+  const p1 = document.createElement("p");
+  p1.textContent = "📭 Data Alkitab belum ada di perangkat ini.";
+  p1.style.fontWeight = "700";
+  empty.appendChild(p1);
+  const p2 = document.createElement("p");
+  p2.textContent = message;
+  empty.appendChild(p2);
+  const btn = document.createElement("button");
+  btn.className = "chip-btn primary";
+  btn.textContent = "📥 Unduh Data Alkitab Sekarang";
+  btn.addEventListener("click", () => syncFromServer(true));
+  empty.appendChild(btn);
+  empty.hidden = false;
 }
 
 function setLoadingText(t) {
@@ -889,16 +1011,25 @@ function highlightMatch(text, query) {
 
 let lastKeywordQuery = ""; // dipakai saat opsi bahasa/cakupan pencarian diubah
 
+// Mode pencarian: "normal" (cepat, dibatasi) atau "max" (semua hasil, bisa
+// lambat kalau katanya sangat umum -- ada kata yang bisa ketemu sampai
+// ratusan ribu kali). Default selalu "normal" tiap kali dibuka; tidak
+// disimpan permanen supaya orang tidak lupa sedang di mode lambat.
+let searchResultMode = "normal";
+const SEARCH_CAP_NORMAL = 1000;
+const SEARCH_CAP_MAX = 100000;
+
 // scope: "verse" | "notes" | "both". lang: kode bahasa, atau "__all__" untuk semua bahasa.
 // testament: "__all__" | "PL" | "PB" -- menyaring hasil AYAT saja berdasar Perjanjian
 // Lama/Baru kitabnya (lihat BOOKS di js/books.js, field "testament"); tidak berlaku
 // untuk hasil catatan pribadi (catatan tidak selalu terikat satu kitab tertentu).
-function runKeywordSearch(query, lang, scope, testament) {
+function runKeywordSearch(query, lang, scope, testament, mode) {
   const q = query.trim().toLowerCase();
   if (q.length < 2) return { verseResults: [], noteResults: [] };
   const useLang = lang || currentLang;
   const useScope = scope || "verse";
   const useTestament = testament || "__all__";
+  const cap = mode === "max" ? SEARCH_CAP_MAX : SEARCH_CAP_NORMAL;
 
   let verseResults = [];
   if (useScope === "verse" || useScope === "both") {
@@ -909,18 +1040,18 @@ function runKeywordSearch(query, lang, scope, testament) {
         return book && book.testament === useTestament;
       });
     }
-    verseResults = pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, 300);
+    verseResults = pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, cap);
   }
 
   let noteResults = [];
   if (useScope === "notes" || useScope === "both") {
-    noteResults = searchInPersonalNotes(q);
+    noteResults = searchInPersonalNotes(q, cap);
   }
-  return { verseResults, noteResults };
+  return { verseResults, noteResults, cap };
 }
 
 // Mencari di catatan pribadi milik pengguna yang sedang login (js/notes.js).
-function searchInPersonalNotes(q) {
+function searchInPersonalNotes(q, cap) {
   const notes = loadLocalNotes(currentUser);
   const out = [];
   Object.keys(notes).forEach((verseId) => {
@@ -929,7 +1060,14 @@ function searchInPersonalNotes(q) {
       out.push({ verseId, note: entry.note, verse: verseById[verseId] || null });
     }
   });
-  return out.slice(0, 300);
+  return out.slice(0, cap || SEARCH_CAP_NORMAL);
+}
+
+function setSearchMode(mode) {
+  searchResultMode = mode === "max" ? "max" : "normal";
+  if (el("searchModeNormal")) el("searchModeNormal").classList.toggle("active", searchResultMode === "normal");
+  if (el("searchModeMax")) el("searchModeMax").classList.toggle("active", searchResultMode === "max");
+  if (lastKeywordQuery) handleSearch(lastKeywordQuery, true);
 }
 
 function initSearchOptions() {
@@ -944,12 +1082,23 @@ function initSearchOptions() {
   langSel.value = currentLang || "__all__";
   scopeSel.value = "verse";
   if (testamentSel) testamentSel.value = "__all__";
+  searchResultMode = "normal";
   const rerun = () => {
     if (lastKeywordQuery) handleSearch(lastKeywordQuery, true);
   };
   langSel.addEventListener("change", rerun);
   scopeSel.addEventListener("change", rerun);
   if (testamentSel) testamentSel.addEventListener("change", rerun);
+  if (el("searchModeNormal") && !el("searchModeNormal").dataset.wired) {
+    el("searchModeNormal").dataset.wired = "1";
+    el("searchModeNormal").addEventListener("click", () => setSearchMode("normal"));
+  }
+  if (el("searchModeMax") && !el("searchModeMax").dataset.wired) {
+    el("searchModeMax").dataset.wired = "1";
+    el("searchModeMax").addEventListener("click", () => setSearchMode("max"));
+  }
+  if (el("searchModeNormal")) el("searchModeNormal").classList.toggle("active", searchResultMode === "normal");
+  if (el("searchModeMax")) el("searchModeMax").classList.toggle("active", searchResultMode === "max");
 }
 
 // Pencarian gabungan beberapa referensi sekaligus, dipisah titik-koma atau
@@ -1042,7 +1191,7 @@ function handleSearch(rawQuery, isOptionChange) {
   const scope = (scopeSel && scopeSel.value) || "verse";
   const testament = (testamentSel && testamentSel.value) || "__all__";
 
-  const { verseResults, noteResults } = runKeywordSearch(query, lang, scope, testament);
+  const { verseResults, noteResults, cap } = runKeywordSearch(query, lang, scope, testament, searchResultMode);
   const total = verseResults.length + noteResults.length;
 
   hideAllPanels();
@@ -1052,17 +1201,23 @@ function handleSearch(rawQuery, isOptionChange) {
   if (langSel) langSel.value = lang;
   if (scopeSel) scopeSel.value = scope;
   if (testamentSel) testamentSel.value = testament;
+  if (el("searchModeNormal")) el("searchModeNormal").classList.toggle("active", searchResultMode === "normal");
+  if (el("searchModeMax")) el("searchModeMax").classList.toggle("active", searchResultMode === "max");
 
-  const cappedNote = total === 300 || verseResults.length === 300 ? "+" : "";
+  const isCapped = verseResults.length === cap || noteResults.length === cap;
+  const cappedNote = isCapped ? "+" : "";
   // Jumlah kata PERSIS "query" muncul, dijumlahkan dari semua ayat + catatan
   // yang ketemu (satu ayat/catatan bisa mengandung kata itu lebih dari sekali).
   const exactWordCount =
     verseResults.reduce((sum, v) => sum + countExactOccurrences(v.text, query), 0) +
     noteResults.reduce((sum, n) => sum + countExactOccurrences(n.note, query), 0);
+  const modeHint = isCapped && searchResultMode === "normal"
+    ? ` — tekan tombol ⚡ Maks di atas untuk melihat semua hasil (bisa lebih lambat)`
+    : "";
   el("searchResultsTitle").textContent =
     `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
     (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan)` : "") +
-    ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali`;
+    ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali` + modeHint;
   const list = el("searchResultsList");
   list.innerHTML = "";
 
@@ -2432,10 +2587,14 @@ const THEMES = [
   { id: 11, name: "Putih - Biru", swatch: "#FFFFFF", ink: "#1846C4" },
   { id: 12, name: "Hitam - Kuning", swatch: "#000000", ink: "#FFE55A" },
   { id: 13, name: "Pink Pastel", swatch: "#FFEAF3", ink: "#A3225F" },
+  { id: 14, name: "Biru Pastel Muda", swatch: "#DCEBFF", ink: "#1F3E7A" },
+  { id: 15, name: "Merah Tua", swatch: "#6E1414", ink: "#FFFFFF" },
+  { id: 16, name: "Hijau Tua Pastel", swatch: "#1F3A28", ink: "#FFE98A" },
+  { id: 17, name: "Kuning - Oranye Pastel", swatch: "#FFF3B0", ink: "#C6712B" },
 ];
 
 function applyTheme(id) {
-  for (let i = 2; i <= 13; i++) document.body.classList.remove("theme-" + i);
+  for (let i = 2; i <= 17; i++) document.body.classList.remove("theme-" + i);
   if (id && id !== 1) document.body.classList.add("theme-" + id);
   localStorage.setItem(THEME_STORAGE_KEY, id);
   document.querySelectorAll("#themePicker .theme-swatch").forEach((btn) => {
@@ -2553,9 +2712,10 @@ function loadTTSSettings() {
       lang: raw.lang || CONFIG.TTS_LANG || "id-ID",
       gender: raw.gender || "any",
       rate: typeof raw.rate === "number" ? raw.rate : 1.0,
+      readNotes: !!raw.readNotes,
     };
   } catch (e) {
-    return { lang: CONFIG.TTS_LANG || "id-ID", gender: "any", rate: 1.0 };
+    return { lang: CONFIG.TTS_LANG || "id-ID", gender: "any", rate: 1.0, readNotes: false };
   }
 }
 function saveTTSSettings(settings) {
@@ -2614,6 +2774,16 @@ function initTTSControls() {
     saveTTSSettings(ttsSettings);
     if (ttsPlaying) { stopTTS(); playTTS(); }
   });
+
+  const readNotesToggle = el("ttsReadNotesToggle");
+  if (readNotesToggle) {
+    readNotesToggle.checked = !!ttsSettings.readNotes;
+    readNotesToggle.addEventListener("change", () => {
+      ttsSettings.readNotes = readNotesToggle.checked;
+      saveTTSSettings(ttsSettings);
+      if (ttsPlaying) { stopTTS(); playTTS(); }
+    });
+  }
 }
 
 function pickVoice() {
@@ -2671,7 +2841,11 @@ function playTTS() {
 
   const voice = pickVoice();
   currentChapterVerses.forEach((v, idx) => {
-    const utter = new SpeechSynthesisUtterance(`Ayat ${v.verse}. ${v.text}`);
+    let spoken = `Ayat ${v.verse}. ${v.text}`;
+    if (ttsSettings.readNotes && v.note && v.note.trim()) {
+      spoken += ` Catatan. ${noteHtmlToPlainText(v.note)}`;
+    }
+    const utter = new SpeechSynthesisUtterance(spoken);
     if (voice) utter.voice = voice;
     utter.lang = ttsSettings.lang;
     utter.rate = ttsSettings.rate;
@@ -3090,6 +3264,13 @@ function initUIEvents() {
   el("resyncBtn").addEventListener("click", () => {
     el("moreMenu").hidden = true;
     syncFromServer(false);
+  });
+  el("downloadBibleBtn").addEventListener("click", () => {
+    el("moreMenu").hidden = true;
+    // Kalau memang belum ada data sama sekali (baru saja "masuk dulu" tanpa
+    // unduh), perlakukan sebagai unduhan PERTAMA (pesan & progres sesuai);
+    // kalau sudah ada data, ini jadi sinkron ulang biasa.
+    syncFromServer(!bibleData.length);
   });
   el("resyncUsersBtn").addEventListener("click", async () => {
     el("moreMenu").hidden = true;
