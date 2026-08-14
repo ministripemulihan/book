@@ -348,6 +348,30 @@ body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .monitor-row-unread .monitor-symbol { color: var(--danger); }
 .monitor-row-unread td { opacity: 0.72; }
 
+/* Tab "Ringkasan (Semua Domba)" / "Detail 1 Orang" */
+.monitor-view-tabs { display: flex; gap: 8px; margin: 12px 0; }
+.monitor-view-tabs .chip-btn.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+
+/* Navigasi jendela 7 hari (mundur/maju tanpa batas) */
+.monitor-week-nav {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 4px 0 16px; font-size: 0.85rem;
+}
+.monitor-week-label { font-weight: 700; color: var(--ink); font-family: var(--font-ui); }
+
+/* Tabel Ringkasan: semua domba (baris) x tanggal (kolom), V/X */
+.monitor-summary-table th, .monitor-summary-table td { text-align: center; }
+.monitor-summary-table .monitor-summary-name {
+  text-align: left; font-weight: 600; white-space: nowrap;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.monitor-summary-level { font-weight: 400; font-size: 0.75em; color: var(--ink-soft); }
+.monitor-summary-row { cursor: pointer; }
+.monitor-summary-row:hover { background: var(--brass-soft); }
+.monitor-cell-read { color: #1a7a3d; }
+.monitor-cell-unread { color: var(--danger); opacity: .75; }
+.monitor-summary-count { font-weight: 700; font-family: var(--font-ui); }
+
 * { box-sizing: border-box; }
 html, body {
   margin: 0;
@@ -708,7 +732,15 @@ input { font-family: inherit; }
    INDIKATOR "SEDANG MEMBACA" — melekat di atas layar saat digulir
    ============================================================ */
 .current-reading-indicator {
-  position: sticky; top: 57px; z-index: 30;
+  /* PENTING: dulu "top: 57px" dipaku (hardcode) -- di HP, header sering
+     melebar jadi 2 baris (lebih tinggi dari 57px, lihat .app-header
+     flex-wrap di media query di bawah), jadi indikator ini nyangkut
+     ketutupan DI BELAKANG header dan tidak pernah kelihatan padahal
+     sudah scroll. Sekarang memakai --header-h yang sama dipakai sidebar
+     (dihitung otomatis dari tinggi header sungguhan, lihat
+     updateHeaderHeightVar() di js/app.js) supaya selalu pas di bawah
+     header, di HP maupun komputer. */
+  position: sticky; top: var(--header-h, 57px); z-index: 45;
   display: flex; justify-content: center;
   margin: 0 auto; width: fit-content;
   padding: 6px 16px; font-size: 12px; font-weight: 600;
@@ -790,7 +822,12 @@ input { font-family: inherit; }
   font-size: 19px; display: flex; align-items: center; justify-content: center;
   cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.18);
   transition: transform .12s ease;
+  touch-action: manipulation;
 }
+.inline-media-drive-hint {
+  font-size: 12px; color: var(--ink-soft); margin-top: -2px;
+}
+.inline-media-drive-hint a { color: var(--petrol); }
 .round-media-btn:hover { transform: scale(1.07); }
 .round-media-btn:active { transform: scale(.96); }
 .round-media-btn.share-variant {
@@ -923,6 +960,13 @@ input { font-family: inherit; }
 .verse-num-btn {
   border: none; padding: 0; font-family: inherit; cursor: pointer;
   transition: transform .12s ease, background .15s ease;
+  /* Tanpa ini, di HP tekan-dua-kali cepat pada tombol ini bisa malah
+     ditangkap sebagai gestur "double-tap to zoom" bawaan browser
+     (terutama Safari/iPhone), bukan event dblclick JS -- jadinya
+     kadang perlu tekan berkali-kali baru catatan muncul. touch-action:
+     manipulation mematikan gestur zoom bawaan itu KHUSUS di tombol ini
+     saja (zoom pakai jari/pinch di tempat lain tetap normal). */
+  touch-action: manipulation;
 }
 .verse-num-btn:hover { transform: scale(1.12); }
 .verse-num-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
@@ -1128,6 +1172,28 @@ input { font-family: inherit; }
 }
 .pokok-box-inline { margin: 4px 0 14px; }
 .pokok-box-label { font-weight: 700; color: var(--petrol); margin-bottom: 6px; }
+.pokok-box-list-item { margin-bottom: 14px; }
+.pokok-box-list-item .chip-btn { margin-top: 10px; }
+
+/* Panel global "Pokok Alkitab" / "Peta+Gambar" (sidebar, semua kitab
+   sekaligus) -- judul pengelompokan per Perjanjian/per kitab. */
+.all-pokok-group-title {
+  font-family: var(--font-display); font-size: 18px;
+  margin: 24px 0 10px; padding-top: 12px; border-top: 1px solid var(--rule);
+  color: var(--petrol);
+}
+.all-pokok-group-title:first-of-type { border-top: none; padding-top: 0; margin-top: 8px; }
+
+/* Tombol pintasan sidebar "📌 Pokok Alkitab" (atas) & "🗺️ Peta+Gambar"
+   (bawah) -- lebar penuh sidebar supaya jelas beda dari daftar kitab. */
+.sidebar-section-shortcut { margin: 0 0 6px; }
+.sidebar-wide-btn {
+  width: 100%; text-align: left; padding: 9px 10px; border-radius: 8px;
+  border: 1px solid var(--rule); background: var(--paper);
+  color: var(--petrol); font-family: var(--font-ui); font-weight: 600;
+  font-size: 13.5px; cursor: pointer;
+}
+.sidebar-wide-btn:hover { background: var(--paper-raised); border-color: var(--petrol); }
 
 /* Judul Garis Besar berjenjang, disisipkan sebelum blok ayat.
    Level 1 = paling besar/mencolok, makin besar levelnya makin kecil. */
