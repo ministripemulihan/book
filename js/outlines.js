@@ -44,18 +44,49 @@ function outlineSheetsConfig() {
   return (typeof CONFIG !== "undefined" && CONFIG.OUTLINE_SHEETS) || {};
 }
 
-// Ambil field apa pun namanya dari kolom Book Number / BookNumber / no kitab
-function rowNum(r, keys) {
-  for (const k of keys) {
-    if (r[k] !== undefined && r[k] !== "") return parseInt(String(r[k]).trim(), 10);
-  }
-  return NaN;
+// Ambil field apa pun namanya dari kolom Book Number / BookNumber / no kitab.
+// Dicocokkan secara LONGGAR (dibuang semua spasi/tanda baca, huruf kecil
+// semua) supaya tidak gagal cuma gara-gara beda spasi/tanda "/" dst di judul
+// kolom Google Sheet (mis. "Link Peta / Gambar" vs "Link Peta/Gambar").
+function normalizeHeaderKey(k) {
+  return String(k || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
-function rowStr(r, keys) {
-  for (const k of keys) {
-    if (r[k] !== undefined && String(r[k]).trim() !== "") return String(r[k]).trim();
+function findFieldLoose(r, candidateKeys) {
+  const wanted = candidateKeys.map(normalizeHeaderKey);
+  for (const key of Object.keys(r)) {
+    if (wanted.includes(normalizeHeaderKey(key))) return r[key];
   }
   return "";
+}
+function rowNum(r, keys) {
+  const v = findFieldLoose(r, keys);
+  if (v === undefined || v === "") return NaN;
+  return parseInt(String(v).trim(), 10);
+}
+function rowStr(r, keys) {
+  const v = findFieldLoose(r, keys);
+  return v === undefined ? "" : String(v).trim();
+}
+
+// Alias nama bahasa -> kode bahasa yang dipakai CONFIG.LANGUAGES (lihat
+// js/config.js). Kolom "Bahasa" di sheet Pokok Kitab / Garis Besar sering
+// diisi orang dengan kata biasa ("Indonesia", "Inggris", dst), BUKAN kode
+// singkatnya persis ("ind", "eng") -- kalau dicocokkan APA ADANYA (persis),
+// baris itu tidak akan pernah ketemu sama sekali walau datanya sudah benar.
+// Alias di bawah ini menerjemahkan variasi umum itu ke kode yang benar.
+const LANG_NAME_ALIASES = {
+  "indonesia": "ind", "bahasaindonesia": "ind", "id": "ind", "indo": "ind", "ind": "ind", "tb": "ind",
+  "indonesiarecovery": "rvind", "recoveryindonesia": "rvind", "rvind": "rvind",
+  "inggris": "eng", "english": "eng", "en": "eng", "eng": "eng",
+  "kingjames": "kjv", "kjv": "kjv", "inggriskjv": "kjv",
+  "inggrisrecovery": "rveng", "recoveryenglish": "rveng", "rveng": "rveng",
+  "tionghoa": "chs", "mandarin": "chs", "chinese": "chs", "chs": "chs", "中文": "chs",
+  "tionghoasederhana": "chssmp", "simplifiedchinese": "chssmp", "chssmp": "chssmp",
+  "jawa": "jawa", "javanese": "jawa",
+};
+function normalizeLangValue(raw) {
+  const key = normalizeHeaderKey(raw);
+  return LANG_NAME_ALIASES[key] || String(raw || "").trim().toLowerCase();
 }
 
 // ---------------- Sheet A: Pokok Kitab ----------------
@@ -68,7 +99,7 @@ async function fetchPokokKitabSheet() {
   const rows = records.map((r) => ({
     bookNum: rowNum(r, ["book number", "booknumber", "no kitab"]),
     bookName: rowStr(r, ["book name", "bookname"]),
-    lang: rowStr(r, ["bahasa", "language", "lang"]).toLowerCase(),
+    lang: normalizeLangValue(rowStr(r, ["bahasa", "language", "lang"])),
     pokok: rowStr(r, ["pokok kitab", "pokok"]),
   })).filter((r) => r.bookNum && r.pokok);
   saveOutlineToCache("pokok", rows);
@@ -84,7 +115,7 @@ async function fetchGarisBesarSheet() {
   const records = parseCSV(await res.text());
   const rows = records.map((r) => ({
     bookNum: rowNum(r, ["book number", "booknumber", "no kitab"]),
-    lang: rowStr(r, ["bahasa", "language", "lang"]).toLowerCase(),
+    lang: normalizeLangValue(rowStr(r, ["bahasa", "language", "lang"])),
     chapterStart: rowNum(r, ["chapter start", "chapterstart", "pasal awal"]),
     verseStart: rowNum(r, ["verse start", "versestart", "ayat awal"]),
     chapterEnd: rowNum(r, ["chapter end", "chapterend", "pasal akhir"]),
@@ -142,20 +173,31 @@ async function resyncAllOutlineSheets() {
 // ------------------------------------------------------------
 
 // Teks "Pokok Kitab" untuk satu kitab+bahasa tertentu (fallback ke
-// bahasa Indonesia kalau bahasa aktif belum diisi).
+// bahasa Indonesia kalau bahasa aktif belum diisi, lalu fallback ke
+// bahasa APA SAJA yang tersedia untuk kitab itu -- lebih baik tampil
+// dalam bahasa lain daripada tidak tampil sama sekali).
 async function getPokokKitabFor(bookNum, lang) {
   const rows = await pokokKitabRows();
   if (!rows.length) return null;
-  const hit = rows.find((r) => r.bookNum === bookNum && r.lang === (lang || "").toLowerCase())
-    || rows.find((r) => r.bookNum === bookNum && r.lang === "ind");
+  const wanted = normalizeLangValue(lang);
+  const hit = rows.find((r) => r.bookNum === bookNum && r.lang === wanted)
+    || rows.find((r) => r.bookNum === bookNum && r.lang === "ind")
+    || rows.find((r) => r.bookNum === bookNum);
   return hit ? hit.pokok : null;
 }
 
 // Semua entri Garis Besar untuk satu kitab+bahasa, terurut level besar->kecil
 // lalu urutan pasal:ayat -- dipakai untuk panel "📋 Garis Besar Kitab" (TOC).
+// Sama seperti Pokok Kitab: fallback ke bahasa Indonesia lalu ke bahasa
+// apa saja yang tersedia, supaya tidak "hilang" hanya karena kode bahasa
+// tidak persis cocok.
 async function getOutlineForBook(bookNum, lang) {
   const rows = await garisBesarRows();
-  const filtered = rows.filter((r) => r.bookNum === bookNum && r.lang === (lang || "").toLowerCase());
+  const forBook = rows.filter((r) => r.bookNum === bookNum);
+  const wanted = normalizeLangValue(lang);
+  let filtered = forBook.filter((r) => r.lang === wanted);
+  if (!filtered.length) filtered = forBook.filter((r) => r.lang === "ind");
+  if (!filtered.length) filtered = forBook;
   filtered.sort((a, b) => {
     if (a.chapterStart !== b.chapterStart) return a.chapterStart - b.chapterStart;
     if (a.verseStart !== b.verseStart) return a.verseStart - b.verseStart;
