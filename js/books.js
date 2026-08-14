@@ -81,3 +81,23 @@ BOOKS.forEach((b) => {
   b.aliases.forEach((a) => (BOOK_ALIAS_INDEX[a] = b));
   BOOK_ALIAS_INDEX[b.name.toLowerCase()] = b;
 });
+
+// Singkatan 3-huruf gaya OSIS/e-Sword (Inggris) yang biasa dipakai di
+// referensi silang pada kolom Note sheet Alkitab, mis. "Psa_74:16",
+// "Gen_1:8" -- urutannya SAMA PERSIS dengan urutan BOOKS di atas (66 kitab,
+// urutan kanon standar), dipakai khusus supaya pembacaan suara (TTS) bisa
+// membacakan referensi itu dengan wajar (mis. "Mazmur 74:16") -- lihat
+// cleanArticulationForSpeech() di js/app.js.
+const OSIS_ABBR_3 = [
+  "Gen", "Exo", "Lev", "Num", "Deu", "Jos", "Jdg", "Rut", "1Sa", "2Sa",
+  "1Ki", "2Ki", "1Ch", "2Ch", "Ezr", "Neh", "Est", "Job", "Psa", "Pro",
+  "Ecc", "Sng", "Isa", "Jer", "Lam", "Eze", "Dan", "Hos", "Joe", "Amo",
+  "Oba", "Jon", "Mic", "Nah", "Hab", "Zep", "Hag", "Zec", "Mal",
+  "Mat", "Mar", "Luk", "Joh", "Act", "Rom", "1Co", "2Co", "Gal", "Eph",
+  "Phi", "Col", "1Th", "2Th", "1Ti", "2Ti", "Tit", "Phm", "Heb", "Jam",
+  "1Pe", "2Pe", "1Jo", "2Jo", "3Jo", "Jud", "Rev",
+];
+const OSIS_ABBR_INDEX = {};
+OSIS_ABBR_3.forEach((abbr, i) => {
+  if (BOOKS[i]) OSIS_ABBR_INDEX[abbr.toLowerCase()] = BOOKS[i]; // simpan objek kitab (perlu .num & .name)
+});
