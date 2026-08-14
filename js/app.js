@@ -1467,6 +1467,20 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
 // ------------------------------------------------------------
 // 6) MEMBACA PASAL / AYAT (dari index di memori — instan)
 // ------------------------------------------------------------
+// Mengirim posisi bacaan terakhir ("Kejadian 1" dst) ke kolom
+// "Last_Read_Day" pada Sheet Pengguna asli (lihat saveLastRead_() di
+// apps-script/Code.gs) -- best-effort, tidak memblokir tampilan, dan
+// tidak dikirim ulang kalau labelnya sama persis dengan pengiriman
+// terakhir (mis. pasal yang sama dibuka ulang).
+let lastPushedReadLabel = "";
+function pushLastReadPosition(label) {
+  if (!currentUser || !label || label === lastPushedReadLabel) return;
+  lastPushedReadLabel = label;
+  if (typeof Sync !== "undefined" && Sync.enabled()) {
+    Sync.pushLastRead(currentUser, label).catch(() => {});
+  }
+}
+
 function renderChapter(bookNum, chapter, verseToHighlight) {
   const book = BOOKS.find((b) => b.num === bookNum);
   const verses = getChapterVerses(currentLang, bookNum, chapter);
@@ -1490,6 +1504,7 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
   if (el("readerTitleBottom")) el("readerTitleBottom").textContent = `${displayName} ${chapter}`;
   updateCurrentReadingIndicator(`${displayName} ${chapter}`);
   logActivity(`Baca: ${displayName} ${chapter}`);
+  pushLastReadPosition(`${displayName} ${chapter}`);
 
   const wrap = el("readerVerses");
   const columnsCount = getSetting(currentUser, "columns") || 1;
@@ -1651,8 +1666,7 @@ function runKeywordSearch(query, lang, scope, testament, mode) {
   const useTestament = testament || "__all__";
   const cap = mode === "max" ? SEARCH_CAP_MAX : SEARCH_CAP_NORMAL;
 
-  let verseResults = [];
-  if (useScope === "verse" || useScope === "both") {
+  function filteredPool() {
     let pool = useLang === "__all__" ? bibleData : bibleData.filter((v) => v.lang === useLang);
     if (useTestament === "PL" || useTestament === "PB") {
       pool = pool.filter((v) => {
@@ -1660,14 +1674,44 @@ function runKeywordSearch(query, lang, scope, testament, mode) {
         return book && book.testament === useTestament;
       });
     }
-    verseResults = pool.filter((v) => v.text.toLowerCase().includes(q)).slice(0, cap);
+    return pool;
+  }
+
+  let verseResults = [];
+  if (useScope === "verse" || useScope === "both") {
+    verseResults = filteredPool().filter((v) => v.text.toLowerCase().includes(q)).slice(0, cap);
   }
 
   let noteResults = [];
-  if (useScope === "notes" || useScope === "both") {
+  if (useScope === "both") {
+    // "Ayat & Catatan" -- catatan di sini adalah kolom Note dari SHEET ALKITAB
+    // (catatan admin/penjelasan per ayat, mis. footnote rvind), BUKAN catatan
+    // pribadi pengguna. Dicari di teks polosnya (tag HTML dibuang dulu) supaya
+    // markup <p>/<FR> dst tidak mengganggu pencocokan kata.
+    noteResults = searchInBibleNotes(filteredPool(), q, cap);
+  } else if (useScope === "notes") {
+    // "Catatan Saya" -- catatan pribadi milik pengguna yang sedang login.
     noteResults = searchInPersonalNotes(q, cap);
   }
   return { verseResults, noteResults, cap };
+}
+
+// Mencari di kolom Note pada SHEET ALKITAB (catatan/penjelasan per ayat yang
+// datang dari Google Sheet, field terakhir: Bahasa;Verse ID;Book Name;
+// Book Number;Chapter;Verse;Text;Note) -- ini yang tampil sebagai badge 📝
+// di layar baca pasal. `pool` sudah difilter bahasa & Perjanjian sesuai opsi
+// pencarian yang aktif.
+function searchInBibleNotes(pool, q, cap) {
+  const out = [];
+  for (const v of pool) {
+    if (!v.note || !v.note.trim()) continue;
+    const plain = noteHtmlToPlainText(v.note);
+    if (plain.toLowerCase().includes(q)) {
+      out.push({ verseId: v.id, note: plain, verse: v, isPersonal: false });
+      if (out.length >= (cap || SEARCH_CAP_NORMAL)) break;
+    }
+  }
+  return out;
 }
 
 // Mencari di catatan pribadi milik pengguna yang sedang login (js/notes.js).
@@ -1677,7 +1721,7 @@ function searchInPersonalNotes(q, cap) {
   Object.keys(notes).forEach((verseId) => {
     const entry = notes[verseId];
     if (entry && entry.note && entry.note.toLowerCase().includes(q)) {
-      out.push({ verseId, note: entry.note, verse: verseById[verseId] || null });
+      out.push({ verseId, note: entry.note, verse: verseById[verseId] || null, isPersonal: true });
     }
   });
   return out.slice(0, cap || SEARCH_CAP_NORMAL);
@@ -1871,8 +1915,9 @@ function handleSearch(rawQuery, isOptionChange) {
     const btn = document.createElement("button");
     btn.className = "result-item";
     const ref = n.verse ? `${n.verse.bookName} ${n.verse.chapter}:${n.verse.verse}` : n.verseId;
+    const tag = n.isPersonal ? "(catatan Anda)" : "(catatan)";
     btn.innerHTML = `
-      <div class="result-ref">📝 ${ref} <span class="result-note-tag">(catatan Anda)</span></div>
+      <div class="result-ref">📝 ${ref} <span class="result-note-tag">${tag}</span></div>
       <div class="result-text">${highlightAllMatches(n.note, query)}</div>
     `;
     btn.addEventListener("click", () => {
