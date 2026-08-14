@@ -1128,3 +1128,65 @@ input { font-family: inherit; }
 :fullscreen .sidebar,
 :fullscreen .sidebar-backdrop { display: none; }
 :fullscreen .content-wrap { padding-top: 8px; }
+
+/* ============================================================
+   POKOK KITAB / GARIS BESAR (nested) / PETA+GAMBAR
+   ============================================================ */
+.chapter-picker-extra {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 4px 0 16px;
+}
+.book-info-btn { border-color: var(--petrol); color: var(--petrol); }
+.book-info-btn:hover { background: var(--petrol); color: #fff; }
+
+.book-info-panel { max-width: 720px; margin: 0 auto; }
+.book-info-panel h2 { font-family: var(--font-display); font-size: 22px; margin: 14px 0; }
+.book-info-panel > .chip-btn { margin-bottom: 4px; }
+
+.pokok-box {
+  padding: 16px 18px; background: var(--paper-raised);
+  border: 1px solid var(--rule); border-left: 4px solid var(--petrol);
+  border-radius: 10px; line-height: 1.6; white-space: pre-wrap;
+}
+.pokok-box-inline { margin: 4px 0 14px; }
+.pokok-box-label { font-weight: 700; color: var(--petrol); margin-bottom: 6px; }
+
+/* Judul Garis Besar berjenjang, disisipkan sebelum blok ayat.
+   Level 1 = paling besar/mencolok, makin besar levelnya makin kecil. */
+.outline-heading {
+  font-weight: 700; line-height: 1.4; margin: 14px 0 6px;
+  color: var(--petrol);
+}
+.outline-heading.level-1 { font-family: var(--font-display); font-size: 1.15em; padding-top: 10px; border-top: 2px solid var(--rule); }
+.outline-heading.level-2 { font-size: 1.02em; padding-left: 6px; }
+.outline-heading.level-3 { font-size: 0.92em; font-weight: 600; padding-left: 14px; color: var(--ink-soft); }
+.outline-heading.level-4,
+.outline-heading.level-5 { font-size: 0.88em; font-weight: 600; padding-left: 22px; color: var(--ink-soft); }
+.outline-heading-ref { font-weight: 400; font-size: 0.82em; color: var(--ink-soft); }
+
+.outline-toc-list { display: flex; flex-direction: column; gap: 4px; }
+.outline-toc-item {
+  text-align: left; background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 8px 12px; cursor: pointer; font-family: var(--font-ui);
+  color: var(--ink);
+}
+.outline-toc-item:hover { border-color: var(--petrol); }
+.outline-toc-item.level-1 { font-weight: 700; }
+.outline-toc-item.level-2 { margin-left: 16px; }
+.outline-toc-item.level-3 { margin-left: 32px; font-size: 0.92em; color: var(--ink-soft); }
+.outline-toc-item.level-4,
+.outline-toc-item.level-5 { margin-left: 48px; font-size: 0.88em; color: var(--ink-soft); }
+.outline-toc-ref { font-weight: 400; font-size: 0.82em; color: var(--ink-soft); margin-right: 6px; }
+
+.map-gallery {
+  display: flex; flex-direction: column; gap: 18px;
+}
+.map-gallery-item {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px; padding: 12px;
+}
+.map-gallery-item img {
+  width: 100%; max-height: 70vh; object-fit: contain;
+  border-radius: 6px; background: #fff;
+  cursor: zoom-in;
+}
