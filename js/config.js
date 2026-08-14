@@ -141,4 +141,33 @@ const CONFIG = {
       csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQGlRBfxjNK7R_kRLUo9pnf4OnGQQJHlUn-MuJWBCX5V2ekrT4MqHAvVfmvNfgWfw/pub?gid=1522606854&single=true&output=csv",
     },
   ],
+
+  // ----------------------------------------------------------
+  // 7) POKOK KITAB / GARIS BESAR / PETA+GAMBAR (per kitab)
+  // ----------------------------------------------------------
+  // TIGA sheet TERPISAH (lagi) dari semua sheet di atas -- lihat
+  // README.md bagian "Pokok Kitab / Garis Besar / Peta+Gambar" untuk
+  // format kolom yang harus dipakai di tiap sheet. Publikasikan tiap
+  // sheet ke web sebagai CSV (sama caranya seperti sheet lain), lalu
+  // tempel URL-nya di sini. Kosongkan ("") kalau belum ada -- fitur
+  // itu otomatis disembunyikan, aplikasi tidak error.
+  OUTLINE_SHEETS: {
+    // Sheet A -- "Pokok Kitab": 1 baris = 1 kitab + 1 bahasa.
+    // Kolom: Book Number | Book Name | Bahasa | Pokok Kitab
+    // BELUM diisi URL-nya (sheet baru dibuat pengguna, tapi belum
+    // dikirim link CSV publikasinya) -- tempel URL-nya di sini nanti.
+    pokokKitabCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQV8rxG6tlAEuFC_OViDoKe6cQFW188PLwVUlxNfvOMu-1vTv0FeYxsRaGI_DBguBL1Q-aLBs6ei68s/pub?output=csv",
+
+    // Sheet B -- "Garis Besar Ayat": 1 baris = 1 rentang ayat + 1
+    // ringkasan (boleh bersarang/tumpang tindih rentang untuk level
+    // besar vs kecil).
+    // Kolom: Book Number | Bahasa | Chapter Start | Verse Start |
+    //        Chapter End | Verse End | Level | Ringkasan
+    garisBesarCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRnTDjBiw0g0E2UCwtvJaUdb2Orj5Szwk09NCJKGfNqUvvlAu4VugLs4ATvnnLvtHETk7Ig0IQ-MFIJ/pub?output=csv",
+
+    // Sheet C -- "Info Kitab (Peta & Gambar)": 1 kitab boleh punya
+    // lebih dari 1 baris (lebih dari 1 peta/gambar).
+    // Kolom: Book Number | Book Name | Link Peta/Gambar (Google Drive)
+    petaGambarCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSl5CNXQb3q5wMaTF7egAzlAhYtyvX30x2NtlsWiT4mtOfvpKimM61RYWHK81jgwjJZ0oy-Mbrwbv8v/pub?output=csv",
+  },
 };
