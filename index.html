@@ -163,6 +163,15 @@
         </label>
       </div>
 
+      <div class="more-menu-section">
+        <div class="more-menu-section-title">🔑 Ganti Password</div>
+        <p class="announcement-compose-hint">Kosongkan kedua kolom kalau tidak ingin mengganti password.</p>
+        <input type="password" id="changePasswordNew" class="columns-lang-select" placeholder="Password baru" autocomplete="new-password" />
+        <input type="password" id="changePasswordConfirm" class="columns-lang-select" placeholder="Ulangi password baru" autocomplete="new-password" style="margin-top:6px;" />
+        <div id="changePasswordMsg" class="announcement-compose-hint" hidden></div>
+        <button id="changePasswordBtn" type="button" class="chip-btn" style="margin-top:8px;">Simpan Password Baru</button>
+      </div>
+
       <label class="more-menu-toggle" for="readingAnimToggle">
         <span>🎉 Animasi progres membaca</span>
         <span class="toggle-switch">
@@ -305,7 +314,7 @@
     </div>
   </div>
 
-  <!-- ===================== TOAST PROGRES MEMBACA ok (tanpa perlu diklik) ===================== -->
+  <!-- ===================== TOAST PROGRES MEMBACA (tanpa perlu diklik) ===================== -->
   <div id="readingProgressToast" class="reading-toast" hidden>
     <span id="readingProgressToastText"></span>
   </div>
