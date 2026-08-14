@@ -139,7 +139,10 @@ const Sync = {
   // activeFrom/activeUntil: teks "yyyy-MM-dd" (boleh kosong = tanpa batas
   // tanggal). status: "draft" (belum tayang, hanya kelihatan administrator)
   // / "done" (aktif, siap tayang sesuai tanggal) / "expired" (ditutup manual).
-  async pushAnnouncement(username, text, activeFrom, activeUntil, status) {
+  // visibleTo: "all" (semua orang, default) ATAU daftar username dipisah
+  // koma hasil tag @username di teksnya (lihat parseAnnouncementTags() di
+  // js/app.js) -- kalau ada tag @all di teksnya, tetap dianggap "all".
+  async pushAnnouncement(username, text, activeFrom, activeUntil, status, visibleTo) {
     try {
       const data = await this._post({
         type: "announcement",
@@ -148,6 +151,7 @@ const Sync = {
         activeFrom: activeFrom || "",
         activeUntil: activeUntil || "",
         status: status || "draft",
+        visibleTo: visibleTo || "all",
         updatedAt: new Date().toISOString(),
       });
       return (data && data.ok) || false;
@@ -213,6 +217,33 @@ const Sync = {
     try {
       await this._post({ type: "collection_delete", username, id: String(id) });
       return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ---------------- Ganti Password (lihat js/app.js showChangePasswordPanel()) ----------------
+  // Mengambil password PENGGANTI kalau pengguna ini pernah mengganti
+  // password lewat menu Setting -- "" (kosong) berarti belum pernah ganti,
+  // jadi password dari Sheet Pengguna (Sheet #2) yang tetap dipakai.
+  async pullPasswordOverride(username) {
+    try {
+      const data = await this._get({ type: "password_override", username });
+      return (data && data.ok) ? (data.password || "") : "";
+    } catch (e) {
+      return ""; // offline -- pemanggil (validateLogin) sudah punya cadangan lokal sendiri
+    }
+  },
+
+  async pushPasswordOverride(username, newPassword) {
+    try {
+      const data = await this._post({
+        type: "password_override_set",
+        username,
+        password: newPassword,
+        updatedAt: new Date().toISOString(),
+      });
+      return (data && data.ok) || false;
     } catch (e) {
       return false;
     }
