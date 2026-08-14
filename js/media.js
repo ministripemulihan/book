@@ -132,6 +132,49 @@ function mediaLinkButton(label, url) {
 //  API juga dipasang (lihat wireMediaSession()) supaya pemutaran audio/
 //  video lebih tahan saat layar dikunci.
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+//  GOOGLE DRIVE — helper mengenali & membangun link Drive.
+//  Link yang dipakai pengguna di sheet bisa dalam beberapa bentuk:
+//    - https://drive.google.com/open?id=FILE_ID
+//    - https://drive.google.com/file/d/FILE_ID/view
+//    - https://drive.google.com/uc?id=FILE_ID&export=download
+//  Semuanya berisi FILE_ID yang sama, hanya bentuk URL-nya beda.
+// ------------------------------------------------------------
+function driveFileIdFromUrl(url) {
+  if (!url) return null;
+  let m = String(url).match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = String(url).match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  if (m) return m[1];
+  return null;
+}
+function isDriveUrl(url) {
+  return /drive\.google\.com/.test(String(url || ""));
+}
+
+function driveOpenUrl(url) {
+  if (!url) return "";
+  // Selalu arahkan ke halaman "/view" resmi Drive (paling andal dibuka
+  // manual di tab baru / dibagikan), dari FILE_ID-nya berapa pun bentuk
+  // link aslinya (…/open?id=, …/uc?id=, …/file/d/…).
+  const id = driveFileIdFromUrl(url);
+  if (id) return `https://drive.google.com/file/d/${id}/view`;
+  return url;
+}
+
+// URL "preview" Drive -- INI yang bisa ditanam (embed) di <iframe> dan
+// benar-benar memutar audio/video-nya langsung di halaman, TIDAK seperti
+// "/view" atau "/open?id=" yang cuma bisa dibuka penuh satu halaman
+// (dan TIDAK BISA dipasang sebagai src <audio>/<video> biasa -- itulah
+// sebab MP3/MP4 dari Drive sebelumnya gagal diputar sama sekali: kode lama
+// memasang link halaman Drive itu langsung ke `<audio src="...">`, padahal
+// itu halaman HTML, bukan berkas suara/video mentah, jadi browser tidak
+// bisa memutarnya).
+function driveEmbedPreviewUrl(url) {
+  const id = driveFileIdFromUrl(url);
+  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+}
+
 function roundMediaButton(icon, title) {
   const b = document.createElement("button");
   b.type = "button";
@@ -244,26 +287,54 @@ function buildInlineMediaBlock(media, titleForSession) {
 
   function openPlayer(kind) {
     closePlayer();
-    if (kind === "mp3") {
-      const audio = document.createElement("audio");
-      audio.controls = true;
-      audio.autoplay = true;
-      audio.setAttribute("playsinline", "");
-      audio.className = "inline-media-player";
-      audio.src = driveOpenUrl(media.mp3);
-      playerSlot.appendChild(audio);
-      wireMediaSession(audio, titleForSession);
-      wireWakeLockToMediaEl(audio);
-    } else if (kind === "mp4") {
-      const video = document.createElement("video");
-      video.controls = true;
-      video.autoplay = true;
-      video.setAttribute("playsinline", "");
-      video.className = "inline-media-player";
-      video.src = driveOpenUrl(media.mp4);
-      playerSlot.appendChild(video);
-      wireMediaSession(video, titleForSession);
-      wireWakeLockToMediaEl(video);
+    if (kind === "mp3" || kind === "mp4") {
+      const rawUrl = kind === "mp3" ? media.mp3 : media.mp4;
+      if (isDriveUrl(rawUrl)) {
+        // Link Google Drive -- TIDAK BISA dipasang langsung sebagai
+        // src <audio>/<video> (itu bukan berkas mentah, tapi halaman
+        // Drive). Satu-satunya cara resmi Drive bisa ditanam & langsung
+        // memutar di halaman yang sama adalah lewat iframe "/preview".
+        const embedUrl = driveEmbedPreviewUrl(rawUrl);
+        if (embedUrl) {
+          const iframe = document.createElement("iframe");
+          iframe.className = "inline-media-player " + (kind === "mp4" ? "inline-media-drive-video" : "inline-media-drive-audio");
+          iframe.src = embedUrl;
+          iframe.allow = "autoplay";
+          iframe.allowFullscreen = true;
+          playerSlot.appendChild(iframe);
+          // Kita tidak bisa "mendengar" event play/pause dari isi iframe
+          // Drive (beda origin), jadi layar dijaga tetap menyala selama
+          // pemutarnya terbuka (bukan hanya saat benar-benar sedang play).
+          if (typeof requestWakeLock === "function") { requestWakeLock(); holdingWakeLock = true; }
+        } else {
+          // ID file tidak terbaca dari link-nya -- fallback: buka Drive
+          // apa adanya di tab baru (lebih baik daripada tidak berbuat apa-apa).
+          window.open(driveOpenUrl(rawUrl), "_blank", "noopener,noreferrer");
+          return;
+        }
+      } else if (kind === "mp3") {
+        // Bukan link Drive (file MP3 dihosting sendiri/tempat lain) --
+        // tetap pakai elemen <audio> asli seperti sebelumnya.
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.autoplay = true;
+        audio.setAttribute("playsinline", "");
+        audio.className = "inline-media-player";
+        audio.src = rawUrl;
+        playerSlot.appendChild(audio);
+        wireMediaSession(audio, titleForSession);
+        wireWakeLockToMediaEl(audio);
+      } else {
+        const video = document.createElement("video");
+        video.controls = true;
+        video.autoplay = true;
+        video.setAttribute("playsinline", "");
+        video.className = "inline-media-player";
+        video.src = rawUrl;
+        playerSlot.appendChild(video);
+        wireMediaSession(video, titleForSession);
+        wireWakeLockToMediaEl(video);
+      }
     } else if (kind === "youtube") {
       const embedUrl = youTubeEmbedUrl(media.youtube);
       if (embedUrl) {
@@ -366,12 +437,3 @@ async function resyncMediaPlan(plan) {
   return plan;
 }
 
-function driveOpenUrl(url) {
-  if (!url) return "";
-  // Link "Bagikan" Google Drive standar (…/file/d/ID) tidak selalu langsung
-  // bisa diputar; "/view" membuka pratinjau Drive yang punya tombol putar.
-  if (/drive\.google\.com\/file\/d\//.test(url) && !/\/(view|preview)/.test(url)) {
-    return url.replace(/\/?$/, "/view");
-  }
-  return url;
-}
