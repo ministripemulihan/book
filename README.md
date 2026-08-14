@@ -1,4 +1,4 @@
-# Aplikasi Baca Alkitab (Multi-Google Sheet, multi-bahasa, rencana baca)
+# Aplikasi Baca Alkitab (Multi Google Sheet, multi-bahasa, rencana baca)
 
 Aplikasi web statis (tanpa build/backend) untuk membaca Alkitab, mencari ayat
 (mis. `kejadian 1:1`), mencari kata di seluruh isi Alkitab, membaca satu pasal
@@ -8,7 +8,7 @@ setelah pengambilan pertama.
 
 ## Cara kerja singkat
 
-1. **Dua Google Sheet berbeda:**
+1. **Multi Google Sheet berbeda:**
    - **Sheet Alkitab** — isi teks Alkitab (bisa banyak bahasa sekaligus).
    - **Sheet Pengguna** — daftar akun (username, password, nama).
 2. **Kunjungan pertama**: aplikasi mengambil kedua data itu (CSV publik),
@@ -585,33 +585,166 @@ hosting Anda (Vercel dsb).
      punya batasan lebih ketat lagi di kebanyakan browser HP (belum
      dikerjakan di tahap ini — lihat "Belum termasuk" di bawah).
 
-## Belum termasuk (dikerjakan lain waktu, sudah diberi tahu ke pemesan)
+## Update lanjutan (Agustus 2026, tahap 4)
 
-- **Opsi TTS "baca juga catatannya"** — sekarang pembacaan suara (Google
-  Voice) hanya membaca teks ayat, belum ada pilihan supaya ikut membaca
-  isi kolom Note (field terakhir di sheet Alkitab: `Bahasa; Verse ID;
-  Book Name; Book Number; Chapter; Verse; Text; Note`).
-- **Suara TTS (Google Voice) tetap jalan saat layar HP dikunci total** —
-  perlu Wake Lock API + workaround "keep-alive" untuk bug bawaan Chrome/
-  Android yang menghentikan `speechSynthesis` setelah beberapa saat tidak
-  aktif di layar depan.
-- **Notifikasi awal soal unduh data lewat WiFi** — kalau dibuka pertama
-  kali tanpa WiFi, tetap bisa masuk tapi diberi tahu data Alkitab belum
-  terunduh, lalu bisa diunduh nanti dari menu Setting dengan info progres.
+1. **5 fitur kecil-menengah**: 4 tema warna baru (biru pastel muda/tua, merah
+   tua-putih, hijau tua pastel-kuning pastel, kuning-oranye pastel — total 17
+   tema), tombol 🔗 Bagikan link MP3/MP4/YouTube, opsi TTS "ikut baca
+   Catatan", ukuran huruf Catatan (Note) di layar baca mengikuti A+/A- ayat +
+   lebar panel dilebarkan di komputer, dan mode pencarian Normal/⚡ Maks
+   (Normal dibatasi 1.000 hasil biar cepat, Maks sampai 100.000 hasil).
+   - Berkas: `js/app.js`, `js/media.js`, `index.html`, `css/style.css`.
+
+2. **Notifikasi unduh data lewat WiFi (di awal, sebelum unduh data Alkitab
+   pertama kali)** — kunjungan PERTAMA KALI (belum ada data Alkitab
+   tersimpan lokal sama sekali) tidak lagi langsung menyedot data besar dari
+   server begitu saja:
+   - Kalau browser bisa memastikan sedang WiFi/kabel (Network Information
+     API — hanya didukung sebagian browser, terutama Chrome/Android):
+     langsung unduh otomatis seperti sebelumnya, tidak ada dialog tambahan.
+   - Kalau terdeteksi data seluler, ATAU jenis koneksi tidak bisa dipastikan
+     sama sekali (mis. kebanyakan browser di iPhone tidak mendukung API
+     ini): muncul dialog "📶 Belum terdeteksi WiFi" dengan dua pilihan —
+     **📥 Unduh Sekarang Juga** (lanjut seperti biasa, dengan info progres),
+     atau **⏭️ Masuk Dulu (hemat kuota)** — tetap bisa masuk ke aplikasi
+     walau data Alkitab belum ada, dengan pesan jelas + tombol unduh besar
+     di tengah layar.
+   - Kalau perangkat sedang benar-benar offline (`navigator.onLine === false`),
+     dialog di atas dilewati — langsung tampil pesan "belum ada sambungan
+     internet" (tidak ada gunanya menawarkan unduh sekarang).
+   - Unduhan bisa dipicu kapan saja setelahnya lewat tombol menu baru
+     **⋮ → 📥 Unduh Data Alkitab** (progres ditampilkan sama seperti sinkron
+     ulang biasa — teks & bar persentase di `loadingOverlay`).
+   - **Catatan jujur**: Network Information API (`navigator.connection`)
+     tidak bisa membedakan WiFi vs seluler di semua browser/HP — terutama
+     Safari/iPhone tidak mendukungnya sama sekali, jadi di situ dialog akan
+     selalu muncul (tidak bisa dipastikan otomatis "aman", jadi tetap
+     bertanya dulu demi jaga-jaga kuota pengguna).
+   - Berkas: `js/app.js` (`handleInitialBibleDownload()`,
+     `detectConnectionType()`, `showWifiDownloadPrompt()`,
+     `showBibleNotDownloadedState()` — semuanya baru; `startApp()` diubah
+     bagian pengecekan data lokal kosong), `index.html` (tombol
+     `#downloadBibleBtn` baru di menu ⋮), `css/style.css`
+     (`.empty-state .chip-btn`).
+
+## Update lanjutan (Agustus 2026, tahap 5)
+
+1. **Wake Lock (layar tidak mati sendiri) selama TTS atau pemutar
+   sebaris MP3/MP4 sedang jalan** — sebelumnya kalau layar HP mati
+   sendiri (timeout), suara TTS (Google Voice) maupun audio/video
+   sebaris ikut berhenti. Sekarang selama salah satunya sedang
+   memutar, aplikasi meminta layar tetap menyala (Wake Lock API),
+   dan otomatis diminta ulang begitu tab terlihat lagi kalau sempat
+   terlepas (mis. sempat pindah aplikasi sebentar).
+   - Berkas: `js/app.js` (`requestWakeLock()`, `releaseWakeLock()`
+     baru, dipasang di `playTTS()`/`pauseTTS()`/`stopTTS()`),
+     `js/media.js` (`wireWakeLockToMediaEl()` baru, dipasang di
+     pemutar MP3/MP4 sebaris).
+   - **Catatan jujur (batasan yang TIDAK bisa dijamin dari sisi web)**:
+     Wake Lock hanya mencegah layar mati **karena timeout otomatis**
+     selama tab ini aktif di depan. Kalau pengguna **sendiri** menekan
+     tombol kunci layar HP, atau benar-benar pindah/menutup
+     aplikasi/browser, sistem operasi HP tetap bisa menghentikan
+     suara — ini batasan OS, bukan sesuatu yang bisa "diperbaiki"
+     penuh dari web biasa (beda dari aplikasi native). Yang paling
+     tahan tetap audio MP3 murni. Wake Lock juga belum didukung
+     semua browser HP lama — di situ fiturnya otomatis dilewati
+     tanpa error, perilaku sama seperti sebelumnya.
+
+## Update lanjutan (Agustus 2026, tahap 6)
+
+1. **Tag @username / @all di Pengumuman** — administrator sekarang bisa
+   menandai pengumuman supaya hanya tampil ke orang tertentu. Ketik `@`
+   lalu nama, atau lebih mudah: pilih dari dropdown **"Tandai (@tag)
+   untuk"** di form Kirim Pengumuman lalu klik **+ Tambah Tag** (dropdown
+   otomatis berisi semua username aktif + pilihan **🌐 Semua Pengguna
+   (@all)** paling atas). Tulisan `@nama` **TIDAK ikut tampil** di
+   pengumuman yang jadi — hanya dipakai untuk menyaring siapa yang boleh
+   melihat, lalu dibuang dari teksnya sebelum disimpan. Kalau tidak ditag
+   sama sekali (atau ditag `@all`), pengumuman tampil ke semua orang
+   seperti biasa.
+   - **Penting**: karena `all` dipakai sebagai kata kunci "semua orang",
+     jangan sampai ada username asli bernama persis `all` di Sheet
+     Pengguna (Sheet #2) — kalau ada, akan selalu dianggap tag broadcast,
+     bukan username itu. Pastikan juga semua username di sana **unik**
+     (tidak ada yang kembar) supaya tag @username tidak salah sasaran.
+   - Berkas: `apps-script/Code.gs` (kolom `VisibleTo` baru di tab
+     Announcements), `js/sync.js` (`pushAnnouncement()` kirim
+     `visibleTo`), `js/app.js` (`parseAnnouncementTags()`,
+     `announcementVisibleToMe()`, `announcementShouldShow()` — semuanya
+     baru; form compose & daftar pengumuman dirombak), `css/style.css`
+     (`.announcement-tag-row`).
+
+2. **Ganti Password** (menu ⋮ → **🔑 Ganti Password**) — dua kolom
+   "Password baru" & "Ulangi password baru". **Kosongkan keduanya = tidak
+   ada perubahan sama sekali** (bukan error, cuma pesan info). Kalau
+   diisi, harus diisi **keduanya** dan **harus sama persis**, minimal 4
+   karakter, baru disimpan. Password baru berlaku untuk login berikutnya
+   di HP/komputer MANA PUN (disimpan lewat Apps Script, terpisah dari
+   Sheet Pengguna aslinya supaya Sheet itu tidak perlu diedit manual
+   tiap kali ada yang ganti password), dan juga dicadangkan secara lokal
+   di perangkat ini supaya tetap bisa login walau lagi offline.
+   - **Catatan keamanan** — SAMA seperti password di Sheet Pengguna
+     (Sheet #2): disimpan apa adanya (teks biasa), BUKAN keamanan tingkat
+     server. Cocok untuk keperluan pribadi/keluarga/jemaat; jangan pakai
+     password yang juga dipakai di akun penting lain.
+   - Berkas: `apps-script/Code.gs` (tab `PasswordOverrides` baru,
+     `readPasswordOverride_()`/`setPasswordOverride_()`), `js/sync.js`
+     (`pullPasswordOverride()`/`pushPasswordOverride()`), `js/app.js`
+     (`validateLogin()` dirombak supaya cek password pengganti ini
+     duluan, `getEffectivePassword()`/`initChangePasswordUI()` baru),
+     `index.html` (bagian baru di menu ⋮).
+   - **Setelah update ini, JANGAN LUPA**: deploy ulang `Code.gs` (Deploy
+     → Manage deployments → ikon pensil → Version: **New version** →
+     Deploy) supaya tab `PasswordOverrides` & endpoint barunya aktif —
+     kalau lupa, tombol Ganti Password akan selalu gagal menyimpan.
+
+## Sudah dikerjakan sebelumnya (jangan dikerjakan ulang)
+
+Supaya tidak dobel, ini daftar hal yang **SUDAH ADA** di paket ini walau
+sempat ditanyakan ulang:
+- Tombol bulat 🎵/🎬/▶️ MP3/MP4/YouTube yang main **di halaman yang sama**
+  (bukan tab baru) — di Rencana Baca, panel Kumpulan Ayat, dan layar baca
+  pasal. Lihat "Update lanjutan tahap 3" di atas.
+- Tombol 🔗 Bagikan link MP3/MP4/YouTube — Lihat "Update lanjutan tahap 4".
+- Opsi TTS "ikut baca Catatan" (`#ttsReadNotesToggle`) — sudah aktif.
+- Tombol kecepatan TTS **+ / −**, naik-turun **0.1** (bukan 0.2) — sudah
+  sesuai permintaan (`ttsRateDown`/`ttsRateUp` di `js/app.js`).
+- Pengumuman hanya tampil ke status **Done** (+ dalam rentang tanggal
+  aktif/berakhir) — lihat "Update lanjutan tahap 3".
+- Tag **@username / @all** & **Ganti Password** — lihat "Update lanjutan
+  tahap 6" di atas.
+
+## Belum termasuk / perlu info tambahan dari Anda dulu
+
+- **Data Rencana Baca "PB 1 Tahun" & "PL 2 Tahun" sesuai isi sheet yang
+  Anda kirim** — link CSV yang Anda berikan kali ini **sama persis**
+  dengan yang sudah terisi di `CONFIG.READING_MEDIA_SHEETS` sebagai
+  `pl_ind` (Perjanjian Lama Indonesia), dan **satu link CSV publikasi
+  Google Sheet hanya berisi SATU tab/sheet** (bukan keempatnya
+  sekaligus: PL Bahasa Indonesia, PB Bahasa Indonesia, PB Bahasa
+  Inggris, PB Bahasa Mandarin). Supaya keempatnya bisa tampil sebagai 4
+  pilihan rencana baca terpisah, mohon buka tiap TAB itu satu-satu di
+  Google Sheets → **File → Bagikan → Publikasikan ke web** → pilih tab
+  yang benar → format CSV → salin URL-nya (URL tiap tab akan beda di
+  parameter `gid=` pada akhirnya) — kirim 4 URL itu (atau minimal yang
+  PB 1 Tahun Indonesia dulu), nanti langsung saya isikan ke 3 slot yang
+  masih kosong di `js/config.js` (`pb_ind`, `pb_mandarin`, `pb_inggris`).
 - **Fitur "Garis Besar"/Pokok Alkitab per kitab** (rangkuman per rentang
-  ayat, ditampilkan sebelum ayatnya, bisa diedit khusus administrator,
-  3 bahasa) — fitur besar, perlu skema Google Sheet baru + menu edit
-  admin + logika tampilan baru di layar baca pasal.
-- **Verifikasi pemetaan sheet PB 1 Tahun & PL 2 Tahun** — dua URL Google
-  Sheet yang Anda kirim untuk kedua rencana ini **identik**
-  (`2PACX-1vQGlRBfxjNK7R_...`), padahal biasanya tiap TAB/rencana beda
-  punya link CSV publikasi sendiri-sendiri (beda parameter `gid=` di
-  akhir URL). Saya tidak bisa membuka Google Sheet Anda langsung dari
-  sini untuk mengecek isi tab-nya — mohon konfirmasi/salin URL CSV
-  **khusus untuk tab PB 1 Tahun** dan **khusus untuk tab PL 2 Tahun**
-  secara terpisah (File → Bagikan → Publikasikan ke web → pilih tab yang
-  benar → format CSV), lalu saya tambahkan sebagai 2 slot baru di
-  `CONFIG.READING_MEDIA_SHEETS`.
+  ayat + pokok satu kitab, ditampilkan sebelum ayatnya, bisa diedit
+  khusus administrator, 3 bahasa) dan **2 baris tambahan di menu kitab
+  (Pokok, Peta+Gambar)** — ini fitur BESAR yang perlu dirancang dulu
+  sebelum dikerjakan, karena perlu: (1) skema Google Sheet BARU (kolom
+  kitab/pasal/rentang ayat/bahasa/isi rangkuman — belum ada sheet-nya),
+  (2) tambahan endpoint di `apps-script/Code.gs` supaya administrator
+  bisa menyimpan/mengedit dari aplikasi (bukan dari Sheet langsung), dan
+  (3) menu edit admin + logika tampilan baru bersarang per rentang ayat
+  di layar baca pasal. Ini realistis dikerjakan sebagai **tahap
+  terpisah berikutnya** — kalau Anda mau lanjutkan, beri tahu, nanti
+  saya siapkan dulu rancangan struktur Sheet-nya sebelum mulai coding.
+- **Notifikasi awal soal unduh data lewat WiFi** — SUDAH ada (lihat
+  "Update lanjutan tahap 4", poin 2) — sebelumnya salah tercatat belum
+  dikerjakan di versi README ini, sudah diperbaiki.
 
 ## Struktur berkas
 
