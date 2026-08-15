@@ -1796,13 +1796,24 @@ function renderVerseJumpBar(fullChapterVerses, verseMode) {
   const landmarks = computeVerseLandmarks(verseNums);
   const activeVerse = verseMode === "verse" ? currentSingleVerse : highlightVerse;
   bar.innerHTML = "";
+  // Maksimal 15 nomor per baris (dipaksa, TIDAK mengandalkan flex-wrap
+  // alami saja) -- supaya di HP barisnya tidak pernah kepanjangan/
+  // berdempetan, apa pun lebar layarnya (lihat .verse-jump-row-break
+  // di css/style.css).
+  const PER_ROW = 15;
   landmarks.forEach((vnum, i) => {
-    if (i > 0) {
+    const atRowBreak = i > 0 && i % PER_ROW === 0;
+    if (i > 0 && !atRowBreak) {
       const dots = document.createElement("span");
       dots.className = "verse-jump-dots";
       dots.textContent = "···";
       dots.setAttribute("aria-hidden", "true");
       bar.appendChild(dots);
+    }
+    if (atRowBreak) {
+      const brk = document.createElement("span");
+      brk.className = "verse-jump-row-break";
+      bar.appendChild(brk);
     }
     const btn = document.createElement("button");
     btn.type = "button";
