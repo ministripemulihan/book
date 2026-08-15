@@ -758,8 +758,24 @@ function initColumnsControl() {
   if (savedLangs[1] && available.some((l) => l.code === savedLangs[1])) sel3.value = savedLangs[1];
   else if (available[2]) sel3.value = available[2].code;
 
+  // PENTING: tombol jumlah kolom ("1/2/3 Kolom") dan tombol arah
+  // ("Menyamping"/"Atas-bawah") SAMA-SAMA memakai class ".columns-btn"
+  // (dipakai bersama hanya untuk styling tombol). Kalau di-query lewat
+  // "document.querySelectorAll(\".columns-btn\")" begitu saja, listener klik
+  // untuk tombol jumlah kolom ikut terpasang ke tombol arah juga (dan
+  // sebaliknya) -- akibatnya klik tombol arah ikut memicu handler jumlah
+  // kolom dengan btn.dataset.cols = undefined -> Number(undefined) = NaN,
+  // lalu NaN itu tersimpan sebagai pengaturan "columns". Karena NaN falsy,
+  // baris render (`getSetting(...,"columns") || 1`) jatuh balik ke 1 kolom
+  // -- itulah sebabnya tampilan 3-kolom langsung hilang begitu tombol arah
+  // (menyamping ATAU atas-bawah, dua-duanya) diklik. Perbaikannya: query
+  // masing-masing SELALU dibatasi ke grup tombolnya sendiri (#columnsBtnGroup
+  // vs #columnDirectionBtnGroup), bukan ke seluruh dokumen.
+  const colsGroup = el("columnsBtnGroup");
+  const colsBtns = colsGroup ? colsGroup.querySelectorAll(".columns-btn") : document.querySelectorAll(".columns-btn");
+
   function applyColumnsUI(count) {
-    document.querySelectorAll(".columns-btn").forEach((b) => {
+    colsBtns.forEach((b) => {
       b.classList.toggle("active", Number(b.dataset.cols) === count);
     });
     el("columnLangRow2").hidden = count < 2;
@@ -791,7 +807,7 @@ function initColumnsControl() {
     if (currentBookNum && currentChapter) renderChapter(currentBookNum, currentChapter, highlightVerse);
   }
 
-  document.querySelectorAll(".columns-btn").forEach((btn) => {
+  colsBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const count = Number(btn.dataset.cols);
       applyColumnsUI(count);
