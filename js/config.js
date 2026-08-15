@@ -55,7 +55,7 @@ const CONFIG = {
   // URL Web App dari "apps-script/CurhatCode.gs" (BUKAN file Code.gs yang
   // lama -- ini Sheet & deployment baru sendiri, lihat catatan cara pasang
   // di dalam file itu). Kosongkan untuk mematikan menu "💬 Curhat".
-  CURHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwvV-FYJg18dOM-mdCzbL9ujLzAlFiHdDEptat6ygwlz-zR5CHCmwNxgRJfBDR88E4IDQ/exec",
+  CURHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbztH2VE6jOUVeFPY-lE0tIdWuV8RxceV4fq-AlqYKqdurKfL6NUSxfoiRXRD8EH2n7Iaw/exec",
 
   // Jenis topik pilihan (domba boleh juga mengetik jenis sendiri kalau
   // memilih "Lainnya…"). Silakan tambah/ubah sesuai kebutuhan jemaat.
@@ -80,7 +80,7 @@ const CONFIG = {
   // URL Web App dari "apps-script/AiChatCode.gs" (lihat cara pasang di
   // dalam file itu, termasuk cara mengisi API key Gemini dengan aman).
   // Kosongkan untuk mematikan menu "🤖 AI Chat Gembala".
-  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwFP8HMtHUCCK7LQG_tCGTnGAoiovqdCXu3H_48nEhRn3WQJ8tlMExhPqsHBLQJsiYWgA/exec",
+  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzJnxQSe9z4ifzW0jzHrp_nA4IqELpAsVbgsTgnvG4mRn8wc47yfBgUrkriIC1CHD-jBA/exec",
   // Level yang boleh membuka menu AI Chat -- default sama dengan
   // CURHAT_GEMBALA_LEVELS, boleh dipersempit/diperluas sendiri di sini.
   AI_CHAT_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
