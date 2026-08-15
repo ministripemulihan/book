@@ -23,6 +23,10 @@ const DEFAULT_SETTINGS = {
   // (menyamping, kiri-kanan), "stacked" = atas-bawah (satu di atas yang
   // lain). Tidak berpengaruh saat columns = 1.
   columnDirection: "side",
+  // Mode tampilan ayat: "chapter" = seluruh pasal (perilaku lama/default),
+  // "verse" = cuma 1 ayat yang ditampilkan (lihat menu ⋮ → 👁️ Tampilan
+  // Ayat, dan renderChapter()/renderVerseJumpBar() di js/app.js).
+  verseDisplayMode: "chapter",
 };
 
 function settingsStorageKey(username) {
