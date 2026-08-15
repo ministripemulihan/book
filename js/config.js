@@ -54,7 +54,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwggU3lMgZucidzlPayNURK2Eg0l6GXU9Tp5cvgUPYwZp_wxyvsICJ-qqtFCxspaE7m/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxWlg4iRyJ6EBQaf_Wzn6Vn1bghfdFkJDt4pQNZFEJTNFrVU1yXPmgAXI9Ndghfner-/exec",
 
   // ----------------------------------------------------------
   // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
@@ -87,7 +87,7 @@ const CONFIG = {
   // URL Web App dari "apps-script/AiChatCode.gs" (lihat cara pasang di
   // dalam file itu, termasuk cara mengisi API key Gemini dengan aman).
   // Kosongkan untuk mematikan menu "🤖 AI Chat Gembala".
-  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx--kW4sK6A-Dt63-7A4UlC61fKBVQtFyGyQN_Hw87Is5ar8RdZaX_WrCH1FFWoBrqg/exec",
+  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwrCuSNhnz_zrAW8MGGyYHLYcdkkXW-wglW6jaeKOk08074vSspt7L9bOdt0SOofEPH/exec",
   // Level yang boleh membuka menu AI Chat -- default sama dengan
   // CURHAT_GEMBALA_LEVELS, boleh dipersempit/diperluas sendiri di sini.
   AI_CHAT_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
@@ -228,4 +228,36 @@ const CONFIG = {
     // Kolom: Book Number | Book Name | Link Peta/Gambar (Google Drive)
     petaGambarCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSl5CNXQb3q5wMaTF7egAzlAhYtyvX30x2NtlsWiT4mtOfvpKimM61RYWHK81jgwjJZ0oy-Mbrwbv8v/pub?output=csv",
   },
+
+  // ----------------------------------------------------------
+  // 8) PENGETAHUAN TAMBAHAN AI CHAT (istilah/kategori & topik) -- OPSIONAL
+  // ----------------------------------------------------------
+  // Sebagian pengetahuan sudah tertanam LANGSUNG di kode (lihat
+  // AI_KNOWLEDGE_BUILTIN di js/aichat.js: Perjanjian Baru, Jantung
+  // Alkitab, Kitab Taurat, Kitab tentang Wahyu, Baptisan, Pemecahan
+  // Roti) -- JALAN OTOMATIS tanpa perlu isi apa pun di sini.
+  //
+  // Isi URL di bawah HANYA kalau suatu saat mau MENAMBAH istilah/topik
+  // baru TANPA perlu minta bantuan ubah kode lagi -- caranya:
+  //   1. Buat Google Sheet baru, isi kolom (baris pertama = judul
+  //      kolom, PERSIS salah satu nama di bawah -- boleh pilih salah
+  //      satu variasi, tidak harus semua):
+  //        Istilah        (WAJIB) -- kata/frasa pemicu. Boleh lebih
+  //                          dari satu alias untuk baris yang sama,
+  //                          dipisah "|", mis. "kitab nubuat|nubuatan"
+  //        Kitab Terkait  -- daftar nama kitab, dipisah koma
+  //        Ayat Terkait   -- daftar referensi ayat, dipisah koma (mis.
+  //                          "Markus 16:16, Yohanes 3:5") -- CUKUP
+  //                          referensinya saja, teks lengkap ayatnya
+  //                          otomatis dicari sendiri oleh aplikasi dari
+  //                          data Alkitab yang sudah ada, TIDAK perlu
+  //                          disalin manual ke Sheet ini
+  //        Keterangan     -- penjelasan bebas (opsional)
+  //   2. File -> Share -> Publish to web -> pilih sheet ini -> format
+  //      CSV -> Publish. Salin link-nya, tempel di bawah ini.
+  //   3. Muat ulang aplikasi (data disegarkan otomatis tiap 24 jam,
+  //      atau langsung kalau baru pertama kali diisi/dikosongkan).
+  // Kosongkan ("") kalau tidak dipakai -- fitur bawaan (builtin) di
+  // atas tetap jalan seperti biasa tanpa ini.
+  AI_KNOWLEDGE_CSV_URL: "1zlZcLeAwB7cmdkP8vjSZpaxZM7yGnUneB-_SaGz2yX4",
 };
