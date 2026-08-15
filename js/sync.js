@@ -1,5 +1,5 @@
 // ============================================================
-//  SINKRONISASI KE GOOGLE SHEET (lewat Google Apps Script) 
+//  SINKRONISASI KE GOOGLE SHEET (lewat Google Apps Script)
 // ============================================================
 //  Menyimpan CATATAN PRIBADI per ayat & PROGRES RENCANA BACA ke
 //  Google Sheet, supaya bisa dibuka dan tetap sama persis dari
@@ -125,14 +125,18 @@ const Sync = {
   // dibuka secara eksplisit oleh pengguna, supaya kalau gagal ambil data
   // (mis. tidak ada sinyal saat itu), pesannya jelas "gagal memuat" +
   // tombol coba lagi, BUKAN diam-diam menampilkan "belum ada pengumuman"
-  // padahal sebenarnya di Sheet sudah ada isinya.
+  // padahal sebenarnya di Sheet sudah ada isinya. Pesan error ASLI dari
+  // server (mis. "Sheet Sinkron tidak ditemukan") ikut dikembalikan
+  // (bukan dibuang) supaya lebih mudah didiagnosa daripada pesan
+  // generik "periksa sambungan internet" yang bisa menyesatkan kalau
+  // penyebabnya sebenarnya bukan soal internet sama sekali.
   async pullAnnouncementsChecked() {
     try {
       const data = await this._get({ type: "announcements" });
       if (data && data.ok) return { ok: true, list: data.announcements || [] };
-      return { ok: false, list: [] };
+      return { ok: false, list: [], error: (data && data.error) || "" };
     } catch (e) {
-      return { ok: false, list: [] };
+      return { ok: false, list: [], error: String((e && e.message) || e) };
     }
   },
 
