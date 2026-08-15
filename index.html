@@ -102,6 +102,14 @@
       <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
 
       <div class="more-menu-section">
+        <div class="more-menu-section-title">👁️ Tampilan Ayat</div>
+        <div class="columns-btn-group" id="verseModeBtnGroup">
+          <button type="button" class="columns-btn" data-verse-mode="chapter">📖 Seluruh Pasal</button>
+          <button type="button" class="columns-btn" data-verse-mode="verse">🔎 1 Ayat Saja</button>
+        </div>
+      </div>
+
+      <div class="more-menu-section">
         <div class="more-menu-section-title">📐 Tampilan kolom (bahasa berdampingan)</div>
         <div class="columns-btn-group" id="columnsBtnGroup">
           <button type="button" class="columns-btn" data-cols="1">1 Kolom</button>
@@ -316,6 +324,21 @@
               <button id="prevChapter" class="chip-btn">← Pasal Sebelumnya</button>
               <h2 id="readerTitle"></h2>
               <button id="nextChapter" class="chip-btn">Pasal Berikutnya →</button>
+            </div>
+            <!-- Strip nomor ayat (mis. "1 ··· 5 ··· 10 ··· 15 ··· 18") -- klik
+                 nomornya untuk langsung menuju ayat itu. Diisi oleh
+                 renderVerseJumpBar() di js/app.js, muncul otomatis tiap
+                 pasal dibuka (disembunyikan sendiri kalau pasalnya cuma
+                 1 ayat). -->
+            <div id="verseJumpBar" class="verse-jump-bar" hidden></div>
+            <!-- Hanya muncul kalau mode tampilan = "🔎 1 Ayat Saja" (menu ⋮ →
+                 Tampilan Ayat) -- navigasi maju/mundur PER AYAT (bukan per
+                 pasal), termasuk otomatis lanjut ke pasal berikut/sebelumnya
+                 kalau sudah di ayat pertama/terakhir pasal ini. -->
+            <div id="verseNavRow" class="verse-nav-row" hidden>
+              <button type="button" id="prevVerseBtn" class="chip-btn">◀ Ayat Sebelumnya</button>
+              <span id="verseNavLabel" class="verse-nav-label"></span>
+              <button type="button" id="nextVerseBtn" class="chip-btn">Ayat Berikutnya ▶</button>
             </div>
             <div id="readerMediaSlot" class="reader-media-slot" hidden></div>
             <!-- kotak "📌 Pokok Kitab" -- hanya tampil di pasal 1 kalau datanya ada -->
