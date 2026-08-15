@@ -88,12 +88,17 @@
       <button id="curhatBtn" class="more-menu-btn">💬 Curhat</button>
       <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala (lihat updateLevelGatedMenus() di js/app.js) -->
       <button id="aiChatBtn" class="more-menu-btn" hidden>🤖 AI Chat Gembala</button>
+      <!-- Tampil hanya untuk level di CONFIG.LANG_CHECK_LEVELS (administrator selalu boleh) -->
+      <button id="langCheckBtn" class="more-menu-btn" hidden>🔎 Verifikasi Bahasa Ayat</button>
       <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala/pra gembala/inti (lihat updateLevelGatedMenus() di js/app.js) -->
       <button id="monitorBtn" class="more-menu-btn" hidden>👀 Pantau Pembacaan</button>
       <!-- Tampil hanya untuk administrator -->
       <button id="logViewerBtn" class="more-menu-btn" hidden>📊 Log Aktivitas</button>
+      <!-- Satu tombol untuk unduh pertama kali MAUPUN sinkron ulang -- teks
+           tombol disesuaikan otomatis lewat updateResyncBtnLabel() di
+           js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
+           Pokok Kitab / Garis Besar / Peta+Gambar juga (lihat confirmAndSync). -->
       <button id="resyncBtn" class="more-menu-btn">🔄 Sinkronkan ulang Alkitab</button>
-      <button id="downloadBibleBtn" class="more-menu-btn">📥 Unduh Data Alkitab</button>
       <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
 
       <div class="more-menu-section">
@@ -263,6 +268,9 @@
           <!-- panel AI Chat khusus gembala (Apps Script terpisah, lihat js/aichat.js) -->
           <div id="aiChatPanel" class="ai-chat-panel" hidden></div>
 
+          <!-- panel Verifikasi Bahasa Ayat (pemindai lokal, lihat js/langcheck.js) -->
+          <div id="langCheckPanel" class="log-panel" hidden></div>
+
           <!-- panel log aktivitas (khusus administrator) -->
           <div id="logPanel" class="log-panel" hidden></div>
 
@@ -349,5 +357,6 @@
   <script src="js/app.js"></script>
   <script src="js/curhat.js"></script>
   <script src="js/aichat.js"></script>
+  <script src="js/langcheck.js"></script>
 </body>
 </html>
