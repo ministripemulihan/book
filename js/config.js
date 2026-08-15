@@ -21,7 +21,14 @@ const CONFIG = {
   // sekitar ... MB"), supaya pengguna baru tidak bingung kenapa loading
   // di awal cukup lama. Ubah angka ini kalau ukuran datanya berubah
   // banyak (tidak perlu presisi, cukup perkiraan).
-  BIBLE_DATA_APPROX_SIZE_MB: 51,
+  // Perkiraan ukuran unduhan ditampilkan di dialog "Unduh Data Alkitab" --
+  // mencakup teks Alkitab utama + 3 sheet Pokok Kitab/Garis Besar/Peta&
+  // Gambar yang sekarang ikut disinkronkan bersamaan (lihat
+  // resyncAllOutlineSheets() di js/outlines.js, dipanggil dari
+  // syncFromServer() di js/app.js). Total ketiga sheet itu bisa terus
+  // bertambah isinya, jadi angka ini perlu dinaikkan lagi sewaktu-waktu
+  // kalau ukurannya membengkak jauh dari ini.
+  BIBLE_DATA_APPROX_SIZE_MB: 60,
 
   // ----------------------------------------------------------
   // 2) SUMBER DATA PENGGUNA — Google Sheet #2 (BERBEDA dari sheet Alkitab)
@@ -47,7 +54,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby0xsYVxCSlHYHj8CymI9JzA6C66RKuP1ww_dO9KK7vxwFrdplcpppvG5MOic36AGlo/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx_wfCiaGqW5KNceSdLU_KLe5FXPMZzDj9PFfN_-S8vdjBBw6MX4s-QjtHvUDOVQyIv/exec",
 
   // ----------------------------------------------------------
   // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
@@ -84,6 +91,16 @@ const CONFIG = {
   // Level yang boleh membuka menu AI Chat -- default sama dengan
   // CURHAT_GEMBALA_LEVELS, boleh dipersempit/diperluas sendiri di sini.
   AI_CHAT_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
+
+  // ----------------------------------------------------------
+  // 3d) VERIFIKASI BAHASA AYAT — alat bantu ADMIN (lihat js/langcheck.js)
+  // ----------------------------------------------------------
+  // Memindai SEMUA ayat yang tersimpan lokal untuk mendeteksi baris yang
+  // kode bahasanya (kolom "Bahasa" di Sheet) tidak cocok dengan teks yang
+  // sesungguhnya (mis. kolom "ind" tapi isinya Inggris). Berjalan 100% di
+  // perangkat (tidak perlu internet). "administrator" SELALU boleh (lihat
+  // isLangCheckAllowed()); level lain di sini boleh ditambah/dikurangi.
+  LANG_CHECK_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
 
   // Daftar bahasa yang ada di kolom "Bahasa" pada sheet Alkitab, dengan label yang
   // tampil di tombol pemilih bahasa. Sesuaikan "label" jika kurang tepat — kode
