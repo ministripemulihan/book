@@ -44,6 +44,7 @@ const CONFIG = {
   // Cocok untuk keperluan pribadi/keluarga/jemaat, JANGAN dipakai untuk data rahasia,
   // dan jangan pakai password yang juga dipakai di akun penting lain.
   USERS_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZjIx2UlpNYullJPAjYBD-32FAX0FZyARGCE-PfEwTArW4GESHyyXqXqutkhL4GqSsTfUD2AyhqH_i/pub?output=csv",
+
   // ----------------------------------------------------------
   // 3) SINKRONISASI CATATAN & PROGRES RENCANA BACA — Google Apps Script
   // ----------------------------------------------------------
@@ -53,7 +54,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx0JaW_ClMC9fUXUUPsYsh9EHV-XqvG_96syHHeDM5zLK-eS1cvt5AP9BFXXFrxbfK8/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwggU3lMgZucidzlPayNURK2Eg0l6GXU9Tp5cvgUPYwZp_wxyvsICJ-qqtFCxspaE7m/exec",
 
   // ----------------------------------------------------------
   // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
@@ -61,7 +62,7 @@ const CONFIG = {
   // URL Web App dari "apps-script/CurhatCode.gs" (BUKAN file Code.gs yang
   // lama -- ini Sheet & deployment baru sendiri, lihat catatan cara pasang
   // di dalam file itu). Kosongkan untuk mematikan menu "💬 Curhat".
-  CURHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbztH2VE6jOUVeFPY-lE0tIdWuV8RxceV4fq-AlqYKqdurKfL6NUSxfoiRXRD8EH2n7Iaw/exec",
+  CURHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwaWd_bSNY4zgRAK3N9KOrMBsG10t43OfEN80kb_jzn6xzNaWvtDcJAqcQmCm4pVobKWw/exec",
 
   // Jenis topik pilihan (domba boleh juga mengetik jenis sendiri kalau
   // memilih "Lainnya…"). Silakan tambah/ubah sesuai kebutuhan jemaat.
@@ -86,7 +87,7 @@ const CONFIG = {
   // URL Web App dari "apps-script/AiChatCode.gs" (lihat cara pasang di
   // dalam file itu, termasuk cara mengisi API key Gemini dengan aman).
   // Kosongkan untuk mematikan menu "🤖 AI Chat Gembala".
-  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyS_qssm3OvHUOdOZxaV8eVIXqO-ILN-rEvpXv9SApY5KpLAa0lXDGUHrU0wk8Kgvcr/exec",
+  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx--kW4sK6A-Dt63-7A4UlC61fKBVQtFyGyQN_Hw87Is5ar8RdZaX_WrCH1FFWoBrqg/exec",
   // Level yang boleh membuka menu AI Chat -- default sama dengan
   // CURHAT_GEMBALA_LEVELS, boleh dipersempit/diperluas sendiri di sini.
   AI_CHAT_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
