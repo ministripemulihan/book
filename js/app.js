@@ -348,8 +348,9 @@ async function handleInitialBibleDownload() {
   showBibleSyncPrompt({ isFirstTime: true });
 }
 
-// Dipakai tombol menu ⋮ → 🔄 Sinkronkan ulang Alkitab / 📥 Unduh Data
-// Alkitab -- tetap diberi info kalau sedang TIDAK terdeteksi WiFi (supaya
+// Dipakai tombol menu ⋮ → 🔄/📥 Sinkronkan ulang / Unduh Data Alkitab
+// (satu tombol, teks berubah otomatis -- lihat updateResyncBtnLabel())
+// -- tetap diberi info kalau sedang TIDAK terdeteksi WiFi (supaya
 // tidak tiba-tiba menyedot kuota data seluler tanpa sadar), tapi kalau
 // terdeteksi WiFi/kabel dengan pasti, langsung jalan tanpa dialog
 // tambahan (penggunanya sendiri yang memilih untuk sinkron).
@@ -381,7 +382,7 @@ function detectConnectionType() {
 // saat WiFi tidak/tidak-bisa dipastikan (opts.isFirstTime false).
 function showBibleSyncPrompt(opts) {
   const { isFirstTime, connType } = opts || {};
-  const sizeMB = (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 51;
+  const sizeMB = (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 60;
   let overlay = el("wifiPromptOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -518,7 +519,7 @@ async function syncFromServer(isFirstTime) {
   overlay.hidden = false;
   setLoadingText(
     isFirstTime
-      ? `Mengambil seluruh data Alkitab (semua bahasa, ~${(CONFIG.BIBLE_DATA_APPROX_SIZE_MB || 51)} MB) dari server — hanya sekali ini saja, mohon tunggu…`
+      ? `Mengambil seluruh data Alkitab (semua bahasa, ~${(CONFIG.BIBLE_DATA_APPROX_SIZE_MB || 60)} MB) dari server — hanya sekali ini saja, mohon tunggu…`
       : "Menyinkronkan ulang data Alkitab dari server…"
   );
   setLoadingProgress(3);
@@ -557,6 +558,17 @@ async function syncFromServer(isFirstTime) {
     });
 
     await LocalDB.setMeta("lastSync", new Date().toISOString());
+    setLoadingProgress(97);
+
+    // Ikut sinkronkan Pokok Kitab / Garis Besar / Peta+Gambar (3 sheet
+    // terpisah, lihat js/outlines.js) supaya tidak perlu tombol/menu
+    // terpisah lagi -- kalau salah satu sheet gagal diambil (mis. sheet-nya
+    // belum ada isinya), tetap lanjut, tidak sampai menggagalkan sinkron
+    // Alkitab utama yang sudah berhasil.
+    if (typeof resyncAllOutlineSheets === "function") {
+      setLoadingText("Menyinkronkan Pokok Kitab, Garis Besar & Peta/Gambar…");
+      await resyncAllOutlineSheets().catch(() => {});
+    }
     setLoadingProgress(100);
 
     bibleData = allRecords;
@@ -584,7 +596,19 @@ function afterDataReady() {
   initReadingProgressControl();
   initColumnsControl();
   updateStatusPanel();
+  updateResyncBtnLabel();
   showEmptyState();
+}
+
+// Teks tombol menu ⋮ disesuaikan: kalau data lokal masih kosong sama
+// sekali, tombolnya jelas mengarah ke "unduh pertama kali"; kalau sudah
+// ada data, jadi "sinkron ulang" biasa. Satu tombol, dua konteks.
+function updateResyncBtnLabel() {
+  const btn = el("resyncBtn");
+  if (!btn) return;
+  btn.textContent = bibleData.length
+    ? "🔄 Sinkronkan ulang Alkitab"
+    : "📥 Unduh Data Alkitab";
 }
 
 async function updateStatusPanel() {
@@ -608,6 +632,7 @@ function updateLevelGatedMenus() {
   if (el("logViewerBtn")) el("logViewerBtn").hidden = !isAdministrator();
   if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
   if (el("aiChatBtn")) el("aiChatBtn").hidden = typeof isAiChatAllowed === "function" ? !isAiChatAllowed() : true;
+  if (el("langCheckBtn")) el("langCheckBtn").hidden = typeof isLangCheckAllowed === "function" ? !isLangCheckAllowed() : true;
 }
 
 // ------------------------------------------------------------
@@ -3146,13 +3171,13 @@ function saveLogAsCsv(rows) {
     alert("Tidak ada data log untuk disimpan.");
     return;
   }
-  const header = ["Username", "Tanggal", "Jam", "OS", "IP", "Menu", "Pencarian"];
+  const header = ["Username", "Tanggal", "Jam", "OS", "IP", "Kota", "Negara", "Menu", "Pencarian"];
   const escCsv = (v) => {
     const s = String(v == null ? "" : v);
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const lines = [header.join(",")].concat(
-    rows.map((l) => [l.username, l.date, l.time, l.os, l.ip, l.menu, l.search].map(escCsv).join(","))
+    rows.map((l) => [l.username, l.date, l.time, l.os, l.ip, l.city, l.country, l.menu, l.search].map(escCsv).join(","))
   );
   const csv = lines.join("\r\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); // BOM supaya Excel baca UTF-8 dgn benar
@@ -3166,9 +3191,47 @@ function saveLogAsCsv(rows) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-// state filter panel log disimpan di luar fungsi supaya tetap diingat
-// selama sesi ini kalau panel dibuka-tutup berkali-kali
-const _logPanelState = { days: "30", userFilter: "", textFilter: "", rows: [] };
+// state filter + urutan panel log disimpan di luar fungsi supaya tetap
+// diingat selama sesi ini kalau panel dibuka-tutup berkali-kali.
+// sortField: "updatedAt" (jam server, paling akurat untuk urutan waktu
+// asli) / "username" / "city" / "country" / "menu". sortDir: "asc"/"desc".
+// Defaultnya "updatedAt" + "desc" supaya YANG PALING BARU tampil PALING
+// ATAS begitu panel dibuka -- lihat _sortLogRows_() di bawah.
+const _logPanelState = {
+  days: "30", userFilter: "", textFilter: "", timeFilter: "",
+  sortField: "updatedAt", sortDir: "desc", rows: [],
+};
+
+// Kolom tabel yang boleh diklik header-nya untuk diurutkan, beserta label
+// tampilan (dipakai baik untuk <th> maupun tanda panah ▲▼ urutan aktif).
+const LOG_TABLE_COLUMNS = [
+  { field: "updatedAt", label: "Tanggal" },
+  { field: "updatedAt", label: "Jam" }, // sengaja field sama dgn Tanggal: satu-satunya sumber waktu yang akurat urutannya adalah jam server (updatedAt), bukan teks lokal "Tanggal"/"Jam" terpisah yang formatnya bisa beda antar HP.
+  { field: "username", label: "Pengguna" },
+  { field: "os", label: "OS" },
+  { field: "ip", label: "IP" },
+  { field: "city", label: "Kota" },
+  { field: "country", label: "Negara" },
+  { field: "menu", label: "Menu" },
+  { field: "search", label: "Pencarian" },
+];
+
+function _sortLogRows_(rows, field, dir) {
+  const sorted = rows.slice();
+  sorted.sort((a, b) => {
+    let av, bv;
+    if (field === "updatedAt") {
+      av = new Date(a.updatedAt).getTime() || 0;
+      bv = new Date(b.updatedAt).getTime() || 0;
+    } else {
+      av = String(a[field] || "").toLowerCase();
+      bv = String(b[field] || "").toLowerCase();
+    }
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return dir === "asc" ? cmp : -cmp;
+  });
+  return sorted;
+}
 
 async function showLogPanel() {
   hideAllPanels();
@@ -3184,6 +3247,9 @@ async function loadAndRenderLogPanel(daysOverride) {
   title.textContent = "📊 Log Aktivitas";
   container.appendChild(title);
 
+  // Menu ini HANYA untuk level administrator -- termasuk kolom Kota/Negara
+  // dari IP di dalamnya, jadi tidak perlu pengecekan level terpisah lagi
+  // untuk kolom itu; seluruh panel ini memang sudah dikunci di sini.
   if (!isAdministrator()) {
     const p = document.createElement("p");
     p.className = "media-empty";
@@ -3215,6 +3281,7 @@ async function loadAndRenderLogPanel(daysOverride) {
     </label>
     <label>Pengguna: <input type="text" id="logUserFilter" placeholder="mis. budi" /></label>
     <label>Cari menu/kata: <input type="text" id="logTextFilter" placeholder="mis. Kejadian, Pengumuman" /></label>
+    <label>Cari waktu: <input type="text" id="logTimeFilter" placeholder="mis. 14/08/2026 atau 09:" /></label>
     <button id="logApplyBtn" class="chip-btn primary" type="button">Terapkan</button>
     <button id="logSaveBtn" class="chip-btn" type="button">💾 Simpan sebagai CSV</button>
   `;
@@ -3222,6 +3289,7 @@ async function loadAndRenderLogPanel(daysOverride) {
   controls.querySelector("#logDaysSelect").value = _logPanelState.days;
   controls.querySelector("#logUserFilter").value = _logPanelState.userFilter;
   controls.querySelector("#logTextFilter").value = _logPanelState.textFilter;
+  controls.querySelector("#logTimeFilter").value = _logPanelState.timeFilter;
 
   const tableWrap = document.createElement("div");
   tableWrap.className = "log-table-wrap";
@@ -3231,12 +3299,13 @@ async function loadAndRenderLogPanel(daysOverride) {
   controls.querySelector("#logApplyBtn").addEventListener("click", () => {
     _logPanelState.userFilter = controls.querySelector("#logUserFilter").value.trim().toLowerCase();
     _logPanelState.textFilter = controls.querySelector("#logTextFilter").value.trim().toLowerCase();
+    _logPanelState.timeFilter = controls.querySelector("#logTimeFilter").value.trim().toLowerCase();
     loadAndRenderLogPanel(controls.querySelector("#logDaysSelect").value);
   });
   controls.querySelector("#logSaveBtn").addEventListener("click", () => saveLogAsCsv(_logPanelState.rows));
 
   const daysNum = Number(_logPanelState.days) || 0;
-  const logs = await Sync.pullLogs(currentUser, daysNum);
+  const logs = await Sync.pullLogs(currentUser, daysNum); // sudah terurut TERBARU DULU dari server (lihat readLogs_ di Code.gs)
   let filtered = logs;
   if (_logPanelState.userFilter) {
     filtered = filtered.filter((l) => (l.username || "").toLowerCase().indexOf(_logPanelState.userFilter) !== -1);
@@ -3246,8 +3315,22 @@ async function loadAndRenderLogPanel(daysOverride) {
       (String(l.menu || "") + " " + String(l.search || "")).toLowerCase().indexOf(_logPanelState.textFilter) !== -1
     );
   }
+  if (_logPanelState.timeFilter) {
+    filtered = filtered.filter((l) =>
+      (String(l.date || "") + " " + String(l.time || "")).toLowerCase().indexOf(_logPanelState.timeFilter) !== -1
+    );
+  }
   _logPanelState.rows = filtered;
 
+  renderLogTable(tableWrap);
+}
+
+// Menggambar ULANG tabel log dari _logPanelState.rows (yang sudah difilter),
+// diurutkan sesuai _logPanelState.sortField/sortDir -- dipanggil ulang saat
+// header kolom diklik (TANPA perlu memanggil server lagi, cukup urut ulang
+// di browser supaya terasa instan).
+function renderLogTable(tableWrap) {
+  const filtered = _logPanelState.rows;
   tableWrap.innerHTML = "";
   const count = document.createElement("p");
   count.className = "log-count";
@@ -3262,11 +3345,21 @@ async function loadAndRenderLogPanel(daysOverride) {
     return;
   }
 
-  const shown = filtered.slice(0, 500);
+  const sorted = _sortLogRows_(filtered, _logPanelState.sortField, _logPanelState.sortDir);
+  const shown = sorted.slice(0, 500);
+
   const table = document.createElement("table");
   table.className = "log-table";
+  const theadHtml =
+    "<thead><tr>" +
+    LOG_TABLE_COLUMNS.map((c) => {
+      const isActive = c.field === _logPanelState.sortField;
+      const arrow = isActive ? (_logPanelState.sortDir === "asc" ? " ▲" : " ▼") : "";
+      return `<th class="log-sortable-th${isActive ? " is-sorted" : ""}" data-field="${c.field}">${escapeHtml(c.label)}${arrow}</th>`;
+    }).join("") +
+    "</tr></thead>";
   table.innerHTML =
-    "<thead><tr><th>Tanggal</th><th>Jam</th><th>Pengguna</th><th>OS</th><th>IP</th><th>Menu</th><th>Pencarian</th></tr></thead>" +
+    theadHtml +
     "<tbody>" +
     shown.map((l) => `
       <tr>
@@ -3275,16 +3368,35 @@ async function loadAndRenderLogPanel(daysOverride) {
         <td>${escapeHtml(l.username)}</td>
         <td>${escapeHtml(l.os)}</td>
         <td>${escapeHtml(l.ip)}</td>
+        <td>${escapeHtml(l.city)}</td>
+        <td>${escapeHtml(l.country)}</td>
         <td>${escapeHtml(l.menu)}</td>
         <td>${escapeHtml(l.search)}</td>
       </tr>`).join("") +
     "</tbody>";
   tableWrap.appendChild(table);
 
+  // Klik header kolom -> urutkan berdasar kolom itu (klik lagi kolom yang
+  // sama untuk membalik arah naik/turun), lalu gambar ulang tabelnya saja.
+  table.querySelectorAll(".log-sortable-th").forEach((th) => {
+    th.addEventListener("click", () => {
+      const field = th.getAttribute("data-field");
+      if (_logPanelState.sortField === field) {
+        _logPanelState.sortDir = _logPanelState.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        _logPanelState.sortField = field;
+        // Waktu: default TERBARU dulu (desc). Kolom teks lain: default A-Z (asc).
+        _logPanelState.sortDir = field === "updatedAt" ? "desc" : "asc";
+      }
+      renderLogTable(tableWrap);
+    });
+  });
+
   if (filtered.length > shown.length) {
     const note = document.createElement("p");
     note.className = "media-empty";
-    note.textContent = `Menampilkan ${shown.length} baris terbaru dari ${filtered.length}. Persempit dengan filter pengguna/kata, atau tekan "💾 Simpan sebagai CSV" untuk mendapat semuanya.`;
+    const sortedCol = LOG_TABLE_COLUMNS.find((c) => c.field === _logPanelState.sortField);
+    note.textContent = `Menampilkan ${shown.length} baris (urutan "${sortedCol ? sortedCol.label : ""}") dari ${filtered.length}. Persempit dengan filter di atas, atau tekan "💾 Simpan sebagai CSV" untuk mendapat semuanya.`;
     tableWrap.appendChild(note);
   }
 }
@@ -3720,6 +3832,7 @@ function hideAllPanels() {
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
   if (el("curhatPanel")) el("curhatPanel").hidden = true;
   if (el("aiChatPanel")) el("aiChatPanel").hidden = true;
+  if (el("langCheckPanel")) el("langCheckPanel").hidden = true;
   if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
   if (el("allPokokPanel")) el("allPokokPanel").hidden = true;
   if (el("allMapsPanel")) el("allMapsPanel").hidden = true;
@@ -4688,6 +4801,13 @@ function initUIEvents() {
       closeSidebarOnMobile();
     });
   }
+  if (el("langCheckBtn")) {
+    el("langCheckBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showLangCheckPanel();
+      closeSidebarOnMobile();
+    });
+  }
 
   el("menuToggle").addEventListener("click", () => {
     el("moreMenu").hidden = !el("moreMenu").hidden;
@@ -4698,15 +4818,14 @@ function initUIEvents() {
     }
   });
 
+  // Dulu ada 2 tombol terpisah ("Sinkronkan ulang Alkitab" & "Unduh Data
+  // Alkitab") yang ternyata memanggil fungsi persis sama begitu data lokal
+  // sudah ada (kondisi normal) -- digabung jadi SATU tombol saja supaya
+  // tidak membingungkan. Kalau data lokal masih kosong sama sekali,
+  // otomatis diperlakukan sebagai unduhan PERTAMA KALI (pesan & progres
+  // sesuai); kalau sudah ada data, ini jadi sinkron ulang biasa.
   el("resyncBtn").addEventListener("click", () => {
     el("moreMenu").hidden = true;
-    confirmAndSync(false);
-  });
-  el("downloadBibleBtn").addEventListener("click", () => {
-    el("moreMenu").hidden = true;
-    // Kalau memang belum ada data sama sekali (baru saja "masuk dulu" tanpa
-    // unduh), perlakukan sebagai unduhan PERTAMA (pesan & progres sesuai);
-    // kalau sudah ada data, ini jadi sinkron ulang biasa.
     confirmAndSync(!bibleData.length);
   });
   el("resyncUsersBtn").addEventListener("click", async () => {
