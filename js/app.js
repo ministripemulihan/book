@@ -607,6 +607,7 @@ async function updateStatusPanel() {
 function updateLevelGatedMenus() {
   if (el("logViewerBtn")) el("logViewerBtn").hidden = !isAdministrator();
   if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
+  if (el("aiChatBtn")) el("aiChatBtn").hidden = typeof isAiChatAllowed === "function" ? !isAiChatAllowed() : true;
 }
 
 // ------------------------------------------------------------
@@ -3604,9 +3605,13 @@ async function renderMonitorPanel(selectedUsername, showPinEditor) {
 
     const table = document.createElement("table");
     table.className = "monitor-table monitor-summary-table";
-    const headCells = dateKeys.slice().reverse().map((key) => `<th>${escapeHtml(dateKeyLabel(key))}</th>`).join("");
+    // dateKeys sudah urut dari HARI INI (paling baru) -> mundur ke paling
+    // lama (lihat monitorWindowDateKeys()). Dipakai APA ADANYA (TANPA
+    // reverse()) di sini supaya kolom paling KIRI = hari ini, kolom paling
+    // KANAN = 7 hari yang lalu, sesuai permintaan urutan tabel ringkasan.
+    const headCells = dateKeys.map((key) => `<th>${escapeHtml(dateKeyLabel(key))}</th>`).join("");
     const bodyRows = users.map((u) => {
-      const rows = buildReadRowsForUser(readLogsByUser[u.username] || [], dateKeys.slice().reverse());
+      const rows = buildReadRowsForUser(readLogsByUser[u.username] || [], dateKeys);
       const readCount = rows.filter((r) => r.read).length;
       const cells = rows.map((r) => `<td class="monitor-symbol ${r.read ? "monitor-cell-read" : "monitor-cell-unread"}">${r.read ? "V" : "X"}</td>`).join("");
       const lvl = (u.levels && u.levels.length) ? u.levels.map(levelLabel).join(", ") : (CONFIG.NO_LEVEL_LABEL || "Kaum Saleh");
@@ -3713,6 +3718,8 @@ function hideAllPanels() {
   if (el("collectionsPanel")) el("collectionsPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
+  if (el("curhatPanel")) el("curhatPanel").hidden = true;
+  if (el("aiChatPanel")) el("aiChatPanel").hidden = true;
   if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
   if (el("allPokokPanel")) el("allPokokPanel").hidden = true;
   if (el("allMapsPanel")) el("allMapsPanel").hidden = true;
@@ -4657,6 +4664,20 @@ function initUIEvents() {
     el("monitorBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
       showMonitorPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("curhatBtn")) {
+    el("curhatBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showCurhatPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("aiChatBtn")) {
+    el("aiChatBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showAiChatPanel();
       closeSidebarOnMobile();
     });
   }
