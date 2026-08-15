@@ -1114,6 +1114,57 @@ input { font-family: inherit; }
   .reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(220px, 80vw)); }
 }
 
+/* Arah "atas-bawah" (stacked) untuk >1 bahasa: dikelompokkan PER AYAT
+   (bukan per bahasa) -- urutan barisnya: bahasa 1 ayat N, bahasa 2 ayat
+   N, bahasa 3 ayat N, baru bahasa 1 ayat N+1, bahasa 2 ayat N+1, dst
+   (lihat renderColumnsStacked() di js/app.js). Tiap baris diberi label
+   bahasa kecil di depan nomor ayat supaya tetap jelas bahasa mana yang
+   mana walau tidak ada judul kolom seperti mode menyamping. */
+.reader-columns-stacked { display: flex; flex-direction: column; }
+.reader-columns-stacked .verse-block { padding-top: 4px; }
+.reader-columns-stacked .verse-group-end {
+  padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px dashed var(--rule);
+}
+.reader-columns-stacked .verse-group-end:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.reader-stacked-lang-tag {
+  display: inline-block; font-family: var(--font-ui); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--brass);
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 999px;
+  padding: 1px 8px; margin-right: 6px; vertical-align: middle;
+}
+
+/* ============================================================
+   STRIP NOMOR AYAT ("1 ··· 5 ··· 10 ··· 15 ··· 18") -- klik nomornya
+   untuk langsung menuju ayat itu (scroll+sorot di mode "Seluruh
+   Pasal", atau ganti tampilan di mode "1 Ayat Saja"). Lihat
+   renderVerseJumpBar() di js/app.js.
+   ============================================================ */
+.verse-jump-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+  margin: 10px 0 14px; padding: 8px 10px;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px;
+  font-family: var(--font-ui);
+}
+.verse-jump-num {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  padding: 3px 9px; border-radius: 999px; min-width: 30px;
+}
+.verse-jump-num:hover { background: var(--paper); }
+.verse-jump-num.active { background: var(--petrol); color: #fff; }
+.verse-jump-dots { color: var(--ink-soft); font-size: 12px; user-select: none; padding: 0 1px; }
+
+/* Baris navigasi PER AYAT -- hanya muncul di mode "🔎 1 Ayat Saja". */
+.verse-nav-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 14px;
+}
+.verse-nav-label { font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); text-align: center; flex: 1; }
+@media (max-width: 640px) {
+  .verse-nav-row { flex-wrap: wrap; }
+  .verse-nav-label { order: 3; flex-basis: 100%; }
+}
+
 /* ============================================================
    CATATAN AYAT — kelas ini masih dipakai oleh panel catatan SEBARIS
    (lihat .verse-inline-note & .inline-note-* di atas) walau namanya
