@@ -182,6 +182,180 @@ function outlineContextAsSources(context) {
   return out;
 }
 
+// ------------------------------------------------------------
+// 📚 PENGETAHUAN TAMBAHAN AI CHAT -- istilah/kategori/topik Alkitab
+// yang TIDAK bisa ditemukan lewat pencarian kata kunci biasa (mis.
+// "jantung alkitab" TIDAK PERNAH muncul harfiah di teks ayat mana pun
+// -- itu SEBUTAN yang perlu "diketahui" duluan, bukan dicari).
+//
+// DUA sumber, digabung (bawaan dulu, lalu tambahan dari Sheet kalau
+// ada):
+//   1) AI_KNOWLEDGE_BUILTIN di bawah -- sudah berisi persis apa yang
+//      diminta (Perjanjian Baru, Jantung Alkitab, Kitab Taurat, Kitab
+//      tentang Wahyu, Baptisan, Pemecahan Roti). Aktif LANGSUNG, tidak
+//      perlu setup apa pun.
+//   2) CONFIG.AI_KNOWLEDGE_CSV_URL (js/config.js) -- OPSIONAL, Google
+//      Sheet TERPISAH kalau suatu saat mau menambah istilah/topik baru
+//      TANPA perlu ubah kode ini lagi -- cukup tambah baris di Sheet-
+//      nya. Lihat komentar di config.js untuk format kolomnya.
+// ------------------------------------------------------------
+const AI_KNOWLEDGE_BUILTIN = [
+  {
+    terms: ["perjanjian baru", "kitab perjanjian baru", "pb (perjanjian baru)"],
+    // Dihitung otomatis dari data kitab yang sudah ada (semua kitab
+    // testament "PB") -- BUKAN daftar tetap, supaya kalau kelak ada
+    // penyesuaian di js/books.js, ini otomatis ikut benar.
+    books: () => BOOKS.filter((b) => b.testament === "PB").map((b) => b.name),
+    note: "Perjanjian Baru mencakup semua kitab mulai dari Matius sampai Wahyu.",
+  },
+  {
+    terms: ["jantung alkitab", "empat kitab jantung alkitab"],
+    books: ["Galatia", "Efesus", "Filipi", "Kolose"],
+    note: 'Sebutan "Jantung Alkitab" merujuk khusus pada 4 kitab: Galatia, Efesus, Filipi, dan Kolose.',
+  },
+  {
+    terms: ["kitab taurat", "taurat", "pentateukh", "lima kitab musa", "hukum taurat"],
+    books: ["Kejadian", "Keluaran", "Imamat", "Bilangan", "Ulangan"],
+    note: "Kitab Taurat (Pentateukh / Lima Kitab Musa) terdiri dari: Kejadian, Keluaran, Imamat, Bilangan, dan Ulangan.",
+  },
+  {
+    terms: ["kitab tentang wahyu", "kitab-kitab wahyu", "nubuatan wahyu"],
+    books: ["Wahyu", "Daniel", "Matius", "1 Korintus", "2 Korintus", "Hagai", "Yehezkiel", "Yesaya", "Yeremia"],
+    note: 'Kitab utama tentang wahyu adalah Wahyu itu sendiri. Kitab Daniel, Matius, 1 & 2 Korintus, Hagai, Yehezkiel, Yesaya, dan Yeremia juga sering dikaitkan karena sama-sama berisi nubuatan/wahyu.',
+  },
+  {
+    terms: ["baptisan", "dibaptis", "pembaptisan"],
+    // CATATAN: "Matius 3:15" persis seperti diminta -- kalau maksudnya
+    // baptisan Tuhan Yesus sendiri, ayat yang lebih tepat biasanya
+    // Matius 3:13-17 (bukan 3:15, yang bicara tentang orang banyak yang
+    // datang dibaptis Yohanes). Silakan koreksi lewat Sheet tambahan
+    // (lihat CONFIG.AI_KNOWLEDGE_CSV_URL) kalau perlu -- baris di Sheet
+    // akan ditambahkan berdampingan dengan baris bawaan ini.
+    verseRefs: ["Markus 16:16", "Yohanes 3:5", "Yohanes 3:15", "Matius 3:15", "Kisah Para Rasul 8:26-40"],
+    note: "Kisah Para Rasul 8:26-40 adalah kisah sida-sida Etiopia dibaptis oleh Filipus.",
+  },
+  {
+    terms: ["pemecahan roti", "perjamuan kudus", "perjamuan tuhan"],
+    books: ["Matius", "1 Korintus", "2 Korintus"],
+  },
+];
+
+const AI_KNOWLEDGE_CACHE_KEY = "bible_app_ai_knowledge_v1";
+
+function loadAiKnowledgeFromCache() {
+  try {
+    const raw = localStorage.getItem(AI_KNOWLEDGE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function saveAiKnowledgeToCache(rows) {
+  try {
+    localStorage.setItem(AI_KNOWLEDGE_CACHE_KEY, JSON.stringify({ rows, fetchedAt: new Date().toISOString() }));
+  } catch (e) { /* localStorage penuh -- diabaikan, tetap jalan tanpa cache */ }
+}
+
+// Sheet TAMBAHAN (opsional) -- format kolom (nama longgar, lihat
+// findFieldLoose di js/outlines.js):
+//   Istilah        -- kata/frasa pemicu, boleh >1 alias dipisah "|"
+//   Kitab Terkait  -- daftar nama kitab dipisah koma
+//   Ayat Terkait   -- daftar referensi ayat dipisah koma (mis.
+//                     "Markus 16:16, Yohanes 3:5") -- teks lengkapnya
+//                     dicari OTOMATIS dari data Alkitab yang sudah ada,
+//                     bukan disalin manual
+//   Keterangan     -- penjelasan bebas (opsional)
+async function fetchAiKnowledgeSheet() {
+  const url = CONFIG.AI_KNOWLEDGE_CSV_URL;
+  if (!url || !url.trim()) return [];
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("Gagal mengambil Pengetahuan AI Chat (" + res.status + ")");
+  const records = parseCSV(await res.text());
+  return records.map((r) => ({
+    terms: rowStr(r, ["istilah", "term", "alias"]).split("|").map((s) => s.trim().toLowerCase()).filter(Boolean),
+    books: rowStr(r, ["kitab terkait", "kitab-kitab terkait", "kitabterkait", "books"]).split(",").map((s) => s.trim()).filter(Boolean),
+    verseRefs: rowStr(r, ["ayat terkait", "ayat-ayat terkait", "ayatterkait", "verses"]).split(",").map((s) => s.trim()).filter(Boolean),
+    note: rowStr(r, ["keterangan", "catatan", "note", "penjelasan"]),
+  })).filter((r) => r.terms.length);
+}
+
+let _aiKnowledgeRowsPromise = null;
+// Digabung: bawaan (AI_KNOWLEDGE_BUILTIN) DULU, baru tambahan dari Sheet
+// (kalau CONFIG.AI_KNOWLEDGE_CSV_URL diisi) -- di-cache 24 jam supaya
+// tidak fetch Sheet berulang tiap kali tanya (gagal fetch -> pakai cache
+// lama kalau ada, atau bawaan saja kalau belum pernah berhasil sekali
+// pun -- AI Chat tetap jalan normal).
+async function getAiKnowledgeRows() {
+  const builtin = AI_KNOWLEDGE_BUILTIN.map((r) => ({
+    terms: r.terms.map((t) => t.toLowerCase()),
+    books: typeof r.books === "function" ? r.books() : (r.books || []),
+    verseRefs: r.verseRefs || [],
+    note: r.note || "",
+  }));
+  if (!CONFIG.AI_KNOWLEDGE_CSV_URL || !CONFIG.AI_KNOWLEDGE_CSV_URL.trim()) return builtin;
+
+  if (_aiKnowledgeRowsPromise) return _aiKnowledgeRowsPromise;
+  _aiKnowledgeRowsPromise = (async () => {
+    const cached = loadAiKnowledgeFromCache();
+    const isFresh = cached && cached.fetchedAt && (Date.now() - new Date(cached.fetchedAt).getTime() < 24 * 60 * 60 * 1000);
+    if (isFresh) return builtin.concat(cached.rows);
+    try {
+      const rows = await fetchAiKnowledgeSheet();
+      saveAiKnowledgeToCache(rows);
+      return builtin.concat(rows);
+    } catch (e) {
+      return builtin.concat((cached && cached.rows) || []);
+    }
+  })();
+  return _aiKnowledgeRowsPromise;
+}
+
+// Cari baris yang istilahnya cocok (substring, tidak peka huruf
+// besar/kecil) dengan pertanyaan.
+function matchAiKnowledgeRows(question, rows) {
+  const q = (question || "").toLowerCase();
+  return rows.filter((r) => r.terms.some((t) => t && q.includes(t)));
+}
+
+// Ubah baris yang cocok jadi teks konteks utk Gemini + daftar "sumber"
+// utk ditampilkan di bawah jawaban (tombol "📖 N sumber yang dipakai").
+// Ayat terkait DICARI teks lengkapnya dari data Alkitab yang sudah ada
+// di perangkat (lewat parseReference() & getChapterVerses(), sama
+// dengan mesin kotak cari referensi utama) -- supaya AI mengutip ayat
+// yang BENAR-BENAR akurat, bukan menghafal/mengarang sendiri.
+function aiKnowledgeRowsToContext(matchedRows) {
+  const lines = [];
+  const sources = [];
+  matchedRows.forEach((r) => {
+    const label = r.terms[0];
+    if (r.books && r.books.length) {
+      lines.push(`- Istilah "${label}" merujuk pada kitab: ${r.books.join(", ")}.`);
+      sources.push({ ref: "📚 " + label, text: "Kitab terkait: " + r.books.join(", ") });
+    }
+    if (r.note) {
+      lines.push(`- Keterangan "${label}": ${r.note}`);
+    }
+    (r.verseRefs || []).forEach((refText) => {
+      const parsed = typeof parseReference === "function" ? parseReference(refText) : null;
+      if (!parsed || !bookAvailableInLang(currentLang, parsed.book.num)) {
+        lines.push(`- Ayat terkait "${label}": ${refText}`);
+        return;
+      }
+      const chVerses = getChapterVerses(currentLang, parsed.book.num, parsed.chapter);
+      const vStart = parsed.verseStart || 1;
+      const vEnd = parsed.verseEnd || vStart;
+      const matched = parsed.verseStart ? chVerses.filter((v) => v.verse >= vStart && v.verse <= vEnd) : chVerses;
+      matched.forEach((v) => {
+        const ref = `${v.bookName || parsed.book.name} ${v.chapter}:${v.verse}`;
+        lines.push(`- (${ref}) ${v.text}`);
+        sources.push({ ref, text: v.text });
+      });
+    });
+  });
+  return {
+    contextText: lines.length ? "PENGETAHUAN TAMBAHAN (istilah/topik Alkitab):\n" + lines.join("\n") : "",
+    sources,
+  };
+}
+
 async function gatherAiChatContext(question) {
   const keywords = extractAiChatKeywords(question);
 
@@ -211,7 +385,29 @@ async function gatherAiChatContext(question) {
   });
 
   const outline = await gatherAiChatOutlineContext(question);
-  return { verses, notes, bookPokok: outline.bookPokok, allPokok: outline.allPokok };
+
+  // 📚 Pengetahuan tambahan (istilah/kategori & topik -- lihat blok di
+  // atas) -- dicocokkan TERPISAH dari pencarian kata kunci biasa, karena
+  // istilah seperti "jantung alkitab" TIDAK muncul secara harfiah di
+  // teks ayat mana pun (jadi tidak akan pernah ketemu lewat
+  // runKeywordSearch di atas).
+  let knowledgeContext = "";
+  let knowledgeSources = [];
+  try {
+    const knowledgeRows = await getAiKnowledgeRows();
+    const matched = matchAiKnowledgeRows(question, knowledgeRows);
+    if (matched.length) {
+      const built = aiKnowledgeRowsToContext(matched);
+      knowledgeContext = built.contextText;
+      knowledgeSources = built.sources;
+    }
+  } catch (e) { /* opsional -- AI tetap jalan tanpanya kalau gagal (mis. Sheet belum diisi) */ }
+
+  return {
+    verses, notes,
+    bookPokok: outline.bookPokok, allPokok: outline.allPokok,
+    knowledgeContext, knowledgeSources,
+  };
 }
 
 const _aiChatState = { allowExternal: false, history: [], busy: false };
@@ -302,9 +498,14 @@ function renderAiChatPanel() {
   // HP tombol "Tanya" & kotak tulisnya selalu kelihatan tanpa perlu
   // menggulir ke bawah dulu -- sama seperti aplikasi chat pada umumnya.
   form.className = "ai-chat-input-row";
+  // Tombol kirim: HANYA ikon ("logo enter"/kirim, ⏎), bukan lagi tombol
+  // teks "📤 Tanya" -- lebih minim & ringkas, terutama di HP (lihat
+  // .ai-chat-send-btn di css/style.css). Teks "Tanya" dipindah jadi
+  // title/aria-label saja (tetap terbaca pembaca layar), tidak hilang
+  // fungsinya, cuma tidak lagi makan tempat di layar.
   form.innerHTML = `
     <textarea id="aiChatInput" rows="1" placeholder="Tulis pertanyaan Anda, mis. 'Apa kata Alkitab tentang menghadapi kekhawatiran?'" required></textarea>
-    <button type="submit" class="chip-btn primary" id="aiChatSendBtn">📤 Tanya</button>
+    <button type="submit" class="ai-chat-send-btn" id="aiChatSendBtn" title="Kirim pertanyaan (Tanya)" aria-label="Kirim pertanyaan">⏎</button>
   `;
   container.appendChild(form);
 
@@ -420,7 +621,7 @@ async function handleAiChatAsk(question) {
     _aiChatState.history.push({
       role: "ai",
       text: data.answer,
-      sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context)),
+      sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context), context.knowledgeSources || []),
     });
   } catch (err) {
     _aiChatState.history.push({ role: "ai", text: "⚠️ Terjadi kesalahan: " + String(err.message || err) });
