@@ -8,6 +8,16 @@ let currentLang = null;
 let currentBookNum = null;
 let currentChapter = null;
 let highlightVerse = null;
+// true kalau catatan ayat yang di-highlight harus LANGSUNG dibuka otomatis
+// (mis. dari menu "Catatan Saya" / hasil pencarian catatan) -- false untuk
+// navigasi biasa (pencarian ayat, strip lompat ayat, dst) supaya tidak
+// membuka catatan tanpa diminta & membingungkan pembaca. Lihat
+// buildVerseBlock() & renderChapter().
+let highlightVerseOpenNote = false;
+// Ayat yang sedang ditampilkan sendirian di mode "🔎 1 Ayat Saja" (lihat
+// initVerseModeControl() & renderChapter()) -- null kalau mode "📖 Seluruh
+// Pasal" sedang aktif.
+let currentSingleVerse = null;
 let currentUser = null;        // username (huruf kecil) yang sedang login
 let currentUserDisplay = null; // nama tampilan
 let currentChapterVerses = []; // ayat-ayat pasal yang sedang ditampilkan (dipakai TTS & modal catatan)
@@ -595,6 +605,7 @@ function afterDataReady() {
   initTTS();
   initReadingProgressControl();
   initColumnsControl();
+  initVerseModeControl();
   updateStatusPanel();
   updateResyncBtnLabel();
   showEmptyState();
@@ -717,7 +728,7 @@ function initLanguageSelector() {
     buildSidebar();
     if (currentBookNum && currentChapter) {
       if (bookAvailableInLang(currentLang, currentBookNum)) {
-        renderChapter(currentBookNum, currentChapter, highlightVerse);
+        renderChapter(currentBookNum, currentChapter, highlightVerse, { openNote: highlightVerseOpenNote });
       } else {
         showLangUnavailable();
       }
@@ -804,7 +815,7 @@ function initColumnsControl() {
   }
 
   function rerenderIfReading() {
-    if (currentBookNum && currentChapter) renderChapter(currentBookNum, currentChapter, highlightVerse);
+    if (currentBookNum && currentChapter) renderChapter(currentBookNum, currentChapter, highlightVerse, { openNote: highlightVerseOpenNote });
   }
 
   colsBtns.forEach((btn) => {
@@ -1401,9 +1412,13 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   block.appendChild(notePanel);
 
   // Kalau ayat ini sedang di-highlight (mis. datang dari menu "Catatan
-  // Saya" atau hasil pencarian) DAN memang punya catatan, langsung buka
-  // panel catatannya supaya tidak perlu tekan dua kali lagi.
-  if (highlightVerse && v.verse === highlightVerse && (hasAdminNote || hasPersonalNote)) {
+  // Saya" atau hasil pencarian CATATAN) DAN memang punya catatan, langsung
+  // buka panel catatannya supaya tidak perlu tekan dua kali lagi. HANYA
+  // kalau highlightVerseOpenNote true -- untuk navigasi biasa (pencarian
+  // AYAT, strip lompat ayat) sengaja TIDAK dibuka otomatis, supaya
+  // pembaca tidak bingung tiba-tiba muncul kotak catatan padahal cuma
+  // mau membaca ayatnya.
+  if (highlightVerse && v.verse === highlightVerse && highlightVerseOpenNote && (hasAdminNote || hasPersonalNote)) {
     notePanel.hidden = false;
     block.classList.add("note-open");
   }
@@ -1465,7 +1480,10 @@ async function insertOutlineHeaders(wrap, bookNum, chapter, verses) {
 // Tampilan beberapa kolom berdampingan (bahasa berbeda per kolom), untuk
 // membaca beberapa terjemahan sekaligus. Kolom 1 selalu memakai bahasa
 // aktif (langSelect); kolom 2 & 3 memakai bahasa yang dipilih di menu ⋮.
-function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, columnsCount, extraLangs) {
+// `singleVerseNum`: kalau diisi (mode "🔎 1 Ayat Saja" aktif), SETIAP
+// kolom difilter supaya cuma menampilkan ayat itu saja, bukan satu pasal
+// penuh (lihat renderChapter()).
+function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, columnsCount, extraLangs, singleVerseNum) {
   wrap.classList.add("reader-columns");
   wrap.setAttribute("data-cols", String(columnsCount));
   const direction = getSetting(currentUser, "columnDirection") || "side";
@@ -1475,43 +1493,25 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
   const columns = [{ lang: currentLang, verses: primaryVerses }];
   for (let i = 0; i < columnsCount - 1; i++) {
     const lang = extraLangs[i];
-    const verses = lang ? getChapterVerses(lang, bookNum, chapter) : [];
+    let verses = lang ? getChapterVerses(lang, bookNum, chapter) : [];
+    if (singleVerseNum) verses = verses.filter((v) => v.verse === singleVerseNum);
     columns.push({ lang, verses });
   }
 
   // Tampilan "menyamping" (side-by-side) dengan >1 kolom: dirender sebagai
   // baris grid per nomor ayat, supaya ayat yang sama sejajar tingginya di
   // semua kolom (tinggi baris grid otomatis mengikuti kolom yang teksnya
-  // paling panjang). Tampilan "atas-bawah" (stacked) dan 1 kolom tetap
-  // memakai blok kolom independen seperti sebelumnya (tidak perlu sejajar).
+  // paling panjang).
   if (direction === "side" && columnsCount > 1) {
     renderColumnsGridAligned(wrap, columns, displayName, columnsCount);
     return;
   }
 
-  columns.forEach((col) => {
-    const colEl = document.createElement("div");
-    colEl.className = "reader-column";
-
-    const head = document.createElement("div");
-    head.className = "reader-column-head";
-    head.textContent = col.lang ? langLabelFor(col.lang) : "— pilih bahasa —";
-    colEl.appendChild(head);
-
-    const versesWrap = document.createElement("div");
-    versesWrap.className = "reader-verses";
-    if (col.verses.length === 0) {
-      const empty = document.createElement("p");
-      empty.style.fontSize = "13px";
-      empty.style.color = "var(--ink-soft)";
-      empty.textContent = col.lang ? "Pasal ini belum tersedia dalam bahasa ini." : "Pilih bahasa di menu ⋮.";
-      versesWrap.appendChild(empty);
-    } else {
-      col.verses.forEach((v, idx) => versesWrap.appendChild(buildVerseBlock(v, idx, displayName)));
-    }
-    colEl.appendChild(versesWrap);
-    wrap.appendChild(colEl);
-  });
+  // Tampilan "atas-bawah" (stacked): DIKELOMPOKKAN PER AYAT, bukan per
+  // bahasa -- urutan barisnya persis seperti diminta: bahasa 1 ayat N,
+  // bahasa 2 ayat N, bahasa 3 ayat N, baru pindah ke bahasa 1 ayat N+1,
+  // bahasa 2 ayat N+1, dst. Lihat renderColumnsStacked() di bawah.
+  renderColumnsStacked(wrap, columns, displayName);
 }
 
 // Merender kolom paralel sebagai grid asli (bukan kolom independen),
@@ -1560,6 +1560,49 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
   });
 }
 
+// Merender kolom paralel dalam arah "atas-bawah" (stacked), DIKELOMPOKKAN
+// PER AYAT -- untuk tiap nomor ayat (berurutan), tampilkan versi bahasa 1
+// dulu, lalu bahasa 2, lalu bahasa 3 (kalau ada) tepat di bawahnya, baru
+// lanjut ke nomor ayat berikutnya dengan urutan bahasa yang sama. Contoh
+// untuk pasal 10 ayat & 3 bahasa: baris 1=bhs1 ay1, baris 2=bhs2 ay1,
+// baris 3=bhs3 ay1, baris 4=bhs1 ay2, baris 5=bhs2 ay2, dst. Setiap baris
+// diberi label bahasa kecil di depan nomor ayat (tidak ada judul kolom
+// terpisah seperti mode menyamping, karena semuanya satu kolom lebar
+// penuh yang ditumpuk vertikal).
+function renderColumnsStacked(wrap, columns, displayName) {
+  wrap.classList.add("reader-columns-stacked");
+
+  const verseNumSet = new Set();
+  columns.forEach((col) => col.verses.forEach((v) => verseNumSet.add(v.verse)));
+  const verseNums = Array.from(verseNumSet).sort((a, b) => a - b);
+
+  if (verseNums.length === 0) {
+    const empty = document.createElement("p");
+    empty.style.fontSize = "13px";
+    empty.style.color = "var(--ink-soft)";
+    empty.textContent = "Pasal ini belum tersedia.";
+    wrap.appendChild(empty);
+    return;
+  }
+
+  verseNums.forEach((vnum, groupIdx) => {
+    const langsWithVerse = columns.filter((col) => col.verses.some((vv) => vv.verse === vnum));
+    langsWithVerse.forEach((col, colIdxInGroup) => {
+      const v = col.verses.find((vv) => vv.verse === vnum);
+      const block = buildVerseBlock(v, groupIdx, displayName);
+      const langTag = document.createElement("span");
+      langTag.className = "reader-stacked-lang-tag";
+      langTag.textContent = col.lang ? langLabelFor(col.lang) : "?";
+      block.insertBefore(langTag, block.firstChild);
+      // Garis pemisah SETELAH baris bahasa TERAKHIR dalam kelompok ayat
+      // ini (bukan setelah tiap baris), supaya kelompok per-ayat tetap
+      // terlihat jelas sebagai satu unit.
+      if (colIdxInGroup === langsWithVerse.length - 1) block.classList.add("verse-group-end");
+      wrap.appendChild(block);
+    });
+  });
+}
+
 // ------------------------------------------------------------
 // 6) MEMBACA PASAL / AYAT (dari index di memori — instan)
 // ------------------------------------------------------------
@@ -1577,9 +1620,9 @@ function pushLastReadPosition(label) {
   }
 }
 
-function renderChapter(bookNum, chapter, verseToHighlight) {
+function renderChapter(bookNum, chapter, verseToHighlight, opts) {
   const book = BOOKS.find((b) => b.num === bookNum);
-  const verses = getChapterVerses(currentLang, bookNum, chapter);
+  const verses = getChapterVerses(currentLang, bookNum, chapter); // SELALU satu pasal penuh -- dipakai strip lompat ayat, navigasi per-ayat, & garis besar, terlepas dari mode tampilan di bawah
   if (!book || verses.length === 0) {
     showLangUnavailable();
     return;
@@ -1589,8 +1632,8 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
 
   currentBookNum = bookNum;
   currentChapter = chapter;
-  currentChapterVerses = verses;
   highlightVerse = verseToHighlight || null;
+  highlightVerseOpenNote = !!(opts && opts.openNote);
   setActiveBookButton(bookNum);
 
   hideAllPanels();
@@ -1602,14 +1645,40 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
   logActivity(`Baca: ${displayName} ${chapter}`);
   pushLastReadPosition(`${displayName} ${chapter}`);
 
+  // ------------------------------------------------------------
+  // Mode tampilan ayat: "chapter" (default, seluruh pasal seperti biasa)
+  // atau "verse" (cuma 1 ayat yang ditampilkan -- lihat menu ⋮ → 👁️
+  // Tampilan Ayat). Di mode "verse", `versesToRender` cuma berisi SATU
+  // ayat (dipakai untuk apa yang benar-benar dirender ke layar & dibaca
+  // TTS), sedangkan `verses` di atas tetap satu pasal penuh (dipakai
+  // untuk strip lompat ayat & navigasi Ayat Sebelumnya/Berikutnya).
+  // ------------------------------------------------------------
+  const verseMode = getSetting(currentUser, "verseDisplayMode") || "chapter";
+  let versesToRender = verses;
+  if (verseMode === "verse") {
+    let target = verseToHighlight;
+    if (!target || !verses.some((v) => v.verse === target)) {
+      target = (currentSingleVerse && verses.some((v) => v.verse === currentSingleVerse))
+        ? currentSingleVerse
+        : verses[0].verse;
+    }
+    currentSingleVerse = target;
+    highlightVerse = target;
+    versesToRender = verses.filter((v) => v.verse === target);
+  }
+  currentChapterVerses = versesToRender; // dipakai TTS/rekam MP3 -- supaya yang dibacakan = yang tampil di layar
+
   const wrap = el("readerVerses");
   const columnsCount = getSetting(currentUser, "columns") || 1;
   const columnLangs = getSetting(currentUser, "columnLangs") || [];
   if (columnsCount > 1) {
-    renderColumnsView(wrap, bookNum, chapter, verses, displayName, columnsCount, columnLangs);
+    renderColumnsView(wrap, bookNum, chapter, versesToRender, displayName, columnsCount, columnLangs, verseMode === "verse" ? currentSingleVerse : null);
   } else {
-    renderSingleColumn(wrap, verses, displayName, bookNum, chapter);
+    renderSingleColumn(wrap, versesToRender, displayName, bookNum, chapter);
   }
+
+  renderVerseJumpBar(verses, verseMode);
+  updateVerseNavRow(verses, verseMode);
 
   // "📌 Pokok Kitab" -- hanya di pasal 1 (awal mula pembacaan kitab ini),
   // & "📋 Garis Besar" berjenjang disisipkan langsung di dalam
@@ -1687,6 +1756,154 @@ function renderChapter(bookNum, chapter, verseToHighlight) {
     }, 60);
   }
   initReadingProgressForChapter();
+}
+
+// ------------------------------------------------------------
+// 6b) STRIP LOMPAT AYAT ("1 ··· 5 ··· 10 ··· 15 ··· 18") & NAVIGASI
+//     PER AYAT (mode "🔎 1 Ayat Saja")
+// ------------------------------------------------------------
+// Memilih nomor-nomor ayat "landmark" yang ditampilkan di strip, supaya
+// tetap ringkas untuk pasal yang panjang (mis. Mazmur 119 = 176 ayat)
+// tapi tetap menampilkan SEMUA nomor untuk pasal pendek. Selalu
+// menyertakan ayat pertama & terakhir, ditambah kelipatan `step` di
+// antaranya -- contoh pasal 18 ayat -> step 5 -> [1, 5, 10, 15, 18],
+// persis seperti contoh "1 ··· 5 ··· 10 ··· 15 ··· 18".
+function computeVerseLandmarks(verseNums) {
+  if (verseNums.length <= 12) return verseNums.slice();
+  const total = verseNums.length;
+  let step = 5;
+  if (total > 60) step = 10;
+  if (total > 150) step = 20;
+  const first = verseNums[0];
+  const last = verseNums[verseNums.length - 1];
+  const set = new Set([first, last]);
+  verseNums.forEach((v) => { if (v % step === 0) set.add(v); });
+  return Array.from(set).sort((a, b) => a - b);
+}
+
+// `fullChapterVerses`: SELALU satu pasal penuh (bukan versesToRender),
+// supaya stripnya tetap menampilkan semua nomor ayat pasal ini walau
+// yang sedang dirender di layar cuma 1 ayat (mode "verse").
+function renderVerseJumpBar(fullChapterVerses, verseMode) {
+  const bar = el("verseJumpBar");
+  if (!bar) return;
+  const verseNums = fullChapterVerses.map((v) => v.verse).sort((a, b) => a - b);
+  if (verseNums.length <= 1) {
+    bar.hidden = true;
+    bar.innerHTML = "";
+    return;
+  }
+  const landmarks = computeVerseLandmarks(verseNums);
+  const activeVerse = verseMode === "verse" ? currentSingleVerse : highlightVerse;
+  bar.innerHTML = "";
+  landmarks.forEach((vnum, i) => {
+    if (i > 0) {
+      const dots = document.createElement("span");
+      dots.className = "verse-jump-dots";
+      dots.textContent = "···";
+      dots.setAttribute("aria-hidden", "true");
+      bar.appendChild(dots);
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "verse-jump-num";
+    btn.textContent = String(vnum);
+    btn.title = "Menuju ayat " + vnum;
+    btn.setAttribute("aria-label", "Menuju ayat " + vnum);
+    if (activeVerse === vnum) btn.classList.add("active");
+    btn.addEventListener("click", () => jumpToVerse(vnum));
+    bar.appendChild(btn);
+  });
+  bar.hidden = false;
+}
+
+// Dipakai baik oleh strip lompat ayat MAUPUN navigasi Ayat
+// Sebelumnya/Berikutnya -- navigasi biasa (BUKAN dari "Catatan Saya" /
+// hasil pencarian catatan), jadi catatan TIDAK dibuka otomatis (lihat
+// highlightVerseOpenNote di buildVerseBlock()).
+function jumpToVerse(vnum) {
+  if (!currentBookNum || !currentChapter) return;
+  renderChapter(currentBookNum, currentChapter, vnum);
+}
+
+// Menampilkan/menyembunyikan & mengisi baris "◀ Ayat Sebelumnya / Ayat
+// Berikutnya ▶" -- HANYA terlihat di mode "🔎 1 Ayat Saja". Di batas
+// pasal (ayat pertama/terakhir), otomatis lanjut ke ayat TERAKHIR pasal
+// sebelumnya / ayat PERTAMA pasal berikutnya (kalau pasal itu ada),
+// supaya bisa terus membaca maju/mundur tanpa harus kembali ke menu
+// kitab dulu.
+function updateVerseNavRow(fullChapterVerses, verseMode) {
+  const row = el("verseNavRow");
+  if (!row) return;
+  if (verseMode !== "verse") {
+    row.hidden = true;
+    return;
+  }
+  row.hidden = false;
+
+  const verseNums = fullChapterVerses.map((v) => v.verse).sort((a, b) => a - b);
+  const idx = verseNums.indexOf(currentSingleVerse);
+  const chapters = getChaptersForBook(currentLang, currentBookNum);
+  const chapterIdx = chapters.indexOf(currentChapter);
+
+  const label = el("verseNavLabel");
+  if (label) label.textContent = `Ayat ${currentSingleVerse} dari ${verseNums.length}`;
+
+  const prevBtn = el("prevVerseBtn");
+  const nextBtn = el("nextVerseBtn");
+  const hasPrevChapter = chapterIdx > 0;
+  const hasNextChapter = chapterIdx !== -1 && chapterIdx < chapters.length - 1;
+
+  if (prevBtn) {
+    prevBtn.disabled = idx <= 0 && !hasPrevChapter;
+    prevBtn.onclick = () => {
+      if (idx > 0) {
+        jumpToVerse(verseNums[idx - 1]);
+      } else if (hasPrevChapter) {
+        // Ke pasal sebelumnya, mulai dari ayat TERAKHIRnya
+        const prevChapterVerses = getChapterVerses(currentLang, currentBookNum, chapters[chapterIdx - 1]);
+        const lastVerse = prevChapterVerses.length ? prevChapterVerses[prevChapterVerses.length - 1].verse : 1;
+        renderChapter(currentBookNum, chapters[chapterIdx - 1], lastVerse);
+      }
+    };
+  }
+  if (nextBtn) {
+    nextBtn.disabled = idx === -1 || (idx >= verseNums.length - 1 && !hasNextChapter);
+    nextBtn.onclick = () => {
+      if (idx !== -1 && idx < verseNums.length - 1) {
+        jumpToVerse(verseNums[idx + 1]);
+      } else if (hasNextChapter) {
+        // Ke pasal berikutnya, mulai dari ayat PERTAMAnya
+        renderChapter(currentBookNum, chapters[chapterIdx + 1], null);
+      }
+    };
+  }
+}
+
+// Kontrol mode tampilan ayat (menu ⋮ → 👁️ Tampilan Ayat): "📖 Seluruh
+// Pasal" (default, perilaku lama) atau "🔎 1 Ayat Saja". Dipanggil sekali
+// dari afterDataReady(), sama seperti initColumnsControl().
+function initVerseModeControl() {
+  const group = el("verseModeBtnGroup");
+  if (!group) return;
+  const btns = group.querySelectorAll(".columns-btn");
+
+  function applyUI(mode) {
+    btns.forEach((b) => b.classList.toggle("active", b.dataset.verseMode === mode));
+  }
+  applyUI(getSetting(currentUser, "verseDisplayMode") || "chapter");
+
+  btns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.verseMode;
+      applyUI(mode);
+      setSetting(currentUser, "verseDisplayMode", mode);
+      if (mode === "verse" && !currentSingleVerse && highlightVerse) currentSingleVerse = highlightVerse;
+      if (currentBookNum && currentChapter) {
+        renderChapter(currentBookNum, currentChapter, mode === "verse" ? currentSingleVerse : highlightVerse);
+      }
+    });
+  });
 }
 
 // ------------------------------------------------------------
@@ -2030,7 +2247,7 @@ function handleSearch(rawQuery, isOptionChange) {
       if (n.verse) {
         currentLang = n.verse.lang;
         if (langSelectEl()) langSelectEl().value = n.verse.lang;
-        renderChapter(n.verse.bookNumber, n.verse.chapter, n.verse.verse);
+        renderChapter(n.verse.bookNumber, n.verse.chapter, n.verse.verse, { openNote: true }); // hasil pencarian CATATAN -- memang diminta buka catatannya
       }
     });
     list.appendChild(btn);
@@ -2431,7 +2648,7 @@ async function showAnnouncementPanel(preloaded) {
   }
   const container = el("announcementPanel");
   container.innerHTML = `<h2>📢 Pengumuman</h2><p class="media-empty">Memuat…</p>`;
-  const { ok, list } = await Sync.pullAnnouncementsChecked();
+  const { ok, list, error } = await Sync.pullAnnouncementsChecked();
   if (!ok) {
     // GAGAL mengambil data (bukan berarti kosong!) -- tampilkan jelas +
     // tombol coba lagi, supaya tidak disangka "memang belum ada pengumuman"
@@ -2444,6 +2661,18 @@ async function showAnnouncementPanel(preloaded) {
     p.className = "media-empty";
     p.textContent = "Gagal memuat pengumuman. Periksa sambungan internet Anda, lalu coba lagi.";
     container.appendChild(p);
+    // Pesan error ASLI dari server (kalau ada) ditampilkan terpisah --
+    // supaya administrator bisa langsung tahu penyebab sebenarnya (mis.
+    // "Sheet Sinkron tidak ditemukan") daripada cuma dugaan "internet",
+    // yang seringnya BUKAN penyebab sesungguhnya. Pengguna biasa cukup
+    // membaca pesan di atas & tombol coba lagi.
+    if (error && isAdministrator()) {
+      const errP = document.createElement("p");
+      errP.className = "media-empty";
+      errP.style.fontSize = "12px";
+      errP.textContent = "Detail teknis (khusus administrator): " + error;
+      container.appendChild(errP);
+    }
     const retryBtn = document.createElement("button");
     retryBtn.className = "chip-btn primary";
     retryBtn.textContent = "🔄 Coba Lagi";
@@ -2650,7 +2879,7 @@ function renderNotesMenuPanel() {
       if (entryItem.verse) {
         currentLang = entryItem.verse.lang;
         if (el("langSelect")) el("langSelect").value = entryItem.verse.lang;
-        renderChapter(entryItem.verse.bookNumber, entryItem.verse.chapter, entryItem.verse.verse);
+        renderChapter(entryItem.verse.bookNumber, entryItem.verse.chapter, entryItem.verse.verse, { openNote: true }); // dari menu "Catatan Saya" -- memang diminta buka catatannya
       }
     });
     row.appendChild(openBtn);
