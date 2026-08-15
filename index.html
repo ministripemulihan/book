@@ -84,6 +84,10 @@
       <button id="announcementBtn" class="more-menu-btn">📢 Pengumuman</button>
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
       <button id="collectionsMenuBtn" class="more-menu-btn">📚 Kumpulan Ayat</button>
+      <!-- Tampil untuk semua orang yang login; isi lengkap (balas + umur) hanya untuk level gembala (lihat js/curhat.js) -->
+      <button id="curhatBtn" class="more-menu-btn">💬 Curhat</button>
+      <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala (lihat updateLevelGatedMenus() di js/app.js) -->
+      <button id="aiChatBtn" class="more-menu-btn" hidden>🤖 AI Chat Gembala</button>
       <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala/pra gembala/inti (lihat updateLevelGatedMenus() di js/app.js) -->
       <button id="monitorBtn" class="more-menu-btn" hidden>👀 Pantau Pembacaan</button>
       <!-- Tampil hanya untuk administrator -->
@@ -253,6 +257,12 @@
           <!-- panel pantau pembacaan 7 hari (level gembala dst) -->
           <div id="monitorPanel" class="monitor-panel" hidden></div>
 
+          <!-- panel curhat domba & gembala (Apps Script/Sheet terpisah, lihat js/curhat.js) -->
+          <div id="curhatPanel" class="curhat-panel" hidden></div>
+
+          <!-- panel AI Chat khusus gembala (Apps Script terpisah, lihat js/aichat.js) -->
+          <div id="aiChatPanel" class="ai-chat-panel" hidden></div>
+
           <!-- panel log aktivitas (khusus administrator) -->
           <div id="logPanel" class="log-panel" hidden></div>
 
@@ -337,5 +347,7 @@
   <script src="js/media.js"></script>
   <script src="js/outlines.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/curhat.js"></script>
+  <script src="js/aichat.js"></script>
 </body>
 </html>
