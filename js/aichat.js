@@ -216,6 +216,38 @@ async function gatherAiChatContext(question) {
 
 const _aiChatState = { allowExternal: false, history: [], busy: false };
 
+// ------------------------------------------------------------
+//  Format gaya WhatsApp untuk teks chat (dipakai untuk balon AI
+//  MAUPUN balon pengguna, supaya konsisten):
+//    *tebal*        -> <strong>tebal</strong>
+//    _miring_       -> <em>miring</em>
+//    ~coret~        -> <s>coret</s>
+//  Emoji/ikon (📖 🙏 ❤️ dst) TIDAK perlu diproses apa-apa -- itu karakter
+//  unicode biasa, otomatis tampil apa adanya begitu di-escape ke HTML.
+//  Teks di-escape ke HTML DULU (escapeHtml, fungsi umum di js/app.js)
+//  sebelum tanda *_~ diubah jadi tag, supaya tetap aman dari suntikan
+//  HTML asing (mis. kalau pertanyaan/jawaban kebetulan mengandung "<").
+//  Aturan tanda pembuka TIDAK boleh langsung diikuti spasi (sama seperti
+//  aturan asli WhatsApp) supaya "3 * 4 = 12" tidak ikut kepotong jadi tebal.
+// ------------------------------------------------------------
+function formatChatText(text) {
+  let out = escapeHtml(text || "");
+  out = out.replace(/\*([^\s*][^*]*?)\*/g, "<strong>$1</strong>");
+  out = out.replace(/_([^\s_][^_]*?)_/g, "<em>$1</em>");
+  out = out.replace(/~([^\s~][^~]*?)~/g, "<s>$1</s>");
+  return out.replace(/\n/g, "<br>");
+}
+
+// Tinggi kotak tulis pertanyaan mengikuti panjang teks secara otomatis
+// (seperti kotak chat WhatsApp) -- dikembalikan dulu ke "auto" supaya
+// scrollHeight terhitung ulang dari nol, baru dibatasi ke max-height
+// yang sama dengan yang diset di CSS (.ai-chat-input-row textarea).
+function autoGrowAiChatTextarea(textarea) {
+  textarea.style.height = "auto";
+  const max = 160;
+  textarea.style.height = Math.min(textarea.scrollHeight, max) + "px";
+}
+
 async function showAiChatPanel() {
   hideAllPanels();
   el("aiChatPanel").hidden = false;
@@ -266,12 +298,29 @@ function renderAiChatPanel() {
   renderAiChatThread(thread);
 
   const form = document.createElement("form");
+  // Ditempel di bawah (position: sticky, lihat css/style.css) supaya di
+  // HP tombol "Tanya" & kotak tulisnya selalu kelihatan tanpa perlu
+  // menggulir ke bawah dulu -- sama seperti aplikasi chat pada umumnya.
   form.className = "ai-chat-input-row";
   form.innerHTML = `
-    <textarea id="aiChatInput" rows="2" placeholder="Tulis pertanyaan Anda, mis. 'Apa kata Alkitab tentang menghadapi kekhawatiran?'" required></textarea>
+    <textarea id="aiChatInput" rows="1" placeholder="Tulis pertanyaan Anda, mis. 'Apa kata Alkitab tentang menghadapi kekhawatiran?'" required></textarea>
     <button type="submit" class="chip-btn primary" id="aiChatSendBtn">📤 Tanya</button>
   `;
   container.appendChild(form);
+
+  const inputEl = form.querySelector("#aiChatInput");
+  // Kotak tulis membesar otomatis mengikuti panjang pertanyaan (lihat
+  // autoGrowAiChatTextarea() di atas), supaya nyaman dipakai mengetik
+  // pertanyaan panjang di HP -- tidak lagi terpaku 2 baris kecil.
+  inputEl.addEventListener("input", () => autoGrowAiChatTextarea(inputEl));
+  // Enter = kirim, Shift+Enter = baris baru (kebiasaan umum aplikasi
+  // chat). Di HP, tombol "Tanya" tetap ada sebagai cara utama mengirim.
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -280,6 +329,7 @@ function renderAiChatPanel() {
     const question = textarea.value.trim();
     if (!question) return;
     textarea.value = "";
+    autoGrowAiChatTextarea(textarea);
     await handleAiChatAsk(question);
   });
 }
@@ -299,7 +349,7 @@ function renderAiChatThread(thread) {
         <span>${label}</span>
         <button type="button" class="chip-btn small ai-chat-copy-btn" data-idx="${idx}">📋 Salin</button>
       </div>
-      <div class="ai-chat-bubble-text">${escapeHtml(turn.text).replace(/\n/g, "<br>")}</div>
+      <div class="ai-chat-bubble-text">${formatChatText(turn.text)}</div>
       ${turn.sources && turn.sources.length ? `
         <details class="ai-chat-sources">
           <summary>📖 ${turn.sources.length} sumber yang dipakai</summary>
