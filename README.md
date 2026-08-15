@@ -1039,3 +1039,31 @@ bible-app/
      kolom bebas, dicari lewat nama header, bukan harus kolom A) —
      kalau Sheet Anda memakai nama header persis seperti daftar di atas,
      semuanya otomatis ketemu tanpa perlu ubah apa pun lagi.
+
+## Update lanjutan (Agustus 2026, tahap 11) — gabung tombol unduh/sinkron, Pokok Kitab & Garis Besar ikut sinkron
+
+1. **Tombol menu ⋮ "🔄 Sinkronkan ulang Alkitab" & "📥 Unduh Data Alkitab"
+   digabung jadi SATU tombol.** Sebelumnya dua tombol ini memanggil fungsi
+   yang persis sama begitu ada data lokal (kondisi normal) — hanya beda
+   teks dialog kalau data lokal benar-benar kosong. Sekarang cuma ada satu
+   tombol `#resyncBtn`, teksnya otomatis berganti antara "🔄 Sinkronkan
+   ulang Alkitab" (kalau sudah ada data) dan "📥 Unduh Data Alkitab" (kalau
+   belum ada data sama sekali) lewat `updateResyncBtnLabel()`.
+   - Berkas: `index.html` (tombol `#downloadBibleBtn` dihapus), `js/app.js`
+     (`updateResyncBtnLabel()` baru dipanggil dari `afterDataReady()`;
+     handler klik `#resyncBtn` disatukan).
+2. **Pokok Kitab / Garis Besar / Peta+Gambar sekarang ikut disinkronkan**
+   setiap kali tombol sinkron/unduh Alkitab di atas ditekan — sebelumnya
+   fungsi `resyncAllOutlineSheets()` di `js/outlines.js` sudah ada tapi
+   belum dipanggil dari mana pun (ketiga sheet ini hanya diambil sekali
+   lalu di-cache permanen, tidak pernah otomatis diperbarui). Kalau salah
+   satu dari ketiga sheet gagal diambil, sinkron Alkitab utama tetap
+   dianggap berhasil (tidak saling menggagalkan).
+   - Berkas: `js/app.js` (`syncFromServer()` memanggil
+     `resyncAllOutlineSheets()` di akhir proses).
+3. **Perkiraan ukuran unduhan di dialog dinaikkan dari 51 MB → 60 MB**
+   (`CONFIG.BIBLE_DATA_APPROX_SIZE_MB`) untuk memperhitungkan gabungan
+   ketiga sheet Pokok Kitab/Garis Besar/Peta&Gambar yang sekarang ikut
+   disinkronkan dan bisa terus bertambah isinya. Naikkan lagi angka ini
+   di `js/config.js` kalau total ukurannya membengkak jauh dari itu.
+   - Berkas: `js/config.js`.
