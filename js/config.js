@@ -49,6 +49,42 @@ const CONFIG = {
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby0xsYVxCSlHYHj8CymI9JzA6C66RKuP1ww_dO9KK7vxwFrdplcpppvG5MOic36AGlo/exec",
 
+  // ----------------------------------------------------------
+  // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
+  // ----------------------------------------------------------
+  // URL Web App dari "apps-script/CurhatCode.gs" (BUKAN file Code.gs yang
+  // lama -- ini Sheet & deployment baru sendiri, lihat catatan cara pasang
+  // di dalam file itu). Kosongkan untuk mematikan menu "💬 Curhat".
+  CURHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwvV-FYJg18dOM-mdCzbL9ujLzAlFiHdDEptat6ygwlz-zR5CHCmwNxgRJfBDR88E4IDQ/exec",
+
+  // Jenis topik pilihan (domba boleh juga mengetik jenis sendiri kalau
+  // memilih "Lainnya…"). Silakan tambah/ubah sesuai kebutuhan jemaat.
+  CURHAT_TOPIC_TYPES: [
+    "Pacar", "Galau", "Ekonomi", "Pendidikan", "Harta", "Keluarga",
+    "Orang Tua", "Ayah", "Ibu", "Anak", "Cucu", "Pekerjaan",
+    "Kerohanian", "Alkitab", "Kebenaran Firman Tuhan",
+    "Kesehatan", "Pernikahan", "Persahabatan", "Pelayanan", "Lainnya",
+  ],
+  CURHAT_STATUSES: [
+    { key: "tertunda", label: "⏳ Tertunda" },
+    { key: "selesai", label: "✅ Selesai" },
+    { key: "lewat", label: "➡️ Lewat" },
+  ],
+  // level (key dari LEVEL_DEFINITIONS di bawah) yang dianggap "gembala" --
+  // hanya level inilah yang boleh melihat & membalas curhat + tahu umur.
+  CURHAT_GEMBALA_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
+
+  // ----------------------------------------------------------
+  // 3c) AI CHAT GEMBALA — Google Apps Script BARU & TERPISAH lagi
+  // ----------------------------------------------------------
+  // URL Web App dari "apps-script/AiChatCode.gs" (lihat cara pasang di
+  // dalam file itu, termasuk cara mengisi API key Gemini dengan aman).
+  // Kosongkan untuk mematikan menu "🤖 AI Chat Gembala".
+  AI_CHAT_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwFP8HMtHUCCK7LQG_tCGTnGAoiovqdCXu3H_48nEhRn3WQJ8tlMExhPqsHBLQJsiYWgA/exec",
+  // Level yang boleh membuka menu AI Chat -- default sama dengan
+  // CURHAT_GEMBALA_LEVELS, boleh dipersempit/diperluas sendiri di sini.
+  AI_CHAT_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
+
   // Daftar bahasa yang ada di kolom "Bahasa" pada sheet Alkitab, dengan label yang
   // tampil di tombol pemilih bahasa. Sesuaikan "label" jika kurang tepat — kode
   // ("code") HARUS SAMA PERSIS dengan nilai di kolom Bahasa pada Google Sheet Anda.
@@ -107,7 +143,7 @@ const CONFIG = {
   // ----------------------------------------------------------
   FONT_SIZE_STORAGE_KEY: "bible_app_font_size_v1",
   FONT_SIZE_MIN: 5,
-  FONT_SIZE_MAX: 200,
+  FONT_SIZE_MAX: 500,
   FONT_SIZE_STEP: 2,
   FONT_SIZE_DEFAULT: 19,
 
