@@ -1393,12 +1393,48 @@ input { font-family: inherit; }
   font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 6px; gap: 8px;
 }
 .ai-chat-bubble-text { white-space: pre-wrap; line-height: 1.5; }
+/* Format gaya WhatsApp (lihat formatChatText() di js/aichat.js): *tebal*
+   dan _miring_ dirender jadi <strong>/<em> beneran, bukan cuma tanda
+   bintang/underscore yang tampil apa adanya. */
+.ai-chat-bubble-text strong { font-weight: 700; }
+.ai-chat-bubble-text em { font-style: italic; }
+.ai-chat-bubble-text s { opacity: .75; }
 .ai-chat-sources { margin-top: 8px; font-size: 0.8rem; color: var(--ink-soft); }
 .ai-chat-sources ul { margin: 6px 0 0; padding-left: 18px; }
 .ai-chat-sources li { margin-bottom: 4px; }
 .ai-chat-loading { font-style: italic; }
-.ai-chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+
+/* ------------------------------------------------------------
+   KOTAK TULIS PERTANYAAN -- dibuat "menempel" (sticky) di bagian
+   bawah layar seperti aplikasi chat pada umumnya (WhatsApp dst),
+   supaya di HP tidak perlu menggulir jauh ke bawah dulu untuk
+   menemukan tempat mengetik, dan kotaknya dibuat lebih besar/nyaman
+   dipakai mengetik (bukan cuma 2 baris kecil seperti sebelumnya).
+   Tinggi kotak ikut membesar otomatis mengikuti panjang tulisan
+   (lihat autoGrowAiChatTextarea() di js/aichat.js), sampai batas
+   maksimum, baru setelah itu boleh digulir di dalam kotaknya sendiri.
+   ------------------------------------------------------------ */
+.ai-chat-input-row {
+  display: flex; gap: 8px; align-items: flex-end;
+  position: sticky; bottom: 0; z-index: 5;
+  background: var(--paper); border-top: 1px solid var(--rule);
+  padding: 10px 2px 8px; margin: 0 -2px;
+}
 .ai-chat-input-row textarea {
-  flex: 1; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px;
-  font-family: var(--font-ui); background: var(--paper); color: var(--ink); resize: vertical;
+  flex: 1; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 16px;
+  font-family: var(--font-ui); font-size: 16px; line-height: 1.4;
+  background: var(--paper); color: var(--ink);
+  resize: none; min-height: 48px; max-height: 160px; overflow-y: auto;
+}
+.ai-chat-input-row .chip-btn {
+  flex-shrink: 0; align-self: flex-end; min-height: 48px;
+  padding: 0 18px; border-radius: 16px; font-size: 15px;
+}
+@media (max-width: 640px) {
+  /* font-size 16px sengaja dipertahankan (bukan diperkecil) -- di bawah
+     16px, Safari/Chrome iOS otomatis zoom in tiap kali kotak ini difokus,
+     yang justru bikin tidak nyaman diketik di HP. */
+  .ai-chat-input-row { padding: 8px 0 6px; }
+  .ai-chat-input-row textarea { min-height: 52px; }
+  .ai-chat-input-row .chip-btn { min-height: 52px; padding: 0 16px; }
 }
