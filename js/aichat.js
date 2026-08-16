@@ -168,16 +168,19 @@ async function gatherAiChatOutlineContext(question) {
 // format sama dgn sumber ayat/catatan supaya tampilannya konsisten.
 function outlineContextAsSources(context) {
   const out = [];
+  // kind: "outline" -> dari Pokok Kitab / Garis Besar Ayat (bukan catatan
+  // kaki di kolom Note, bukan juga ayat langsung) -- sheet TERPISAH,
+  // lihat js/outlines.js.
   if (context.bookPokok) {
     if (context.bookPokok.pokok) {
-      out.push({ ref: "📌 Pokok Kitab " + context.bookPokok.bookName, text: context.bookPokok.pokok });
+      out.push({ kind: "outline", ref: "📌 Pokok Kitab " + context.bookPokok.bookName, text: context.bookPokok.pokok });
     }
     (context.bookPokok.garisBesar || []).forEach((g) => {
-      out.push({ ref: "📋 " + g.ref, text: g.ringkasan });
+      out.push({ kind: "outline", ref: "📋 " + g.ref, text: g.ringkasan });
     });
   }
   (context.allPokok || []).forEach((r) => {
-    out.push({ ref: "📌 Pokok Kitab " + r.bookName, text: r.pokok });
+    out.push({ kind: "outline", ref: "📌 Pokok Kitab " + r.bookName, text: r.pokok });
   });
   return out;
 }
@@ -324,11 +327,15 @@ function matchAiKnowledgeRows(question, rows) {
 function aiKnowledgeRowsToContext(matchedRows) {
   const lines = [];
   const sources = [];
+  // kind: "knowledge" -> dari "kumpulan catatan/pengetahuan AI" yang
+  // sudah disiapkan di dalam aplikasi (AI_KNOWLEDGE_BUILTIN + Sheet
+  // tambahan CONFIG.AI_KNOWLEDGE_CSV_URL kalau diisi) -- BUKAN dari
+  // kolom Note Sheet Alkitab, dan BUKAN jawaban bebas AI dari luar.
   matchedRows.forEach((r) => {
     const label = r.terms[0];
     if (r.books && r.books.length) {
       lines.push(`- Istilah "${label}" merujuk pada kitab: ${r.books.join(", ")}.`);
-      sources.push({ ref: "📚 " + label, text: "Kitab terkait: " + r.books.join(", ") });
+      sources.push({ kind: "knowledge", ref: "📚 " + label, text: "Kitab terkait: " + r.books.join(", ") });
     }
     if (r.note) {
       lines.push(`- Keterangan "${label}": ${r.note}`);
@@ -346,7 +353,7 @@ function aiKnowledgeRowsToContext(matchedRows) {
       matched.forEach((v) => {
         const ref = `${v.bookName || parsed.book.name} ${v.chapter}:${v.verse}`;
         lines.push(`- (${ref}) ${v.text}`);
-        sources.push({ ref, text: v.text });
+        sources.push({ kind: "knowledge", ref, text: v.text });
       });
     });
   });
@@ -373,14 +380,19 @@ async function gatherAiChatContext(question) {
       if (seenVerse.has(key)) return;
       seenVerse.add(key);
       const book = BOOKS.find((b) => b.num === v.bookNumber);
-      verses.push({ ref: `${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}`, text: v.text });
+      // kind: "verse" -> ditandai di daftar sumber sebagai kutipan ayat
+      // Alkitab langsung (BUKAN catatan kaki/penjelasan tambahan).
+      verses.push({ kind: "verse", ref: `${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}`, text: v.text });
     });
     noteResults.forEach((n) => {
       if (notes.length >= 6) return;
       if (seenNote.has(n.verseId)) return;
       seenNote.add(n.verseId);
       const ref = n.verse ? `${n.verse.bookName} ${n.verse.chapter}:${n.verse.verse}` : n.verseId;
-      notes.push({ ref, text: n.note });
+      // kind: "note" -> ditandai sebagai catatan kaki (kolom Note di Sheet
+      // Alkitab) supaya pembaca tahu ini PENJELASAN TAMBAHAN pada ayat
+      // itu, bukan teks ayatnya sendiri.
+      notes.push({ kind: "note", ref, text: n.note });
     });
   });
 
@@ -541,10 +553,24 @@ function renderAiChatThread(thread) {
     thread.innerHTML = `<p class="media-empty">Belum ada percakapan. Mulai dengan mengetik pertanyaan di bawah.</p>`;
     return;
   }
+  // Label sumber di bawah jawaban AI, supaya pembaca langsung tahu asal
+  // tiap referensi (lihat "kind" yang ditandai saat sumber dikumpulkan
+  // di gatherAiChatContext()/aiKnowledgeRowsToContext()/
+  // outlineContextAsSources() di atas).
+  const SOURCE_KIND_LABEL = {
+    verse: "📖 Kutipan ayat",
+    note: "📝 Catatan kaki (kolom Note Sheet Alkitab)",
+    outline: "📋 Pokok Kitab / Garis Besar",
+    knowledge: "🤖 Referensi tambahan (kumpulan catatan AI yang di-inject)",
+  };
+
   _aiChatState.history.forEach((turn, idx) => {
     const bubble = document.createElement("div");
     bubble.className = "ai-chat-bubble ai-chat-bubble-" + (turn.role === "ai" ? "ai" : "user");
-    const label = turn.role === "ai" ? "🤖 AI" : "🙋 Anda";
+    // Nama pengguna yang login ditampilkan langsung (bukan "🙋 Anda" yang
+    // generik) supaya lebih enak dibaca, terutama kalau riwayat percakapan
+    // ini kelak dilihat orang lain (mis. administrator).
+    const label = turn.role === "ai" ? "🤖 AI" : "🙋 " + (currentUserDisplay || currentUser || "Anda");
     // Tombol "📋 Salin" sengaja dipasang DUA KALI pada balasan AI (atas &
     // bawah): jawaban AI kadang panjang, dan di HP tombol yang cuma ada
     // di atas jadi sulit dijangkau setelah membaca sampai bawah (harus
@@ -561,7 +587,7 @@ function renderAiChatThread(thread) {
       ${turn.sources && turn.sources.length ? `
         <details class="ai-chat-sources">
           <summary>📖 ${turn.sources.length} sumber yang dipakai</summary>
-          <ul>${turn.sources.map((s) => `<li><strong>${escapeHtml(s.ref)}</strong> — ${escapeHtml(s.text)}</li>`).join("")}</ul>
+          <ul>${turn.sources.map((s) => `<li><span class="ai-chat-source-kind">${escapeHtml(SOURCE_KIND_LABEL[s.kind] || "📎 Sumber")}</span><br><strong>${escapeHtml(s.ref)}</strong> — ${escapeHtml(s.text)}</li>`).join("")}</ul>
         </details>
       ` : ""}
       ${isAi ? `
@@ -615,7 +641,7 @@ async function handleAiChatAsk(question) {
         _aiChatState.history.push({
           role: "ai",
           text: formatAllPokokAsText(rows),
-          sources: rows.map((r) => ({ ref: "📌 Pokok Kitab " + r.bookName, text: r.pokok })),
+          sources: rows.map((r) => ({ kind: "outline", ref: "📌 Pokok Kitab " + r.bookName, text: r.pokok })),
         });
       }
       return; // tidak perlu memanggil Gemini sama sekali untuk kasus ini
