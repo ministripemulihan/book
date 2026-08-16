@@ -79,6 +79,27 @@ function activityLogEnabled() {
 // Kejadian 1", "Rencana Baca", "Pencarian"). `searchQuery` opsional, diisi
 // khusus saat aktivitasnya adalah pencarian. Selalu "fire-and-forget" —
 // tidak pernah menunggu/menghalangi tampilan aplikasi.
+// Format jam manual "HH:mm:ss" pakai TITIK DUA -- SENGAJA tidak pakai
+// now.toLocaleTimeString("id-ID") lagi (yang menghasilkan "18.10.15" pakai
+// TITIK). Akar masalah bug "Jam tampil 00.00.00": format id-ID kebetulan
+// memakai titik untuk jam, PERSIS sama dengan pemisah yang dipakai gaya
+// tanggal "dd.mm.yy" -- jadi kalau proteksi format kolom "Plain text" di
+// Code.gs (fixActivityLogColumnFormat_) telat/gagal menempel sesaat SAAT
+// baris baru ditambahkan (bisa terjadi kalau ada beberapa pengguna
+// menyimpan log berbarengan), Google Sheets diam-diam MENGIRA teks jam itu
+// tanggal "18 Okt 2015" & membuang info jamnya (jadi tengah malam).
+// Titik dua ("18:10:15") TIDAK PERNAH ambigu dengan pola tanggal apa pun,
+// jadi walau Sheets sempat salah mengenali sel ini sebagai tipe "Jam"
+// (bukan "Tanggal") sekalipun, jam aslinya tetap tersimpan utuh -- bug ini
+// jadi kebal terhadap race condition di atas, bukan cuma "dicegah kalau
+// sempat").
+function pad2(n) {
+  return (n < 10 ? "0" : "") + n;
+}
+function localTimeStrColon(d) {
+  return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+}
+
 async function logActivity(menu, searchQuery) {
   if (!activityLogEnabled() || !currentUser) return;
   try {
@@ -87,7 +108,7 @@ async function logActivity(menu, searchQuery) {
     Sync.pushLog({
       username: currentUser,
       date: now.toLocaleDateString("id-ID"),
-      time: now.toLocaleTimeString("id-ID"),
+      time: localTimeStrColon(now),
       os: detectOS(),
       ip: geo.ip,
       city: geo.city,
