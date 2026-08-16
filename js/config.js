@@ -54,7 +54,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyhKxP-p-Yc5frHYp41Uh6YNBBmQL7gBhhdb-gjn9a0UN6XjkNtAHfB5z5Ty1JAE3HJ/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyMfUosSBvytgi7u3FWPjmGe1ZdHJwqtlNMu9pUg5ZtpIWx278tF5zBmTVsQlmuCmW_/exec",
 
   // ----------------------------------------------------------
   // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
