@@ -72,26 +72,86 @@ function noteHtmlToPlainText(html) {
   return (template.content.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-// Mengubah referensi silang gaya OSIS (mis. "Psa_74:16", "Gen_1:8") yang ada
-// di dalam teks Catatan menjadi TOMBOL yang bisa diklik -- saat diklik, ayat
-// yang dirujuk langsung tampil SEBARIS di bawahnya (lihat
-// toggleInlineVerseRefPreview()), TIDAK membuka tab/jendela baru. Dijalankan
-// SETELAH sanitizeNoteHtml() supaya hanya beroperasi pada HTML yang sudah
-// aman (tag & atribut liar sudah dibuang).
-function linkifyOsisReferences(safeHtml) {
+// Mengubah referensi silang di dalam teks Catatan menjadi TOMBOL yang bisa
+// diklik -- saat diklik, ayat yang dirujuk langsung tampil SEBARIS di
+// bawahnya (lihat toggleInlineVerseRefPreview()), TIDAK membuka tab/jendela
+// baru. Dijalankan SETELAH sanitizeNoteHtml() supaya hanya beroperasi pada
+// HTML yang sudah aman (tag & atribut liar sudah dibuang).
+//
+// Dua pola dikenali, DALAM SATU KALI JALAN (kiri ke kanan) supaya urutan
+// kemunculannya di teks ikut menentukan konteks kitab/pasal yang benar:
+//
+//   1) Referensi OSIS penuh -- "Psa_74:16", "Gen_1:8", atau rentang ayat
+//      "Luk_3:23-28" (rentang -28 ikut ditangkap lewat grup opsional
+//      `(?:-(\d+))?`, jadi tombolnya menampilkan SEMUA ayat 23 s.d. 28,
+//      bukan cuma ayat pertamanya). Juga menangani referensi PASAL SAJA
+//      tanpa ":ayat" (mis. "Luk_3", umum dipakai di footnote seperti
+//      "lihat note 382 di Luk_3") -- ini tidak jadi tombol ayat spesifik,
+//      tapi TETAP memindahkan konteks untuk pola (2) di bawah.
+//
+//   2) Referensi RELATIF gaya "(ay. 4, 10, 12, 21, 25)" / "(vv. 11-12, 21)"
+//      / "(cf. vv. 4, 10)" -- ini TIDAK menyebut kitab/pasal sama sekali,
+//      karena maksudnya adalah "ayat-ayat lain DI PASAL YANG SAMA sedang
+//      dibicarakan". Pasal itu adalah pasal ayat catatan ini sendiri
+//      (ownBookNum/ownChapter) SECARA DEFAULT, TAPI begitu ada referensi
+//      OSIS eksplisit (pola 1) muncul lebih dulu di dalam teks yang sama,
+//      konteksnya BERPINDAH ke situ -- persis cara pembaca manusia
+//      menafsirkannya (mis. "...berdasarkan Gen_1:3 membuktikan sesuatu
+//      (ay. 10)" -> ay. 10 di sini artinya Kejadian 1:10, BUKAN pasal
+//      ayat catatan ini). Setiap angka dalam daftarnya (boleh rentang
+//      "11-12" & boleh berhuruf seperti "2b") jadi tombol tersendiri.
+function linkifyOsisReferences(safeHtml, ownBookNum, ownChapter) {
   if (!safeHtml) return safeHtml;
-  return safeHtml.replace(/\b([1-3]?[A-Za-z]{2,4})_(\d+):(\d+)\b/g, (m, abbr, chapter, verse) => {
-    const book = OSIS_ABBR_INDEX[abbr.toLowerCase()];
-    if (!book) return m;
-    const label = `${book.name} ${chapter}:${verse}`;
-    return `<button type="button" class="note-verse-ref" data-book="${book.num}" data-chapter="${chapter}" data-verse="${verse}">📖 ${label}</button>`;
+
+  // Konteks kitab/pasal AKTIF -- lihat penjelasan pola (2) di atas.
+  let ctxBook = ownBookNum || null;
+  let ctxChapter = ownChapter || null;
+
+  const OSIS_PART = "\\b([1-3]?[A-Za-z]{2,4})_(\\d+)(?::(\\d+)(?:-(\\d+))?)?\\b";
+  const AY_PART = "\\((?:cf\\.?\\s+)?(ay\\.|vv?\\.)\\s*([0-9][0-9a-z,\\-\\s]*[0-9a-z]?)\\)";
+  const combined = new RegExp(OSIS_PART + "|" + AY_PART, "gi");
+
+  return safeHtml.replace(combined, (m, abbr, chapter, verseStart, verseEnd, ayPrefix, ayList) => {
+    if (abbr) {
+      // --- pola (1): referensi OSIS ---
+      const book = OSIS_ABBR_INDEX[abbr.toLowerCase()];
+      if (!book) return m; // singkatan tidak dikenal -- biarkan sbg teks biasa, jangan ubah konteks
+      ctxBook = book.num;
+      ctxChapter = parseInt(chapter, 10);
+      if (!verseStart) {
+        // Referensi PASAL SAJA (mis. "Luk_3", tanpa ":ayat") -- konteks
+        // sudah dipindah di atas; tombolnya sendiri buka pasal itu di
+        // ayat 1 (tidak ada ayat spesifik yang bisa dirujuk).
+        return `<button type="button" class="note-verse-ref" data-book="${book.num}" data-chapter="${chapter}" data-verse="1">📖 ${book.name} ${chapter}</button>`;
+      }
+      const label = verseEnd
+        ? `${book.name} ${chapter}:${verseStart}-${verseEnd}`
+        : `${book.name} ${chapter}:${verseStart}`;
+      const endAttr = verseEnd ? ` data-verse-end="${verseEnd}"` : "";
+      return `<button type="button" class="note-verse-ref" data-book="${book.num}" data-chapter="${chapter}" data-verse="${verseStart}"${endAttr}>📖 ${label}</button>`;
+    }
+
+    // --- pola (2): "(ay. 4, 10, 12, 21, 25)" dst, relatif ke konteks aktif ---
+    if (!ctxBook || !ctxChapter) return m; // tidak ada konteks kitab/pasal sama sekali -- biarkan teks biasa
+    const items = ayList.split(",").map((tokRaw) => {
+      const tok = tokRaw.trim();
+      const rangeMatch = tok.match(/^(\d+)[a-z]?(?:-(\d+)[a-z]?)?$/i);
+      if (!rangeMatch) return escapeHtml(tok); // token aneh (bukan angka) -- biarkan apa adanya, jangan jadi tombol
+      const vs = rangeMatch[1];
+      const ve = rangeMatch[2] || null;
+      const endAttr = ve ? ` data-verse-end="${ve}"` : "";
+      return `<button type="button" class="note-verse-ref note-verse-ref-inline" data-book="${ctxBook}" data-chapter="${ctxChapter}" data-verse="${vs}"${endAttr}>${escapeHtml(tok)}</button>`;
+    }).join(", ");
+    return `(${ayPrefix} ${items})`;
   });
 }
 
 // Menampilkan/menyembunyikan ayat yang dirujuk TEPAT DI BAWAH tombol
 // referensinya (di dalam panel catatan yang sama) -- bahasanya SAMA dengan
 // bahasa ayat/catatan yang sedang dibuka (`lang`), bukan bahasa lain, dan
-// TIDAK membuka tab/jendela/pembaca baru.
+// TIDAK membuka tab/jendela/pembaca baru. Kalau tombolnya berupa RENTANG
+// ayat (mis. "Lukas 3:23-28"), SEMUA ayat dalam rentang itu ditampilkan
+// berurutan (bukan cuma ayat pertamanya saja).
 function toggleInlineVerseRefPreview(btn, lang) {
   const existing = btn.nextElementSibling;
   if (existing && existing.classList && existing.classList.contains("note-verse-ref-preview")) {
@@ -101,20 +161,42 @@ function toggleInlineVerseRefPreview(btn, lang) {
   }
   const bookNum = parseInt(btn.dataset.book, 10);
   const chapter = parseInt(btn.dataset.chapter, 10);
-  const verseNum = parseInt(btn.dataset.verse, 10);
-  const found = getChapterVerses(lang, bookNum, chapter).find((x) => x.verse === verseNum);
+  const verseStart = parseInt(btn.dataset.verse, 10);
+  const verseEnd = btn.dataset.verseEnd ? parseInt(btn.dataset.verseEnd, 10) : verseStart;
+  const chapterVerses = getChapterVerses(lang, bookNum, chapter);
+  const found = chapterVerses.filter((x) => x.verse >= verseStart && x.verse <= verseEnd);
   const book = BOOKS.find((b) => b.num === bookNum);
+  const bookLabel = book ? book.name : bookNum;
 
   const preview = document.createElement("div");
   preview.className = "note-verse-ref-preview";
-  const refEl = document.createElement("div");
-  refEl.className = "note-verse-ref-preview-ref";
-  refEl.textContent = `${book ? book.name : bookNum} ${chapter}:${verseNum}`;
-  preview.appendChild(refEl);
-  const textEl = document.createElement("div");
-  textEl.className = "note-verse-ref-preview-text";
-  textEl.textContent = found ? found.text : `(ayat tidak ditemukan di bahasa ini — ${langLabelFor(lang)})`;
-  preview.appendChild(textEl);
+
+  if (!found.length) {
+    const refEl = document.createElement("div");
+    refEl.className = "note-verse-ref-preview-ref";
+    refEl.textContent = verseEnd > verseStart
+      ? `${bookLabel} ${chapter}:${verseStart}-${verseEnd}`
+      : `${bookLabel} ${chapter}:${verseStart}`;
+    preview.appendChild(refEl);
+    const textEl = document.createElement("div");
+    textEl.className = "note-verse-ref-preview-text";
+    textEl.textContent = `(ayat tidak ditemukan di bahasa ini — ${langLabelFor(lang)})`;
+    preview.appendChild(textEl);
+  } else {
+    // Rentang > 1 ayat: setiap ayat ditampilkan dengan nomornya masing-
+    // masing (mirip tampilan baca normal), bukan digabung jadi satu
+    // paragraf tanpa nomor -- supaya tetap jelas ayat mana yang mana.
+    found.forEach((v) => {
+      const refEl = document.createElement("div");
+      refEl.className = "note-verse-ref-preview-ref";
+      refEl.textContent = `${bookLabel} ${chapter}:${v.verse}`;
+      preview.appendChild(refEl);
+      const textEl = document.createElement("div");
+      textEl.className = "note-verse-ref-preview-text";
+      textEl.textContent = v.text;
+      preview.appendChild(textEl);
+    });
+  }
 
   btn.classList.add("active");
   btn.insertAdjacentElement("afterend", preview);
@@ -601,6 +683,7 @@ function afterDataReady() {
   initFontSizeControl();
   initThemeControl();
   initFontFamilyControl();
+  initNoteFontFamilyControl();
   initFullscreenControl();
   initTTS();
   initReadingProgressControl();
@@ -1234,6 +1317,88 @@ function updateVerseNoteBadge(v, block, personalText) {
   }
 }
 
+// Membuat SATU baris tombol "📋 Salin Ayat" / "📋 Salin Catatan" (kalau ada
+// catatan Alkitab DAN/ATAU catatan pribadi) / "📚 Kumpulan" -- dipakai DUA
+// KALI oleh buildInlineNoteCardEl() (sekali di atas panel, sekali di
+// bawah), supaya kode tombolnya tidak dobel-tulis. Setiap panggilan
+// membuat elemen <button> BARU (elemen DOM tidak bisa dipasang di dua
+// tempat sekaligus).
+//
+// PERBAIKAN: sebelumnya tombol ini HANYA menyalin catatan Alkitab/admin
+// (v.note) dan bahkan TIDAK MUNCUL SAMA SEKALI kalau ayat itu cuma punya
+// catatan PRIBADI (tulisan sendiri) tanpa catatan Alkitab -- padahal
+// justru catatan pribadi itulah yang paling sering ingin disalin.
+// Sekarang tombolnya muncul kalau SALAH SATU (atau keduanya) ada, dan
+// menyalin KEDUANYA sekaligus (diberi label masing-masing) kalau memang
+// keduanya terisi.
+function buildNoteQuickActionsRow(v, refLabel, hasAdminNote, liveDraftEl) {
+  const row = document.createElement("div");
+  row.className = "inline-note-actions";
+
+  const copyVerseBtn = document.createElement("button");
+  copyVerseBtn.type = "button";
+  copyVerseBtn.className = "chip-btn small";
+  copyVerseBtn.textContent = "📋 Salin Ayat";
+  copyVerseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    copyTextWithFeedback(`${refLabel}\n${v.text}`, copyVerseBtn);
+  });
+  row.appendChild(copyVerseBtn);
+
+  // PERBAIKAN: dulu tombol "Salin Catatan" HANYA dibuat kalau SUDAH ADA
+  // catatan admin atau catatan pribadi YANG SUDAH TERSIMPAN saat panel ini
+  // pertama kali dibangun -- jadi kalau ayatnya belum punya catatan sama
+  // sekali, tombolnya TIDAK PERNAH muncul, walau pengguna lalu mengetik
+  // catatan baru di kotak di bawahnya (baru muncul kalau panel ditutup lalu
+  // dibuka lagi dari awal). Sekarang tombolnya SELALU dibuat, tapi
+  // tampil/sembunyinya diperbarui langsung (live) lewat
+  // refreshCopyNoteVisibility() setiap kali kotak catatan pribadi diketik --
+  // lihat pemanggilannya di buildInlineNoteCardEl().
+  const copyNoteBtn = document.createElement("button");
+  copyNoteBtn.type = "button";
+  copyNoteBtn.className = "chip-btn small";
+  copyNoteBtn.textContent = "📋 Salin Catatan";
+  const currentDraftText = () => (liveDraftEl
+    ? (liveDraftEl.value || "").trim()
+    : (getPersonalNote(currentUser, v.id) || "").trim());
+  const refreshCopyNoteVisibility = () => {
+    copyNoteBtn.hidden = !(hasAdminNote || currentDraftText());
+  };
+  refreshCopyNoteVisibility();
+  copyNoteBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const parts = [refLabel];
+    if (hasAdminNote) parts.push(`— Catatan Alkitab:\n${noteHtmlToPlainText(v.note)}`);
+    // Kalau tombol ini punya akses ke kotak tulis LANGSUNG (liveDraftEl --
+    // dipakai khusus untuk baris tombol BAWAH, yang memang bersebelahan
+    // dengan kotak catatan pribadi), pakai isi kotak itu APA ADANYA saat
+    // ini juga -- termasuk tulisan yang BELUM ditekan "Simpan Catatan"
+    // sekalipun -- supaya tidak perlu simpan dulu baru bisa disalin.
+    // Kalau tidak ada (baris tombol ATAS), pakai catatan pribadi yang
+    // SUDAH tersimpan.
+    const latestPersonal = currentDraftText();
+    if (latestPersonal) parts.push(`— Catatan Pribadi Anda:\n${latestPersonal}`);
+    copyTextWithFeedback(parts.join("\n"), copyNoteBtn);
+  });
+  row.appendChild(copyNoteBtn);
+  // Diekspos supaya pemanggil (buildInlineNoteCardEl) bisa memperbarui
+  // tampil/sembunyi tombol ini setiap kali kotak catatan diketik.
+  row.refreshCopyNoteVisibility = refreshCopyNoteVisibility;
+
+  const addCollBtn = document.createElement("button");
+  addCollBtn.type = "button";
+  addCollBtn.className = "chip-btn small";
+  addCollBtn.textContent = "📚 Kumpulan";
+  addCollBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    handleAddToCollection(v);
+  });
+  row.appendChild(addCollBtn);
+
+  return row;
+}
+
+
 // Membangun panel catatan SEBARIS untuk satu ayat (catatan dari sheet/admin
 // kalau ada, + kotak catatan pribadi + tombol aksi) -- ditaruh sebagai anak
 // TERAKHIR di dalam blok ayat itu sendiri, jadi lebarnya otomatis SAMA
@@ -1248,6 +1413,28 @@ function buildInlineNoteCardEl(v, block) {
   const displayName = v.bookName || (book ? book.name : "");
   const refLabel = `${displayName} ${v.chapter}:${v.verse}`;
 
+  // Kotak catatan pribadi DIBUAT DULUAN di sini (elemennya saja, belum
+  // ditempel ke DOM -- baru ditempel di bawah, di posisi tampilnya yang
+  // benar) supaya baris tombol ATAS (topActions, ditempel duluan) BISA
+  // ikut membaca isinya secara langsung (live) juga -- persis seperti
+  // baris tombol BAWAH -- bukan cuma catatan yang SUDAH tersimpan.
+  const textarea = document.createElement("textarea");
+  textarea.className = "inline-note-textarea";
+  textarea.rows = 3;
+  textarea.placeholder = "Tulis renungan atau catatan pribadi Anda untuk ayat ini…";
+  textarea.value = getPersonalNote(currentUser, v.id);
+  textarea.addEventListener("click", (e) => e.stopPropagation());
+
+  // Tombol "Salin Ayat" / "Salin Catatan" / "Kumpulan" DIULANG di ATAS
+  // panel (sebelum catatan admin & kotak catatan pribadi yang bisa
+  // panjang), supaya tidak perlu gulir ke paling bawah dulu hanya untuk
+  // menyalin ayat/catatan atau memasukkannya ke Kumpulan Ayat. Tombol
+  // "💾 Simpan Catatan" TETAP hanya di bawah (dekat kotak catatan
+  // pribadinya) karena aksi itu memang terikat ke kotak tulis di bawah.
+  const topActions = buildNoteQuickActionsRow(v, refLabel, hasAdminNote, textarea);
+  topActions.classList.add("inline-note-actions-top");
+  wrap.appendChild(topActions);
+
   if (hasAdminNote) {
     const adminWrap = document.createElement("div");
     adminWrap.className = "inline-note-admin";
@@ -1257,7 +1444,7 @@ function buildInlineNoteCardEl(v, block) {
     adminWrap.appendChild(label);
     const adminText = document.createElement("div");
     adminText.className = "note-modal-admin-text";
-    adminText.innerHTML = linkifyOsisReferences(sanitizeNoteHtml(v.note));
+    adminText.innerHTML = linkifyOsisReferences(sanitizeNoteHtml(v.note), v.bookNumber, v.chapter);
     adminText.addEventListener("click", (e) => {
       const btn = e.target.closest(".note-verse-ref");
       if (!btn) return;
@@ -1273,12 +1460,6 @@ function buildInlineNoteCardEl(v, block) {
   personalLabel.textContent = "🖊️ Catatan pribadi Anda";
   wrap.appendChild(personalLabel);
 
-  const textarea = document.createElement("textarea");
-  textarea.className = "inline-note-textarea";
-  textarea.rows = 3;
-  textarea.placeholder = "Tulis renungan atau catatan pribadi Anda untuk ayat ini…";
-  textarea.value = getPersonalNote(currentUser, v.id);
-  textarea.addEventListener("click", (e) => e.stopPropagation());
   wrap.appendChild(textarea);
 
   const actions = document.createElement("div");
@@ -1302,42 +1483,28 @@ function buildInlineNoteCardEl(v, block) {
   });
   actions.appendChild(saveBtn);
 
-  const copyVerseBtn = document.createElement("button");
-  copyVerseBtn.type = "button";
-  copyVerseBtn.className = "chip-btn small";
-  copyVerseBtn.textContent = "📋 Salin Ayat";
-  copyVerseBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    copyTextWithFeedback(`${refLabel}\n${v.text}`, copyVerseBtn);
-  });
-  actions.appendChild(copyVerseBtn);
-
-  if (hasAdminNote) {
-    const copyNoteBtn = document.createElement("button");
-    copyNoteBtn.type = "button";
-    copyNoteBtn.className = "chip-btn small";
-    copyNoteBtn.textContent = "📋 Salin Catatan";
-    copyNoteBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      copyTextWithFeedback(`${refLabel} — Catatan:\n${noteHtmlToPlainText(v.note)}`, copyNoteBtn);
-    });
-    actions.appendChild(copyNoteBtn);
-  }
-
-  const addCollBtn = document.createElement("button");
-  addCollBtn.type = "button";
-  addCollBtn.className = "chip-btn small";
-  addCollBtn.textContent = "📚 Kumpulan";
-  addCollBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    handleAddToCollection(v);
-  });
-  actions.appendChild(addCollBtn);
+  const bottomQuickActions = buildNoteQuickActionsRow(v, refLabel, hasAdminNote, textarea);
+  // Digabung ke baris "actions" yang sama (bukan <div> terpisah) supaya
+  // tata letak bawah tetap seperti sebelumnya: Simpan Catatan lalu tombol
+  // salin/kumpulan sebaris.
+  Array.from(bottomQuickActions.children).forEach((btn) => actions.appendChild(btn));
   actions.appendChild(savedHint);
 
   wrap.appendChild(actions);
+
+  // PERBAIKAN "Salin Catatan" separuh jalan: setiap kali kotak catatan
+  // pribadi diketik (BELUM tentu sudah ditekan "Simpan Catatan"), tombol
+  // "📋 Salin Catatan" di baris ATAS *dan* BAWAH langsung dimunculkan/
+  // disembunyikan sesuai ada-tidaknya isi -- tidak perlu simpan dulu atau
+  // tutup-buka panel dulu supaya tombolnya muncul.
+  textarea.addEventListener("input", () => {
+    topActions.refreshCopyNoteVisibility();
+    bottomQuickActions.refreshCopyNoteVisibility();
+  });
+
   return wrap;
 }
+
 
 // Buka/tutup panel catatan sebaris milik satu ayat. Panel ayat LAIN yang
 // mungkin sedang terbuka TIDAK ikut ditutup otomatis -- boleh lebih dari
@@ -4482,6 +4649,50 @@ function initFontFamilyControl() {
 }
 
 // ------------------------------------------------------------
+// 11c-2) JENIS HURUF KHUSUS CATATAN (Note) -- SEBELUMNYA font catatan
+// tidak konsisten: catatan dari Sheet Alkitab (📝 Catatan pada ayat ini)
+// ikut warisan font UI (--font-ui, Inter/sans) karena tidak diatur
+// sendiri, sedangkan kotak catatan pribadi (🖊️) memakai font baca
+// (--font-body, Literata/serif) -- dua tampilan beda dalam SATU panel
+// yang sama. Sekarang KEDUANYA diseragamkan lewat SATU variabel CSS
+// khusus (--font-note, lihat css/style.css: .note-modal-admin-text &
+// .inline-note-textarea), dan jenis hurufnya bisa dipilih sendiri
+// (terpisah dari jenis huruf ayat) lewat menu ⋮ -> "📝 Jenis huruf
+// Catatan (Note)". Daftar pilihannya sama persis dengan FONT_FAMILIES di
+// atas supaya konsisten, tapi tersimpan di localStorage TERPISAH
+// (NOTE_FONT_FAMILY_STORAGE_KEY) -- jadi jenis huruf ayat & jenis huruf
+// catatan bisa diatur beda-beda sesuai selera.
+// ------------------------------------------------------------
+const NOTE_FONT_FAMILY_STORAGE_KEY = "bible_app_note_font_family_v1";
+
+function applyNoteFontFamily(id) {
+  const f = FONT_FAMILIES.find((x) => x.id === id) || FONT_FAMILIES[0];
+  document.documentElement.style.setProperty("--font-note", f.body);
+  localStorage.setItem(NOTE_FONT_FAMILY_STORAGE_KEY, f.id);
+  document.querySelectorAll("#noteFontFamilyPicker .font-family-option").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.font === f.id);
+  });
+}
+
+function initNoteFontFamilyControl() {
+  const picker = el("noteFontFamilyPicker");
+  if (!picker) return;
+  picker.innerHTML = "";
+  FONT_FAMILIES.forEach((f) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "font-family-option";
+    btn.dataset.font = f.id;
+    btn.style.fontFamily = f.body;
+    btn.textContent = "Aa — " + f.name;
+    btn.addEventListener("click", () => applyNoteFontFamily(f.id));
+    picker.appendChild(btn);
+  });
+  const saved = localStorage.getItem(NOTE_FONT_FAMILY_STORAGE_KEY) || "default";
+  applyNoteFontFamily(saved);
+}
+
+// ------------------------------------------------------------
 // 12) LAYAR PENUH (Fullscreen API)
 // ------------------------------------------------------------
 function initFullscreenControl() {
@@ -4711,12 +4922,18 @@ function pickVoice() {
 //     berarti apa-apa kalau dibaca "buka kurung a tutup kurung").
 //   - "Psa_74:16" -> "Mazmur 74:16" (nama kitab Indonesia + tanpa garis
 //     bawah), dicocokkan lewat OSIS_ABBR_INDEX di js/books.js.
+//   - "Luk_3:23-28" (rentang ayat) -> "Lukas 3 ayat 23 sampai 28" --
+//     SEBELUMNYA akhir rentang ("-28") tidak ditangkap regex-nya sama
+//     sekali, jadi terbaca aneh apa adanya ("Lukas 3 ayat 23 -28").
 function cleanArticulationForSpeech(text) {
   if (!text) return text;
   let out = text.replace(/\([a-zA-Z]{1,2}\)/g, " ");
-  out = out.replace(/\b([1-3]?[A-Za-z]{2,4})_(\d+):(\d+)\b/g, (m, abbr, chapter, verse) => {
+  out = out.replace(/\b([1-3]?[A-Za-z]{2,4})_(\d+):(\d+)(?:-(\d+))?\b/g, (m, abbr, chapter, verseStart, verseEnd) => {
     const book = OSIS_ABBR_INDEX[abbr.toLowerCase()];
-    return book ? `${book.name} ${chapter} ayat ${verse}` : `${abbr} ${chapter} ayat ${verse}`;
+    const name = book ? book.name : abbr;
+    return verseEnd
+      ? `${name} ${chapter} ayat ${verseStart} sampai ${verseEnd}`
+      : `${name} ${chapter} ayat ${verseStart}`;
   });
   return out.replace(/\s{2,}/g, " ").trim();
 }
@@ -5402,6 +5619,17 @@ function initChangePasswordUI() {
 function initScrollTopFloatButton() {
   const btn = el("scrollTopFloatBtn");
   if (!btn) return;
+
+  // PERBAIKAN: tombol ini mulai dengan atribut HTML "hidden" di index.html
+  // (supaya tidak kelihatan sekilas sebelum JS siap), tapi kode di bawah
+  // ini SEBELUMNYA hanya menambah/melepas class ".visible" & TIDAK PERNAH
+  // melepas atribut "hidden" itu sendiri. Karena CSS punya aturan
+  // "[hidden] { display: none !important; }", !important itu SELALU
+  // menang dari opacity/transform class ".visible" manapun -- akibatnya
+  // tombol ini tidak akan pernah benar-benar muncul walau sudah discroll
+  // sejauh apa pun. Dilepas SEKALI di sini, sesudahnya tampil/sembunyi
+  // sepenuhnya diatur lewat class ".visible" saja (lihat updateVisibility()).
+  btn.hidden = false;
 
   const SHOW_AFTER_PX = 260; // baru muncul setelah scroll turun sejauh ini
 
