@@ -545,10 +545,17 @@ function renderAiChatThread(thread) {
     const bubble = document.createElement("div");
     bubble.className = "ai-chat-bubble ai-chat-bubble-" + (turn.role === "ai" ? "ai" : "user");
     const label = turn.role === "ai" ? "🤖 AI" : "🙋 Anda";
+    // Tombol "📋 Salin" sengaja dipasang DUA KALI pada balasan AI (atas &
+    // bawah): jawaban AI kadang panjang, dan di HP tombol yang cuma ada
+    // di atas jadi sulit dijangkau setelah membaca sampai bawah (harus
+    // gulir balik ke atas dulu). Tombol bawah HANYA untuk balasan AI
+    // (bukan bubble pertanyaan pengguna sendiri, yang biasanya pendek dan
+    // tombol atasnya sudah cukup) supaya tidak mubazir/berulang.
+    const isAi = turn.role === "ai";
     bubble.innerHTML = `
       <div class="ai-chat-bubble-head">
         <span>${label}</span>
-        <button type="button" class="chip-btn small ai-chat-copy-btn" data-idx="${idx}">📋 Salin</button>
+        <button type="button" class="chip-btn small ai-chat-copy-btn" data-idx="${idx}" data-pos="top">📋 Salin</button>
       </div>
       <div class="ai-chat-bubble-text">${formatChatText(turn.text)}</div>
       ${turn.sources && turn.sources.length ? `
@@ -557,15 +564,22 @@ function renderAiChatThread(thread) {
           <ul>${turn.sources.map((s) => `<li><strong>${escapeHtml(s.ref)}</strong> — ${escapeHtml(s.text)}</li>`).join("")}</ul>
         </details>
       ` : ""}
+      ${isAi ? `
+        <div class="ai-chat-bubble-foot">
+          <button type="button" class="chip-btn small ai-chat-copy-btn" data-idx="${idx}" data-pos="bottom">📋 Salin Jawaban</button>
+        </div>
+      ` : ""}
     `;
-    bubble.querySelector(".ai-chat-copy-btn").addEventListener("click", () => {
-      navigator.clipboard.writeText(turn.text).then(() => {
-        const btn = bubble.querySelector(".ai-chat-copy-btn");
-        const old = btn.textContent;
-        btn.textContent = "✅ Tersalin";
-        setTimeout(() => { btn.textContent = old; }, 1200);
-      }).catch(() => alert("Gagal menyalin. Salin manual dari layar."));
-    });
+    const wireCopyBtn = (btn) => {
+      btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(turn.text).then(() => {
+          const old = btn.textContent;
+          btn.textContent = "✅ Tersalin";
+          setTimeout(() => { btn.textContent = old; }, 1200);
+        }).catch(() => alert("Gagal menyalin. Salin manual dari layar."));
+      });
+    };
+    bubble.querySelectorAll(".ai-chat-copy-btn").forEach(wireCopyBtn);
     thread.appendChild(bubble);
   });
   thread.scrollTop = thread.scrollHeight;
