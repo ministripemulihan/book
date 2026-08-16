@@ -164,6 +164,27 @@ const Sync = {
     }
   },
 
+  // Ubah pengumuman yang sudah ada (dicari lewat id-nya) -- dipakai tombol
+  // "Edit" administrator, supaya tidak perlu hapus+buat baru lagi.
+  async updateAnnouncement(username, id, text, activeFrom, activeUntil, status, visibleTo) {
+    try {
+      const data = await this._post({
+        type: "announcement_update",
+        username,
+        id: String(id),
+        text,
+        activeFrom: activeFrom || "",
+        activeUntil: activeUntil || "",
+        status: status || "draft",
+        visibleTo: visibleTo || "all",
+        updatedAt: new Date().toISOString(),
+      });
+      return (data && data.ok) || false;
+    } catch (e) {
+      return false;
+    }
+  },
+
   async deleteAnnouncement(username, id) {
     try {
       const data = await this._post({ type: "announcement_delete", username, id: String(id) });
