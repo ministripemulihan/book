@@ -22,6 +22,13 @@
   --font-body: "Literata", Georgia, serif;
   --font-ui: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body-weight: 400;
+  /* Font khusus panel Catatan (Note) -- DIPISAH dari --font-body (teks
+     ayat) supaya bisa diganti sendiri lewat menu ⋮ -> "📝 Jenis huruf
+     Catatan" (lihat applyNoteFontFamily() di js/app.js), tanpa ikut
+     mengubah font ayat. Dipakai SERAGAM oleh catatan dari Sheet Alkitab
+     (.note-modal-admin-text) & kotak catatan pribadi
+     (.inline-note-textarea) -- sebelumnya dua-duanya beda font. */
+  --font-note: "Literata", Georgia, serif;
 }
 /* Teks ayat mengikuti berat huruf pilihan (mis. 900 untuk "Tebal ala Arial Black") */
 .verse-text-wrap, .verse-block, .collection-verse-item .result-text { font-weight: var(--font-body-weight, 400); }
@@ -1069,7 +1076,7 @@ input { font-family: inherit; }
 .inline-note-personal-label { margin-top: 4px; }
 .inline-note-textarea {
   width: 100%; min-height: 72px; resize: vertical;
-  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  font-family: var(--font-note); font-size: 15px; line-height: 1.5;
   padding: 8px 10px; border-radius: 6px;
   border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
   box-sizing: border-box;
@@ -1079,6 +1086,16 @@ input { font-family: inherit; }
   margin-top: 10px;
 }
 .inline-note-actions .chip-btn.small { padding: 5px 10px; font-size: 0.82rem; }
+/* Baris tombol salin/kumpulan yang diulang di ATAS panel (lihat
+   buildNoteQuickActionsRow() di js/app.js) -- supaya tidak perlu gulir ke
+   bawah panel yang panjang hanya untuk menyalin ayat/catatan atau
+   memasukkan ke Kumpulan Ayat. */
+.inline-note-actions-top {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--rule);
+}
 
 /* ------------------------------------------------------------
    POPUP MELAYANG: PILIH WARNA HIGHLIGHT AYAT
@@ -1270,7 +1287,7 @@ input { font-family: inherit; }
    ayat, dan tetap bisa diperbesar/diperkecil dari tombol A+/A- yang sama. */
 .note-modal-admin-text {
   font-size: var(--verse-font-size, 16px); font-style: italic; color: var(--ink-soft); margin: 0;
-  line-height: 1.6;
+  line-height: 1.6; font-family: var(--font-note);
 }
 /* Catatan bisa berisi markup HTML dasar (mis. <p>, <sup>) — beri jarak
    antar paragraf & rapikan superscript supaya tetap enak dibaca. */
@@ -1289,13 +1306,17 @@ input { font-family: inherit; }
   font-size: 0.85em; font-style: normal; font-family: var(--font-ui); cursor: pointer;
 }
 .note-verse-ref:hover, .note-verse-ref.active { background: var(--brass); color: #fff; }
+/* Chip kecil untuk pola "(ay. 4, 10, 12, 21, 25)" -- beda dari tombol
+   referensi kitab penuh (📖 Kejadian 1:10) yang lebih besar, supaya
+   daftar angkanya tidak memakan tempat berlebihan di dalam kalimat. */
+.note-verse-ref-inline { padding: 1px 7px; margin: 1px; font-size: 0.82em; }
 .note-verse-ref-preview {
   margin: 6px 0 10px; padding: 10px 12px;
   background: var(--paper); border-left: 3px solid var(--brass); border-radius: 6px;
   font-style: normal; text-align: left;
 }
 .note-verse-ref-preview-ref { font-family: var(--font-ui); font-weight: 700; font-size: 0.8em; color: var(--brass); margin-bottom: 4px; }
-.note-verse-ref-preview-text { color: var(--ink); line-height: 1.6; }
+.note-verse-ref-preview-text { color: var(--ink); line-height: 1.6; font-family: var(--font-note); }
 
 .empty-state {
   text-align: center; color: var(--ink-soft); font-family: var(--font-body);
@@ -1539,7 +1560,17 @@ input { font-family: inherit; }
 .ai-chat-bubble-text s { opacity: .75; }
 .ai-chat-sources { margin-top: 8px; font-size: 0.8rem; color: var(--ink-soft); }
 .ai-chat-sources ul { margin: 6px 0 0; padding-left: 18px; }
-.ai-chat-sources li { margin-bottom: 4px; }
+.ai-chat-sources li { margin-bottom: 8px; }
+/* Label jenis sumber (ayat / catatan kaki / Pokok Kitab-Garis Besar /
+   referensi tambahan AI) -- lihat SOURCE_KIND_LABEL di js/aichat.js,
+   supaya pembaca langsung tahu asal tiap referensi di bawah jawaban AI. */
+.ai-chat-source-kind {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--petrol);
+  opacity: .85;
+}
 .ai-chat-loading { font-style: italic; }
 /* Tombol "Salin" KEDUA, di bawah teks jawaban AI (lihat js/aichat.js) --
    supaya di HP tidak perlu gulir balik ke atas untuk menyalin jawaban
