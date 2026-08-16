@@ -1352,6 +1352,101 @@ function toggleInlineNote(block) {
   }
 }
 
+// ============================================================
+//  POPUP MELAYANG: PILIH WARNA HIGHLIGHT AYAT
+// ============================================================
+//  Muncul di dekat nomor ayat begitu nomornya ditekan sekali. Berisi
+//  3 lingkaran warna pastel (kuning/hijau/biru) + satu tombol hapus.
+//  Highlight berlaku untuk SATU AYAT PENUH (seluruh blok ayat berubah
+//  warna latar), bukan sebagian teks yang diseleksi.
+// ============================================================
+let activeHighlightPopup = null;
+
+function closeHighlightPopup() {
+  if (!activeHighlightPopup) return;
+  activeHighlightPopup.remove();
+  activeHighlightPopup = null;
+  document.removeEventListener("click", onDocClickCloseHighlightPopup, true);
+  window.removeEventListener("scroll", closeHighlightPopup, true);
+  window.removeEventListener("resize", closeHighlightPopup, true);
+}
+
+function onDocClickCloseHighlightPopup(e) {
+  if (activeHighlightPopup && !activeHighlightPopup.contains(e.target)) closeHighlightPopup();
+}
+
+// Menerapkan (atau menghapus, kalau color = null) warna highlight ke
+// blok ayat + menyimpannya secara lokal lewat js/highlights.js.
+function applyVerseHighlight(block, v, color) {
+  ["hl-yellow", "hl-green", "hl-blue"].forEach((c) => block.classList.remove(c));
+  if (color) block.classList.add("hl-" + color);
+  setVerseHighlight(currentUser, v.id, color);
+}
+
+function openHighlightPopup(anchorEl, block, v) {
+  closeHighlightPopup();
+
+  const popup = document.createElement("div");
+  popup.className = "verse-highlight-popup";
+  popup.setAttribute("role", "menu");
+  popup.setAttribute("aria-label", "Pilih warna highlight ayat " + v.verse);
+
+  const current = getVerseHighlight(currentUser, v.id);
+  const colors = [
+    { key: "yellow", label: "Kuning" },
+    { key: "green", label: "Hijau" },
+    { key: "blue", label: "Biru" },
+  ];
+
+  colors.forEach((c) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "hl-swatch hl-swatch-" + c.key + (current === c.key ? " hl-swatch-active" : "");
+    btn.title = "Highlight " + c.label;
+    btn.setAttribute("aria-label", "Highlight warna " + c.label);
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      applyVerseHighlight(block, v, c.key);
+      closeHighlightPopup();
+    });
+    popup.appendChild(btn);
+  });
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "hl-swatch hl-swatch-clear";
+  clearBtn.title = "Hapus highlight ayat ini";
+  clearBtn.setAttribute("aria-label", "Hapus highlight ayat ini");
+  clearBtn.textContent = "✕";
+  clearBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    applyVerseHighlight(block, v, null);
+    closeHighlightPopup();
+  });
+  popup.appendChild(clearBtn);
+
+  document.body.appendChild(popup);
+
+  // Posisikan tepat di bawah nomor ayat yang ditekan, jaga supaya tidak
+  // keluar dari tepi kanan layar.
+  const r = anchorEl.getBoundingClientRect();
+  const top = r.bottom + window.scrollY + 6;
+  let left = r.left + window.scrollX;
+  const maxLeft = window.scrollX + document.documentElement.clientWidth - popup.offsetWidth - 12;
+  if (left > maxLeft) left = Math.max(8, maxLeft);
+  popup.style.top = top + "px";
+  popup.style.left = left + "px";
+
+  activeHighlightPopup = popup;
+  // Ditunda satu tick supaya klik yang baru saja membuka popup ini tidak
+  // langsung dianggap "klik di luar popup" dan menutupnya lagi.
+  setTimeout(() => {
+    document.addEventListener("click", onDocClickCloseHighlightPopup, true);
+    window.addEventListener("scroll", closeHighlightPopup, true);
+    window.addEventListener("resize", closeHighlightPopup, true);
+  }, 0);
+}
+
 // Membuat satu blok ayat (nomor, teks, badge catatan, tombol salin) —
 // dipakai baik untuk tampilan satu kolom (biasa) maupun tampilan
 // beberapa-kolom-berdampingan (lihat renderColumnsView).
@@ -1362,21 +1457,47 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   block.style.animationDelay = Math.min(idx * 35, 700) + "ms";
   if (highlightVerse && v.verse === highlightVerse) block.classList.add("highlight");
 
-  // Nomor ayat sekarang TOMBOL sungguhan (bukan cuma teks) -- TEKAN DUA
-  // KALI untuk buka/tutup catatan ayat ini. Sekali tekan sengaja tidak
-  // melakukan apa-apa supaya tidak "salah tekan" waktu menggulir layar.
+  // Nomor ayat sekarang TOMBOL sungguhan (bukan cuma teks):
+  //  - SEKALI tekan  -> buka popup melayang untuk memilih warna highlight
+  //    ayat ini (lihat openHighlightPopup() di bawah).
+  //  - DUA KALI tekan -> buka/tutup catatan ayat ini (perilaku lama).
+  // Klik pertama sengaja ditunda sebentar (lihat verseNumClickTimer) supaya
+  // bisa dibedakan dari klik kedua pada gestur tekan-dua-kali.
   const num = document.createElement("button");
   num.type = "button";
   num.className = "verse-num verse-num-btn";
   num.textContent = v.verse;
-  num.title = "Tekan dua kali untuk buka/tutup catatan ayat ini";
-  num.setAttribute("aria-label", "Ayat " + v.verse + " — tekan dua kali untuk catatan");
-  num.addEventListener("click", (e) => e.stopPropagation()); // sekali tekan: sengaja tidak apa-apa
+  num.title = "Tekan sekali untuk warna highlight, dua kali untuk catatan";
+  num.setAttribute("aria-label", "Ayat " + v.verse + " — tekan sekali untuk highlight, dua kali untuk catatan");
+  let verseNumClickTimer = null;
+  num.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (verseNumClickTimer) {
+      // Ini klik kedua dari gestur tekan-dua-kali -- biarkan dblclick yang menangani.
+      clearTimeout(verseNumClickTimer);
+      verseNumClickTimer = null;
+      return;
+    }
+    verseNumClickTimer = setTimeout(() => {
+      verseNumClickTimer = null;
+      openHighlightPopup(num, block, v);
+    }, 260);
+  });
   num.addEventListener("dblclick", (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (verseNumClickTimer) {
+      clearTimeout(verseNumClickTimer);
+      verseNumClickTimer = null;
+    }
+    closeHighlightPopup();
     toggleInlineNote(block);
   });
+
+  // Highlight warna pastel yang tersimpan (kalau ada) langsung dipasang
+  // ke seluruh blok ayat ini saat dirender.
+  const savedHighlight = getVerseHighlight(currentUser, v.id);
+  if (savedHighlight) block.classList.add("hl-" + savedHighlight);
 
   const textWrap = document.createElement("div");
   textWrap.className = "verse-text-wrap";
@@ -1784,6 +1905,13 @@ function computeVerseLandmarks(verseNums) {
 // `fullChapterVerses`: SELALU satu pasal penuh (bukan versesToRender),
 // supaya stripnya tetap menampilkan semua nomor ayat pasal ini walau
 // yang sedang dirender di layar cuma 1 ayat (mode "verse").
+//
+// Setiap ayat di antara nomor "besar" (landmark, mis. 1/5/10/15/18)
+// TETAP ditampilkan sebagai titik "•" TERSENDIRI (bukan satu tanda
+// "···" gabungan) -- supaya tiap titik bisa DIKLIK LANGSUNG menuju
+// ayat aslinya (mis. di antara "1" dan "5" ada 3 titik utk ayat 2, 3,
+// 4 -- tap titik yang mewakili ayat 4 langsung ke ayat 4, bukan cuma
+// lompat ke 1 atau 5 terdekat).
 function renderVerseJumpBar(fullChapterVerses, verseMode) {
   const bar = el("verseJumpBar");
   if (!bar) return;
@@ -1793,32 +1921,19 @@ function renderVerseJumpBar(fullChapterVerses, verseMode) {
     bar.innerHTML = "";
     return;
   }
-  const landmarks = computeVerseLandmarks(verseNums);
+  const landmarkSet = new Set(computeVerseLandmarks(verseNums));
   const activeVerse = verseMode === "verse" ? currentSingleVerse : highlightVerse;
   bar.innerHTML = "";
-  // Maksimal 15 nomor per baris (dipaksa, TIDAK mengandalkan flex-wrap
-  // alami saja) -- supaya di HP barisnya tidak pernah kepanjangan/
-  // berdempetan, apa pun lebar layarnya (lihat .verse-jump-row-break
-  // di css/style.css).
-  const PER_ROW = 15;
-  landmarks.forEach((vnum, i) => {
-    const atRowBreak = i > 0 && i % PER_ROW === 0;
-    if (i > 0 && !atRowBreak) {
-      const dots = document.createElement("span");
-      dots.className = "verse-jump-dots";
-      dots.textContent = "···";
-      dots.setAttribute("aria-hidden", "true");
-      bar.appendChild(dots);
-    }
-    if (atRowBreak) {
-      const brk = document.createElement("span");
-      brk.className = "verse-jump-row-break";
-      bar.appendChild(brk);
-    }
+  // Flex-wrap alami (bukan dipaksa pindah baris tiap N item seperti
+  // sebelumnya) -- sekarang jumlah elemennya sudah SATU PER AYAT
+  // (bukan cuma landmark), jadi lebih rapi dibiarkan membungkus sendiri
+  // mengikuti lebar layar, apa pun panjang pasalnya.
+  verseNums.forEach((vnum) => {
+    const isLandmark = landmarkSet.has(vnum);
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "verse-jump-num";
-    btn.textContent = String(vnum);
+    btn.className = isLandmark ? "verse-jump-num" : "verse-jump-dot";
+    btn.textContent = isLandmark ? String(vnum) : "•";
     btn.title = "Menuju ayat " + vnum;
     btn.setAttribute("aria-label", "Menuju ayat " + vnum);
     if (activeVerse === vnum) btn.classList.add("active");
@@ -2519,6 +2634,37 @@ function todayDateStr() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Ambil hanya bagian "yyyy-MM-dd" dari sebuah nilai tanggal, walau nilainya
+// kebetulan berupa timestamp lengkap (mis. "2026-08-13T12:04:05.424Z", ada
+// jam/menit/detik & huruf "Z" di belakangnya -- pernah terjadi pada baris
+// yang ditambahkan langsung di Sheet, bukan lewat form aplikasi). Server
+// (apps-script/Code.gs, lihat normalizeDateOnly_()) sudah membersihkan ini
+// sebelum dikirim ke aplikasi, TAPI dibersihkan juga di sini sebagai jaga-
+// jaga kedua (mis. data lama yang sempat tersimpan di cache/localStorage
+// sebelum pembaruan backend ini) supaya perbandingan teks di bawah selalu
+// benar apa pun sumbernya.
+function dateOnlyStr(v) {
+  if (!v) return "";
+  const s = String(v);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : s;
+}
+
+// Jaga-jaga KEDUA (server -- apps-script/Code.gs, fmtLogDateCell_() /
+// fmtLogTimeCell_() -- sudah membersihkan ini duluan) khusus untuk kolom
+// Date/Time di panel "📊 Log Aktivitas": buang huruf "Z" & bagian jam
+// ISO ("T12:04:05.424Z") kalau entah kenapa masih kebawa (mis. baris lama
+// yang sempat tersimpan di cache/localStorage sebelum pembaruan backend
+// ini) -- supaya yang tampil di layar SELALU tanggal/jam bersih, apa pun
+// sumbernya.
+function cleanLogDateTimeStr(v) {
+  if (!v) return "";
+  const s = String(v).trim();
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  return s.replace(/Z$/i, "");
+}
+
 // Apakah pengumuman ini SEDANG BERLAKU untuk pengguna biasa (bukan administrator):
 // status harus "done" (siap tayang, bukan draft/expired), DAN hari ini ada di
 // antara ActiveFrom..ActiveUntil (kosong = tidak dibatasi ke arah itu).
@@ -2526,8 +2672,10 @@ function announcementIsLive(a) {
   const status = a.status || "done"; // baris lama (sebelum kolom Status ada) dianggap aktif
   if (status !== "done") return false;
   const today = todayDateStr();
-  if (a.activeFrom && today < a.activeFrom) return false;
-  if (a.activeUntil && today > a.activeUntil) return false;
+  const activeFrom = dateOnlyStr(a.activeFrom);
+  const activeUntil = dateOnlyStr(a.activeUntil);
+  if (activeFrom && today < activeFrom) return false;
+  if (activeUntil && today > activeUntil) return false;
   return true;
 }
 
@@ -2537,7 +2685,8 @@ function announcementStatusLabel(a) {
   if (status === "expired") return "⛔ Expired (ditutup manual)";
   if (announcementIsLive(a)) return "🟢 Aktif sekarang";
   const today = todayDateStr();
-  if (a.activeFrom && today < a.activeFrom) return "⏳ Belum waktunya (dijadwalkan)";
+  const activeFrom = dateOnlyStr(a.activeFrom);
+  if (activeFrom && today < activeFrom) return "⏳ Belum waktunya (dijadwalkan)";
   return "⌛ Expired (lewat tanggal berakhir)";
 }
 
@@ -2709,10 +2858,20 @@ function renderAnnouncementPanel(list) {
   title.textContent = "📢 Pengumuman";
   container.appendChild(title);
 
+  // Dideklarasikan di luar blok if() di bawah supaya bisa dipakai lagi oleh
+  // tombol "Edit" di daftar pengumuman (visibleList.forEach() di bawah),
+  // yang berada di luar blok if(isAdministrator()) ini.
+  let enterAnnouncementEditMode = null;
   if (isAdministrator()) {
     const composeWrap = document.createElement("div");
     composeWrap.className = "announcement-compose";
+    // editingId: null = mode "tambah baru" (default). Diisi id pengumuman
+    // saat tombol "Edit" salah satu item di bawah diklik -- lihat tombol
+    // Edit di dalam visibleList.forEach() -- supaya form yang SAMA ini
+    // dipakai ulang untuk menyimpan PERUBAHAN (bukan membuat baris baru).
+    let editingId = null;
     composeWrap.innerHTML = `
+      <h3 id="announcementComposeTitle" class="announcement-compose-title">Tulis Pengumuman Baru</h3>
       <textarea id="announcementComposeText" rows="3" placeholder="Tulis pengumuman baru untuk semua pengguna… (opsional: tag @username tertentu supaya hanya dia yang lihat)"></textarea>
       <div class="announcement-tag-row">
         <label>Tandai (@tag) untuk:<br>
@@ -2733,7 +2892,10 @@ function renderAnnouncementPanel(list) {
         </label>
       </div>
       <p class="announcement-compose-hint">Pengumuman hanya tampil ke pengguna lain kalau Status = "Done" DAN hari ini ada di antara tanggal aktif s/d tanggal berakhir. Kosongkan tanggal kalau tidak ingin dibatasi.</p>
-      <button id="announcementComposeBtn" class="chip-btn primary">Kirim Pengumuman</button>
+      <div class="announcement-compose-actions">
+        <button id="announcementComposeBtn" class="chip-btn primary">Kirim Pengumuman</button>
+        <button id="announcementCancelEditBtn" class="chip-btn small" hidden>Batal Edit</button>
+      </div>
     `;
     container.appendChild(composeWrap);
 
@@ -2760,6 +2922,43 @@ function renderAnnouncementPanel(list) {
       ta.selectionStart = ta.selectionEnd = pos + insertion.length;
     });
 
+    // Dipanggil tombol "Edit" di bawah -- pindah ke mode edit: isi ulang
+    // form dengan data pengumuman yang dipilih & ubah label tombol.
+    function enterEditMode(a) {
+      editingId = a.id;
+      composeWrap.querySelector("#announcementComposeTitle").textContent = "Edit Pengumuman";
+      const ta = composeWrap.querySelector("#announcementComposeText");
+      // Tag @username lama tidak disimpan di teks (sudah dibersihkan saat
+      // dibuat, lihat parseAnnouncementTags()) -- munculkan lagi di kotak
+      // teks supaya kelihatan & bisa diubah, biar konsisten dengan alur
+      // "tulis @tag lalu dibersihkan lagi saat disimpan" yang sama.
+      const vt = (a.visibleTo || "all").trim().toLowerCase();
+      const tagPrefix = (vt && vt !== "all") ? vt.split(",").map((u) => `@${u.trim()}`).join(" ") + " " : "";
+      ta.value = tagPrefix + (a.text || "");
+      composeWrap.querySelector("#announcementActiveFrom").value = dateOnlyStr(a.activeFrom);
+      composeWrap.querySelector("#announcementActiveUntil").value = dateOnlyStr(a.activeUntil);
+      composeWrap.querySelector("#announcementStatus").value = a.status || "draft";
+      composeWrap.querySelector("#announcementComposeBtn").textContent = "Simpan Perubahan";
+      composeWrap.querySelector("#announcementCancelEditBtn").hidden = false;
+      composeWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+      ta.focus();
+    }
+
+    function exitEditMode() {
+      editingId = null;
+      composeWrap.querySelector("#announcementComposeTitle").textContent = "Tulis Pengumuman Baru";
+      composeWrap.querySelector("#announcementComposeText").value = "";
+      composeWrap.querySelector("#announcementActiveFrom").value = "";
+      composeWrap.querySelector("#announcementActiveUntil").value = "";
+      composeWrap.querySelector("#announcementStatus").value = "done";
+      composeWrap.querySelector("#announcementComposeBtn").textContent = "Kirim Pengumuman";
+      composeWrap.querySelector("#announcementCancelEditBtn").hidden = true;
+    }
+    composeWrap.querySelector("#announcementCancelEditBtn").addEventListener("click", exitEditMode);
+    // simpan referensi supaya tombol "Edit" di daftar (dibuat di bawah,
+    // setelah blok ini) bisa memanggilnya.
+    enterAnnouncementEditMode = enterEditMode;
+
     composeWrap.querySelector("#announcementComposeBtn").addEventListener("click", async () => {
       const ta = composeWrap.querySelector("#announcementComposeText");
       const rawText = ta.value.trim();
@@ -2778,15 +2977,17 @@ function renderAnnouncementPanel(list) {
       }
       const btn = composeWrap.querySelector("#announcementComposeBtn");
       btn.disabled = true;
-      btn.textContent = "Mengirim…";
-      const ok = await Sync.pushAnnouncement(currentUser, cleanText, activeFrom, activeUntil, status, visibleTo);
+      btn.textContent = editingId ? "Menyimpan…" : "Mengirim…";
+      const ok = editingId
+        ? await Sync.updateAnnouncement(currentUser, editingId, cleanText, activeFrom, activeUntil, status, visibleTo)
+        : await Sync.pushAnnouncement(currentUser, cleanText, activeFrom, activeUntil, status, visibleTo);
       btn.disabled = false;
-      btn.textContent = "Kirim Pengumuman";
+      btn.textContent = editingId ? "Simpan Perubahan" : "Kirim Pengumuman";
       if (ok) {
-        ta.value = "";
+        exitEditMode();
         showAnnouncementPanel();
       } else {
-        alert("Gagal mengirim pengumuman. Pastikan Apps Script sudah dikonfigurasi.");
+        alert(editingId ? "Gagal menyimpan perubahan. Pastikan Apps Script sudah dikonfigurasi." : "Gagal mengirim pengumuman. Pastikan Apps Script sudah dikonfigurasi.");
       }
     });
   }
@@ -2810,7 +3011,7 @@ function renderAnnouncementPanel(list) {
     item.className = "announcement-item" + (announcementIsLive(a) ? " is-live" : "");
     const when = a.createdAt ? new Date(a.createdAt).toLocaleString("id-ID") : "";
     const rangeTxt = (a.activeFrom || a.activeUntil)
-      ? `📅 ${a.activeFrom || "…"} s/d ${a.activeUntil || "…"}`
+      ? `📅 ${dateOnlyStr(a.activeFrom) || "…"} s/d ${dateOnlyStr(a.activeUntil) || "…"}`
       : "📅 Tanpa batas tanggal";
     const targetTxt = (!a.visibleTo || a.visibleTo === "all") ? "🌐 Semua pengguna" : `🎯 ${a.visibleTo}`;
     item.innerHTML = `
@@ -2820,15 +3021,25 @@ function renderAnnouncementPanel(list) {
     `;
     item.querySelector(".announcement-text").textContent = a.text; // textContent -> aman dari HTML asing
     if (isAdministrator()) {
+      const actionsRow = document.createElement("div");
+      actionsRow.className = "announcement-item-actions";
+      const editBtn = document.createElement("button");
+      editBtn.className = "chip-btn small";
+      editBtn.textContent = "✏️ Edit";
+      editBtn.addEventListener("click", () => {
+        if (enterAnnouncementEditMode) enterAnnouncementEditMode(a);
+      });
+      actionsRow.appendChild(editBtn);
       const delBtn = document.createElement("button");
       delBtn.className = "chip-btn small danger-outline";
-      delBtn.textContent = "Hapus";
+      delBtn.textContent = "🗑️ Hapus";
       delBtn.addEventListener("click", async () => {
         if (!confirm("Hapus pengumuman ini?")) return;
         await Sync.deleteAnnouncement(currentUser, a.id);
         showAnnouncementPanel();
       });
-      item.appendChild(delBtn);
+      actionsRow.appendChild(delBtn);
+      item.appendChild(actionsRow);
     }
     listWrap.appendChild(item);
   });
@@ -3433,7 +3644,7 @@ function saveLogAsCsv(rows) {
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const lines = [header.join(",")].concat(
-    rows.map((l) => [l.username, l.date, l.time, l.os, l.ip, l.city, l.country, l.menu, l.search].map(escCsv).join(","))
+    rows.map((l) => [l.username, cleanLogDateTimeStr(l.date), cleanLogDateTimeStr(l.time), l.os, l.ip, l.city, l.country, l.menu, l.search].map(escCsv).join(","))
   );
   const csv = lines.join("\r\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); // BOM supaya Excel baca UTF-8 dgn benar
@@ -3619,8 +3830,8 @@ function renderLogTable(tableWrap) {
     "<tbody>" +
     shown.map((l) => `
       <tr>
-        <td>${escapeHtml(l.date)}</td>
-        <td>${escapeHtml(l.time)}</td>
+        <td>${escapeHtml(cleanLogDateTimeStr(l.date))}</td>
+        <td>${escapeHtml(cleanLogDateTimeStr(l.time))}</td>
         <td>${escapeHtml(l.username)}</td>
         <td>${escapeHtml(l.os)}</td>
         <td>${escapeHtml(l.ip)}</td>
@@ -3763,15 +3974,22 @@ async function showMonitorPanel() {
   await renderMonitorPanel();
 }
 
-// Format detik jadi teks ramah dibaca, mis. 125 -> "2 menit 5 detik",
-// 40 -> "40 detik". Dipakai untuk kolom "Total Waktu" (selisih jam akhir
-// - jam awal baca pada hari itu).
+// Format detik jadi teks ramah dibaca dalam JAM, MENIT, dan DETIK, mis.
+// 3725 -> "1 jam 2 menit 5 detik", 125 -> "2 menit 5 detik", 40 -> "40
+// detik". Dipakai untuk kolom "Total Waktu" (selisih jam akhir - jam awal
+// baca pada hari itu) di panel Pantau Pembacaan.
 function formatDurationSeconds(totalSec) {
   if (!totalSec || totalSec <= 0) return "-";
-  const m = Math.floor(totalSec / 60);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
   const s = Math.round(totalSec % 60);
-  if (m <= 0) return `${s} detik`;
-  return `${m} menit${s ? " " + s + " detik" : ""}`;
+  if (h > 0) {
+    return `${h} jam${m ? " " + m + " menit" : ""}${s ? " " + s + " detik" : ""}`;
+  }
+  if (m > 0) {
+    return `${m} menit${s ? " " + s + " detik" : ""}`;
+  }
+  return `${s} detik`;
 }
 
 // Menyusun ringkasan pembacaan (per tanggal dalam jendela minggu yang
@@ -5102,6 +5320,7 @@ function initUIEvents() {
   el("logoutBtn").addEventListener("click", () => {
     if (confirm("Keluar dari aplikasi? Anda perlu memasukkan username & password lagi saat kembali.")) logout();
   });
+  initScrollTopFloatButton();
 }
 
 // ------------------------------------------------------------
@@ -5169,6 +5388,69 @@ function initChangePasswordUI() {
       showMsg("Gagal menyimpan password baru. Periksa sambungan internet Anda, lalu coba lagi.", true);
     }
   });
+}
+
+// ------------------------------------------------------------
+// TOMBOL MELAYANG "TOP" -- lihat #scrollTopFloatBtn di index.html.
+// Muncul otomatis setelah scroll ke bawah SAAT sedang membaca pasal
+// (article #reader terlihat), tap -> geser layar ke atas (sampai strip
+// nomor ayat #verseJumpBar kelihatan lagi) supaya bisa langsung tap
+// nomor/titik ayat tanpa scroll manual dulu. Posisi kiri/kanan-bawah
+// pindah sendiri menjauhi menu yang sedang terbuka (laci daftar kitab
+// di kiri / menu ⋮ di kanan) supaya tidak pernah ketutupan.
+// ------------------------------------------------------------
+function initScrollTopFloatButton() {
+  const btn = el("scrollTopFloatBtn");
+  if (!btn) return;
+
+  const SHOW_AFTER_PX = 260; // baru muncul setelah scroll turun sejauh ini
+
+  function updatePosition() {
+    const sidebarOpen = window.innerWidth <= 859 && el("sidebar") && el("sidebar").classList.contains("open");
+    const moreMenuOpen = el("moreMenu") && !el("moreMenu").hidden;
+    // Menu ⋮ ada di KANAN -> tombol pindah ke KIRI supaya tidak ketutupan.
+    // Laci daftar kitab ada di KIRI -> tombol tetap/pindah ke KANAN.
+    // Kalau kebetulan dua-duanya (jarang terjadi) -> ikut menu ⋮ (paling
+    // sering dibuka saat sedang scroll baca) supaya tetap terlihat.
+    const goLeft = moreMenuOpen && !sidebarOpen;
+    btn.classList.toggle("pos-left", goLeft);
+    btn.classList.toggle("pos-right", !goLeft);
+  }
+
+  function updateVisibility() {
+    const readerVisible = el("reader") && !el("reader").hidden;
+    if (!readerVisible) {
+      btn.classList.remove("visible");
+      return;
+    }
+    btn.classList.toggle("visible", window.scrollY > SHOW_AFTER_PX);
+  }
+
+  window.addEventListener("scroll", updateVisibility, { passive: true });
+  window.addEventListener("resize", updatePosition);
+  btn.addEventListener("click", () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  // Pantau buka/tutup laci & menu ⋮ lewat MutationObserver (bukan menambah
+  // listener di setiap tombol yang membuka/menutupnya satu-satu, supaya
+  // tetap benar walau nanti ada tombol baru yang membuka/menutup menu yang
+  // sama) -- lihat toggleSidebar()/closeSidebarOnMobile() (class "open"
+  // di #sidebar) & menuToggle (atribut "hidden" di #moreMenu).
+  if (el("sidebar")) {
+    new MutationObserver(updatePosition).observe(el("sidebar"), { attributes: true, attributeFilter: ["class"] });
+  }
+  if (el("moreMenu")) {
+    new MutationObserver(updatePosition).observe(el("moreMenu"), { attributes: true, attributeFilter: ["hidden"] });
+  }
+  // #reader ganti hidden/tidak setiap pindah menu (baca <-> panel lain) --
+  // pantau juga supaya tombol langsung hilang begitu keluar dari halaman baca.
+  if (el("reader")) {
+    new MutationObserver(updateVisibility).observe(el("reader"), { attributes: true, attributeFilter: ["hidden"] });
+  }
+
+  updatePosition();
+  updateVisibility();
 }
 
 // ------------------------------------------------------------
