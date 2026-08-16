@@ -2058,10 +2058,9 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
 // persis seperti contoh "1 ··· 5 ··· 10 ··· 15 ··· 18".
 function computeVerseLandmarks(verseNums) {
   if (verseNums.length <= 12) return verseNums.slice();
-  const total = verseNums.length;
-  let step = 5;
-  if (total > 60) step = 10;
-  if (total > 150) step = 20;
+  // Selalu kelipatan 5, berapa pun panjang pasalnya (termasuk Mazmur 119
+  // yang 176 ayat) -- contoh: 1 ··· 5 ··· 10 ··· 15 ··· ... ··· 175 ··· 176.
+  const step = 5;
   const first = verseNums[0];
   const last = verseNums[verseNums.length - 1];
   const set = new Set([first, last]);
