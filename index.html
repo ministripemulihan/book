@@ -364,6 +364,18 @@
     <span id="readingProgressToastText"></span>
   </div>
 
+  <!-- ===================== TOMBOL MELAYANG "TOP" (saat membaca Alkitab) =====================
+       Muncul otomatis setelah pengguna scroll ke bawah saat sedang membaca
+       pasal -- tap untuk geser layar ke atas (sampai strip nomor ayat
+       terlihat lagi, lihat #verseJumpBar) supaya bisa langsung tap nomor/
+       titik ayat tanpa scroll manual. Transparan, tulisan "TOP" saja.
+       Posisi kiri/kanan-bawah otomatis pindah sendiri (lihat
+       updateScrollTopFloatPosition() di js/app.js) supaya tidak pernah
+       ketutupan menu yang sedang terbuka: default kanan-bawah, pindah ke
+       kiri-bawah kalau menu ⋮ (di kanan) sedang terbuka, atau ke
+       kanan-bawah kalau laci daftar kitab (di kiri) sedang terbuka. -->
+  <button id="scrollTopFloatBtn" class="scroll-top-float" type="button" aria-label="Geser ke atas" hidden>TOP</button>
+
   <script src="js/config.js"></script>
   <script src="js/books.js"></script>
   <script src="js/csv.js"></script>
@@ -372,6 +384,7 @@
   <script src="js/levels.js"></script>
   <script src="js/activitylog.js"></script>
   <script src="js/notes.js"></script>
+  <script src="js/highlights.js"></script>
   <script src="js/collections.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/plans.js"></script>
