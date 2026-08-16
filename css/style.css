@@ -158,6 +158,9 @@ body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .announcement-text { white-space: pre-wrap; margin-bottom: 6px; }
 .announcement-meta { font-size: 0.78rem; color: var(--ink-soft); }
 .announcement-item .chip-btn { margin-top: 8px; }
+.announcement-item-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.announcement-compose-title { font-family: var(--font-display); font-size: 16px; margin: 0; }
+.announcement-compose-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* Tanggal aktif/berakhir + status saat administrator menulis pengumuman */
 .announcement-compose-dates {
@@ -981,6 +984,15 @@ input { font-family: inherit; }
   box-shadow: var(--shadow);
 }
 .verse-block.highlight { background: var(--brass-soft); }
+/* Highlight warna pastel pilihan pengguna (lihat js/highlights.js +
+   openHighlightPopup() di app.js). Dipasang ke SELURUH blok ayat, bukan
+   sebagian teks. Kalau ayat ini kebetulan juga jadi tujuan navigasi
+   (.highlight, warna brass di atas), warna pastel pilihan pengguna tetap
+   menang supaya tandanya tidak "hilang" saat dibuka dari pencarian. */
+.verse-block.hl-yellow { background: #fbeeb0; }
+.verse-block.hl-green { background: #cfe9d6; }
+.verse-block.hl-blue { background: #cfe2f3; }
+.verse-block.hl-yellow:hover, .verse-block.hl-green:hover, .verse-block.hl-blue:hover { filter: brightness(0.97); }
 .verse-block.speaking {
   background: var(--paper-raised);
   border-color: var(--petrol);
@@ -1068,6 +1080,42 @@ input { font-family: inherit; }
 }
 .inline-note-actions .chip-btn.small { padding: 5px 10px; font-size: 0.82rem; }
 
+/* ------------------------------------------------------------
+   POPUP MELAYANG: PILIH WARNA HIGHLIGHT AYAT
+   Muncul saat nomor ayat ditekan SEKALI (lihat openHighlightPopup()
+   & .verse-num-btn di app.js/style di atas).
+------------------------------------------------------------ */
+.verse-highlight-popup {
+  position: absolute;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  animation: inlineNoteOpen .15s ease;
+}
+.hl-swatch {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.10);
+  cursor: pointer; padding: 0;
+  transition: transform .12s ease, border-color .12s ease;
+}
+.hl-swatch:hover { transform: scale(1.15); }
+.hl-swatch-yellow { background: #fbeeb0; }
+.hl-swatch-green { background: #cfe9d6; }
+.hl-swatch-blue { background: #cfe2f3; }
+.hl-swatch-active { border-color: var(--petrol); box-shadow: 0 0 0 2px rgba(47,111,99,.25); }
+.hl-swatch-clear {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: transparent; border: 1px solid var(--rule);
+  color: var(--ink-soft); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.hl-swatch-clear:hover { color: var(--petrol); border-color: var(--petrol); }
+
 .reader-nav-bottom { margin-top: 22px; margin-bottom: 0; }
 .reader-nav-bottom h2 { font-size: 16px; opacity: .7; }
 
@@ -1145,17 +1193,20 @@ input { font-family: inherit; }
 }
 
 /* ============================================================
-   STRIP NOMOR AYAT ("1 ··· 5 ··· 10 ··· 15 ··· 18") -- klik nomornya
-   untuk langsung menuju ayat itu (scroll+sorot di mode "Seluruh
-   Pasal", atau ganti tampilan di mode "1 Ayat Saja"). Lihat
-   renderVerseJumpBar() di js/app.js.
+   STRIP NOMOR AYAT ("1 • • • 5 • • • 10 • • 15 • 18") -- klik nomor
+   BESAR (landmark) atau titik KECIL DI ANTARANYA untuk langsung
+   menuju ayat itu (scroll+sorot di mode "Seluruh Pasal", atau ganti
+   tampilan di mode "1 Ayat Saja"). SETIAP ayat pasal ini punya
+   elemen sendiri (nomor besar untuk landmark, titik kecil untuk
+   sisanya) -- bukan satu tanda "···" gabungan -- supaya tiap titik
+   bisa ditekan LANGSUNG menuju ayat aslinya. Lihat renderVerseJumpBar()
+   di js/app.js.
    `row-gap` dibuat lebih lega dari `column-gap` supaya kalau baris
    terpaksa pindah ke bawah (chapter panjang / layar HP sempit), tidak
-   terlihat terlalu berdempetan antar barisnya. Target tekan (tombol
-   nomor) juga dibuat cukup besar untuk jari di HP (lihat media query
-   di bawah), & renderVerseJumpBar() otomatis pindah baris paksa
-   setiap 15 nomor (lihat .verse-jump-row-break) supaya barisnya tidak
-   pernah kepanjangan di layar sempit.
+   terlihat terlalu berdempetan antar barisnya. Target tekan (baik
+   nomor besar maupun titik kecil) dibuat cukup besar untuk jari di HP
+   (lihat media query di bawah) -- flex-wrap alami yang mengatur
+   pindah barisnya, mengikuti lebar layar.
    ============================================================ */
 .verse-jump-bar {
   display: flex; flex-wrap: wrap; align-items: center;
@@ -1171,15 +1222,23 @@ input { font-family: inherit; }
 }
 .verse-jump-num:hover { background: var(--paper); }
 .verse-jump-num.active { background: var(--petrol); color: #fff; }
-.verse-jump-dots { color: var(--ink-soft); font-size: 12px; user-select: none; padding: 0 1px; }
-/* Elemen "kosong" selebar penuh baris -- dipakai renderVerseJumpBar()
-   utk MEMAKSA pindah baris setiap 15 nomor (bukan menunggu flex-wrap
-   alami, yang jumlahnya bisa beda-beda tergantung lebar layar). */
-.verse-jump-row-break { flex-basis: 100%; height: 0; }
+/* Titik kecil (ayat "di antara" landmark) -- tampilan hanya "•" ringkas,
+   TAPI target sentuhnya (padding/min-width/min-height) dibuat sama
+   besarnya dengan tombol nomor di atas, supaya tetap gampang ditekan
+   jari di HP walau tampilannya kecil. */
+.verse-jump-dot {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 16px; line-height: 1; font-weight: 700; color: var(--ink-soft);
+  padding: 6px 8px; border-radius: 999px; min-width: 30px; min-height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.verse-jump-dot:hover { background: var(--paper); color: var(--ink); }
+.verse-jump-dot.active { background: var(--petrol); color: #fff; }
 
 @media (max-width: 640px) {
   .verse-jump-bar { row-gap: 12px; padding: 12px; }
   .verse-jump-num { min-width: 38px; min-height: 38px; font-size: 14px; padding: 8px 10px; }
+  .verse-jump-dot { min-width: 34px; min-height: 38px; font-size: 17px; padding: 8px 9px; }
 }
 
 /* Baris navigasi PER AYAT -- hanya muncul di mode "🔎 1 Ayat Saja". */
@@ -1482,6 +1541,13 @@ input { font-family: inherit; }
 .ai-chat-sources ul { margin: 6px 0 0; padding-left: 18px; }
 .ai-chat-sources li { margin-bottom: 4px; }
 .ai-chat-loading { font-style: italic; }
+/* Tombol "Salin" KEDUA, di bawah teks jawaban AI (lihat js/aichat.js) --
+   supaya di HP tidak perlu gulir balik ke atas untuk menyalin jawaban
+   yang panjang. Rata kanan, dipisah garis tipis dari teks di atasnya. */
+.ai-chat-bubble-foot {
+  display: flex; justify-content: flex-end; margin-top: 10px;
+  padding-top: 8px; border-top: 1px dashed var(--rule);
+}
 
 /* ------------------------------------------------------------
    KOTAK TULIS PERTANYAAN -- "menempel" di bagian bawah layar seperti
@@ -1545,4 +1611,37 @@ input { font-family: inherit; }
      yang justru bikin tidak nyaman diketik di HP. */
   .ai-chat-input-row textarea { min-height: 48px; }
   .ai-chat-send-btn { width: 48px; height: 48px; min-width: 48px; font-size: 20px; }
+}
+
+/* ============================================================
+   TOMBOL MELAYANG "TOP" -- saat membaca Alkitab & sudah scroll ke
+   bawah, muncul otomatis (lihat updateScrollTopFloatVisibility() di
+   js/app.js). Sengaja transparan (tidak solid) supaya tidak terlalu
+   menutupi teks ayat di baliknya, tulisan "TOP" saja biar ringkas.
+   Posisi kiri/kanan-bawah diatur lewat class .pos-left/.pos-right
+   (default kanan) yang ditambah/dilepas otomatis tergantung menu mana
+   yang sedang terbuka -- lihat updateScrollTopFloatPosition().
+   ============================================================ */
+.scroll-top-float {
+  position: fixed; bottom: 22px; z-index: 45;
+  width: 48px; height: 48px; border-radius: 999px;
+  border: 1.5px solid var(--rule);
+  background: rgba(250, 246, 238, 0.55);
+  color: var(--ink);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: opacity .18s ease, transform .18s ease, left .18s ease, right .18s ease;
+  opacity: 0; transform: translateY(8px); pointer-events: none;
+}
+.scroll-top-float.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+/* Default: kanan-bawah. */
+.scroll-top-float.pos-right { right: 18px; left: auto; }
+/* Menu ⋮ (kanan) sedang terbuka -> pindah ke kiri supaya tidak ketutupan. */
+.scroll-top-float.pos-left { left: 18px; right: auto; }
+.scroll-top-float:hover { background: rgba(250, 246, 238, 0.85); }
+@media (max-width: 640px) {
+  .scroll-top-float { bottom: max(18px, env(safe-area-inset-bottom, 0px)); width: 44px; height: 44px; font-size: 10px; }
 }
