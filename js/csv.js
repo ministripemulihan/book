@@ -235,6 +235,13 @@ function normalizeVerseRecord(rec) {
 // lagi): Plan, Start_Date, Last_Read_Day, Bahasa, Language, No Efata ID,
 // Saudara/i, Digembalakan, PB_Aktif, PB_Tanggal_Mulai, PB_Bahasa,
 // PB_History, PL_Aktif, PL_Tanggal_Mulai, PL_Bahasa, PL_History.
+//
+// Kolom "Tipe" (BARU): dipakai untuk membedakan pengguna "premium" dari
+// pengguna biasa -- SENGAJA ditambahkan sebagai kolom BARU di Sheet
+// Pengguna yang SAMA (bukan Sheet terpisah), supaya status premium tidak
+// tersebar di 2 tempat berbeda. Isi kolom ini dengan "premium" untuk
+// pengguna yang boleh melihat Riwayat AI Chat (lihat js/aichat.js dan
+// apps-script/AiChatCode.gs); kosong / nilai lain = pengguna biasa.
 function normalizeUserRecord(rec) {
   const get = (...keys) => {
     for (const k of keys) {
@@ -246,8 +253,13 @@ function normalizeUserRecord(rec) {
   return {
     username: rawUsername.toLowerCase(), // kunci pencocokan tidak peka huruf besar/kecil
     displayName: (get("nama", "name", "display name", "nama tampilan") || rawUsername).trim(),
-    password: get("password", "sandi", "kata sandi"),
+    // .trim() (BARU) -- CSV publikasi Google Sheets kadang menyisipkan
+    // spasi/​whitespace tak terlihat di sekitar nilai sel; tanpa trim ini,
+    // login bisa gagal "password salah" padahal terlihat sama persis di
+    // Sheet maupun yang diketik pengguna.
+    password: (get("password", "sandi", "kata sandi") || "").trim(),
     levels: parseLevelsField(get("level", "levels", "jenjang", "jabatan")),
+    userType: parseUserTypeField(get("tipe", "tipe user", "tipe pengguna", "type", "user type", "membership", "paket")),
     extra: {
       plan: get("plan"),
       startDate: get("start_date", "start date", "tanggal mulai"),
@@ -267,6 +279,15 @@ function normalizeUserRecord(rec) {
       plHistory: get("pl_history", "pl history"),
     },
   };
+}
+
+// Mengubah isi kolom "Tipe" jadi "premium" atau "" (biasa). Longgar terhadap
+// variasi tulisan (huruf besar/kecil, spasi berlebih, mis. "Premium",
+// " PREMIUM ") -- nilai lain (kosong, "biasa", "reguler", dst.) semuanya
+// dianggap pengguna biasa (bukan error, cukup dianggap tidak premium).
+function parseUserTypeField(raw) {
+  const v = (raw || "").trim().toLowerCase();
+  return v === "premium" ? "premium" : "";
 }
 
 // Mengubah isi kolom "Level" (boleh lebih dari satu, dipisah koma / titik
