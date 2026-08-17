@@ -5522,7 +5522,28 @@ function initUIEvents() {
     el("moreMenu").hidden = true;
     try {
       await syncUsersFromServer();
+      // PENTING: syncUsersFromServer() cuma menulis data BARU (termasuk
+      // kolom "Tipe"/premium & "Level") ke penyimpanan lokal (IndexedDB) --
+      // tidak otomatis menyegarkan currentUserLevels/currentUserType milik
+      // sesi yang SEDANG login di memori. Tanpa baris ini, pengguna yang
+      // baru saja ditandai "premium" di Sheet TIDAK akan melihat tab
+      // "🕘 Riwayat" atau perubahan level lain sampai logout-login ulang,
+      // walau tombol ini sudah menarik data terbaru. Lihat isPremiumUser()
+      // di js/levels.js & renderAiChatPanel() di js/aichat.js.
+      if (currentUser) await resolveCurrentUserLevels(currentUser);
       updateStatusPanel();
+      // Kalau panel AI Chat sedang terbuka saat resync ini ditekan, gambar
+      // ulang supaya tab "🕘 Riwayat" langsung muncul/hilang sesuai status
+      // premium TERBARU tanpa perlu menutup-buka panel lagi. Cache riwayat
+      // lama (_aiChatState.historySessions) dikosongkan supaya kalau tab
+      // Riwayat dibuka, datanya ditarik ulang dari server (bukan basi).
+      if (el("aiChatPanel") && !el("aiChatPanel").hidden && typeof renderAiChatPanel === "function") {
+        if (typeof _aiChatState !== "undefined") {
+          _aiChatState.historySessions = null;
+          _aiChatState.historyError = "";
+        }
+        renderAiChatPanel();
+      }
       alert("Daftar pengguna berhasil disinkronkan ulang.");
     } catch (e) {
       alert("Gagal menyinkronkan daftar pengguna: " + e.message);
