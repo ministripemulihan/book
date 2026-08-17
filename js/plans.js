@@ -67,10 +67,32 @@ function loadPlan(username) {
   }
 }
 
+// PENTING -- kenapa dulu tersimpan "Masukan Anda melebihi jumlah maksimum
+// 50000 karakter dalam satu sel": untuk rencana berbasis Bacaan Bersuara
+// (plan.mediaSheetKey terisi), plan.schedule berisi objek LENGKAP per hari
+// (label + link MP3/MP4/YouTube) untuk SEMUA hari (bisa 365-730 hari) --
+// begitu di-JSON.stringify ukurannya jauh melebihi batas 50.000 karakter
+// per sel Google Sheets (lihat saveProgress_ di apps-script/Code.gs), jadi
+// SETIAP kali satu hari dicentang (savePlan dipanggil), pengiriman ke
+// server gagal dengan pesan itu. Padahal schedule ini TIDAK PERLU dikirim
+// ke server sama sekali -- isinya bisa dibangun ulang kapan saja dari
+// sheet Bacaan Bersuara aslinya lewat mediaSheetKey (lihat
+// buildMediaPlan()/resyncMediaPlan() di js/media.js). Jadi: yang dikirim
+// ke server untuk rencana media HANYA planId/label/days/startDate/
+// mediaSheetKey/completed (kecil, aman) -- "schedule" dikosongkan di sisi
+// server saja, salinan LENGKAP tetap ada di localStorage perangkat ini
+// supaya tampilan tetap instan. Rencana baca biasa (bukan media) tetap
+// dikirim apa adanya seperti sebelumnya (isinya hanya {bookNum,chapter},
+// jauh lebih kecil, tidak pernah mendekati batas 50.000).
+function toRemoteSafePlan_(plan) {
+  if (!plan.mediaSheetKey) return plan;
+  return Object.assign({}, plan, { schedule: [] });
+}
+
 function savePlan(username, plan) {
   plan.updatedAt = new Date().toISOString();
   localStorage.setItem(planStorageKey(username), JSON.stringify(plan));
-  if (typeof Sync !== "undefined") Sync.pushProgress(username, plan);
+  if (typeof Sync !== "undefined") Sync.pushProgress(username, toRemoteSafePlan_(plan));
 }
 
 function clearPlan(username) {
@@ -81,12 +103,28 @@ function clearPlan(username) {
 // Menarik progres rencana baca dari Google Sheet dan menggabungkannya
 // dengan data lokal — yang paling baru (updatedAt) yang dipakai.
 // Dipanggil diam-diam setelah login, dan setiap kali panel rencana dibuka.
+// Untuk rencana media (mediaSheetKey terisi), "schedule" dari server sudah
+// SENGAJA dikosongkan (lihat toRemoteSafePlan_ di atas) -- jadi begitu
+// data remote dipakai, schedule-nya dibangun ulang di sini dari sheet
+// Bacaan Bersuara aslinya (lewat buildMediaScheduleFromRows di
+// js/media.js) supaya panel Rencana Baca tetap bisa tampil lengkap +
+// link MP3/MP4/YouTube-nya, bukan cuma daftar kosong.
 async function refreshPlanFromRemote(username) {
   if (typeof Sync === "undefined" || !Sync.enabled()) return;
   const remote = await Sync.pullProgress(username);
   if (!remote || !remote.planId) return;
   const local = loadPlan(username);
   if (!local || !local.updatedAt || new Date(remote.updatedAt) > new Date(local.updatedAt)) {
+    if (remote.mediaSheetKey && (!remote.schedule || !remote.schedule.length) && typeof resyncMediaPlan === "function") {
+      try {
+        await resyncMediaPlan(remote); // mengisi remote.schedule dari sheet asli, completed dicocokkan per-index
+      } catch (e) {
+        // offline / sheet Bacaan Bersuara ini sedang tidak bisa diakses --
+        // biarkan schedule kosong dulu, tetap simpan progres centangnya
+        // (completed) supaya tidak hilang; nanti otomatis lengkap lagi
+        // begitu panel dibuka saat online.
+      }
+    }
     localStorage.setItem(planStorageKey(username), JSON.stringify(remote));
   }
 }
