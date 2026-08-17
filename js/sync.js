@@ -111,9 +111,24 @@ const Sync = {
   },
 
   // ---------------- Pengumuman (hanya administrator yang menulis) ----------------
-  async pullAnnouncements() {
+  // PENTING -- kenapa dulu selalu muncul "Gagal memuat pengumuman" dengan
+  // detail teknis "username wajib diisi": doGet() di apps-script/Code.gs
+  // MEWAJIBKAN parameter "username" di SEMUA jenis permintaan (?type=...),
+  // termasuk "announcements" -- lihat baris paling atas doGet() ("if
+  // (!username) return ... username wajib diisi"). Tapi fungsi ini
+  // (dan pullAnnouncementsChecked() di bawah) TIDAK PERNAH mengirim
+  // "username" sama sekali, beda dari pullNotes/pullProgress/pullSettings
+  // yang semuanya sudah benar mengirim username. Akibatnya server SELALU
+  // menolak permintaan pengumuman lebih dulu sebelum sempat membaca isi
+  // Sheet-nya sama sekali -- apa pun isi Sheet Announcements-nya, pesan
+  // "Gagal memuat pengumuman" akan selalu muncul. Perbaikannya: kirim
+  // "username" juga di sini, sama seperti endpoint lain (nilainya tidak
+  // dipakai untuk menyaring ISI daftar pengumuman -- server tetap
+  // mengirim semua pengumuman ke siapa pun yang login -- hanya supaya
+  // lolos pengecekan wajib di doGet()).
+  async pullAnnouncements(username) {
     try {
-      const data = await this._get({ type: "announcements" });
+      const data = await this._get({ type: "announcements", username: username || "" });
       return (data && data.ok && data.announcements) || [];
     } catch (e) {
       return [];
@@ -130,9 +145,9 @@ const Sync = {
   // (bukan dibuang) supaya lebih mudah didiagnosa daripada pesan
   // generik "periksa sambungan internet" yang bisa menyesatkan kalau
   // penyebabnya sebenarnya bukan soal internet sama sekali.
-  async pullAnnouncementsChecked() {
+  async pullAnnouncementsChecked(username) {
     try {
-      const data = await this._get({ type: "announcements" });
+      const data = await this._get({ type: "announcements", username: username || "" });
       if (data && data.ok) return { ok: true, list: data.announcements || [] };
       return { ok: false, list: [], error: (data && data.error) || "" };
     } catch (e) {
