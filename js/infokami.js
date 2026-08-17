@@ -23,10 +23,10 @@
 //  daftar bawaan INFO_KAMI_FALLBACK di bawah -- supaya panel ini
 //  tidak pernah tampil kosong total.
 // ============================================================
-const INFO_KAMI_CACHE_KEY = "bible_app_infokami_cache_v1";
-const INFO_KAMI_FONT_KEY = "bible_app_infokami_font_scale_v1";
+const INFO_KAMI_CACHE_KEY = "bible_app_infokami_cache_v2";
+const INFO_KAMI_FONT_KEY = "bible_app_infokami_font_scale_v2";
 const INFO_KAMI_FONT_MIN = 0.8;
-const INFO_KAMI_FONT_MAX = 1.8;
+const INFO_KAMI_FONT_MAX = 3.8;
 
 const INFO_KAMI_FALLBACK = [
   { key: "versi", label: "Versi Aplikasi", value: "2026.08.17" },
