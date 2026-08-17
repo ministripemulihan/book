@@ -1544,8 +1544,21 @@ function onDocClickCloseHighlightPopup(e) {
 
 // Menerapkan (atau menghapus, kalau color = null) warna highlight ke
 // blok ayat + menyimpannya secara lokal lewat js/highlights.js.
+const HIGHLIGHT_COLORS = [
+  { key: "yellow", label: "Kuning" },
+  { key: "green", label: "Hijau" },
+  { key: "blue", label: "Biru" },
+  { key: "pink", label: "Pink" },
+  { key: "purple", label: "Ungu" },
+  { key: "orange", label: "Oranye" },
+  { key: "teal", label: "Tosca" },
+  { key: "coral", label: "Salem" },
+  { key: "gray", label: "Abu-abu" },
+  { key: "cream", label: "Krem" },
+];
+
 function applyVerseHighlight(block, v, color) {
-  ["hl-yellow", "hl-green", "hl-blue"].forEach((c) => block.classList.remove(c));
+  HIGHLIGHT_COLORS.forEach((c) => block.classList.remove("hl-" + c.key));
   if (color) block.classList.add("hl-" + color);
   setVerseHighlight(currentUser, v.id, color);
 }
@@ -1559,13 +1572,8 @@ function openHighlightPopup(anchorEl, block, v) {
   popup.setAttribute("aria-label", "Pilih warna highlight ayat " + v.verse);
 
   const current = getVerseHighlight(currentUser, v.id);
-  const colors = [
-    { key: "yellow", label: "Kuning" },
-    { key: "green", label: "Hijau" },
-    { key: "blue", label: "Biru" },
-  ];
 
-  colors.forEach((c) => {
+  HIGHLIGHT_COLORS.forEach((c) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "hl-swatch hl-swatch-" + c.key + (current === c.key ? " hl-swatch-active" : "");
@@ -4577,8 +4585,16 @@ const THEMES = [
 ];
 
 function applyTheme(id) {
-  for (let i = 2; i <= 17; i++) document.body.classList.remove("theme-" + i);
-  if (id && id !== 1) document.body.classList.add("theme-" + id);
+  // PENTING: class tema dipasang di <html> (document.documentElement),
+  // BUKAN di <body>. Variabel CSS (--paper, --ink, dst.) cuma mengalir
+  // ke bawah lewat DOM, jadi kalau class cuma di <body>, elemen <html>
+  // tetap memakai warna tema lama -- itulah sebabnya dulu cuma
+  // "separuh layar bagian atas" yang kelihatan berubah warna, terutama
+  // di komputer/layar lebar. Dipasang di <html> supaya seluruh layar
+  // (termasuk area di luar kotak <body>) ikut berubah.
+  const root = document.documentElement;
+  for (let i = 2; i <= 17; i++) root.classList.remove("theme-" + i);
+  if (id && id !== 1) root.classList.add("theme-" + id);
   localStorage.setItem(THEME_STORAGE_KEY, id);
   document.querySelectorAll("#themePicker .theme-swatch").forEach((btn) => {
     btn.classList.toggle("active", parseInt(btn.dataset.theme, 10) === id);
