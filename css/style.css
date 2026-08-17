@@ -1537,6 +1537,38 @@ input { font-family: inherit; }
    ============================================================ */
 .ai-chat-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
 .ai-chat-toggle { margin-bottom: 14px; }
+/* Baris judul + tombol "🆕 Percakapan Baru" (lihat renderAiChatPanel() di
+   js/aichat.js) -- dipisah dari tab "💬 Percakapan"/"🕘 Riwayat" (yang
+   memakai .curhat-tabs, hanya muncul untuk pengguna premium) supaya
+   tombol Percakapan Baru selalu terlihat untuk SEMUA pengguna. */
+.ai-chat-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.ai-chat-tabs { margin-bottom: 14px; }
+
+/* ------------------------------------------------------------
+   🕘 TAB "RIWAYAT" (khusus pengguna premium) -- daftar sesi percakapan
+   lama, tiap sesi bisa dibuka/tutup (accordion, elemen <details>),
+   berisi giliran tanya-jawab + sumber referensinya (lihat
+   renderAiChatHistoryView() di js/aichat.js).
+   ------------------------------------------------------------ */
+.ai-chat-history-view { max-height: 70vh; overflow-y: auto; }
+.ai-chat-history-session {
+  border: 1px solid var(--rule); border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 10px; background: var(--paper-raised);
+}
+.ai-chat-history-session summary {
+  cursor: pointer; font-weight: 600; color: var(--petrol);
+}
+.ai-chat-history-turns { margin-top: 10px; display: flex; flex-direction: column; gap: 14px; }
+.ai-chat-history-turn {
+  border-top: 1px dashed var(--rule); padding-top: 10px;
+}
+.ai-chat-history-turn:first-child { border-top: none; padding-top: 0; }
+.ai-chat-history-q { margin-bottom: 6px; line-height: 1.5; }
+.ai-chat-history-a { line-height: 1.5; }
+.ai-chat-history-a strong, .ai-chat-history-q strong { color: var(--ink-soft); }
 .ai-chat-thread {
   display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px;
   max-height: 55vh; overflow-y: auto; padding-right: 4px;
