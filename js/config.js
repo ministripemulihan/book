@@ -43,7 +43,7 @@ const CONFIG = {
   // apa adanya (teks biasa) di Google Sheet dan di penyimpanan lokal browser.
   // Cocok untuk keperluan pribadi/keluarga/jemaat, JANGAN dipakai untuk data rahasia,
   // dan jangan pakai password yang juga dipakai di akun penting lain.
-  USERS_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOz8kNKgnf0DVhVNP9PxI-8h9BgaNcVQA8IN0L5ZrV2ko0ms21GHA2WJZs4fWhqnJskDhbnt7e1mT8/pub?output=csv",
+  USERS_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZjIx2UlpNYullJPAjYBD-32FAX0FZyARGCE-PfEwTArW4GESHyyXqXqutkhL4GqSsTfUD2AyhqH_i/pub?output=csv",
                         
   // ----------------------------------------------------------
   // 3) SINKRONISASI CATATAN & PROGRES RENCANA BACA — Google Apps Script
