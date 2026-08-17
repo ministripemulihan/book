@@ -23,17 +23,18 @@
 //  daftar bawaan INFO_KAMI_FALLBACK di bawah -- supaya panel ini
 //  tidak pernah tampil kosong total.
 // ============================================================
-const INFO_KAMI_CACHE_KEY = "bible_app_infokami_cache_v2";
-const INFO_KAMI_FONT_KEY = "bible_app_infokami_font_scale_v2";
+const INFO_KAMI_CACHE_KEY = "bible_app_infokami_cache_v1";
+const INFO_KAMI_FONT_KEY = "bible_app_infokami_font_scale_v1";
 const INFO_KAMI_FONT_MIN = 0.8;
-const INFO_KAMI_FONT_MAX = 3.8;
+const INFO_KAMI_FONT_MAX = 1.8;
 
 const INFO_KAMI_FALLBACK = [
   { key: "versi", label: "Versi Aplikasi", value: "2026.08.17" },
   { key: "amanat_kami", label: "Amanat Kami", value: "Firman Tuhan menyebar ke Seluruh Indonesia" },
   { key: "misi_kami", label: "Misi Kami", value: "Misi Kami membuat Firman Tuhan hidup  di dalam hidup orang Kristen" },
+  { key: "harapan_kami", label: "Harapan Kami", value: "Harapan Kami membuat Firman Tuhan terus bertumbuh di dalam hidup orang Kristen" },
   { key: "donasi", label: "Anda Bisa Donasi di", value: "Persembahan Anda bisa mencantumkan biaya keperluan Pembuatan Website ke BCA 0108387800 an Gereja Sidang Jemaat Kristus dengan isi: pembuatan Website AI" },
-  { key: "dibuat_dari", label: "Dibuat oleh", value: "Para Aktivis Pencinta Tuhan approved by Robbin Tanzil" },
+  { key: "dibuat_dari", label: "Dibuat oleh", value: "Para Aktivis Pencinta Tuhan" },
   { key: "sumber_alkitab", label: "Sumber Alkitab diambil dari", value: "Alkitab Versi Pemulihan TB1, dan seterusnya" },
   { key: "ai_chat", label: "AI Chat", value: "Ditenagai oleh Gemini AI.\n\nVersi Gratis (Free): untuk pengguna dengan Plan reguler.\nVersi Premium (Pro): untuk pengguna dengan Plan Premium, kemampuan AI Chat lebih tinggi." },
 ];
@@ -158,7 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ov = document.getElementById("infoKamiOverlay");
     if (ov && !ov.hidden) InfoKami.close();
   });
-  // Tombol menu "ℹ️ Info Kami" DI DALAM aplikasi (setelah login) dipasang 
+  // Tombol menu "ℹ️ Info Kami" DI DALAM aplikasi (setelah login) dipasang
   // di js/app.js (initUIEvents) supaya bisa ikut menutup menu ⋮ &
   // sidebar HP seperti tombol menu lain -- lihat "infoKamiBtn" di sana.
 });
