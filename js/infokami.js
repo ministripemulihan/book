@@ -29,13 +29,13 @@ const INFO_KAMI_FONT_MIN = 0.8;
 const INFO_KAMI_FONT_MAX = 1.8;
 
 const INFO_KAMI_FALLBACK = [
-  { key: "versi", label: "Versi Aplikasi", value: "1.0.0" },
-  { key: "amanat_kami", label: "Amanat Kami", value: "" },
-  { key: "misi_kami", label: "Misi Kami", value: "" },
-  { key: "donasi", label: "Anda Bisa Donasi di", value: "" },
-  { key: "dibuat_dari", label: "Dibuat oleh", value: "Para Aktivis Pencinta Tuhan" },
+  { key: "versi", label: "Versi Aplikasi", value: "2026.08.17" },
+  { key: "amanat_kami", label: "Amanat Kami", value: "Firman Tuhan menyebar ke Seluruh Indonesia" },
+  { key: "misi_kami", label: "Misi Kami", value: "Misi Kami membuat Firman Tuhan hidup  di dalam hidup orang Kristen" },
+  { key: "donasi", label: "Anda Bisa Donasi di", value: "Persembahan Anda bisa mencantumkan biaya keperluan Pembuatan Website ke BCA 0108387800 an Gereja Sidang Jemaat Kristus dengan isi: pembuatan Website AI" },
+  { key: "dibuat_dari", label: "Dibuat oleh", value: "Para Aktivis Pencinta Tuhan approved by Robbin Tanzil" },
   { key: "sumber_alkitab", label: "Sumber Alkitab diambil dari", value: "Alkitab Versi Pemulihan TB1, dan seterusnya" },
-  { key: "ai_chat", label: "AI Chat", value: "Ditenagai oleh Gemini AI." },
+  { key: "ai_chat", label: "AI Chat", value: "Ditenagai oleh Gemini AI.\n\nVersi Gratis (Free): untuk pengguna dengan Plan reguler.\nVersi Premium (Pro): untuk pengguna dengan Plan Premium, kemampuan AI Chat lebih tinggi." },
 ];
 
 const InfoKami = {
