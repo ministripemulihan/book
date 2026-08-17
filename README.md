@@ -71,6 +71,17 @@ Buat **Google Sheet baru yang berbeda**, dengan kolom:
 - **Nama** boleh dikosongkan (kalau kosong, Username yang ditampilkan).
 - Satu baris = satu akun.
 
+Kolom opsional tambahan yang dikenali aplikasi (boleh ditambahkan kapan
+saja tanpa mengganggu kolom yang sudah ada):
+
+- **Level** — jenjang pengguna (administrator, penatua, dst.), lihat
+  bagian "Update terbaru: level pengguna…" di bawah.
+- **Tipe** — (BARU, lihat "tahap 12" di bawah) isi `premium` untuk
+  pengguna yang boleh membuka tab "🕘 Riwayat" di dalam AI Chat. Kosong
+  atau nilai lain = pengguna biasa. Kolom ini **ditambahkan ke Sheet
+  Pengguna yang sama** (bukan Sheet terpisah), supaya status premium
+  tidak tersebar di 2 tempat berbeda.
+
 Contoh (lihat juga `sample-users.csv` di dalam paket ini):
 
 | Username | Password      | Nama          |
@@ -963,8 +974,12 @@ bible-app/
 ├── js/plans.js           definisi rencana baca, pembuatan jadwal, penyimpanan progres
 ├── js/media.js           bacaan bersuara harian (MP3/MP4/YouTube per rentang ayat) + rencana baca darinya
 ├── js/outlines.js        Pokok Kitab / Garis Besar berjenjang / Peta+Gambar per kitab (fetch+cache+helper tampilan)
+├── js/curhat.js          Curhat Domba & Gembala (panel terpisah)
+├── js/aichat.js          AI Chat Gembala + tab "🕘 Riwayat" khusus premium (panel terpisah)
 ├── js/app.js             logika utama aplikasi (login, baca, cari, rencana baca, TTS, progres membaca, dll)
-├── apps-script/Code.gs   backend Google Apps Script untuk sinkronisasi (opsional, lihat di atas)
+├── apps-script/Code.gs         backend Google Apps Script untuk sinkronisasi (opsional, lihat di atas)
+├── apps-script/CurhatCode.gs   backend TERPISAH untuk Curhat Domba & Gembala (Sheet & deployment sendiri)
+├── apps-script/AiChatCode.gs   backend TERPISAH untuk AI Chat Gembala + Riwayat premium (Sheet & deployment sendiri)
 ├── sample-data.csv       contoh data Alkitab untuk uji coba lokal
 ├── sample-users.csv      contoh data pengguna untuk uji coba lokal
 └── vercel.json           konfigurasi hosting Vercel
@@ -1067,3 +1082,57 @@ bible-app/
    disinkronkan dan bisa terus bertambah isinya. Naikkan lagi angka ini
    di `js/config.js` kalau total ukurannya membengkak jauh dari itu.
    - Berkas: `js/config.js`.
+
+## Update lanjutan (Agustus 2026, tahap 12) — Riwayat AI Chat khusus pengguna Premium
+
+1. **Kolom BARU "Tipe" di Sheet Pengguna (Sheet #2)** — dipakai untuk
+   menandai pengguna sebagai `premium` atau biasa. SENGAJA ditambahkan
+   sebagai kolom baru di Sheet Pengguna yang **sudah ada**, bukan Sheet
+   terpisah, supaya status premium tidak tersebar di 2 tempat berbeda.
+   Kosong/nilai lain = pengguna biasa (tidak error).
+   - Berkas: `js/csv.js` (`parseUserTypeField()`, dipanggil dari
+     `normalizeUserRecord()` — hasilnya disimpan sebagai `userType` di
+     objek akun lokal), `js/levels.js` (`currentUserType`,
+     `isPremiumUser()` — diisi dari `resolveCurrentUserLevels()`, sama
+     seperti `currentUserLevels`), `sample-users.csv` (contoh kolom
+     `Tipe`, akun `admin` dicontohkan sebagai `premium`).
+2. **Tab BARU "🕘 Riwayat" di dalam panel AI Chat Gembala — HANYA
+   tampil untuk pengguna premium.** Menampilkan daftar sesi percakapan
+   lama (sesi terbaru di atas), tiap sesi bisa dibuka/tutup dan berisi
+   daftar pasangan pertanyaan-jawaban lengkap dengan referensi/sumber
+   yang dipakai tiap jawaban (ayat, catatan kaki, Pokok Kitab/Garis
+   Besar, atau pengetahuan tambahan AI) — persis format sumber yang
+   sudah ada di layar percakapan biasa. Read-only (tidak bisa
+   melanjutkan percakapan lama dari sini).
+   - Berkas: `js/aichat.js` (`renderAiChatHistoryView()`,
+     `AI_CHAT_SOURCE_KIND_LABEL` dipindah ke lingkup modul supaya
+     dipakai bersama oleh layar percakapan & Riwayat).
+3. **Tombol BARU "🆕 Percakapan Baru"** di header panel AI Chat —
+   tersedia untuk SEMUA pengguna yang boleh membuka AI Chat (bukan cuma
+   premium). Mengosongkan layar percakapan yang sedang tampil & memulai
+   SessionID baru untuk giliran tanya-jawab berikutnya. Riwayat LAMA
+   yang sudah tersimpan **tidak ikut terhapus** — kalau ingin benar-benar
+   memulai dari nol tanpa riwayat menumpuk di satu sesi panjang, tinggal
+   tekan tombol ini kapan saja; kalau tidak ingin menyimpan riwayat sama
+   sekali, cukup jangan berstatus premium (lihat poin 4).
+   - Berkas: `js/aichat.js` (`startNewAiChat()`, `genAiChatSessionId()`).
+4. **Sheet BARU & TERPISAH "AiChatHistory"** — dibuat OTOMATIS oleh
+   `apps-script/AiChatCode.gs` di Spreadsheet yang sama tempat skrip itu
+   terpasang (pola yang sama seperti tab `Curhat`/`CurhatRatings` di
+   `apps-script/CurhatCode.gs`), TIDAK perlu dibuat manual. Kolom: `ID |
+   Username | SessionID | Waktu | Pertanyaan | Jawaban | Sumber` (kolom
+   Sumber berisi teks JSON daftar referensi). Pengguna **biasa (bukan
+   premium) TIDAK disimpan riwayatnya sama sekali** — dicek ULANG di
+   server (bukan cuma di aplikasi) sebelum menulis ke Sheet ini, supaya
+   tidak bisa "diakali" dari sisi browser.
+   - Berkas: `apps-script/AiChatCode.gs` (`getAiChatHistorySheet_()`,
+     `isPremiumUser_()`, endpoint baru `ai_chat_save` &
+     `ai_chat_history`, dipanggil lewat `AiChatSync.saveHistory()` /
+     `AiChatSync.getHistory()` di `js/aichat.js`).
+   - **Kalau AiChatCode.gs sudah pernah di-deploy sebelumnya**: tempel
+     ulang SELURUH isi file terbaru ke editor Apps Script Anda, lalu
+     "Deploy" → "Manage deployments" → ikon pensil → Version: "New
+     version" → Deploy (JANGAN buat deployment baru, supaya URL yang
+     sudah ada di `CONFIG.AI_CHAT_APPS_SCRIPT_URL` tetap berlaku). Tab
+     `AiChatHistory` akan otomatis dibuat sendiri saat pertama kali ada
+     yang menyimpan riwayat — tidak perlu dibuat manual.
