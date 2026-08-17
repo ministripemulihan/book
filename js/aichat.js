@@ -13,6 +13,26 @@
 //      KECUALI kalau tombol "🌐 Izinkan referensi luar" dinyalakan.
 //   4) Jawaban tampil di layar dengan tombol salin untuk pertanyaan
 //      maupun jawaban.
+//
+//  🕘 RIWAYAT AI CHAT (BARU, khusus pengguna "premium" -- lihat kolom
+//  "Tipe" di Sheet Pengguna & isPremiumUser() di js/levels.js):
+//   - Menu ⋮ di dalam panel AI Chat sekarang punya tab TAMBAHAN
+//     "🕘 Riwayat" (HANYA muncul untuk pengguna premium) yang menampilkan
+//     daftar pertanyaan & jawaban AI sebelumnya, LENGKAP dengan
+//     referensi/sumber yang dipakai tiap jawaban -- disimpan di Sheet
+//     BARU & TERPISAH ("AiChatHistory", dibuat otomatis oleh
+//     apps-script/AiChatCode.gs di Spreadsheet yang sama tempat skrip
+//     itu terpasang), BUKAN di Sheet Alkitab maupun Sheet Pengguna.
+//   - Tombol "🆕 Percakapan Baru" mengosongkan layar percakapan yang
+//     sedang tampil (mulai sesi/SessionID baru) -- riwayat LAMA yang
+//     sudah tersimpan TIDAK terhapus, cuma layar depannya yang bersih,
+//     supaya orang yang tidak ingin percakapannya "menumpuk" di satu
+//     sesi panjang bisa mulai dari nol kapan saja.
+//   - Pengguna BUKAN premium: percakapannya tetap berjalan normal
+//     seperti biasa, HANYA saja tidak ada yang tersimpan ke Sheet
+//     Riwayat sama sekali (tidak ada tab "Riwayat", tidak ada
+//     permintaan simpan dikirim ke server) -- percakapan hilang begitu
+//     panel ditutup/dimuat ulang, persis seperti sebelum fitur ini ada.
 // ============================================================
 
 const AiChatSync = {
@@ -28,7 +48,39 @@ const AiChatSync = {
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
   },
+  // Simpan SATU giliran tanya-jawab (+ sumber) ke Sheet Riwayat -- HANYA
+  // berpengaruh kalau pengguna ini "premium" (dicek ULANG di server,
+  // lihat isPremiumUser_() di apps-script/AiChatCode.gs); dipanggil
+  // "fire-and-forget" (lihat handleAiChatAsk() di bawah) supaya gagal
+  // simpan tidak pernah mengganggu jawaban yang sudah tampil di layar.
+  async saveHistory({ username, sessionId, question, answer, sources }) {
+    const res = await fetch(CONFIG.AI_CHAT_APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ type: "ai_chat_save", username, sessionId, question, answer, sources }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  },
+  // Ambil seluruh riwayat (dikelompokkan per sesi) milik pengguna ini.
+  async getHistory({ username }) {
+    const res = await fetch(CONFIG.AI_CHAT_APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ type: "ai_chat_history", username }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  },
 };
+
+// Nomor sesi percakapan BARU (dipakai untuk mengelompokkan giliran
+// tanya-jawab yang tersimpan ke Riwayat -- lihat AiChatSync.saveHistory()
+// di atas & startNewAiChat() di bawah). Formatnya sengaja tidak perlu unik
+// sekali secara global, cukup unik per perangkat/waktu.
+function genAiChatSessionId() {
+  return "sesi_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+}
 
 function isAiChatAllowed() {
   const allowed = CONFIG.AI_CHAT_LEVELS || CONFIG.CURHAT_GEMBALA_LEVELS || [];
@@ -422,7 +474,35 @@ async function gatherAiChatContext(question) {
   };
 }
 
-const _aiChatState = { allowExternal: false, history: [], busy: false };
+const _aiChatState = {
+  allowExternal: false,
+  history: [],
+  busy: false,
+  // "chat" = layar percakapan biasa, "history" = tab "🕘 Riwayat" (khusus
+  // premium, lihat renderAiChatHistoryView() di bawah).
+  view: "chat",
+  sessionId: genAiChatSessionId(),
+  // Cache hasil AiChatSync.getHistory() supaya tidak fetch ulang tiap kali
+  // berpindah tab bolak-balik di panel yang sama -- dikosongkan lagi
+  // (null) setiap kali panel AI Chat ditutup & dibuka ulang (lihat
+  // showAiChatPanel()), supaya riwayat baru tetap ikut kebaca.
+  historySessions: null,
+  historyLoading: false,
+  historyError: "",
+};
+
+// Mulai percakapan BARU: mengosongkan layar yang tampil & memakai
+// SessionID baru untuk giliran tanya-jawab berikutnya (lihat komentar
+// besar di atas file ini). Riwayat LAMA yang sudah tersimpan ke Sheet
+// (khusus pengguna premium) TIDAK ikut terhapus -- tetap bisa dibuka
+// lagi lewat tab "🕘 Riwayat".
+function startNewAiChat() {
+  if (_aiChatState.busy) return;
+  _aiChatState.history = [];
+  _aiChatState.sessionId = genAiChatSessionId();
+  _aiChatState.view = "chat";
+  renderAiChatPanel();
+}
 
 // ------------------------------------------------------------
 //  Format gaya WhatsApp untuk teks chat (dipakai untuk balon AI
@@ -456,10 +536,106 @@ function autoGrowAiChatTextarea(textarea) {
   textarea.style.height = Math.min(textarea.scrollHeight, max) + "px";
 }
 
+// ------------------------------------------------------------
+// 🕘 TAB "RIWAYAT" (khusus premium): daftar pertanyaan & jawaban AI
+// sebelumnya, dikelompokkan per sesi percakapan (sesi TERBARU di
+// paling atas), lengkap dengan referensi/sumber tiap jawaban -- data
+// diambil dari Sheet "AiChatHistory" lewat AiChatSync.getHistory().
+// Read-only (tidak bisa melanjutkan percakapan lama dari sini) --
+// untuk bertanya lagi, pindah ke tab "💬 Percakapan" atau tekan
+// "🆕 Percakapan Baru".
+// ------------------------------------------------------------
+async function renderAiChatHistoryView(container) {
+  const wrap = document.createElement("div");
+  wrap.className = "ai-chat-history-view";
+  container.appendChild(wrap);
+
+  if (_aiChatState.historySessions === null && !_aiChatState.historyLoading) {
+    _aiChatState.historyLoading = true;
+    _aiChatState.historyError = "";
+    AiChatSync.getHistory({ username: currentUser })
+      .then((data) => {
+        if (!data || !data.ok) throw new Error((data && data.error) || "Gagal mengambil riwayat");
+        _aiChatState.historySessions = data.sessions || [];
+      })
+      .catch((err) => {
+        _aiChatState.historySessions = [];
+        _aiChatState.historyError = String(err.message || err);
+      })
+      .finally(() => {
+        _aiChatState.historyLoading = false;
+        // Hanya gambar ulang kalau tab "Riwayat" masih yang sedang dibuka
+        // (pengguna mungkin sudah pindah tab lagi sebelum data ini datang).
+        if (_aiChatState.view === "history") renderAiChatPanel();
+      });
+  }
+
+  if (_aiChatState.historyLoading || _aiChatState.historySessions === null) {
+    wrap.innerHTML = `<p class="media-empty">🕘 Memuat riwayat percakapan…</p>`;
+    return;
+  }
+
+  if (_aiChatState.historyError) {
+    wrap.innerHTML = `<p class="media-empty">⚠️ ${escapeHtml(_aiChatState.historyError)}</p>`;
+    return;
+  }
+
+  const sessions = _aiChatState.historySessions;
+  if (!sessions.length) {
+    wrap.innerHTML = `<p class="media-empty">Belum ada riwayat percakapan tersimpan. Riwayat akan otomatis tersimpan di sini setiap kali Anda bertanya di tab "💬 Percakapan".</p>`;
+    return;
+  }
+
+  const SOURCE_KIND_LABEL = AI_CHAT_SOURCE_KIND_LABEL;
+  sessions.forEach((session) => {
+    const box = document.createElement("details");
+    box.className = "ai-chat-history-session";
+    const waktu = session.lastWaktu ? formatHistoryDate_(session.lastWaktu) : "";
+    box.innerHTML = `<summary>🕘 ${escapeHtml(waktu)} — ${session.turns.length} pertanyaan</summary>`;
+    const turnsWrap = document.createElement("div");
+    turnsWrap.className = "ai-chat-history-turns";
+    session.turns.forEach((turn) => {
+      const t = document.createElement("div");
+      t.className = "ai-chat-history-turn";
+      t.innerHTML = `
+        <div class="ai-chat-history-q"><strong>🙋 Pertanyaan:</strong> ${formatChatText(turn.question)}</div>
+        <div class="ai-chat-history-a"><strong>🤖 Jawaban:</strong> ${formatChatText(turn.answer)}</div>
+        ${turn.sources && turn.sources.length ? `
+          <details class="ai-chat-sources">
+            <summary>📖 ${turn.sources.length} sumber yang dipakai</summary>
+            <ul>${turn.sources.map((s) => `<li><span class="ai-chat-source-kind">${escapeHtml(SOURCE_KIND_LABEL[s.kind] || "📎 Sumber")}</span><br><strong>${escapeHtml(s.ref)}</strong> — ${escapeHtml(s.text)}</li>`).join("")}</ul>
+          </details>
+        ` : ""}
+      `;
+      turnsWrap.appendChild(t);
+    });
+    box.appendChild(turnsWrap);
+    wrap.appendChild(box);
+  });
+}
+
+// Format tanggal/waktu ISO dari Sheet jadi teks yang lebih enak dibaca,
+// mengikuti format tanggal/waktu Indonesia. Kalau gagal parse (mis. isi
+// sel tidak terduga), tampilkan apa adanya supaya tidak error di layar.
+function formatHistoryDate_(isoOrDate) {
+  try {
+    const d = new Date(isoOrDate);
+    if (isNaN(d.getTime())) return String(isoOrDate);
+    return d.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch (e) {
+    return String(isoOrDate);
+  }
+}
+
 async function showAiChatPanel() {
   hideAllPanels();
   el("aiChatPanel").hidden = false;
   logActivity("AI Chat Gembala");
+  // Riwayat mungkin sudah bertambah sejak terakhir panel ini dibuka (mis.
+  // dibuka dari perangkat lain) -- kosongkan cache supaya tab "🕘 Riwayat"
+  // fetch ulang dari server saat dibuka, bukan menampilkan data basi.
+  _aiChatState.historySessions = null;
+  _aiChatState.historyError = "";
   renderAiChatPanel();
 }
 
@@ -467,9 +643,10 @@ function renderAiChatPanel() {
   const container = el("aiChatPanel");
   container.innerHTML = "";
 
-  const title = document.createElement("h2");
-  title.textContent = "🤖 AI Chat Gembala";
-  container.appendChild(title);
+  const titleRow = document.createElement("div");
+  titleRow.className = "ai-chat-title-row";
+  titleRow.innerHTML = `<h2 style="margin:0;">🤖 AI Chat Gembala</h2>`;
+  container.appendChild(titleRow);
 
   if (!isAiChatAllowed()) {
     const p = document.createElement("p");
@@ -483,6 +660,49 @@ function renderAiChatPanel() {
     p.className = "media-empty";
     p.textContent = "Fitur ini belum diaktifkan. Isi dulu CONFIG.AI_CHAT_APPS_SCRIPT_URL di js/config.js (lihat cara pasang di apps-script/AiChatCode.gs).";
     container.appendChild(p);
+    return;
+  }
+
+  // Tombol "🆕 Percakapan Baru" -- untuk SEMUA pengguna yang boleh buka AI
+  // Chat (bukan cuma premium): mengosongkan layar percakapan yang sedang
+  // tampil supaya bisa mulai dari nol kapan saja. Untuk pengguna premium
+  // ini juga memisahkan giliran tanya-jawab berikutnya ke SessionID baru
+  // di Riwayat (lihat startNewAiChat()).
+  const newChatBtn = document.createElement("button");
+  newChatBtn.type = "button";
+  newChatBtn.className = "chip-btn small ai-chat-newchat-btn";
+  newChatBtn.textContent = "🆕 Percakapan Baru";
+  newChatBtn.title = "Mulai percakapan baru (layar dikosongkan)";
+  newChatBtn.addEventListener("click", startNewAiChat);
+  titleRow.appendChild(newChatBtn);
+
+  // Tab "🕘 Riwayat" -- HANYA muncul untuk pengguna "premium" (kolom
+  // "Tipe" di Sheet Pengguna, lihat isPremiumUser() di js/levels.js).
+  // Pengguna biasa tidak pernah melihat tab ini sama sekali, dan
+  // percakapannya memang tidak pernah disimpan ke Sheet Riwayat (lihat
+  // handleAiChatAsk() di bawah).
+  if (isPremiumUser()) {
+    const tabs = document.createElement("div");
+    tabs.className = "curhat-tabs ai-chat-tabs";
+    const chatTab = document.createElement("button");
+    chatTab.type = "button";
+    chatTab.className = "chip-btn" + (_aiChatState.view === "chat" ? " active" : "");
+    chatTab.textContent = "💬 Percakapan";
+    chatTab.addEventListener("click", () => { _aiChatState.view = "chat"; renderAiChatPanel(); });
+    tabs.appendChild(chatTab);
+
+    const historyTab = document.createElement("button");
+    historyTab.type = "button";
+    historyTab.className = "chip-btn" + (_aiChatState.view === "history" ? " active" : "");
+    historyTab.textContent = "🕘 Riwayat";
+    historyTab.addEventListener("click", () => { _aiChatState.view = "history"; renderAiChatPanel(); });
+    tabs.appendChild(historyTab);
+
+    container.appendChild(tabs);
+  }
+
+  if (_aiChatState.view === "history" && isPremiumUser()) {
+    renderAiChatHistoryView(container);
     return;
   }
 
@@ -547,22 +767,26 @@ function renderAiChatPanel() {
   });
 }
 
+// Label sumber di bawah jawaban AI, supaya pembaca langsung tahu asal
+// tiap referensi (lihat "kind" yang ditandai saat sumber dikumpulkan di
+// gatherAiChatContext()/aiKnowledgeRowsToContext()/
+// outlineContextAsSources() di atas). Dipakai bersama oleh
+// renderAiChatThread() (percakapan yang sedang berjalan) DAN
+// renderAiChatHistoryView() (tab "🕘 Riwayat", khusus premium).
+const AI_CHAT_SOURCE_KIND_LABEL = {
+  verse: "📖 Kutipan ayat",
+  note: "📝 Catatan kaki (kolom Note Sheet Alkitab)",
+  outline: "📋 Pokok Kitab / Garis Besar",
+  knowledge: "🤖 Referensi tambahan (kumpulan catatan AI yang di-inject)",
+};
+
 function renderAiChatThread(thread) {
   thread.innerHTML = "";
   if (!_aiChatState.history.length) {
     thread.innerHTML = `<p class="media-empty">Belum ada percakapan. Mulai dengan mengetik pertanyaan di bawah.</p>`;
     return;
   }
-  // Label sumber di bawah jawaban AI, supaya pembaca langsung tahu asal
-  // tiap referensi (lihat "kind" yang ditandai saat sumber dikumpulkan
-  // di gatherAiChatContext()/aiKnowledgeRowsToContext()/
-  // outlineContextAsSources() di atas).
-  const SOURCE_KIND_LABEL = {
-    verse: "📖 Kutipan ayat",
-    note: "📝 Catatan kaki (kolom Note Sheet Alkitab)",
-    outline: "📋 Pokok Kitab / Garis Besar",
-    knowledge: "🤖 Referensi tambahan (kumpulan catatan AI yang di-inject)",
-  };
+  const SOURCE_KIND_LABEL = AI_CHAT_SOURCE_KIND_LABEL;
 
   _aiChatState.history.forEach((turn, idx) => {
     const bubble = document.createElement("div");
@@ -611,6 +835,25 @@ function renderAiChatThread(thread) {
   thread.scrollTop = thread.scrollHeight;
 }
 
+// Simpan giliran tanya-jawab ini ke Riwayat -- HANYA kalau pengguna
+// sedang login berstatus premium (isPremiumUser(), lihat js/levels.js).
+// Dipanggil TANPA di-`await` di handleAiChatAsk() ("fire-and-forget"):
+// jawaban sudah tampil ke pengguna terlepas berhasil/gagalnya
+// penyimpanan ini, supaya koneksi lambat/gagal saat menyimpan riwayat
+// TIDAK PERNAH membuat jawaban yang sudah didapat terasa "nge-hang".
+function maybeSaveAiChatTurn(question, aiTurn) {
+  if (!isPremiumUser() || !AiChatSync.enabled()) return;
+  AiChatSync.saveHistory({
+    username: currentUser,
+    sessionId: _aiChatState.sessionId,
+    question,
+    answer: aiTurn.text,
+    sources: aiTurn.sources || [],
+  }).catch((err) => {
+    console.warn("Gagal menyimpan riwayat AI Chat:", err);
+  });
+}
+
 async function handleAiChatAsk(question) {
   _aiChatState.busy = true;
   _aiChatState.history.push({ role: "user", text: question });
@@ -632,18 +875,21 @@ async function handleAiChatAsk(question) {
     // sama persis dengan panel "📌 Pokok Alkitab — Semua Kitab" di menu.
     if (AI_CHAT_SHOW_ALL_POKOK_TRIGGER.test(question) && !detectBookInQuestion(question)) {
       const rows = await getAllPokokRows();
+      let aiTurn;
       if (!rows.length) {
-        _aiChatState.history.push({
+        aiTurn = {
           role: "ai",
           text: "Belum ada isi Pokok Kitab sama sekali (sheet Pokok Kitab masih kosong / belum disinkron).",
-        });
+        };
       } else {
-        _aiChatState.history.push({
+        aiTurn = {
           role: "ai",
           text: formatAllPokokAsText(rows),
           sources: rows.map((r) => ({ kind: "outline", ref: "📌 Pokok Kitab " + r.bookName, text: r.pokok })),
-        });
+        };
       }
+      _aiChatState.history.push(aiTurn);
+      maybeSaveAiChatTurn(question, aiTurn);
       return; // tidak perlu memanggil Gemini sama sekali untuk kasus ini
     }
 
@@ -658,11 +904,13 @@ async function handleAiChatAsk(question) {
     if (!data || !data.ok) {
       throw new Error((data && data.error) || "Gagal mendapat jawaban dari AI");
     }
-    _aiChatState.history.push({
+    const aiTurn = {
       role: "ai",
       text: data.answer,
       sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context), context.knowledgeSources || []),
-    });
+    };
+    _aiChatState.history.push(aiTurn);
+    maybeSaveAiChatTurn(question, aiTurn);
   } catch (err) {
     _aiChatState.history.push({ role: "ai", text: "⚠️ Terjadi kesalahan: " + String(err.message || err) });
   } finally {
