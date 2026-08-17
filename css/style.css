@@ -35,85 +35,100 @@
 
 /* ============================================================
    10 TEMA — dipilih lewat menu ⋮ → Tema. Diterapkan sebagai
-   class pada <body>, mis. body.theme-2. Tema "manuskrip" bawaan
-   (tanpa class) tetap jadi default/tema-1.
+   class pada <html> (BUKAN <body> lagi), mis. html.theme-2. Tema
+   "manuskrip" bawaan (tanpa class) tetap jadi default/tema-1.
+   ------------------------------------------------------------
+   CATATAN PERBAIKAN BUG (ganti tema cuma separuh layar bagian
+   atas berubah, terutama di komputer/layar lebar): sebelumnya
+   class ini dipasang di <body>, tapi aturan "html, body { background:
+   var(--paper); }" membaca variabel --paper masing-masing DI
+   ELEMENnya sendiri. Custom property CSS cuma mengalir ke BAWAH
+   (dari <html> ke <body>, bukan sebaliknya) -- jadi kalau class
+   tema cuma ada di <body>, elemen <html> tetap memakai --paper versi
+   lama (bawaan/tema 1), sedangkan <body> sudah versi baru. Browser
+   sering memakai warna latar <html> untuk area canvas/overscroll
+   di luar kotak <body>, sehingga sebagian layar (terutama saat
+   halaman lebih pendek dari jendela, atau saat digulir melewati
+   ujung halaman di komputer) masih menunjukkan warna lama. Dengan
+   class dipasang di <html>, variabelnya mengalir ke <body> dan
+   semua elemen di bawahnya, jadi seluruh layar konsisten.
    ============================================================ */
-body.theme-2 { /* Terang Klasik */
+html.theme-2 { /* Terang Klasik */
   --paper: #FFFFFF; --paper-raised: #F7F7F9; --ink: #1A1A1A; --ink-soft: #55555B;
   --rule: #E2E2E8; --petrol: #2554C7; --petrol-dark: #163A8C; --brass: #B08900;
   --brass-soft: #F0DE9E; --danger: #C0392B;
 }
-body.theme-3 { /* Malam Gelap */
+html.theme-3 { /* Malam Gelap */
   --paper: #14161A; --paper-raised: #1D2026; --ink: #EDEDEF; --ink-soft: #A7ACB5;
   --rule: #2C3038; --petrol: #57C7B0; --petrol-dark: #3B9985; --brass: #E3B84C;
   --brass-soft: #6B5B2A; --danger: #E5695A; --shadow: 0 8px 24px rgba(0,0,0,0.45);
 }
-body.theme-4 { /* Sepia Hangat */
+html.theme-4 { /* Sepia Hangat */
   --paper: #F4ECD8; --paper-raised: #FBF6E9; --ink: #3A2E1F; --ink-soft: #6E5C43;
   --rule: #E2D2AC; --petrol: #8A5A2E; --petrol-dark: #613E1D; --brass: #B4842A;
   --brass-soft: #E7CE9C; --danger: #A3392A;
 }
-body.theme-5 { /* Hitam Pekat (OLED) */
+html.theme-5 { /* Hitam Pekat (OLED) */
   --paper: #000000; --paper-raised: #121212; --ink: #F2F2F2; --ink-soft: #9C9C9C;
   --rule: #262626; --petrol: #58B6A6; --petrol-dark: #3D8B7E; --brass: #D8B04C;
   --brass-soft: #5A4A22; --danger: #E06456; --shadow: 0 8px 24px rgba(0,0,0,0.6);
 }
-body.theme-6 { /* Hijau Zaitun */
+html.theme-6 { /* Hijau Zaitun */
   --paper: #F3F5EC; --paper-raised: #FAFBF6; --ink: #26301F; --ink-soft: #56604A;
   --rule: #DCE2CC; --petrol: #4E7A34; --petrol-dark: #375823; --brass: #A38A2A;
   --brass-soft: #DDD298; --danger: #A3392A;
 }
-body.theme-7 { /* Biru Malam */
+html.theme-7 { /* Biru Malam */
   --paper: #0F1B2D; --paper-raised: #16263D; --ink: #E7EEF7; --ink-soft: #9CB0C9;
   --rule: #223856; --petrol: #6FB6E0; --petrol-dark: #4A8AB3; --brass: #E0B860;
   --brass-soft: #4C4020; --danger: #E5766A; --shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
-body.theme-8 { /* Merah Marun */
+html.theme-8 { /* Merah Marun */
   --paper: #FBF3F1; --paper-raised: #FFFAF9; --ink: #2E1512; --ink-soft: #654742;
   --rule: #EAD3CE; --petrol: #7C2A2A; --petrol-dark: #5A1D1D; --brass: #B27A2E;
   --brass-soft: #E9CC9E; --danger: #96271D;
 }
-body.theme-9 { /* Abu-abu Lembut */
+html.theme-9 { /* Abu-abu Lembut */
   --paper: #EDEEF0; --paper-raised: #F7F8F9; --ink: #24262B; --ink-soft: #5C5F66;
   --rule: #DBDDE1; --petrol: #47607A; --petrol-dark: #324458; --brass: #96792F;
   --brass-soft: #D9CEA3; --danger: #A3392A;
 }
-body.theme-11 { /* Putih - Biru (sesuai permintaan: latar putih, tulisan biru) */
+html.theme-11 { /* Putih - Biru (sesuai permintaan: latar putih, tulisan biru) */
   --paper: #FFFFFF; --paper-raised: #F3F7FF; --ink: #1846C4; --ink-soft: #3E63C9;
   --rule: #D7E2FA; --petrol: #1846C4; --petrol-dark: #10307E; --brass: #274E9A;
   --brass-soft: #C7D6F5; --danger: #C0392B;
 }
-body.theme-12 { /* Hitam - Kuning (sesuai permintaan: latar hitam, tulisan kuning) */
+html.theme-12 { /* Hitam - Kuning (sesuai permintaan: latar hitam, tulisan kuning) */
   --paper: #000000; --paper-raised: #141400; --ink: #FFE55A; --ink-soft: #E8CE3F;
   --rule: #3A3A10; --petrol: #FFE55A; --petrol-dark: #C9AE2E; --brass: #FFE55A;
   --brass-soft: #4A3F10; --danger: #FF6B5A; --shadow: 0 8px 24px rgba(0,0,0,0.6);
 }
-body.theme-13 { /* Pink Pastel (sesuai permintaan: latar pink pastel, tulisan pastel pink tua) */
+html.theme-13 { /* Pink Pastel (sesuai permintaan: latar pink pastel, tulisan pastel pink tua) */
   --paper: #FFEAF3; --paper-raised: #FFDCEB; --ink: #A3225F; --ink-soft: #C24A82;
   --rule: #F6C7DD; --petrol: #A3225F; --petrol-dark: #7A1846; --brass: #C24A82;
   --brass-soft: #F5C2DC; --danger: #C0392B;
 }
-body.theme-10 { /* Ungu Senja */
+html.theme-10 { /* Ungu Senja */
   --paper: #17131F; --paper-raised: #221C30; --ink: #EDE7F5; --ink-soft: #AFA3C4;
   --rule: #33293F; --petrol: #B695E0; --petrol-dark: #8E6BBE; --brass: #E0B860;
   --brass-soft: #4C3F26; --danger: #E5766A; --shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
-body.theme-14 { /* Biru Pastel Muda (sesuai permintaan: latar biru muda pastel, tulisan biru pastel tua) */
+html.theme-14 { /* Biru Pastel Muda (sesuai permintaan: latar biru muda pastel, tulisan biru pastel tua) */
   --paper: #DCEBFF; --paper-raised: #EAF3FF; --ink: #1F3E7A; --ink-soft: #3E5C9E;
   --rule: #C3D9F7; --petrol: #1F3E7A; --petrol-dark: #14295A; --brass: #3E5C9E;
   --brass-soft: #C3D9F7; --danger: #C0392B;
 }
-body.theme-15 { /* Merah Tua (sesuai permintaan: latar merah tua, tulisan putih) */
+html.theme-15 { /* Merah Tua (sesuai permintaan: latar merah tua, tulisan putih) */
   --paper: #6E1414; --paper-raised: #7E1C1C; --ink: #FFFFFF; --ink-soft: #F3CFCF;
   --rule: #8F2C2C; --petrol: #FFFFFF; --petrol-dark: #F0DADA; --brass: #FFE0B2;
   --brass-soft: #4A0D0D; --danger: #FFB4A8; --shadow: 0 8px 24px rgba(0,0,0,0.45);
 }
-body.theme-16 { /* Hijau Tua Pastel (sesuai permintaan: latar hijau tua pastel, tulisan kuning pastel) */
+html.theme-16 { /* Hijau Tua Pastel (sesuai permintaan: latar hijau tua pastel, tulisan kuning pastel) */
   --paper: #1F3A28; --paper-raised: #274732; --ink: #FFE98A; --ink-soft: #E8D488;
   --rule: #33553F; --petrol: #FFE98A; --petrol-dark: #D8C060; --brass: #FFE98A;
   --brass-soft: #3A5A32; --danger: #FF9E80; --shadow: 0 8px 24px rgba(0,0,0,0.45);
 }
-body.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tulisan oranye pastel) */
+html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tulisan oranye pastel) */
   --paper: #FFF3B0; --paper-raised: #FFF8CE; --ink: #C6712B; --ink-soft: #D48F52;
   --rule: #F5E08A; --petrol: #C6712B; --petrol-dark: #9C551E; --brass: #D48F52;
   --brass-soft: #F5E08A; --danger: #C0392B;
@@ -999,7 +1014,25 @@ input { font-family: inherit; }
 .verse-block.hl-yellow { background: #fbeeb0; }
 .verse-block.hl-green { background: #cfe9d6; }
 .verse-block.hl-blue { background: #cfe2f3; }
-.verse-block.hl-yellow:hover, .verse-block.hl-green:hover, .verse-block.hl-blue:hover { filter: brightness(0.97); }
+.verse-block.hl-pink { background: #f7d3e0; }
+.verse-block.hl-purple { background: #e1d3f5; }
+.verse-block.hl-orange { background: #fce0bf; }
+.verse-block.hl-teal { background: #cfefe7; }
+.verse-block.hl-coral { background: #f6d6cb; }
+.verse-block.hl-gray { background: #e2e2e6; }
+.verse-block.hl-cream { background: #eedfc4; }
+/* Semua highlight pastel di atas selalu terang, jadi teksnya dipaksa
+   pakai tinta gelap supaya tetap terbaca bahkan saat tema aktif
+   sedang gelap (mis. "Malam Gelap") -- kalau tidak, teks ikut warna
+   --ink terang bawaan tema dan jadi nyaris tak kelihatan di atas
+   latar pastel yang terang. */
+.verse-block[class*="hl-"] { color: #2b2118; }
+.verse-block[class*="hl-"] .verse-copy-btn,
+.verse-block[class*="hl-"] .verse-note-badge { color: #6e5c43; }
+.verse-block.hl-yellow:hover, .verse-block.hl-green:hover, .verse-block.hl-blue:hover,
+.verse-block.hl-pink:hover, .verse-block.hl-purple:hover, .verse-block.hl-orange:hover,
+.verse-block.hl-teal:hover, .verse-block.hl-coral:hover, .verse-block.hl-gray:hover,
+.verse-block.hl-cream:hover { filter: brightness(0.97); }
 .verse-block.speaking {
   background: var(--paper-raised);
   border-color: var(--petrol);
@@ -1106,12 +1139,17 @@ input { font-family: inherit; }
   position: absolute;
   z-index: 500;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
+  /* 10 warna + tombol hapus tidak muat 1 baris -- dibatasi lebar
+     supaya melipat jadi beberapa baris (lihat flex-wrap di atas)
+     alih-alih meluber ke luar layar, terutama di HP. */
+  max-width: 226px;
   background: var(--paper-raised);
   border: 1px solid var(--rule);
-  border-radius: 999px;
+  border-radius: 18px;
   box-shadow: var(--shadow);
   animation: inlineNoteOpen .15s ease;
 }
@@ -1125,6 +1163,13 @@ input { font-family: inherit; }
 .hl-swatch-yellow { background: #fbeeb0; }
 .hl-swatch-green { background: #cfe9d6; }
 .hl-swatch-blue { background: #cfe2f3; }
+.hl-swatch-pink { background: #f7d3e0; }
+.hl-swatch-purple { background: #e1d3f5; }
+.hl-swatch-orange { background: #fce0bf; }
+.hl-swatch-teal { background: #cfefe7; }
+.hl-swatch-coral { background: #f6d6cb; }
+.hl-swatch-gray { background: #e2e2e6; }
+.hl-swatch-cream { background: #eedfc4; }
 .hl-swatch-active { border-color: var(--petrol); box-shadow: 0 0 0 2px rgba(47,111,99,.25); }
 .hl-swatch-clear {
   width: 26px; height: 26px; border-radius: 50%;
