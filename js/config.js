@@ -43,7 +43,7 @@ const CONFIG = {
   // apa adanya (teks biasa) di Google Sheet dan di penyimpanan lokal browser.
   // Cocok untuk keperluan pribadi/keluarga/jemaat, JANGAN dipakai untuk data rahasia,
   // dan jangan pakai password yang juga dipakai di akun penting lain.
-  USERS_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSWdJHs0v-rdfUPA4IPOAO0a8BIK_k9Pdo7cFJCiJFu2pWcj7JfL-oqgOWgNynm8zXmdDYyw95L9PLa/pub?output=csv",
+  USERS_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRUI5c6gbPPNjrkk761rG8yPDrLMQKsyJ9T8QriMdXB8kjIcM5FdFPE_uD3renCVsNvuq9amfbCuCqd/pub?output=csv",
                         
   // ----------------------------------------------------------
   // 3) SINKRONISASI CATATAN & PROGRES RENCANA BACA — Google Apps Script
@@ -54,7 +54,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyMfUosSBvytgi7u3FWPjmGe1ZdHJwqtlNMu9pUg5ZtpIWx278tF5zBmTVsQlmuCmW_/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzIcUTVabb77mSCfu0J_z7UBouAwVwEbFZI4a4eGWYutffJjy508-JY8mzMUQf1CWvv9Q/exec",
 
   // ----------------------------------------------------------
   // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
