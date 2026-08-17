@@ -100,7 +100,7 @@ function clearPlan(username) {
   if (typeof Sync !== "undefined") Sync.pushProgress(username, { planId: "", label: "", days: 0, startDate: "", schedule: [], completed: [] });
 }
 
-// Menarik progres rencana baca dari Google Sheet dan menggabungkannya
+// Menarik progres rencana baca dari Google Sheet dan menggabungkannya 
 // dengan data lokal — yang paling baru (updatedAt) yang dipakai.
 // Dipanggil diam-diam setelah login, dan setiap kali panel rencana dibuka.
 // Untuk rencana media (mediaSheetKey terisi), "schedule" dari server sudah
