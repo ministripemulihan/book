@@ -5465,6 +5465,13 @@ function initUIEvents() {
       closeSidebarOnMobile();
     });
   }
+  if (el("infoKamiBtn")) {
+    el("infoKamiBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      if (typeof InfoKami !== "undefined") InfoKami.open();
+      closeSidebarOnMobile();
+    });
+  }
   if (el("collectionsMenuBtn")) {
     el("collectionsMenuBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
