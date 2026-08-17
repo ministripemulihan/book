@@ -1,5 +1,5 @@
 // ============================================================
-//  SINKRONISASI KE GOOGLE SHEET (lewat Google Apps Script)
+//  SINKRONISASI KE GOOGLE SHEET (lewat Google Apps Script) 
 // ============================================================
 //  Menyimpan CATATAN PRIBADI per ayat & PROGRES RENCANA BACA ke
 //  Google Sheet, supaya bisa dibuka dan tetap sama persis dari
