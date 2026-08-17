@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/style.css?v=20260817d" />
 </head>
 <body>
 
@@ -24,6 +24,31 @@
         <div id="loginError" class="login-error" hidden>Username atau password salah.</div>
         <button type="submit" id="loginSubmitBtn">Masuk</button>
       </form>
+      <button type="button" id="loginInfoKamiBtn" class="login-info-link">ℹ️ Info Kami</button>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL "INFO KAMI" =====================
+       Bisa dibuka SEBELUM login (tombol di layar Masuk di atas) MAUPUN
+       SETELAH login (menu ⋮ -> "ℹ️ Info Kami"). Isinya diambil dari tab
+       "Setup" di Sheet Sinkron lewat js/infokami.js, TIDAK memerlukan
+       username supaya tetap tampil walau belum login (lihat
+       apps-script/Code.gs, type=appinfo di doGet()). -->
+  <div id="infoKamiOverlay" class="info-kami-overlay" hidden>
+    <div id="infoKamiBox" class="info-kami-box">
+      <div class="info-kami-header">
+        <h2>ℹ️ Info Kami</h2>
+        <div class="info-kami-header-actions">
+          <div class="font-size-control">
+            <button type="button" id="infoKamiFontDecrease" class="icon-btn font-btn" title="Perkecil huruf" aria-label="Perkecil huruf">A-</button>
+            <button type="button" id="infoKamiFontIncrease" class="icon-btn font-btn" title="Perbesar huruf" aria-label="Perbesar huruf">A+</button>
+          </div>
+          <button type="button" id="infoKamiCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+        </div>
+      </div>
+      <div id="infoKamiBody" class="info-kami-body">
+        <p class="info-kami-loading">Memuat…</p>
+      </div>
     </div>
   </div>
 
@@ -82,6 +107,7 @@
       <div class="more-menu-item" id="userStatus">Memuat status…</div>
       <div class="more-menu-item" id="syncStatus">Memuat status…</div>
       <button id="announcementBtn" class="more-menu-btn">📢 Pengumuman</button>
+      <button id="infoKamiBtn" class="more-menu-btn">ℹ️ Info Kami</button>
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
       <button id="collectionsMenuBtn" class="more-menu-btn">📚 Kumpulan Ayat</button>
       <!-- Tampil untuk semua orang yang login; isi lengkap (balas + umur) hanya untuk level gembala (lihat js/curhat.js) -->
@@ -381,23 +407,35 @@
        kanan-bawah kalau laci daftar kitab (di kiri) sedang terbuka. -->
   <button id="scrollTopFloatBtn" class="scroll-top-float" type="button" aria-label="Geser ke atas" hidden>TOP</button>
 
-  <script src="js/config.js"></script>
-  <script src="js/books.js"></script>
-  <script src="js/csv.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/sync.js"></script>
-  <script src="js/levels.js"></script>
-  <script src="js/activitylog.js"></script>
-  <script src="js/notes.js"></script>
-  <script src="js/highlights.js"></script>
-  <script src="js/collections.js"></script>
-  <script src="js/settings.js"></script>
-  <script src="js/plans.js"></script>
-  <script src="js/media.js"></script>
-  <script src="js/outlines.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/curhat.js"></script>
-  <script src="js/aichat.js"></script>
-  <script src="js/langcheck.js"></script>
+  <!-- Versi "?v=" di akhir tiap file (PENTING, BARU): memaksa browser
+       mengambil file JS/CSS BARU tiap kali angka ini dinaikkan, bukan
+       memakai file lama dari cache. Situs ini statis tanpa proses build,
+       jadi tanpa penanda versi begini, sebagian pengguna (terutama di
+       komputer, cache browser desktop biasanya lebih "awet" dari HP) bisa
+       tetap menjalankan kode JS versi LAMA setelah deploy ulang -- gejalanya
+       persis seperti fitur baru "tidak ada"/tombol baru "tidak merespons"
+       padahal kodenya sudah benar. NAIKKAN angka "20260817c" ini (mis. jadi
+       tanggal hari itu) SETIAP kali men-deploy perubahan js/*.js atau
+       css/style.css, supaya semua pengguna otomatis dipaksa ambil versi
+       terbaru tanpa perlu diminta hard-refresh manual satu per satu. -->
+  <script src="js/config.js?v=20260817d"></script>
+  <script src="js/books.js?v=20260817d"></script>
+  <script src="js/csv.js?v=20260817d"></script>
+  <script src="js/db.js?v=20260817d"></script>
+  <script src="js/sync.js?v=20260817d"></script>
+  <script src="js/infokami.js?v=20260817d"></script>
+  <script src="js/levels.js?v=20260817d"></script>
+  <script src="js/activitylog.js?v=20260817d"></script>
+  <script src="js/notes.js?v=20260817d"></script>
+  <script src="js/highlights.js?v=20260817d"></script>
+  <script src="js/collections.js?v=20260817d"></script>
+  <script src="js/settings.js?v=20260817d"></script>
+  <script src="js/plans.js?v=20260817d"></script>
+  <script src="js/media.js?v=20260817d"></script>
+  <script src="js/outlines.js?v=20260817d"></script>
+  <script src="js/app.js?v=20260817d"></script>
+  <script src="js/curhat.js?v=20260817d"></script>
+  <script src="js/aichat.js?v=20260817d"></script>
+  <script src="js/langcheck.js?v=20260817d"></script>
 </body>
 </html>
