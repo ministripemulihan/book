@@ -110,6 +110,20 @@ const Sync = {
     }
   },
 
+  // ---------------- Info Kami (tab "Setup" di Sheet Sinkron) ----------------
+  // SENGAJA TIDAK mengirim "username" -- beda dari endpoint lain, jenis
+  // permintaan "appinfo" ini memang tidak mewajibkan username di doGet()
+  // (apps-script/Code.gs), supaya bisa dipanggil dari layar Masuk SEBELUM
+  // pengguna login sama sekali (lihat js/infokami.js).
+  async pullAppInfo() {
+    try {
+      const data = await this._get({ type: "appinfo" });
+      return (data && data.ok && data.info) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
   // ---------------- Pengumuman (hanya administrator yang menulis) ----------------
   // PENTING -- kenapa dulu selalu muncul "Gagal memuat pengumuman" dengan
   // detail teknis "username wajib diisi": doGet() di apps-script/Code.gs
