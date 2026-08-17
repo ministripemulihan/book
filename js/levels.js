@@ -11,6 +11,13 @@
 // Diisi setelah login berhasil / setelah data pengguna lokal dibaca ulang.
 let currentUserLevels = []; // larik key level, mis. ["gembala distrik", "inti"]
 
+// Tipe akun (BARU) -- "premium" atau "" (biasa). Diambil dari kolom "Tipe"
+// di Sheet Pengguna (lihat parseUserTypeField() di js/csv.js). Dipakai
+// khusus untuk menentukan siapa yang boleh melihat menu "🕘 Riwayat" di
+// dalam AI Chat (lihat js/aichat.js) -- BUKAN untuk hak akses level
+// gembala/administrator, yang tetap diatur lewat currentUserLevels di atas.
+let currentUserType = "";
+
 function levelDefs() {
   return (typeof CONFIG !== "undefined" && CONFIG.LEVEL_DEFINITIONS) || [];
 }
@@ -82,8 +89,17 @@ async function resolveCurrentUserLevels(username) {
     const users = await LocalDB.getAllUsers();
     const match = users.find((u) => u.username === (username || "").toLowerCase());
     currentUserLevels = (match && match.levels) || [];
+    currentUserType = (match && match.userType) || "";
   } catch (e) {
     currentUserLevels = [];
+    currentUserType = "";
   }
   return currentUserLevels;
+}
+
+// Apakah pengguna yang sedang login berstatus "premium" (kolom "Tipe" di
+// Sheet Pengguna). Dipakai untuk menampilkan/menyembunyikan menu "🕘
+// Riwayat" di dalam AI Chat -- lihat js/aichat.js.
+function isPremiumUser() {
+  return currentUserType === "premium";
 }
