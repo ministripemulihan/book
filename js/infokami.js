@@ -158,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ov = document.getElementById("infoKamiOverlay");
     if (ov && !ov.hidden) InfoKami.close();
   });
-  // Tombol menu "ℹ️ Info Kami" DI DALAM aplikasi (setelah login) dipasang
+  // Tombol menu "ℹ️ Info Kami" DI DALAM aplikasi (setelah login) dipasang 
   // di js/app.js (initUIEvents) supaya bisa ikut menutup menu ⋮ &
   // sidebar HP seperti tombol menu lain -- lihat "infoKamiBtn" di sana.
 });
