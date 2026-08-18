@@ -1,5 +1,5 @@
 /* ============================================================
-   TOKEN DESAIN 
+   TOKEN DESAIN
    Tema: "manuskrip & kuningan" — kertas hangat, tinta cokelat gelap,
    aksen hijau petrol (sampul kitab berjilid kain) dan kuningan pudar
    untuk nomor ayat. Serif "Literata" untuk teks bacaan (dirancang
@@ -526,6 +526,98 @@ input { font-family: inherit; }
   padding: 4px 6px;
 }
 .login-info-link:hover { color: var(--petrol-dark); }
+
+.login-guest-btn {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1.5px dashed var(--brass);
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.login-guest-btn:hover { background: rgba(169, 129, 47, 0.1); border-color: var(--brass); }
+
+/* ============================================================
+   MODE TAMU -- pita pengingat di atas layar utama + menu "abu-abu"
+   (terlihat tapi tidak aktif) untuk fitur yang butuh login. Lihat
+   applyGuestModeUi() di js/app.js dan js/guest.js.
+   ============================================================ */
+.guest-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--brass-soft);
+  color: var(--ink);
+  font-size: 13.5px;
+  border-bottom: 1px solid var(--rule);
+}
+.guest-banner button {
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--petrol);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.guest-banner button:hover { background: var(--petrol-dark); }
+
+/* Tombol/menu yang tampil tapi TIDAK aktif untuk tamu -- sengaja
+   tetap TERLIHAT (bukan disembunyikan/hidden) supaya tamu tahu fitur
+   itu ADA, cuma perlu login dulu. Klik-nya ditangkap oleh
+   guestGateClickInterceptor() di js/app.js dan menampilkan modal
+   penjelasan, BUKAN membuka fiturnya. */
+.menu-disabled {
+  opacity: 0.42;
+  filter: grayscale(1);
+  cursor: not-allowed !important;
+  position: relative;
+}
+.menu-disabled::after {
+  content: "🔒";
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+.guest-modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(20, 16, 10, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.guest-modal-box {
+  background: var(--paper-raised);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  max-width: 380px;
+  width: 100%;
+  padding: 26px 24px 22px;
+  text-align: center;
+}
+.guest-modal-icon { font-size: 34px; margin-bottom: 6px; }
+.guest-modal-box h2 { font-size: 18px; margin: 6px 0 10px; color: var(--ink); }
+.guest-modal-box p { font-size: 14px; line-height: 1.5; color: var(--ink-soft); margin: 0 0 18px; }
+.guest-modal-actions { display: flex; flex-direction: column; gap: 8px; }
+.guest-modal-btn {
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+.guest-modal-btn.primary { background: var(--petrol); border-color: var(--petrol); color: #fff; }
+.guest-modal-btn.primary:hover { background: var(--petrol-dark); }
+.guest-modal-btn:not(.primary):hover { background: rgba(0,0,0,0.05); }
 
 /* ============================================================
    PANEL "INFO KAMI" -- Versi, Amanat Kami, Misi Kami, Donasi, dst.
@@ -1165,6 +1257,48 @@ input { font-family: inherit; }
 @media (max-width: 859px) {
   .verse-copy-btn { opacity: .45; }
 }
+
+/* ============================================================
+   MODE PRESENTASI 2 LAYAR (baru) -- lihat js/presentation.js
+   ============================================================ */
+/* Tombol kirim-ke-Layar-2 per ayat: ada di DOM selalu, tapi disembunyikan
+   total kecuali body.present-mode-on (diset oleh Presentation.updateStatusUi()). */
+.verse-present-btn {
+  display: none;
+  flex-shrink: 0; align-self: flex-start; margin-top: 4px;
+  background: transparent; border: none; font-size: 13px;
+  opacity: .55; transition: opacity .15s ease, transform .15s ease;
+  color: var(--petrol); padding: 4px; cursor: pointer;
+}
+body.present-mode-on .verse-present-btn { display: inline-flex; }
+.verse-present-btn:hover { opacity: 1; transform: scale(1.12); }
+
+#presentModeRow { border-top: 1px solid var(--rule); padding-top: 12px; margin-top: 6px; }
+.present-preview-label { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin: 10px 0 6px; }
+.present-preview-box {
+  background: #05070c; color: #f5f2e8; border-radius: 8px; padding: 14px;
+  min-height: 70px; display: flex; flex-direction: column; justify-content: center;
+  font-family: var(--font-serif, serif);
+}
+.present-preview-idle { color: #6b7280; font-size: 12.5px; font-family: var(--font-ui); }
+.present-preview-ref {
+  font-family: var(--font-ui); font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: #d8b45c; font-size: 11px; margin-bottom: 6px;
+}
+.present-preview-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.present-freetext-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.present-saved-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.present-saved-empty { font-size: 12.5px; color: var(--ink-soft); }
+.present-saved-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 8px;
+  padding: 6px 8px;
+}
+.present-saved-text {
+  font-size: 12.5px; flex: 1; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; color: var(--ink);
+}
+.present-saved-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* ------------------------------------------------------------
    CATATAN AYAT SEBARIS (dulu jendela/modal terapung -- sekarang
@@ -1835,4 +1969,102 @@ input { font-family: inherit; }
 .scroll-top-float:hover { background: rgba(250, 246, 238, 0.85); }
 @media (max-width: 640px) {
   .scroll-top-float { bottom: max(18px, env(safe-area-inset-bottom, 0px)); width: 44px; height: 44px; font-size: 10px; }
+}
+
+/* ============================================================
+   📝 DAFTAR AKUN BARU (signup) + 🗂️ KELOLA PENGGUNA (approval) +
+   🔔 LONCENG NOTIFIKASI ADMINISTRATOR (BARU)
+   ============================================================ */
+.signup-box { max-width: 420px; text-align: left; }
+.signup-box h2 { text-align: center; }
+.signup-warning {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  background: rgba(163, 59, 42, 0.08);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 16px;
+  text-align: left;
+}
+.signup-form { display: flex; flex-direction: column; gap: 10px; }
+.signup-form input {
+  padding: 11px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  font-family: var(--font-ui);
+}
+.signup-result {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+}
+.signup-result-ok { border-color: var(--petrol); background: rgba(47, 111, 99, 0.08); color: var(--ink); }
+.signup-result-error { border-color: var(--danger); background: rgba(163, 59, 42, 0.08); color: var(--ink); }
+
+.user-approval-box { max-width: 640px; }
+.user-approval-list { padding: 18px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.user-approval-loading, .user-approval-empty { color: var(--ink-soft); text-align: center; padding: 30px 0; }
+.user-approval-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--paper-raised);
+}
+.user-approval-row.user-approval-pending { border-color: var(--brass, var(--petrol)); background: rgba(180, 132, 42, 0.08); }
+.user-approval-info { min-width: 0; }
+.user-approval-name { font-weight: 600; color: var(--ink); font-size: 14px; }
+.user-approval-username { font-weight: 400; color: var(--ink-soft); font-size: 12.5px; }
+.user-approval-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.user-approval-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.user-approval-status { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.user-approval-status.ok { color: var(--petrol); }
+.user-approval-status.pending { color: var(--danger); }
+
+.admin-bell-wrap { position: relative; }
+.admin-bell-btn { position: relative; }
+.admin-bell-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+.admin-bell-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 400;
+  width: 260px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+.admin-bell-panel-title { font-weight: 700; font-size: 13.5px; margin-bottom: 8px; color: var(--ink); }
+.admin-bell-total { font-size: 13.5px; margin: 0 0 8px; color: var(--ink); }
+.admin-bell-breakdown { margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; }
+
+@media (max-width: 640px) {
+  .admin-bell-panel { width: 220px; right: -8px; }
 }
