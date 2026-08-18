@@ -260,6 +260,12 @@ function normalizeUserRecord(rec) {
     password: (get("password", "sandi", "kata sandi") || "").trim(),
     levels: parseLevelsField(get("level", "levels", "jenjang", "jabatan")),
     userType: parseUserTypeField(get("tipe", "tipe user", "tipe pengguna", "type", "user type", "membership", "paket")),
+    // Kolom BARU "Approved"/"TanggalDaftar" -- dipakai fitur "Daftar Akun
+    // Baru" + persetujuan administrator (lihat js/signup.js). Kosong /
+    // kolom belum ada sama sekali = dianggap approved=true (akun LAMA
+    // sebelum fitur ini ada TIDAK terkunci) -- lihat parseApprovedField().
+    approved: parseApprovedField(get("approved", "disetujui", "status approval")),
+    signupDate: (get("tanggaldaftar", "tanggal daftar", "signupdate", "createdat", "created_at") || "").trim(),
     extra: {
       plan: get("plan"),
       startDate: get("start_date", "start date", "tanggal mulai"),
@@ -288,6 +294,18 @@ function normalizeUserRecord(rec) {
 function parseUserTypeField(raw) {
   const v = (raw || "").trim().toLowerCase();
   return v === "premium" ? "premium" : "";
+}
+
+// Kolom "Approved" (BARU) -- kosong = akun lama sebelum kolom ini ada,
+// tetap dianggap disetujui (true) supaya tidak ada yang tiba-tiba
+// terkunci gara-gara pembaruan ini. Hanya isi eksplisit "FALSE"/"belum"/
+// "pending"/"tidak"/"0"/"no" yang dianggap BELUM disetujui -- ini yang
+// ditulis otomatis oleh signupUser_() di apps-script/Code.gs saat ada
+// pendaftaran baru lewat menu "📝 Daftar Akun Baru".
+function parseApprovedField(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  if (!v) return true;
+  return !["false", "belum", "pending", "tidak", "0", "no"].includes(v);
 }
 
 // Mengubah isi kolom "Level" (boleh lebih dari satu, dipisah koma / titik
