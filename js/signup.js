@@ -41,6 +41,12 @@ const Signup = (() => {
     if (el("signupUsername")) el("signupUsername").value = "";
     if (el("signupNama")) el("signupNama").value = "";
     if (el("signupPassword")) el("signupPassword").value = "123";
+    if (el("signupWhatsapp")) el("signupWhatsapp").value = "";
+    if (el("signupGereja")) el("signupGereja").value = "";
+    if (el("signupCabang")) el("signupCabang").value = "";
+    if (el("signupKota")) el("signupKota").value = "";
+    if (el("signupGender")) el("signupGender").value = "";
+    if (el("signupUmur")) el("signupUmur").value = "";
     hideResult();
     const btn = el("signupSubmitBtn");
     if (btn) { btn.disabled = false; btn.textContent = "📝 Kirim Pendaftaran"; }
@@ -64,6 +70,12 @@ const Signup = (() => {
     const username = (el("signupUsername").value || "").trim();
     const nama = (el("signupNama").value || "").trim();
     const password = (el("signupPassword").value || "").trim() || "123";
+    const whatsapp = (el("signupWhatsapp") && el("signupWhatsapp").value || "").trim();
+    const gereja = (el("signupGereja") && el("signupGereja").value || "").trim();
+    const cabang = (el("signupCabang") && el("signupCabang").value || "").trim();
+    const kota = (el("signupKota") && el("signupKota").value || "").trim();
+    const gender = (el("signupGender") && el("signupGender").value || "").trim();
+    const umur = (el("signupUmur") && el("signupUmur").value || "").trim();
     const btn = el("signupSubmitBtn");
 
     hideResult();
@@ -77,7 +89,7 @@ const Signup = (() => {
     btn.disabled = true;
     btn.textContent = "Mengirim…";
     try {
-      const res = await Sync._post({ type: "signup", username, password, nama });
+      const res = await Sync._post({ type: "signup", username, password, nama, whatsapp, gereja, cabang, kota, gender, umur });
       if (res && res.ok) {
         showResult(
           "✅ Pendaftaran terkirim! Akun \"" + username + "\" menunggu PERSETUJUAN administrator " +
@@ -164,6 +176,14 @@ const UserApproval = (() => {
         <div class="user-approval-info">
           <div class="user-approval-name">${escapeHtml(u.nama || u.username)} <span class="user-approval-username">(${escapeHtml(u.username)})</span></div>
           <div class="user-approval-meta">${u.level ? "Level: " + escapeHtml(u.level) + " · " : ""}Tanggal daftar: ${escapeHtml(u.tanggalDaftar || "-")}</div>
+          <div class="user-approval-meta">${[
+            u.whatsapp ? "📱 " + escapeHtml(u.whatsapp) : "",
+            u.gereja ? "⛪ " + escapeHtml(u.gereja) : "",
+            u.cabang ? "🏢 " + escapeHtml(u.cabang) : "",
+            u.kota ? "📍 " + escapeHtml(u.kota) : "",
+            u.gender ? "🚻 " + escapeHtml(u.gender) : "",
+            u.umur ? "🎂 " + escapeHtml(u.umur) + " th" : "",
+          ].filter(Boolean).join(" · ") || "-"}</div>
         </div>
         <div class="user-approval-actions">
           <span class="user-approval-status ${u.approved ? "ok" : "pending"}">${u.approved ? "✅ Disetujui" : "⏳ Menunggu"}</span>
