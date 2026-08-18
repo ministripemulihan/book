@@ -1,5 +1,5 @@
 // ============================================================
-//  APLIKASI UTAMA 
+//  APLIKASI UTAMA
 // ============================================================
 let bibleData = [];       // seluruh ayat (semua bahasa), dimuat sekali ke memori dari IndexedDB
 let verseIndex = {};      // lang -> bookNumber -> chapter -> [ayat...] (terurut), untuk akses instan
@@ -304,7 +304,27 @@ async function validateLogin(usernameRaw, password) {
   if (!match) return null;
 
   const effectivePassword = await getEffectivePassword(uname, match.password);
-  return password === effectivePassword ? match : null;
+  if (password !== effectivePassword) return null;
+
+  // BARU -- akun hasil "📝 Daftar Akun Baru" (js/signup.js) ditandai
+  // approved=false sampai administrator menyetujuinya lewat panel
+  // "Kelola Pengguna". Akun LAMA (kolom "Approved" kosong/tidak ada)
+  // tetap approved=true, lihat parseApprovedField() di js/csv.js -- jadi
+  // pengecekan ini TIDAK mengunci siapa pun yang sudah bisa login sebelum
+  // pembaruan ini.
+  if (match.approved === false) {
+    // Barangkali baru saja disetujui administrator tapi data lokal di
+    // perangkat ini belum sempat diperbarui -- coba sinkron ulang sekali
+    // sebelum benar-benar menolak.
+    try {
+      const fresh = await syncUsersFromServer();
+      const freshMatch = fresh.find((u) => u.username === uname);
+      if (freshMatch && freshMatch.approved !== false) return freshMatch;
+    } catch (e) { /* tetap dianggap pending di bawah */ }
+    return { pendingApproval: true, username: uname };
+  }
+
+  return match;
 }
 
 function initAuth() {
@@ -312,11 +332,32 @@ function initAuth() {
   if (savedUser) {
     currentUser = savedUser;
     currentUserDisplay = localStorage.getItem(CONFIG.AUTH_DISPLAY_KEY) || savedUser;
+    if (typeof Guest !== "undefined") Guest.exit(); // akun asli menang atas sisa status tamu lama
+    startApp();
+    return;
+  }
+
+  // Sudah pernah pilih "Coba Tanpa Daftar" sebelumnya di perangkat ini ->
+  // langsung masuk ke aplikasi sebagai tamu lagi, tidak perlu pilih ulang
+  // tiap buka aplikasi (perilaku sama seperti savedUser di atas).
+  if (CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest()) {
+    currentUser = null;
+    currentUserDisplay = null;
     startApp();
     return;
   }
 
   el("loginScreen").hidden = false;
+  if (CONFIG.GUEST_MODE_ENABLED && el("guestEnterBtn")) {
+    el("guestEnterBtn").hidden = false;
+    el("guestEnterBtn").addEventListener("click", () => {
+      Guest.enter();
+      currentUser = null;
+      currentUserDisplay = null;
+      el("loginScreen").hidden = true;
+      startApp();
+    });
+  }
   el("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const uname = el("loginUsername").value;
@@ -331,17 +372,30 @@ function initAuth() {
     btn.disabled = false;
     btn.textContent = "Masuk";
 
-    if (match) {
+    if (match && match.pendingApproval) {
+      // Akun ditemukan & password benar, tapi belum disetujui
+      // administrator (lihat js/signup.js & panel "Kelola Pengguna").
+      el("loginError").textContent =
+        "Akun Anda sudah terdaftar tapi BELUM disetujui administrator. Silakan hubungi administrator, atau coba masuk lagi nanti setelah disetujui.";
+      el("loginError").hidden = false;
+    } else if (match) {
       currentUser = match.username;
       currentUserDisplay = match.displayName || match.username;
       localStorage.setItem(CONFIG.AUTH_STORAGE_KEY, currentUser);
       localStorage.setItem(CONFIG.AUTH_DISPLAY_KEY, currentUserDisplay);
+      if (typeof Guest !== "undefined") Guest.exit();
       el("loginScreen").hidden = true;
       startApp();
     } else {
+      el("loginError").textContent = "Username atau password salah.";
       el("loginError").hidden = false;
     }
   });
+
+  // BARU -- tombol "📝 Daftar Akun Baru" di layar Masuk (lihat js/signup.js).
+  if (el("signupOpenBtn") && typeof Signup !== "undefined") {
+    el("signupOpenBtn").addEventListener("click", () => Signup.openModal());
+  }
 }
 
 function logout() {
@@ -349,6 +403,7 @@ function logout() {
   // (catatan ayat sekarang sebaris, tidak ada lagi modal terpisah untuk ditutup)
   localStorage.removeItem(CONFIG.AUTH_STORAGE_KEY);
   localStorage.removeItem(CONFIG.AUTH_DISPLAY_KEY);
+  if (typeof Guest !== "undefined") Guest.exit();
   location.reload();
 }
 
@@ -375,6 +430,14 @@ async function startApp() {
     afterDataReady();
   } else {
     await handleInitialBibleDownload();
+  }
+
+  // MODE TAMU -- tidak ada username sama sekali, jadi blok sinkron di
+  // bawah (catatan/rencana baca/dst, semuanya butuh username) dilewati,
+  // tapi status panel & menu tetap perlu digambar ulang supaya pita
+  // "Mode Tamu" & menu abu-abu langsung tampil begitu masuk aplikasi.
+  if (!currentUser && typeof Guest !== "undefined" && Guest.isGuest()) {
+    if (typeof updateStatusPanel === "function") updateStatusPanel();
   }
 
   // Tarik catatan pribadi & progres rencana baca dari Google Sheet (kalau
@@ -437,7 +500,7 @@ async function handleInitialBibleDownload() {
   // aplikasi macet/lambat. Ini yang membedakan dari sinkron ulang biasa
   // (lihat confirmAndSync()), yang tidak perlu info sepanjang ini karena
   // penggunanya sendiri yang menekan tombolnya dengan sadar.
-  showBibleSyncPrompt({ isFirstTime: true });
+  await showBibleSyncPrompt({ isFirstTime: true });
 }
 
 // Dipakai tombol menu ⋮ → 🔄/📥 Sinkronkan ulang / Unduh Data Alkitab
@@ -446,7 +509,7 @@ async function handleInitialBibleDownload() {
 // tidak tiba-tiba menyedot kuota data seluler tanpa sadar), tapi kalau
 // terdeteksi WiFi/kabel dengan pasti, langsung jalan tanpa dialog
 // tambahan (penggunanya sendiri yang memilih untuk sinkron).
-function confirmAndSync(isFirstTime) {
+async function confirmAndSync(isFirstTime) {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     alert("Tidak ada sambungan internet saat ini. Coba lagi setelah tersambung.");
     return;
@@ -456,7 +519,7 @@ function confirmAndSync(isFirstTime) {
     syncFromServer(isFirstTime);
     return;
   }
-  showBibleSyncPrompt({ isFirstTime, connType });
+  await showBibleSyncPrompt({ isFirstTime, connType });
 }
 
 // Network Information API -- HANYA didukung sebagian browser (terutama
@@ -472,9 +535,9 @@ function detectConnectionType() {
 // Dialog gabungan: dipakai baik untuk unduhan PERTAMA KALI (opts.isFirstTime
 // true, selalu muncul supaya tidak membingungkan) maupun sinkron ulang biasa
 // saat WiFi tidak/tidak-bisa dipastikan (opts.isFirstTime false).
-function showBibleSyncPrompt(opts) {
+async function showBibleSyncPrompt(opts) {
   const { isFirstTime, connType } = opts || {};
-  const sizeMB = (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 60;
+  const sizeMB = await getEffectiveBibleSizeMb();
   let overlay = el("wifiPromptOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -606,25 +669,183 @@ async function fetchWithTimeout(url, options, timeoutMs) {
   }
 }
 
+// ------------------------------------------------------------
+// PENGATURAN APLIKASI DARI GOOGLE SHEET (tab "Setup", BARU) -- dipakai
+// supaya beberapa angka (mis. perkiraan ukuran total unduhan data
+// Alkitab) bisa diubah administrator langsung dari Google Sheet, TANPA
+// perlu ubah js/config.js atau deploy ulang apa pun. Lihat endpoint
+// "app_setup" & getSetupNumber_() di apps-script/Code.gs. Hasilnya
+// di-cache di memori (bukan disimpan permanen) supaya tidak memanggil
+// server berkali-kali dalam satu sesi, tapi tetap segar tiap kali
+// aplikasi dibuka ulang / dimuat ulang.
+// ------------------------------------------------------------
+let _remoteAppSetupCache = null;
+let _remoteAppSetupPromise = null;
+
+async function fetchRemoteAppSetup_() {
+  if (_remoteAppSetupCache) return _remoteAppSetupCache;
+  if (!CONFIG.APPS_SCRIPT_URL) return null;
+  if (!_remoteAppSetupPromise) {
+    _remoteAppSetupPromise = fetch(`${CONFIG.APPS_SCRIPT_URL}?type=app_setup`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.ok && d.setup) {
+          _remoteAppSetupCache = d.setup;
+          return _remoteAppSetupCache;
+        }
+        return null;
+      })
+      .catch(() => null); // offline / Apps Script belum dikonfigurasi -> null, pemanggil jatuh balik ke CONFIG.*
+  }
+  return _remoteAppSetupPromise;
+}
+
+// Perkiraan ukuran (MB) TOTAL unduhan data Alkitab (+ Pokok Kitab/Garis
+// Besar/Peta) -- SEKARANG DIHITUNG OTOMATIS OLEH PROGRAM dari unduhan
+// nyata (lihat saveMeasuredBibleSizeMb_() di bawah), BUKAN diketik manual.
+// Urutan sumber:
+//  1. Tab "Setup" Google Sheet (key bible_data_approx_size_mb) -- angka di
+//     sini sekarang DITULIS OTOMATIS oleh apps-script/Code.gs
+//     (updateMeasuredBibleSizeMb_()) setiap ada perangkat mana pun yang
+//     baru saja selesai mengunduh, jadi berlaku juga untuk perangkat LAIN
+//     yang belum pernah mengunduh sama sekali.
+//  2. Kalau tab Setup belum pernah diisi ATAU Apps Script tidak
+//     dikonfigurasi/tidak bisa dihubungi: angka hasil ukur TERAKHIR di
+//     PERANGKAT INI SENDIRI (localStorage, lihat loadMeasuredBibleSizeMbLocal_()).
+//  3. Kalau perangkat ini pun belum pernah sama sekali mengukur (baru
+//     pertama kali dibuka di HP mana pun, dan Apps Script kosong): baru
+//     jatuh balik ke CONFIG.BIBLE_DATA_APPROX_SIZE_MB (js/config.js),
+//     lalu 60 sebagai jaga-jaga terakhir -- ini HANYA dipakai sekali di
+//     awal sebelum ada pengukuran nyata sama sekali.
+async function getEffectiveBibleSizeMb() {
+  const remote = await fetchRemoteAppSetup_();
+  const remoteVal = remote && Number(remote.bible_data_approx_size_mb);
+  if (Number.isFinite(remoteVal) && remoteVal > 0) return remoteVal;
+  const local = loadMeasuredBibleSizeMbLocal_();
+  if (local) return local;
+  return (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 60;
+}
+
+const MEASURED_SIZE_KEY = "bible_app_measured_size_mb_v1";
+
+// Baca hasil ukur TERAKHIR yang tersimpan di perangkat ini sendiri (dari
+// unduhan penuh sebelumnya di perangkat yang sama).
+function loadMeasuredBibleSizeMbLocal_() {
+  try {
+    const v = Number(localStorage.getItem(MEASURED_SIZE_KEY));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Dipanggil OTOMATIS setiap kali unduhan/sinkron PENUH selesai (lihat
+// syncFromServer() di bawah) dengan ukuran byte SUNGGUHAN yang baru saja
+// diterima -- BUKAN pernah diketik siapa pun. Menyimpan ke perangkat ini
+// (instan, langsung dipakai lagi kalau perlu di perangkat yang sama), dan
+// (kalau Apps Script dikonfigurasi) mengirimkannya ke server supaya tab
+// "Setup" ikut ter-update otomatis untuk SEMUA perangkat/pengguna lain --
+// best-effort, diam-diam diabaikan kalau offline / Apps Script belum ada.
+function saveMeasuredBibleSizeMb_(mb) {
+  if (!Number.isFinite(mb) || mb <= 0) return;
+  try { localStorage.setItem(MEASURED_SIZE_KEY, String(mb)); } catch (e) {}
+  if (CONFIG.APPS_SCRIPT_URL) {
+    fetch(CONFIG.APPS_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ type: "report_bible_size", mb }),
+    }).catch(() => {});
+  }
+  // Buang cache pengaturan lama supaya panggilan getEffectiveBibleSizeMb()
+  // BERIKUTNYA (mis. kalau nanti dialog unduh dibuka lagi di sesi yang
+  // sama) tidak memakai angka lama yang sudah kadaluarsa.
+  _remoteAppSetupCache = null;
+}
+
+// ------------------------------------------------------------
+// Unduh isi URL sebagai teks, SAMBIL melaporkan progres unduhan dalam
+// BYTE ASLI yang sudah diterima (bukan tebakan) -- dipakai supaya layar
+// unduhan bisa menampilkan "X MB dari Y MB" yang sungguhan mengikuti
+// unduhan, bukan cuma persentase buta. `total` dari Content-Length
+// respons kalau server mengirimkannya (Google Sheets publish-to-web
+// biasanya iya); kalau tidak ada, `onProgress` tetap dipanggil dengan
+// total=null dan pemanggilnya memakai perkiraan (getEffectiveBibleSizeMb())
+// sebagai gantinya. Browser lama yang tidak mendukung streaming body
+// (jarang sekali di 2026) jatuh balik ke fetch biasa tanpa progres MB
+// bertahap -- tetap jalan, hanya progresnya melompat sekali di akhir.
+// ------------------------------------------------------------
+async function fetchTextWithProgress(url, timeoutMs, onProgress) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+    if (!res.ok) throw new Error("Gagal mengambil data (" + res.status + ")");
+    const totalHeader = res.headers.get("content-length");
+    const total = totalHeader ? Number(totalHeader) : null;
+
+    if (!res.body || !res.body.getReader) {
+      // Fallback: browser tidak mendukung streaming ReadableStream body.
+      const text = await res.text();
+      onProgress(text.length, total || text.length);
+      return text;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let received = 0;
+    let result = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.length;
+      result += decoder.decode(value, { stream: true });
+      onProgress(received, total);
+    }
+    result += decoder.decode(); // selesaikan sisa buffer decoder multi-byte
+    return result;
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw new Error(
+        `Waktu tunggu habis (lebih dari ${Math.round(timeoutMs / 1000)} detik) saat mengambil data dari server. ` +
+        `Periksa koneksi internet Anda, atau coba lagi.`
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function syncFromServer(isFirstTime) {
   const overlay = el("loadingOverlay");
   overlay.hidden = false;
+  const sizeMB = await getEffectiveBibleSizeMb();
   setLoadingText(
     isFirstTime
-      ? `Mengambil seluruh data Alkitab (semua bahasa, ~${(CONFIG.BIBLE_DATA_APPROX_SIZE_MB || 60)} MB) dari server — hanya sekali ini saja, mohon tunggu…`
+      ? `Mengunduh seluruh data Alkitab (semua bahasa, ~${sizeMB} MB) dari server — hanya sekali ini saja, mohon tunggu…`
       : "Menyinkronkan ulang data Alkitab dari server…"
   );
-  setLoadingProgress(3);
+  setLoadingProgress(1);
 
   try {
-    // Ambil file CSV. Timeout 2 menit — cukup longgar untuk file besar (puluhan MB),
-    // tapi tetap akan menampilkan pesan error yang jelas kalau server benar-benar macet,
-    // bukan layar loading diam tanpa penjelasan.
-    const res = await fetchWithTimeout(CONFIG.BIBLE_SHEET_CSV_URL, { cache: "no-store" }, 120000);
-    if (!res.ok) throw new Error("Gagal mengambil data (" + res.status + ")");
-    setLoadingProgress(10);
-    const csvText = await res.text();
-    setLoadingProgress(18);
+    // Ambil file CSV SAMBIL melaporkan progres dalam MB ASLI yang sudah
+    // diterima (bukan tebakan) -- lihat fetchTextWithProgress() di atas.
+    // Kalau server tidak mengirim Content-Length, `total` di bawah null
+    // dan dipakai perkiraan (sizeMB dari tab Setup / config.js) sebagai
+    // gantinya, supaya angka "dari ... MB"-nya tetap masuk akal.
+    // Timeout 2 menit — cukup longgar untuk file besar (puluhan MB), tapi
+    // tetap menampilkan pesan error jelas kalau server benar-benar macet.
+    const approxTotalBytes = sizeMB * 1024 * 1024;
+    const csvText = await fetchTextWithProgress(CONFIG.BIBLE_SHEET_CSV_URL, 120000, (received, total) => {
+      const totalForDisplay = total || approxTotalBytes;
+      const mbDone = (received / 1024 / 1024).toFixed(1);
+      const mbTotal = (totalForDisplay / 1024 / 1024).toFixed(1);
+      setLoadingText(`📥 Mengunduh data Alkitab… ${mbDone} MB dari ~${mbTotal} MB`);
+      // 1%–40% dialokasikan untuk tahap UNDUH mentah (paling lama & paling
+      // besar porsinya), sisanya (40%–95%) untuk baca+simpan di bawah.
+      const pct = 1 + Math.min(39, Math.round((received / totalForDisplay) * 39));
+      setLoadingProgress(pct);
+    });
+    setLoadingProgress(40);
 
     if (!isFirstTime) await LocalDB.clearAll();
 
@@ -636,8 +857,8 @@ async function syncFromServer(isFirstTime) {
     await parseCSVChunked(csvText, {
       batchSize: 3000,
       onProgress: (done, total) => {
-        // 18%–95% dialokasikan untuk tahap membaca + menyimpan data
-        const pct = 18 + Math.round((done / total) * 77);
+        // 40%–95% dialokasikan untuk tahap membaca + menyimpan data
+        const pct = 40 + Math.round((done / total) * 55);
         setLoadingProgress(pct);
       },
       onBatch: async (rawBatch) => {
@@ -662,6 +883,18 @@ async function syncFromServer(isFirstTime) {
       await resyncAllOutlineSheets().catch(() => {});
     }
     setLoadingProgress(100);
+
+    // UKURAN ASLI TOTAL yang baru saja diunduh (Alkitab utama + ketiga
+    // sheet outline) -- dihitung dari byte SUNGGUHAN (Blob), lalu disimpan
+    // otomatis lewat saveMeasuredBibleSizeMb_() di atas. Ini yang membuat
+    // perkiraan "~X MB" di dialog unduhan berikutnya SELALU angka nyata
+    // hasil kalkulasi program, bukan angka yang diketik manual di Sheet.
+    try {
+      const bibleBytes = new Blob([csvText]).size;
+      const outlineBytes = typeof totalOutlineBytesLastSync === "function" ? totalOutlineBytesLastSync() : 0;
+      const measuredMb = Math.round(((bibleBytes + outlineBytes) / 1024 / 1024) * 10) / 10;
+      saveMeasuredBibleSizeMb_(measuredMb);
+    } catch (e) { /* pengukuran gagal -- tidak menggagalkan sinkron yang sudah berhasil */ }
 
     bibleData = allRecords;
     setTimeout(() => {
@@ -710,7 +943,10 @@ async function updateStatusPanel() {
   const lastUsers = await LocalDB.getMeta("lastUserSync");
   const n = bibleData.length;
   const levelText = typeof levelDisplayLabel === "function" ? levelDisplayLabel() : "";
-  el("userStatus").textContent = `Masuk sebagai: ${currentUserDisplay || currentUser}` + (levelText ? ` · ${levelText}` : "");
+  el("userStatus").textContent =
+    typeof Guest !== "undefined" && Guest.isGuest()
+      ? "👤 Mode Tamu (belum masuk)"
+      : `Masuk sebagai: ${currentUserDisplay || currentUser}` + (levelText ? ` · ${levelText}` : "");
   el("syncStatus").textContent =
     `${n.toLocaleString("id-ID")} baris Alkitab tersimpan lokal` +
     (lastBible ? ` — sinkron ${new Date(lastBible).toLocaleString("id-ID")}` : "") +
@@ -727,6 +963,57 @@ function updateLevelGatedMenus() {
   if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
   if (el("aiChatBtn")) el("aiChatBtn").hidden = typeof isAiChatAllowed === "function" ? !isAiChatAllowed() : true;
   if (el("langCheckBtn")) el("langCheckBtn").hidden = typeof isLangCheckAllowed === "function" ? !isLangCheckAllowed() : true;
+  // BARU -- "🗂️ Kelola Pengguna" (persetujuan akun baru) & lonceng 🔔
+  // notifikasi jumlah pencarian hari ini, khusus administrator.
+  if (el("userManageBtn")) el("userManageBtn").hidden = !isAdministrator();
+  if (typeof AdminBell !== "undefined") AdminBell.refreshVisibility(isAdministrator());
+  applyGuestModeUi();
+}
+
+// ------------------------------------------------------------
+// MODE TAMU -- menu yang TIDAK dibuka untuk tamu tetap TERLIHAT tapi
+// "diabu-abukan" (bukan disembunyikan), klik-nya ditangkap dan
+// menampilkan modal penjelasan (lihat js/guest.js showFeatureLocked()).
+// Yang tetap PENUH untuk tamu: pencarian ayat (1/2/3 kolom), salin
+// (copy) ayat, unduh/sinkron Alkitab, pengaturan tampilan (huruf,
+// lebar, bahasa), Pengumuman & Info Kami.
+// Yang DIKUNCI untuk tamu: Rencana Baca, Kumpulan Ayat, Catatan Saya,
+// Curhat, serta highlight/catatan per-ayat (tombol nomor ayat) --
+// lihat buildVerseBlock().
+// ------------------------------------------------------------
+const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "curhatBtn"];
+
+function applyGuestModeUi() {
+  const guest = !!(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest());
+
+  GUEST_GATED_MENU_IDS.forEach((id) => {
+    const node = el(id);
+    if (!node) return;
+    node.classList.toggle("menu-disabled", guest);
+    node.setAttribute("aria-disabled", guest ? "true" : "false");
+    if (guest && !node.dataset.guestGated) {
+      node.dataset.guestGated = "1";
+      node.addEventListener(
+        "click",
+        (e) => {
+          if (!(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest())) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          Guest.showFeatureLocked(node.textContent.trim());
+        },
+        true // capture -- supaya tertangkap SEBELUM listener asli tombolnya jalan
+      );
+    }
+  });
+
+  // Sinkron ulang daftar pengguna tidak relevan untuk tamu (tidak login).
+  if (el("resyncUsersBtn")) el("resyncUsersBtn").hidden = guest;
+
+  if (el("logoutBtn")) el("logoutBtn").textContent = guest ? "🚪 Keluar dari Mode Tamu" : "🚪 Keluar (logout)";
+  if (el("guestBanner")) el("guestBanner").hidden = !guest;
+
+  // Mode Presentasi 2 Layar (js/presentation.js) khusus pengguna login.
+  if (typeof Presentation !== "undefined") Presentation.refreshGuestGate();
 }
 
 // ------------------------------------------------------------
@@ -1647,6 +1934,13 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   let verseNumClickTimer = null;
   num.addEventListener("click", (e) => {
     e.stopPropagation();
+    // MODE TAMU -- highlight warna & catatan per-ayat perlu login (data
+    // pribadi per pengguna), jadi nomor ayat untuk tamu HANYA jadi
+    // penanda, tidak membuka popup highlight sama sekali.
+    if (typeof Guest !== "undefined" && Guest.isGuest()) {
+      Guest.showFeatureLocked("Highlight & Catatan Ayat");
+      return;
+    }
     if (verseNumClickTimer) {
       // Ini klik kedua dari gestur tekan-dua-kali -- biarkan dblclick yang menangani.
       clearTimeout(verseNumClickTimer);
@@ -1661,6 +1955,7 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   num.addEventListener("dblclick", (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (typeof Guest !== "undefined" && Guest.isGuest()) return; // sudah ditangani di listener "click" di atas
     if (verseNumClickTimer) {
       clearTimeout(verseNumClickTimer);
       verseNumClickTimer = null;
@@ -1701,9 +1996,26 @@ function buildVerseBlock(v, idx, fallbackBookName) {
     copyTextWithFeedback(refText, copyBtn);
   });
 
+  // Tombol "kirim ke Layar 2" -- ada di DOM untuk setiap ayat, tapi hanya
+  // TERLIHAT saat Mode Presentasi 2 Layar aktif (lihat body.present-mode-on
+  // di css/style.css & js/presentation.js). Tidak tampil untuk Mode Tamu
+  // (menu Mode Presentasi sendiri disembunyikan untuk tamu).
+  const presentBtn = document.createElement("button");
+  presentBtn.type = "button";
+  presentBtn.className = "verse-present-btn";
+  presentBtn.title = "Tampilkan ayat ini di Layar 2";
+  presentBtn.setAttribute("aria-label", "Tampilkan ayat ini di Layar 2");
+  presentBtn.textContent = "📤";
+  presentBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const bookLabel = v.bookName || fallbackBookName;
+    if (typeof Presentation !== "undefined") Presentation.sendVerse(v, bookLabel);
+  });
+
   block.appendChild(num);
   block.appendChild(textWrap);
   block.appendChild(copyBtn);
+  block.appendChild(presentBtn);
   const notePanel = buildInlineNoteCardEl(v, block);
   block.appendChild(notePanel);
 
@@ -5447,11 +5759,41 @@ function initUIEvents() {
   el("sidebarBackdrop").addEventListener("click", closeSidebarOnMobile);
   window.addEventListener("scroll", handleScrollForReadingIndicator, { passive: true });
 
-  el("searchForm").addEventListener("submit", (e) => {
+  el("searchForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    handleSearch(el("searchInput").value);
+    const query = el("searchInput").value;
+    if (!query || !query.trim()) return;
+
+    // MODE TAMU -- setiap kali tombol pencarian ditekan dihitung 1x,
+    // dicek + dicatat PUSAT lewat Apps Script (lihat js/guest.js
+    // checkAndLog() & apps-script/Code.gs type=guest_search). Kalau
+    // sudah kena batas (10x/perangkat/hari ATAU 100x gabungan semua
+    // tamu/hari), pencarian DIBATALKAN dan modal penjelasan muncul --
+    // tidak lanjut ke handleSearch().
+    if (CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest()) {
+      const searchBtn = el("searchForm").querySelector(".search-btn");
+      if (searchBtn) searchBtn.disabled = true;
+      let result;
+      try {
+        result = await Guest.checkAndLog();
+      } finally {
+        if (searchBtn) searchBtn.disabled = false;
+      }
+      if (!result || !result.allowed) {
+        Guest.showLimitReached(result || { reason: "daily", dailyLimit: CONFIG.GUEST_DAILY_LIMIT_PER_DEVICE, totalLimit: CONFIG.GUEST_TOTAL_DAILY_LIMIT });
+        return;
+      }
+    }
+
+    handleSearch(query);
     closeSidebarOnMobile();
   });
+
+  if (el("guestBannerLoginBtn")) {
+    el("guestBannerLoginBtn").addEventListener("click", () => {
+      if (confirm("Keluar dari Mode Tamu untuk masuk / daftar akun?")) logout();
+    });
+  }
 
   el("planToggle").addEventListener("click", () => {
     showPlanPanel();
@@ -5578,7 +5920,11 @@ function initUIEvents() {
   });
   initChangePasswordUI();
   el("logoutBtn").addEventListener("click", () => {
-    if (confirm("Keluar dari aplikasi? Anda perlu memasukkan username & password lagi saat kembali.")) logout();
+    const guestNow = typeof Guest !== "undefined" && Guest.isGuest();
+    const msg = guestNow
+      ? "Keluar dari Mode Tamu? Anda akan kembali ke layar Masuk."
+      : "Keluar dari aplikasi? Anda perlu memasukkan username & password lagi saat kembali.";
+    if (confirm(msg)) logout();
   });
   initScrollTopFloatButton();
 }
@@ -5730,4 +6076,8 @@ function initScrollTopFloatButton() {
 document.addEventListener("DOMContentLoaded", () => {
   initUIEvents();
   initAuth();
+  if (typeof Presentation !== "undefined") Presentation.init();
+  if (typeof Signup !== "undefined") Signup.init();
+  if (typeof UserApproval !== "undefined") UserApproval.init();
+  if (typeof AdminBell !== "undefined") AdminBell.init();
 });
