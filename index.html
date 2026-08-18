@@ -8,15 +8,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260817a" />
+<link rel="stylesheet" href="css/style.css?v=20260818a" />
 </head>
 <body>
 
   <!-- ===================== LAYAR LOGIN ===================== -->
   <div id="loginScreen" class="login-screen" hidden>
     <div class="login-card">
-      <div class="login-mark">📖</div>
-      <h1>Alkitab Versi Pemulihan</h1>
+      <div class="login-mark">☩</div>
+      <h1>Masuk</h1>
       <p class="login-sub">Masukkan username dan password Anda. Anda hanya perlu melakukannya sekali di perangkat ini.</p>
       <form id="loginForm">
         <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required />
@@ -24,7 +24,66 @@
         <div id="loginError" class="login-error" hidden>Username atau password salah.</div>
         <button type="submit" id="loginSubmitBtn">Masuk</button>
       </form>
-      <button type="button" id="loginInfoKamiBtn" class="login-info-link">ℹ️ Who Us?</button>
+      <!-- Tampil hanya kalau CONFIG.GUEST_MODE_ENABLED true (lihat initAuth()
+           di js/app.js) -- masuk tanpa perlu username/password, tapi dengan
+           batasan (lihat js/guest.js & README.md bagian Mode Tamu). -->
+      <button type="button" id="guestEnterBtn" class="login-guest-btn" hidden>👤 Coba Tanpa Daftar (Mode Tamu)</button>
+      <!-- BARU -- pendaftaran akun mandiri, akun baru MENUNGGU persetujuan
+           administrator sebelum bisa dipakai untuk masuk (lihat
+           js/signup.js & panel "🗂️ Kelola Pengguna" khusus administrator). -->
+      <button type="button" id="signupOpenBtn" class="login-info-link">📝 Daftar Akun Baru</button>
+      <button type="button" id="loginInfoKamiBtn" class="login-info-link">ℹ️ Info Kami</button>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL "DAFTAR AKUN BARU" (BARU) =====================
+       Bisa dibuka dari layar Masuk (belum login). Akun yang terkirim dari
+       sini TIDAK langsung bisa dipakai -- berstatus "menunggu persetujuan"
+       sampai administrator menyetujuinya lewat menu ⋮ -> "🗂️ Kelola
+       Pengguna" (lihat js/signup.js, apps-script/Code.gs endpoint
+       type=signup/type=user_approve). -->
+  <div id="signupOverlay" class="guest-modal-overlay" hidden>
+    <div class="guest-modal-box signup-box">
+      <div class="guest-modal-icon">📝</div>
+      <h2>Daftar Akun Baru</h2>
+      <p class="signup-warning">
+        ⚠️ Password di bawah <strong>terlihat oleh administrator</strong>
+        (bukan disimpan tersamar). Jangan pakai password yang sama dengan
+        akun bank/email Anda. Boleh diganti sekarang atau biarkan
+        default <strong>123</strong> lalu diganti nanti lewat menu
+        "Ganti Password" setelah akun disetujui.
+      </p>
+      <form id="signupForm" class="signup-form">
+        <input type="text" id="signupUsername" placeholder="Username (wajib)" autocomplete="username" required />
+        <input type="text" id="signupNama" placeholder="Nama (opsional)" autocomplete="name" />
+        <input type="text" id="signupPassword" placeholder="Password" value="123" autocomplete="new-password" />
+        <div id="signupResult" class="signup-result" hidden></div>
+        <div class="guest-modal-actions">
+          <button type="submit" id="signupSubmitBtn" class="guest-modal-btn primary">📝 Kirim Pendaftaran</button>
+          <button type="button" id="signupCloseBtn" class="guest-modal-btn">Batal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL "KELOLA PENGGUNA" (BARU, khusus administrator) =====================
+       Menampilkan SEMUA akun (dari Sheet Pengguna) + status
+       Approved/TanggalDaftar -- administrator menekan "Setujui" untuk
+       akun hasil "Daftar Akun Baru" di atas. Dibuka dari menu ⋮ ->
+       "🗂️ Kelola Pengguna" (tombol #userManageBtn, hanya tampil untuk
+       administrator, lihat updateLevelGatedMenus() di js/app.js). -->
+  <div id="userApprovalOverlay" class="info-kami-overlay" hidden>
+    <div class="info-kami-box user-approval-box">
+      <div class="info-kami-header">
+        <h2>🗂️ Kelola Pengguna</h2>
+        <div class="info-kami-header-actions">
+          <button type="button" id="userApprovalRefreshBtn" class="icon-btn" title="Muat ulang" aria-label="Muat ulang">🔄</button>
+          <button type="button" id="userApprovalCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+        </div>
+      </div>
+      <div id="userApprovalBody" class="user-approval-list">
+        <p class="user-approval-loading">Memuat…</p>
+      </div>
     </div>
   </div>
 
@@ -37,7 +96,7 @@
   <div id="infoKamiOverlay" class="info-kami-overlay" hidden>
     <div id="infoKamiBox" class="info-kami-box">
       <div class="info-kami-header">
-        <h2>ℹ️ Who Us?</h2>
+        <h2>ℹ️ Info Kami</h2>
         <div class="info-kami-header-actions">
           <div class="font-size-control">
             <button type="button" id="infoKamiFontDecrease" class="icon-btn font-btn" title="Perkecil huruf" aria-label="Perkecil huruf">A-</button>
@@ -97,11 +156,31 @@
           <button data-width="full" class="width-btn" title="Lebar Penuh">↔️</button>
           <input type="range" id="widthSlider" min="320" max="2200" value="720" title="Atur lebar bebas" />
         </div>
+        <!-- BARU -- lonceng notifikasi khusus administrator: jumlah
+             pencarian ayat HARI INI (gabungan pengguna login + tamu),
+             lihat js/adminbell.js. Disembunyikan untuk selain
+             administrator (lihat updateLevelGatedMenus() di js/app.js). -->
+        <div class="admin-bell-wrap">
+          <button id="adminBellBtn" class="icon-btn admin-bell-btn" title="Notifikasi pencarian hari ini" aria-label="Notifikasi administrator" hidden>
+            🔔<span id="adminBellBadge" class="admin-bell-badge" hidden>0</span>
+          </button>
+          <div id="adminBellPanel" class="admin-bell-panel" hidden>
+            <div class="admin-bell-panel-title">🔔 Notifikasi Administrator</div>
+            <div id="adminBellPanelBody">Memuat…</div>
+          </div>
+        </div>
         <button id="menuToggle" class="icon-btn" aria-label="Menu lainnya">⋮</button>
       </div>
     </header>
 
     <div id="currentReadingIndicator" class="current-reading-indicator" hidden></div>
+
+    <!-- Tampil hanya untuk mode tamu (lihat applyGuestModeUi() di js/app.js) --
+         pengingat singkat + jalan pintas untuk masuk/daftar akun. -->
+    <div id="guestBanner" class="guest-banner" hidden>
+      👤 Anda memakai <strong>Mode Tamu</strong> — pencarian ayat terbatas per hari, dan sebagian menu tidak aktif.
+      <button type="button" id="guestBannerLoginBtn">Masuk / Daftar Akun</button>
+    </div>
 
     <div id="moreMenu" class="more-menu" hidden>
       <div class="more-menu-item" id="userStatus">Memuat status…</div>
@@ -120,6 +199,8 @@
       <button id="monitorBtn" class="more-menu-btn" hidden>👀 Pantau Pembacaan</button>
       <!-- Tampil hanya untuk administrator -->
       <button id="logViewerBtn" class="more-menu-btn" hidden>📊 Log Aktivitas</button>
+      <!-- BARU -- persetujuan akun hasil "Daftar Akun Baru", khusus administrator -->
+      <button id="userManageBtn" class="more-menu-btn" hidden>🗂️ Kelola Pengguna</button>
       <!-- Satu tombol untuk unduh pertama kali MAUPUN sinkron ulang -- teks
            tombol disesuaikan otomatis lewat updateResyncBtnLabel() di
            js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
@@ -238,6 +319,44 @@
           <span class="toggle-slider"></span>
         </span>
       </label>
+
+      <!-- ===================== MODE PRESENTASI 2 LAYAR (baru) =====================
+           Disembunyikan untuk Mode Tamu lewat Presentation.refreshGuestGate()
+           (dipanggil dari applyGuestModeUi() di js/app.js). Lihat js/presentation.js. -->
+      <div class="more-menu-section" id="presentModeRow">
+        <div class="more-menu-section-title">🖥️ Mode Presentasi</div>
+        <label class="more-menu-toggle" for="presentModeToggle">
+          <span>Tampilkan di Layar 2 (jendela terpisah)</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="presentModeToggle" />
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+        <p id="presentStatusText" class="announcement-compose-hint">Mode 1 Layar aktif.</p>
+        <button type="button" id="presentOpenWindowBtn" class="chip-btn small" hidden>🖥️ Buka Layar 2</button>
+
+        <div id="presentControlsBody" hidden>
+          <p class="announcement-compose-hint">
+            Cari &amp; buka ayat seperti biasa di layar ini — tekan tombol 📤 di sebelah tombol salin (📋)
+            pada ayat mana pun untuk menampilkannya di Layar 2.
+          </p>
+          <div class="present-preview-label">Pratinjau Layar 2:</div>
+          <div id="presentPreviewBox" class="present-preview-box">
+            <div class="present-preview-idle">Belum ada tayangan</div>
+          </div>
+          <button type="button" id="presentClearBtn" class="chip-btn small">🧹 Kosongkan Layar 2</button>
+
+          <div class="more-menu-section-title" style="margin-top:14px;">✏️ Tulisan Bebas ke Layar 2</div>
+          <textarea id="presentFreeText" class="columns-lang-select" rows="3" placeholder="Ketik tulisan bebas (pengumuman, ayat hafalan, dsb) untuk ditampilkan di Layar 2…" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          <div class="present-freetext-actions">
+            <button type="button" id="presentSendFreeTextBtn" class="chip-btn small">📤 Kirim ke Layar 2</button>
+            <button type="button" id="presentSaveFreeTextBtn" class="chip-btn small">💾 Simpan</button>
+          </div>
+          <div class="more-menu-section-title" style="margin-top:10px;">🕘 Tulisan Tersimpan</div>
+          <div id="presentSavedList" class="present-saved-list"></div>
+        </div>
+      </div>
+
       <button id="logoutBtn" class="more-menu-btn danger">🚪 Keluar (logout)</button>
     </div>
 
@@ -418,24 +537,28 @@
        tanggal hari itu) SETIAP kali men-deploy perubahan js/*.js atau
        css/style.css, supaya semua pengguna otomatis dipaksa ambil versi
        terbaru tanpa perlu diminta hard-refresh manual satu per satu. -->
-  <script src="js/config.js?v=20260817a"></script>
-  <script src="js/books.js?v=20260817a"></script>
-  <script src="js/csv.js?v=20260817a"></script>
-  <script src="js/db.js?v=20260817a"></script>
-  <script src="js/sync.js?v=20260817a"></script>
-  <script src="js/infokami.js?v=20260817a"></script>
-  <script src="js/levels.js?v=20260817a"></script>
-  <script src="js/activitylog.js?v=20260817a"></script>
-  <script src="js/notes.js?v=20260817a"></script>
-  <script src="js/highlights.js?v=20260817a"></script>
-  <script src="js/collections.js?v=20260817a"></script>
-  <script src="js/settings.js?v=20260817a"></script>
-  <script src="js/plans.js?v=20260817a"></script>
-  <script src="js/media.js?v=20260817a"></script>
-  <script src="js/outlines.js?v=20260817a"></script>
-  <script src="js/app.js?v=20260817a"></script>
-  <script src="js/curhat.js?v=20260817a"></script>
-  <script src="js/aichat.js?v=20260817a"></script>
-  <script src="js/langcheck.js?v=20260817a"></script>
+  <script src="js/config.js?v=20260818a"></script>
+  <script src="js/guest.js?v=20260818a"></script>
+  <script src="js/books.js?v=20260818a"></script>
+  <script src="js/csv.js?v=20260818a"></script>
+  <script src="js/db.js?v=20260818a"></script>
+  <script src="js/sync.js?v=20260818a"></script>
+  <script src="js/infokami.js?v=20260818a"></script>
+  <script src="js/levels.js?v=20260818a"></script>
+  <script src="js/activitylog.js?v=20260818a"></script>
+  <script src="js/notes.js?v=20260818a"></script>
+  <script src="js/highlights.js?v=20260818a"></script>
+  <script src="js/collections.js?v=20260818a"></script>
+  <script src="js/settings.js?v=20260818a"></script>
+  <script src="js/plans.js?v=20260818a"></script>
+  <script src="js/media.js?v=20260818a"></script>
+  <script src="js/outlines.js?v=20260818a"></script>
+  <script src="js/presentation.js?v=20260818a"></script>
+  <script src="js/signup.js?v=20260818a"></script>
+  <script src="js/adminbell.js?v=20260818a"></script>
+  <script src="js/app.js?v=20260818a"></script>
+  <script src="js/curhat.js?v=20260818a"></script>
+  <script src="js/aichat.js?v=20260818a"></script>
+  <script src="js/langcheck.js?v=20260818a"></script>
 </body>
 </html>
