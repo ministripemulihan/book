@@ -57,6 +57,16 @@
         <input type="text" id="signupUsername" placeholder="Username (wajib)" autocomplete="username" required />
         <input type="text" id="signupNama" placeholder="Nama (opsional)" autocomplete="name" />
         <input type="text" id="signupPassword" placeholder="Password" value="123" autocomplete="new-password" />
+        <input type="tel" id="signupWhatsapp" placeholder="No. WhatsApp (opsional)" autocomplete="tel" />
+        <input type="text" id="signupGereja" placeholder="Gereja (opsional)" autocomplete="off" />
+        <input type="text" id="signupCabang" placeholder="Cabang (opsional)" autocomplete="off" />
+        <input type="text" id="signupKota" placeholder="Kota (opsional)" autocomplete="address-level2" />
+        <select id="signupGender" autocomplete="off">
+          <option value="">Saudara/Saudari (opsional)</option>
+          <option value="Saudara">Saudara (Laki-laki)</option>
+          <option value="Saudari">Saudari (Perempuan)</option>
+        </select>
+        <input type="number" id="signupUmur" placeholder="Umur (opsional)" min="1" max="120" autocomplete="off" />
         <div id="signupResult" class="signup-result" hidden></div>
         <div class="guest-modal-actions">
           <button type="submit" id="signupSubmitBtn" class="guest-modal-btn primary">📝 Kirim Pendaftaran</button>
