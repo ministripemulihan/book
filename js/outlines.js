@@ -89,13 +89,24 @@ function normalizeLangValue(raw) {
   return LANG_NAME_ALIASES[key] || String(raw || "").trim().toLowerCase();
 }
 
+// Ukuran (byte) ASLI dari unduhan TERAKHIR tiap sheet outline -- dipakai
+// supaya total ukuran unduhan data (Alkitab + ketiga sheet ini) bisa
+// DIHITUNG OTOMATIS OLEH PROGRAM (lihat totalOutlineBytesLastSync() di
+// bawah & syncFromServer() di js/app.js), BUKAN diketik manual siapa pun.
+let _lastOutlineFetchBytes = { pokok: 0, garisBesar: 0, peta: 0 };
+function totalOutlineBytesLastSync() {
+  return (_lastOutlineFetchBytes.pokok || 0) + (_lastOutlineFetchBytes.garisBesar || 0) + (_lastOutlineFetchBytes.peta || 0);
+}
+
 // ---------------- Sheet A: Pokok Kitab ----------------
 async function fetchPokokKitabSheet() {
   const url = outlineSheetsConfig().pokokKitabCsvUrl;
-  if (!url || !url.trim()) return [];
+  if (!url || !url.trim()) { _lastOutlineFetchBytes.pokok = 0; return []; }
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil Pokok Kitab (" + res.status + ")");
-  const records = parseCSV(await res.text());
+  const csvText = await res.text();
+  _lastOutlineFetchBytes.pokok = new Blob([csvText]).size;
+  const records = parseCSV(csvText);
   const rows = records.map((r) => ({
     bookNum: rowNum(r, ["book number", "booknumber", "no kitab"]),
     bookName: rowStr(r, ["book name", "bookname"]),
@@ -109,10 +120,12 @@ async function fetchPokokKitabSheet() {
 // ---------------- Sheet B: Garis Besar (nested) ----------------
 async function fetchGarisBesarSheet() {
   const url = outlineSheetsConfig().garisBesarCsvUrl;
-  if (!url || !url.trim()) return [];
+  if (!url || !url.trim()) { _lastOutlineFetchBytes.garisBesar = 0; return []; }
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil Garis Besar (" + res.status + ")");
-  const records = parseCSV(await res.text());
+  const csvText = await res.text();
+  _lastOutlineFetchBytes.garisBesar = new Blob([csvText]).size;
+  const records = parseCSV(csvText);
   const rows = records.map((r) => ({
     bookNum: rowNum(r, ["book number", "booknumber", "no kitab"]),
     lang: normalizeLangValue(rowStr(r, ["bahasa", "language", "lang"])),
@@ -130,10 +143,12 @@ async function fetchGarisBesarSheet() {
 // ---------------- Sheet C: Peta & Gambar ----------------
 async function fetchPetaGambarSheet() {
   const url = outlineSheetsConfig().petaGambarCsvUrl;
-  if (!url || !url.trim()) return [];
+  if (!url || !url.trim()) { _lastOutlineFetchBytes.peta = 0; return []; }
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil Peta+Gambar (" + res.status + ")");
-  const records = parseCSV(await res.text());
+  const csvText = await res.text();
+  _lastOutlineFetchBytes.peta = new Blob([csvText]).size;
+  const records = parseCSV(csvText);
   const rows = records.map((r) => ({
     bookNum: rowNum(r, ["book number", "booknumber", "no kitab"]),
     bookName: rowStr(r, ["book name", "bookname"]),
@@ -158,7 +173,10 @@ async function pokokKitabRows() { return getRowsCachedOrFetch("pokok", fetchPoko
 async function garisBesarRows() { return getRowsCachedOrFetch("garis_besar", fetchGarisBesarSheet); }
 async function petaGambarRows() { return getRowsCachedOrFetch("peta_gambar", fetchPetaGambarSheet); }
 
-// Sinkron ulang ketiganya langsung dari server (tombol "sinkron ulang").
+// Sinkron ulang ketiganya langsung dari server -- dipanggil otomatis dari
+// syncFromServer() di js/app.js setiap kali tombol menu ⋮ → "Sinkronkan
+// ulang Alkitab" / "Unduh Data Alkitab" ditekan, jadi tidak perlu tombol
+// terpisah lagi.
 async function resyncAllOutlineSheets() {
   const [pokok, garisBesar, peta] = await Promise.all([
     fetchPokokKitabSheet().catch(() => []),
@@ -217,7 +235,7 @@ async function getOutlineHeadersForVerse(bookNum, lang, chapter, verse) {
 }
 
 // Label rentang ayat, mis. "Kejadian 1:1-1:20" atau "Kejadian 1:2" kalau
-// rentangnya cuma 1 ayat. 
+// rentangnya cuma 1 ayat.
 function outlineRangeLabel(bookName, entry) {
   const start = `${entry.chapterStart}:${entry.verseStart}`;
   const end = `${entry.chapterEnd}:${entry.verseEnd}`;
