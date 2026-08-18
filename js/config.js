@@ -16,18 +16,25 @@ const CONFIG = {
   //  4. Klik "Publikasikan", salin URL yang muncul, tempel di bawah ini
   BIBLE_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQokT8ny0sgFBuYfzBAMBBNJDhcH6Mif31q3oBRM_pFPBQq-qXg3xiiy1A_5nApeSow_1bn1WExHOrk/pub?output=csv",
 
-  // Perkiraan ukuran file data Alkitab (semua bahasa), dalam MB -- HANYA
-  // dipakai untuk teks info di layar unduhan pertama kali ("Data ini
-  // sekitar ... MB"), supaya pengguna baru tidak bingung kenapa loading
-  // di awal cukup lama. Ubah angka ini kalau ukuran datanya berubah
-  // banyak (tidak perlu presisi, cukup perkiraan).
-  // Perkiraan ukuran unduhan ditampilkan di dialog "Unduh Data Alkitab" --
-  // mencakup teks Alkitab utama + 3 sheet Pokok Kitab/Garis Besar/Peta&
-  // Gambar yang sekarang ikut disinkronkan bersamaan (lihat
-  // resyncAllOutlineSheets() di js/outlines.js, dipanggil dari
-  // syncFromServer() di js/app.js). Total ketiga sheet itu bisa terus
-  // bertambah isinya, jadi angka ini perlu dinaikkan lagi sewaktu-waktu
-  // kalau ukurannya membengkak jauh dari ini.
+  // Perkiraan ukuran file data Alkitab (semua bahasa), dalam MB -- dipakai
+  // untuk teks info di layar unduhan pertama kali ("Data ini sekitar ...
+  // MB") DAN sebagai perkiraan pembagi progres unduhan real-time ("X MB
+  // dari ~Y MB", lihat syncFromServer() & fetchTextWithProgress() di
+  // js/app.js), untuk kasus server tidak mengirim Content-Length.
+  // Mencakup teks Alkitab utama + 3 sheet Pokok Kitab/Garis Besar/Peta&
+  // Gambar yang ikut disinkronkan bersamaan (lihat resyncAllOutlineSheets()
+  // di js/outlines.js).
+  //
+  // PENTING (BARU): angka di bawah ini HANYA "tebakan awal" sebelum ADA
+  // SATU PUN perangkat yang pernah menyelesaikan unduhan penuh -- setelah
+  // itu, angka ini TIDAK PERNAH dipakai lagi. Sumber yang sesungguhnya
+  // dipakai aplikasi SEKARANG DIHITUNG OTOMATIS OLEH PROGRAM dari byte
+  // ASLI yang baru saja diunduh (Alkitab + Pokok Kitab/Garis Besar/Peta),
+  // lalu disimpan sendiri ke tab "Setup" Google Sheet (key
+  // `bible_data_approx_size_mb`) DAN ke perangkat itu -- TIDAK ADA lagi
+  // yang perlu diketik manual oleh administrator. Lihat
+  // saveMeasuredBibleSizeMb_() & getEffectiveBibleSizeMb() di js/app.js,
+  // dan updateMeasuredBibleSizeMb_() di apps-script/Code.gs.
   BIBLE_DATA_APPROX_SIZE_MB: 60,
 
   // ----------------------------------------------------------
@@ -54,7 +61,7 @@ const CONFIG = {
   // Google Sheet dan bisa dibuka sama persis dari HP maupun komputer lain.
   // Kosongkan / biarkan seperti ini kalau tidak ingin memakai fitur ini
   // (aplikasi tetap jalan normal, hanya tersimpan lokal di perangkat saja).
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwFBdKKpQNRpTSKKSwMMSidaVqxcGZAgXj8CWefsOU2GzuZdtqapWgMvZIMNDUrmZLqxA/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxYPcPbr1A-1nOwHIgX-bGpIUqtAmkY5jbxuJ-R5VwW_dl-7fWmWX6i8eA8mzPIfF7Lbw/exec",
 
   // ----------------------------------------------------------
   // 3b) CURHAT DOMBA & GEMBALA — Google Apps Script BARU & TERPISAH
@@ -260,4 +267,38 @@ const CONFIG = {
   // Kosongkan ("") kalau tidak dipakai -- fitur bawaan (builtin) di
   // atas tetap jalan seperti biasa tanpa ini.
   AI_KNOWLEDGE_CSV_URL: "1zlZcLeAwB7cmdkP8vjSZpaxZM7yGnUneB-_SaGz2yX4",
+
+  // ----------------------------------------------------------
+  // 9) MODE TAMU (bisa langsung dipakai TANPA login/daftar dulu)
+  // ----------------------------------------------------------
+  // Lihat js/guest.js untuk logikanya. Yang bisa diatur di sini:
+  //  - GUEST_MODE_ENABLED: nyala/matikan tombol "Coba Tanpa Daftar"
+  //    di layar Masuk. Set `false` kalau tidak mau ada akses tamu
+  //    sama sekali (semua orang WAJIB login seperti sebelumnya).
+  //  - GUEST_DAILY_LIMIT_PER_DEVICE: maksimal PENCARIAN per hari
+  //    untuk SATU perangkat/browser yang belum login.
+  //  - GUEST_TOTAL_DAILY_LIMIT: maksimal PENCARIAN gabungan dari
+  //    SEMUA tamu (semua perangkat) per hari -- begitu tercapai,
+  //    SEMUA tamu (termasuk yang belum habis jatah pribadinya)
+  //    tidak bisa mencari lagi sampai besok. Naikkan angka ini kalau
+  //    jemaat/pengunjung tanpa login makin ramai.
+  // PENTING (BARU): kedua angka di bawah ini SEKARANG HANYA CADANGAN
+  // (dipakai kalau tab "Setup" di Google Sheet belum sempat terbaca, mis.
+  // Apps Script benar-benar baru pertama dipasang). Sumber UTAMA & yang
+  // SUNGGUHAN ditegakkan sekarang tab "Setup" di Google Sheet sinkron
+  // Anda, dua baris key: `guest_daily_limit_per_device` &
+  // `guest_total_daily_limit` (dibuat otomatis dengan isi 10 & 100 saat
+  // pertama kali dipakai -- lihat getSheet_() di apps-script/Code.gs).
+  // Administrator TINGGAL UBAH ANGKANYA LANGSUNG DI SHEET kapan saja,
+  // TIDAK perlu ubah file ini atau deploy ulang apa pun -- ditegakkan
+  // lewat Apps Script (endpoint type=guest_search, dibaca lewat
+  // getSetupNumber_(), tab Sheet "GuestUsage" untuk pencatatan
+  // pemakaiannya). Kalau APPS_SCRIPT_URL masih kosong / sedang offline,
+  // aplikasi jatuh balik ke hitungan LOKAL per perangkat saja (tidak
+  // terpusat, bisa diakali dengan hapus data browser) memakai angka
+  // cadangan di bawah -- batas totalnya (gabungan semua tamu) TIDAK bisa
+  // ditegakkan tanpa APPS_SCRIPT_URL terisi & bisa dihubungi.
+  GUEST_MODE_ENABLED: true,
+  GUEST_DAILY_LIMIT_PER_DEVICE: 10,
+  GUEST_TOTAL_DAILY_LIMIT: 100,
 };
