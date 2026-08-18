@@ -1136,3 +1136,155 @@ bible-app/
      sudah ada di `CONFIG.AI_CHAT_APPS_SCRIPT_URL` tetap berlaku). Tab
      `AiChatHistory` akan otomatis dibuat sendiri saat pertama kali ada
      yang menyimpan riwayat — tidak perlu dibuat manual.
+
+## Update lanjutan (Agustus 2026, tahap 13) — progres unduhan pakai MB asli & batas Mode Tamu diatur dari Sheet
+
+1. **Progres unduhan data Alkitab sekarang pakai MB SUNGGUHAN** (mis.
+   "📥 Mengunduh data Alkitab… 12.4 MB dari ~60 MB"), bukan cuma
+   persentase buta seperti sebelumnya. Diambil dari byte ASLI yang
+   sudah diterima browser saat mengunduh (streaming), bukan tebakan.
+   Kalau server tidak mengirim `Content-Length` (jarang), aplikasi
+   jatuh balik memakai perkiraan ukuran (lihat poin 3 di bawah) sebagai
+   pembagi, supaya angka "dari ... MB"-nya tetap masuk akal. Tahapan
+   progress bar sekarang: 0–40% unduh mentah, 40–95% baca+simpan ke
+   perangkat, 95–100% sinkron Pokok Kitab/Garis Besar/Peta.
+   - Berkas: `js/app.js` (`fetchTextWithProgress()` — fungsi baru,
+     `syncFromServer()` — diubah untuk pakai fungsi ini alih-alih
+     `fetchWithTimeout()` + `res.text()`).
+2. **Batas Mode Tamu (10x/perangkat/hari, 100x gabungan/hari) sekarang
+   diatur dari Google Sheet, bukan hardcode di `js/config.js` lagi.**
+   Administrator tinggal buka tab **"Setup"** di Google Sheet sinkron
+   (Sheet yang sama tempat `apps-script/Code.gs` terpasang), cari 2
+   baris key `guest_daily_limit_per_device` & `guest_total_daily_limit`
+   (dibuat otomatis dengan isi 10 & 100 saat tab Setup pertama kali
+   dipakai), lalu **ubah angka di kolom "Isi" langsung** — TIDAK perlu
+   ubah kode apa pun atau deploy ulang. Angka baru langsung berlaku di
+   pemakaian berikutnya (dibaca server tiap kali endpoint
+   `guest_search` dipanggil).
+   - Kolom `Tampil` kedua baris ini sengaja diisi `FALSE` supaya TIDAK
+     ikut muncul di panel "ℹ️ Info Kami" pengunjung (yang memang khusus
+     info publik) — tapi tetap terbaca sebagai pengaturan aplikasi.
+   - **Keamanan diperketat**: sebelumnya batas dikirim dari BROWSER ke
+     Apps Script lewat parameter URL (bisa saja diubah orang yang iseng
+     lewat DevTools). Sekarang Apps Script SELALU membaca angka dari
+     tab Setup sebagai sumber utama (`getSetupNumber_()`); nilai dari
+     browser hanya dipakai sebagai cadangan kalau tab Setup entah kenapa
+     tidak terbaca sama sekali.
+   - Berkas: `apps-script/Code.gs` (baris default baru di `getSheet_()`
+     untuk tab Setup, `readSetupRaw_()`, `getSetupNumber_()`, endpoint
+     `guest_search` diubah untuk memakai keduanya, endpoint BARU
+     `app_setup`), `js/config.js` (komentar diperbarui — nilai
+     `GUEST_DAILY_LIMIT_PER_DEVICE`/`GUEST_TOTAL_DAILY_LIMIT` sekarang
+     status CADANGAN saja), `js/guest.js` (komentar diperbarui,
+     perilaku pengecekan/pencatatan tidak berubah — tetap lewat endpoint
+     `guest_search` yang sama).
+3. **Perkiraan ukuran unduhan (60 MB) juga bisa diubah dari Sheet yang
+   sama** — key `bible_data_approx_size_mb` di tab Setup (dibuat
+   otomatis, isi awal `60`), dipakai di dialog "Unduh Data Alkitab
+   (Pertama Kali)" DAN sebagai pembagi progres MB di poin 1 kalau
+   server tidak mengirim `Content-Length`. `CONFIG.BIBLE_DATA_APPROX_SIZE_MB`
+   di `js/config.js` sekarang juga status CADANGAN saja (dipakai kalau
+   Apps Script tidak bisa dihubungi).
+   - Berkas: `js/app.js` (`getEffectiveBibleSizeMb()`,
+     `fetchRemoteAppSetup_()` — fungsi baru, dipanggil dari
+     `syncFromServer()` & `showBibleSyncPrompt()` yang sekarang `async`).
+4. **Kalau Code.gs sudah pernah di-deploy sebelumnya**: tempel ulang
+   SELURUH isi file terbaru ke editor Apps Script Anda, lalu "Deploy" →
+   "Manage deployments" → ikon pensil → Version: "New version" → Deploy
+   (JANGAN buat deployment baru). Tab "Setup" yang sudah ada akan
+   otomatis ditambah baris pengaturan baru di atas HANYA kalau tab itu
+   belum pernah ada sama sekali (tab yang sudah ada isinya TIDAK
+   ditimpa) — kalau tab "Setup" Anda sudah ada dari update sebelumnya
+   (fitur "Info Kami"), tambahkan 3 baris baru itu SENDIRI secara manual
+   di Sheet (Key | Label | Isi | Tampil):
+   - `guest_daily_limit_per_device` | (bebas) | `10` | `FALSE`
+   - `guest_total_daily_limit` | (bebas) | `100` | `FALSE`
+   - `bible_data_approx_size_mb` | (bebas) | `60` | `FALSE`
+
+## Update lanjutan (Agustus 2026, tahap 14) — Daftar Akun Baru + persetujuan administrator, dan lonceng notifikasi pencarian harian
+
+1. **Tombol BARU "📝 Daftar Akun Baru" di layar Masuk** — siapa saja
+   (tanpa login) bisa mendaftar sendiri: Username (wajib), Nama
+   (opsional), Password (default terisi `123`, boleh diganti sendiri).
+   Ada peringatan tertulis di formulir bahwa password **terlihat oleh
+   administrator** (sama seperti semua password di Sheet Pengguna ini
+   apa adanya, lihat catatan keamanan di bagian awal README) — jangan
+   pakai password yang sama dengan akun bank/email.
+   - Akun BARU **langsung ditulis ke Sheet Pengguna asli** lewat Apps
+     Script (endpoint baru `type=signup`), TAPI kolom **"Approved"**
+     otomatis terisi `FALSE` — akun ini **BELUM BISA dipakai untuk
+     masuk** sampai administrator menyetujuinya (lihat poin 2). Kalau
+     password benar tapi akun belum disetujui, layar Masuk menampilkan
+     pesan khusus ("...menunggu persetujuan administrator..."), BUKAN
+     pesan generik "Username/password salah" — supaya orangnya tahu
+     harus menunggu, bukan mengira lupa password.
+   - Kolom **"Approved"** & **"TanggalDaftar"** dibuat OTOMATIS di
+     Sheet Pengguna kalau belum ada sama sekali (dicari lewat nama
+     header, longgar terhadap variasi penulisan, sama seperti kolom
+     lain di aplikasi ini) — **tidak perlu menambah kolom manual**.
+     Akun LAMA (sebelum kolom ini ada / selnya kosong) **otomatis
+     tetap dianggap disetujui** (approved=true) — pembaruan ini TIDAK
+     mengunci siapa pun yang sudah bisa login sebelumnya.
+   - Berkas: `apps-script/Code.gs` (`signupUser_()`, `ensureUserColumn_()`,
+     `parseApprovedField_()`, endpoint `type=signup` di `doPost()`),
+     `js/csv.js` (`normalizeUserRecord()` — field baru `approved` &
+     `signupDate`, `parseApprovedField()`), `js/app.js`
+     (`validateLogin()` — mengembalikan `{pendingApproval:true}` kalau
+     password benar tapi belum disetujui; kalau ditemukan status belum
+     disetujui, sekali coba sinkron ulang dulu — barangkali baru saja
+     disetujui admin tapi data lokal di HP itu belum sempat
+     diperbarui), `js/signup.js` (BARU — modul `Signup`, panel/form-nya
+     di `index.html` `#signupOverlay`), `css/style.css` (`.signup-*`).
+
+2. **Panel BARU "🗂️ Kelola Pengguna" di menu ⋮ — khusus administrator**
+   (sama pola gating-nya dengan "📊 Log Aktivitas": `hidden` di HTML,
+   ditampilkan lewat `updateLevelGatedMenus()` kalau `isAdministrator()`).
+   Menampilkan SEMUA akun dari Sheet Pengguna (Username, Nama, Level,
+   status Approved, TanggalDaftar) — yang **belum disetujui ditaruh
+   paling atas** supaya cepat ditindaklanjuti. Administrator tinggal
+   tekan tombol **"✅ Setujui"** (atau "Batalkan" untuk mencabut
+   persetujuan kapan saja) di baris akun yang dimaksud.
+   - Berkas: `apps-script/Code.gs` (`setUserApproved_()`,
+     `readAllUsersForAdmin_()`, endpoint `type=admin_users_list` di
+     `doGet()` & `type=user_approve` di `doPost()`), `js/signup.js`
+     (BARU — modul `UserApproval`, panelnya di `index.html`
+     `#userApprovalOverlay`), `index.html` (tombol `#userManageBtn` di
+     `#moreMenu`), `js/app.js` (`updateLevelGatedMenus()` mengatur
+     `hidden` tombol ini), `css/style.css` (`.user-approval-*`).
+   - **Catatan keamanan yang sama seperti fitur admin lain di aplikasi
+     ini** (Log Aktivitas dkk.): siapa yang BOLEH membuka panel ini
+     dicek di SISI APLIKASI (`isAdministrator()`), bukan otentikasi
+     tingkat server — cukup untuk keperluan pribadi/keluarga/jemaat,
+     bukan untuk data benar-benar rahasia.
+
+3. **Lonceng BARU "🔔" di header — pengganti ikon "+" yang sebelumnya
+   tidak berfungsi** — HANYA tampil untuk administrator. Menunjukkan
+   badge angka = jumlah PENCARIAN AYAT hari ini (gabungan pengguna yang
+   sudah login, dihitung dari tab "ActivityLog" Menu="Pencarian", +
+   Mode Tamu, dihitung dari tab "GuestUsage"). Klik lonceng membuka
+   panel kecil berisi rincian (jumlah login vs jumlah tamu). Disegarkan
+   otomatis tiap 5 menit selagi administrator sedang login, dan tiap
+   kali panelnya dibuka.
+   - Berkas: `apps-script/Code.gs` (`readSearchStatsToday_()`, endpoint
+     `type=search_stats_today` di `doGet()`), `js/adminbell.js` (BARU —
+     modul `AdminBell`), `index.html` (`#adminBellBtn`,
+     `#adminBellBadge`, `#adminBellPanel` di header), `js/app.js`
+     (`updateLevelGatedMenus()` memanggil `AdminBell.refreshVisibility()`),
+     `css/style.css` (`.admin-bell-*`).
+
+4. **Kalau Code.gs sudah pernah di-deploy sebelumnya**: tempel ulang
+   SELURUH isi file terbaru ke editor Apps Script Anda, lalu "Deploy" →
+   "Manage deployments" → ikon pensil → Version: "New version" →
+   Deploy (JANGAN buat deployment baru). Kolom "Approved" &
+   "TanggalDaftar" di Sheet Pengguna akan ditambahkan OTOMATIS sendiri
+   saat pertama kali ada yang mendaftar lewat "📝 Daftar Akun Baru" atau
+   saat administrator pertama kali menekan "✅ Setujui"/"Batalkan" di
+   panel "🗂️ Kelola Pengguna" — **tidak perlu menambah kolom manual**.
+5. **Catatan soal kecepatan tampil akun baru**: Sheet Pengguna
+   dipublikasikan sebagai CSV publik (`USERS_SHEET_CSV_URL` di
+   `js/config.js`) yang Google perbarui otomatis beberapa saat setelah
+   Sheet-nya berubah (biasanya dalam hitungan menit, bukan instan). Jadi
+   setelah administrator menekan "✅ Setujui", pengguna yang bersangkutan
+   mungkin perlu **coba masuk lagi sesaat kemudian**, atau administrator
+   bisa memintanya menekan menu ⋮ → "👥 Sinkronkan ulang daftar
+   pengguna" di HP-nya supaya langsung ketemu tanpa menunggu.
