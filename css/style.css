@@ -2212,16 +2212,16 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-timer-display.ps-timer-idle { color: var(--ps-muted); }
 .ps-timer-box .chip-btn.active { background: var(--brass-soft); color: #1a1206; border-color: var(--brass-soft); }
 
-.ps-quick-preview { max-height: 160px; overflow-y: auto; margin-top: 8px; font-size: 12.5px; color: var(--ps-ink-soft); }
+.ps-quick-preview { max-height: 220px; overflow-y: auto; margin-top: 8px; font-size: 14.5px; line-height: 1.5; color: var(--ps-ink-soft); }
 .ps-quick-preview-row { padding: 4px 0; border-bottom: 1px solid var(--ps-col-border); }
-.ps-quick-preview-block { padding: 6px 0; border-bottom: 1px solid var(--ps-col-border); }
+.ps-quick-preview-block { padding: 8px 0; border-bottom: 1px solid var(--ps-col-border); }
 .ps-quick-preview-block:last-child { border-bottom: none; }
-.ps-quick-preview-block b { display: block; margin-bottom: 3px; }
-.ps-quick-preview-vrow { padding: 2px 0; }
+.ps-quick-preview-block b { display: block; margin-bottom: 4px; font-size: 13.5px; color: var(--ps-ink); }
+.ps-quick-preview-vrow { padding: 3px 0; }
 .ps-quick-preview-vtag {
-  display: inline-block; font-size: 10px; font-weight: 700; color: #d8b45c;
+  display: inline-block; font-size: 11.5px; font-weight: 700; color: #d8b45c;
   background: rgba(216, 180, 92, 0.14); border: 1px solid rgba(216, 180, 92, 0.4);
-  border-radius: 4px; padding: 0 5px; margin-right: 6px;
+  border-radius: 4px; padding: 1px 6px; margin-right: 6px;
 }
 .ps-version-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
 .ps-version-grid label { display: flex; align-items: center; gap: 4px; }
@@ -2252,6 +2252,7 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   background: var(--ps-preview-bg); border-radius: 10px; padding: 16px; min-height: 120px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   color: var(--ps-preview-ink); border: 1px solid var(--ps-col-border);
+  font-family: "Merriweather", Georgia, serif;
 }
 /* Saat isinya melebihi tinggi kotak (mis. banyak versi Alkitab
    dicentang sekaligus), JANGAN pusatkan lalu potong tengah kalimat --
@@ -2275,9 +2276,29 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    lewat innerHTML (renderStudioPreview()), jadi dot & canvas SENGAJA
    ditaruh sebagai saudara (sibling), bukan anak, dari psPreviewBox,
    supaya tidak ikut terhapus tiap tayangan berganti. */
-.ps-preview-slot .ps-preview-box-wrap { flex: 1 1 auto; position: relative; border-radius: 10px; overflow: hidden; min-height: 120px; }
+.ps-preview-slot .ps-preview-box-wrap { flex: 1 1 auto; position: relative; border-radius: 10px; overflow: hidden; min-height: 120px; container-type: inline-size; container-name: ps-preview; }
 .ps-preview-box-wrap .ps-preview-box { position: absolute; inset: 0; overflow-y: auto; }
 .ps-preview-box-wrap.ps-pointer-mode { cursor: crosshair; }
+
+/* Skala font di kotak pratinjau Studio dibuat PROPORSIONAL terhadap
+   lebar kotak itu sendiri (container query units, "cqw") -- meniru
+   rasio clamp(...vw...) yang dipakai #ref/#text di present.html
+   (Layar 2), yang berbasis lebar LAYAR PENUH. Dengan begini, makin
+   lebar/besar kotak pratinjau (mis. mode dual monitor), makin besar
+   pula hurufnya secara proporsional -- baris kalimat jadi patah kurang
+   lebih di titik yang sama seperti di Layar 2 sungguhan, supaya posisi
+   Penunjuk/Pen (dikirim sebagai pecahan % dari kotak ini) lebih akurat
+   menunjuk kata yang sama di kedua tempat. Fallback ke px tetap di
+   browser lama yang belum kenal cqw (clamp tetap jalan, minus skala). */
+.ps-preview-box-wrap .present-preview-ref {
+  font-size: clamp(11px, 2.6cqw, 26px);
+  margin-bottom: clamp(6px, 1.6cqw, 16px);
+}
+.ps-preview-box-wrap .present-preview-text,
+.ps-preview-box-wrap .present-preview-version {
+  font-size: clamp(13px, 4.4cqw, 38px);
+  line-height: 1.4;
+}
 
 /* Titik Penunjuk -- ukuran & glow SAMA PERSIS dengan #pointerDot di
    present.html (22px, box-shadow currentColor). Diposisikan pakai %
