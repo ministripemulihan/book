@@ -1286,6 +1286,13 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   color: #d8b45c; font-size: 11px; margin-bottom: 6px;
 }
 .present-preview-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.present-preview-version { font-size: 14px; line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px; }
+.present-preview-version:last-child { margin-bottom: 0; }
+.present-preview-version-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: #d8b45c; background: rgba(216, 180, 92, 0.14); border: 1px solid rgba(216, 180, 92, 0.4);
+  border-radius: 5px; padding: 1px 6px; margin-right: 6px; vertical-align: middle;
+}
 .present-freetext-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .present-saved-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
 .present-saved-empty { font-size: 12.5px; color: var(--ink-soft); }
@@ -1989,7 +1996,8 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   text-align: left;
 }
 .signup-form { display: flex; flex-direction: column; gap: 10px; }
-.signup-form input {
+.signup-form input,
+.signup-form select {
   padding: 11px 12px;
   border-radius: 9px;
   border: 1px solid var(--rule);
@@ -2068,3 +2076,199 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 @media (max-width: 640px) {
   .admin-bell-panel { width: 220px; right: -8px; }
 }
+
+/* ============================================================
+   STUDIO PRESENTASI (Mode 2 Layar) -- js/presentation-studio.js
+   Layout 3 kolom ala OBS: kiri / tengah / kanan, layar penuh,
+   khusus laptop & komputer (>=1100px, lihat media query di bawah).
+   ============================================================ */
+.present-studio {
+  position: fixed; inset: 0; z-index: 900;
+  background: #14100b;
+  color: #f1ece0;
+  display: flex; flex-direction: column;
+  font-family: var(--font-ui);
+}
+.ps-topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 18px;
+  background: #1c1712;
+  border-bottom: 1px solid #33291c;
+  flex: 0 0 auto;
+}
+.ps-topbar-title { font-weight: 800; font-size: 15px; color: var(--brass-soft); }
+.ps-topbar-status { font-size: 12.5px; color: #b8ac97; flex: 1; }
+.ps-topbar-actions { display: flex; gap: 8px; }
+
+.ps-columns {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 300px 1fr 320px;
+  min-height: 0;
+}
+.ps-col {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-right: 1px solid #2a2216;
+}
+.ps-col-right { border-right: none; }
+
+.ps-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.ps-tab {
+  background: #241d14; color: #cfc3ab; border: 1px solid #3a2f1f;
+  border-radius: 8px; padding: 7px 10px; font-size: 12.5px; cursor: pointer;
+  font-weight: 600;
+}
+.ps-tab.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+
+.ps-field-label { font-size: 12px; font-weight: 700; color: #cbbf9e; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.ps-btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+.ps-btn-row [data-pos].active, .ps-btn-row [data-timer-preset].active { background: var(--brass); color: #1a1206; }
+
+.ps-verse-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.ps-verse-row {
+  text-align: left; background: #221b12; border: 1px solid #382c1c; border-radius: 8px;
+  padding: 8px 10px; cursor: pointer; color: #f1ece0;
+}
+.ps-verse-row:hover { border-color: var(--brass); }
+.ps-verse-ref { display: block; font-weight: 700; font-size: 12.5px; color: var(--brass-soft); }
+.ps-verse-snippet { display: block; font-size: 12px; color: #cfc3ab; margin-top: 2px; }
+
+.ps-color-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.ps-color-chip {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+}
+.ps-color-chip.active { border-color: var(--brass); }
+.ps-color-input { width: 100%; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer; }
+
+.ps-timer-box { margin-top: 16px; padding-top: 12px; border-top: 1px solid #33291c; }
+.ps-timer-label-preview {
+  text-align: center; font-size: 13px; font-weight: 600; color: #cfc3ab;
+  margin-top: 8px; min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ps-timer-display {
+  font-size: 34px; font-weight: 800; text-align: center; margin: 4px 0 10px;
+  font-variant-numeric: tabular-nums; color: var(--brass-soft);
+}
+.ps-timer-display.done { color: #e35b4b; }
+.ps-timer-display.ps-timer-idle { color: #6b6250; }
+.ps-timer-box .chip-btn.active { background: var(--brass-soft); color: #1a1206; border-color: var(--brass-soft); }
+
+.ps-quick-preview { max-height: 160px; overflow-y: auto; margin-top: 8px; font-size: 12.5px; color: #cfc3ab; }
+.ps-quick-preview-row { padding: 4px 0; border-bottom: 1px solid #2a2216; }
+.ps-quick-preview-block { padding: 6px 0; border-bottom: 1px solid #2a2216; }
+.ps-quick-preview-block:last-child { border-bottom: none; }
+.ps-quick-preview-block b { display: block; margin-bottom: 3px; }
+.ps-quick-preview-vrow { padding: 2px 0; }
+.ps-quick-preview-vtag {
+  display: inline-block; font-size: 10px; font-weight: 700; color: #d8b45c;
+  background: rgba(216, 180, 92, 0.14); border: 1px solid rgba(216, 180, 92, 0.4);
+  border-radius: 4px; padding: 0 5px; margin-right: 6px;
+}
+.ps-version-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
+.ps-version-grid label { display: flex; align-items: center; gap: 4px; }
+
+.ps-dropzone {
+  border: 2px dashed #4a3c28; border-radius: 10px; padding: 26px 14px; text-align: center;
+  font-size: 13px; color: #cfc3ab; cursor: pointer; margin-top: 8px;
+}
+.ps-dropzone.dragover { border-color: var(--brass); background: #241d14; }
+.ps-dropzone-sub { font-size: 11px; color: #9c9078; }
+.ps-file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ps-file-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: #221b12; border: 1px solid #382c1c; border-radius: 8px; padding: 6px 10px; font-size: 12.5px;
+}
+.ps-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-file-actions { display: flex; gap: 4px; flex: 0 0 auto; align-items: center; }
+.ps-file-status { font-style: normal; font-size: 11px; color: #9a8f74; margin-left: 6px; }
+.ps-file-slide-count { font-size: 11px; color: #cfc3ab; min-width: 34px; text-align: center; }
+
+.ps-preview-box {
+  background: #05070c; border-radius: 10px; padding: 16px; min-height: 120px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  color: #f5f2e8; border: 1px solid #2a2216;
+}
+.present-preview-black { color: #6b7280; font-weight: 700; }
+
+/* Baris pratinjau "Berikutnya" + "Tayang". Di 1 monitor slot Berikutnya
+   disembunyikan (hidden lewat HTML/JS) supaya tampilan sama seperti
+   sebelumnya -- cuma 1 kotak pratinjau live. */
+.ps-preview-row { display: flex; gap: 12px; }
+.ps-preview-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.ps-preview-slot .ps-preview-box { flex: 1 1 auto; }
+.ps-preview-slot-tag {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  color: #cbbf9e; margin-bottom: 6px;
+}
+.ps-preview-slot-tag-live { color: #e35b4b; }
+.ps-preview-slot-btn { margin-top: 8px; width: 100%; }
+.ps-preview-slot-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.ps-theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.ps-theme-swatch {
+  border-radius: 8px; padding: 10px 6px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  border: 2px solid transparent;
+}
+.ps-theme-swatch.active { border-color: var(--brass); }
+
+.ps-pointer-pad {
+  margin-top: 8px; height: 70px; border-radius: 8px; border: 1px dashed #4a3c28;
+  display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: #9c9078;
+  cursor: crosshair;
+}
+
+.chip-btn.primary { background: var(--brass); color: #1a1206; border-color: var(--brass); font-weight: 700; }
+.chip-btn.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+.chip-btn.blinking { animation: psBlink 1s step-start infinite; }
+@keyframes psBlink { 50% { opacity: .45; } }
+
+/* Studio HANYA untuk laptop/komputer -- di layar sempit (HP) selalu
+   disembunyikan; tombol "Buka Studio" & panel 3-kolom disembunyikan
+   juga lewat JS (refreshDeviceGate di js/presentation-studio.js), CSS
+   ini jaring pengaman tambahan supaya tidak pernah nyangkut di HP. */
+@media (max-width: 1099px) {
+  .present-studio { display: none !important; }
+}
+@media (max-width: 1300px) {
+  .ps-columns { grid-template-columns: 260px 1fr 280px; }
+}
+
+/* ------------------------------------------------------------
+   MODE DUAL MONITOR -- hanya aktif saat Layar 2 sungguh terbuka
+   (class .ps-dual-live ditambah lewat JS di refreshStatusUi()).
+   Tata letak 1 monitor (.present-studio TANPA .ps-dual-live) sama
+   sekali TIDAK berubah oleh blok ini.
+   Terinspirasi tampilan "LifeStream": pratinjau besar (Berikutnya /
+   Tayang) memenuhi bagian atas, kontrol dipadatkan jadi 2 kolom di
+   bawahnya supaya operator tidak perlu scroll panjang ke bawah.
+   ------------------------------------------------------------ */
+.present-studio.ps-dual-live .ps-columns {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(200px, 32vh) 1fr;
+  grid-template-areas:
+    "preview preview"
+    "controls-left controls-mid";
+}
+/* Kolom kanan (Pratinjau + Aksi Cepat + Warta + Penunjuk + Tema) pindah
+   jadi baris besar penuh di atas, gaya "Berikutnya/Tayang" ala LifeStream. */
+.present-studio.ps-dual-live .ps-col-right {
+  grid-area: preview;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  align-content: start;
+  padding-bottom: 10px;
+  border-right: none;
+  border-bottom: 1px solid #2a2216;
+}
+.present-studio.ps-dual-live .ps-col-right > .ps-preview-row {
+  grid-column: 1 / -1;
+}
+.present-studio.ps-dual-live .ps-preview-box {
+  min-height: 190px;
+  font-size: 15px;
+}
+.present-studio.ps-dual-live .ps-col-left { grid-area: controls-left; }
+.present-studio.ps-dual-live .ps-col-mid { grid-area: controls-mid; }
