@@ -208,6 +208,7 @@ const PresentationStudio = (() => {
     }
     if (el("presentStudio")) el("presentStudio").hidden = false;
     document.body.classList.add("ps-open");
+    document.documentElement.classList.add("ps-open"); // jaring tambahan untuk <html>, lihat CSS body.ps-open
     refreshStatusUi();
     renderCollectionSelect();
     renderMediaList();
@@ -218,6 +219,7 @@ const PresentationStudio = (() => {
   function closeStudio() {
     if (el("presentStudio")) el("presentStudio").hidden = true;
     document.body.classList.remove("ps-open");
+    document.documentElement.classList.remove("ps-open");
     stopWatchDualLayout();
   }
 
