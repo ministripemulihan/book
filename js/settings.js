@@ -1,5 +1,5 @@
 // ============================================================
-//  PENGATURAN PRIBADI PENGGUNA 
+//  PENGATURAN PRIBADI PENGGUNA
 // ============================================================
 //  Saat ini baru satu pengaturan: nyala/mati animasi progres
 //  membaca (notifikasi "sudah separuh / tiga perempat / selesai
