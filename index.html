@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Alkitab — Baca &amp; Cari Ayat</title>
+<title>Alkitab VP — Baca &amp; Cari Ayat</title>
 <meta name="description" content="Aplikasi pembacaan Alkitab dengan data lokal, pencarian ayat dan kata cepat." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -733,11 +733,23 @@
           <div class="ps-yt-row">
             <input type="text" id="psYtInput" class="columns-lang-select" placeholder="https://www.youtube.com/watch?v=..." />
           </div>
+          <label class="ps-yt-bg-toggle">
+            <input type="checkbox" id="psYtBgMode" />
+            Latar suara saja (video disembunyikan, ayat/pengumuman tetap tampil di Layar 2)
+          </label>
           <div class="ps-btn-row">
             <button type="button" id="psYtShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
             <button type="button" id="psYtAddQueueBtn" class="chip-btn small">➕ Tambah ke Daftar</button>
           </div>
-          <div class="ps-yt-hint">Mendukung link youtube.com/watch, youtu.be, dan YouTube Shorts.</div>
+          <div class="ps-yt-hint">Mendukung link youtube.com/watch, youtu.be, dan YouTube Shorts. Centang "Latar suara saja" untuk memutar lagu di belakang layar sambil tetap menampilkan ayat/pengumuman -- mis. video A tampil (boleh dibisukan lewat 🔇 Mute) sementara suara sebenarnya berasal dari video B yang diputar sebagai latar.</div>
+
+          <div class="ps-field-label">Latar suara (Audio Latar) sedang main</div>
+          <div class="ps-btn-row" id="psYtBgControls">
+            <button type="button" id="psYtBgPlayBtn" class="chip-btn small">▶ Play</button>
+            <button type="button" id="psYtBgPauseBtn" class="chip-btn small">⏸ Pause</button>
+            <button type="button" id="psYtBgStopBtn" class="chip-btn small danger">⏹ Stop</button>
+          </div>
+          <div class="ps-yt-hint" id="psYtBgStatus">Belum ada audio latar yang diputar.</div>
 
           <div class="ps-field-label">Daftar video (urut tayang ◀ ▶)</div>
           <div id="psYtQueueList" class="ps-file-list"><p class="present-saved-empty">Belum ada video di daftar.</p></div>
