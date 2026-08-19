@@ -939,9 +939,34 @@ const PresentationStudio = (() => {
     });
   }
 
+  // ------------------------------------------------------------
+  // Penunjuk & Pen -- digambar LANGSUNG DI ATAS kotak pratinjau
+  // "Tayang" (#psPreviewBoxWrap), 1:1 sama seperti #pointerDot /
+  // #penCanvas di present.html (Layar 2): ukuran titik, glow, warna,
+  // dan gaya coretan sama persis, cuma diposisikan pakai % dari kotak
+  // pratinjau (bukan px dari layar penuh) supaya akurat walau kotak
+  // di-resize. Sebelumnya ada pad terpisah di bawah tombol -- sekarang
+  // operator gerakkan kursor langsung di atas gambar pratinjau.
+  // ------------------------------------------------------------
   function wirePointerPen() {
-    const pad = el("psPointerPad");
+    const wrap = el("psPreviewBoxWrap");
+    const dot = el("psPointerDot");
+    const canvas = el("psPenCanvas");
+    const ctx = canvas ? canvas.getContext("2d") : null;
     let color = "#ff3b30";
+
+    function syncCanvasSize() {
+      if (!wrap || !canvas) return;
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h;
+      }
+    }
+
+    function updateMode() {
+      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive);
+    }
+
     document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
@@ -954,29 +979,62 @@ const PresentationStudio = (() => {
       penActive = false;
       el("psPointerToggle").classList.toggle("active", pointerActive);
       if (el("psPenToggle")) el("psPenToggle").classList.remove("active");
-      if (!pointerActive) rawPost({ type: "pointer", on: false });
+      if (!pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+      updateMode();
     });
     if (el("psPenToggle")) el("psPenToggle").addEventListener("click", () => {
       penActive = !penActive;
       pointerActive = false;
       el("psPenToggle").classList.toggle("active", penActive);
       if (el("psPointerToggle")) el("psPointerToggle").classList.remove("active");
-      if (!penActive) rawPost({ type: "pointer", on: false });
+      if (!penActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+      updateMode();
     });
-    if (el("psPenClear")) el("psPenClear").addEventListener("click", () => rawPost({ type: "pen", clear: true }));
-    if (pad) {
-      pad.addEventListener("mousemove", (e) => {
-        const rect = pad.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width;
-        const y = (e.clientY - rect.top) / rect.height;
-        if (pointerActive) rawPost({ type: "pointer", on: true, x, y, color });
+    if (el("psPenClear")) el("psPenClear").addEventListener("click", () => {
+      rawPost({ type: "pen", clear: true });
+      if (ctx && canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; }
+    });
+    if (wrap) {
+      wrap.addEventListener("mousemove", (e) => {
+        const rect = wrap.getBoundingClientRect();
+        let x = (e.clientX - rect.left) / rect.width;
+        let y = (e.clientY - rect.top) / rect.height;
+        x = Math.min(1, Math.max(0, x));
+        y = Math.min(1, Math.max(0, y));
+        if (pointerActive) {
+          rawPost({ type: "pointer", on: true, x, y, color });
+          if (dot) {
+            dot.style.display = "block";
+            dot.style.color = color;
+            dot.style.background = color;
+            dot.style.left = (x * 100) + "%";
+            dot.style.top = (y * 100) + "%";
+          }
+        }
         if (penActive && e.buttons === 1) {
           penStroke.push({ x, y });
-          rawPost({ type: "pen", stroke: penStroke.slice(-2), color });
+          const seg = penStroke.slice(-2);
+          rawPost({ type: "pen", stroke: seg, color });
+          if (ctx && canvas) {
+            syncCanvasSize();
+            canvas.style.display = "block";
+            if (seg.length > 1) {
+              ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.lineJoin = "round";
+              ctx.beginPath();
+              seg.forEach((pt, i) => {
+                const px = pt.x * canvas.width, py = pt.y * canvas.height;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+              });
+              ctx.stroke();
+            }
+          }
         }
       });
-      pad.addEventListener("mousedown", () => { penStroke = []; });
-      pad.addEventListener("mouseleave", () => { if (pointerActive) rawPost({ type: "pointer", on: false }); });
+      wrap.addEventListener("mousedown", () => { penStroke = []; });
+      wrap.addEventListener("mouseleave", () => {
+        if (pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+      });
+      window.addEventListener("resize", syncCanvasSize);
     }
   }
 
