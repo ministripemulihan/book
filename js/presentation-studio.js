@@ -341,6 +341,7 @@ const PresentationStudio = (() => {
   function renderMediaList() {
     const wrap = el("psMediaList");
     if (!wrap || typeof loadMediaItems !== "function") return;
+    if (typeof window.populateYtBgPicker === "function") window.populateYtBgPicker();
     const username = typeof currentUser !== "undefined" ? currentUser : null;
     const items = loadMediaItems(username);
     if (!items.length) {
@@ -952,7 +953,12 @@ const PresentationStudio = (() => {
     // TANPA autoplay -- video dimuat dalam keadaan siap/pause, bukan
     // langsung jalan. "enablejsapi=1" wajib ada supaya tombol
     // Play/Pause/Mute di Studio bisa mengontrolnya lewat postMessage.
-    return `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1`;
+    // "modestbranding=1&iv_load_policy=3" mengurangi sedikit tombol/
+    // anotasi bawaan YouTube (logo & video terkait TETAP tidak bisa
+    // dihilangkan total -- itu aturan YouTube, bukan batasan aplikasi
+    // ini). "playsinline=1" supaya tidak fullscreen paksa di beberapa
+    // browser.
+    return `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1&modestbranding=1&iv_load_policy=3&playsinline=1`;
   }
 
   function toStudioPreviewEmbedUrl(embedUrl) {
@@ -1102,6 +1108,36 @@ const PresentationStudio = (() => {
       rawPost({ type: "yt_bg_clear" });
       setYtBgStatus("Belum ada audio latar yang diputar.");
     });
+    // Dropdown "Pilih dari video yang sudah tersimpan" -- supaya operator
+    // tidak perlu tempel ulang link, tinggal pilih dari Media Tersimpan
+    // (kolom kiri) yang bertipe YouTube. Diisi ulang tiap kali tab ini
+    // dibuka (lihat pemanggilan populateYtBgPicker() di refreshDeviceGate/
+    // openStudio) supaya ikut daftar terbaru.
+    function populateYtBgPicker() {
+      const picker = el("psYtBgSavedPicker");
+      if (!picker || typeof loadMediaItems !== "function") return;
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const items = loadMediaItems(username).filter((it) => it.type === "youtube");
+      picker.innerHTML = '<option value="">-- pilih video tersimpan untuk diputar sebagai latar --</option>';
+      items.forEach((item) => {
+        const images = item.images || [];
+        images.forEach((url, i) => {
+          const lbl = (item.videoLabels && item.videoLabels[i] && item.videoLabels[i].title) || `${item.name} ${images.length > 1 ? `#${i + 1}` : ""}`;
+          const opt = document.createElement("option");
+          opt.value = url;
+          opt.textContent = lbl;
+          picker.appendChild(opt);
+        });
+      });
+    }
+    window.populateYtBgPicker = populateYtBgPicker;
+    if (el("psYtBgSavedPicker")) el("psYtBgSavedPicker").addEventListener("change", (e) => {
+      const url = e.target.value;
+      if (!url) return;
+      const label = e.target.options[e.target.selectedIndex].textContent;
+      if (typeof window.playAsYtBackground === "function") window.playAsYtBackground(url, label);
+    });
+    populateYtBgPicker();
     // Dipanggil dari renderMediaList() (tombol 🎧 per item Media
     // Tersimpan) supaya 1 cara yang sama dipakai baik untuk link baru
     // maupun video yang sudah tersimpan.
