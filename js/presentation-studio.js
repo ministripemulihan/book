@@ -39,6 +39,47 @@ const PresentationStudio = (() => {
   const UI_THEME_KEY = "bible_app_studio_ui_theme_v1"; // "dark" | "light" -- tema PANEL Studio (bukan Layar Proyeksi)
   const DESKTOP_MIN_WIDTH = 1100;
 
+  // ------------------------------------------------------------
+  // Ukuran Layar 2 (16:9 / 4:3 + resolusi detail) -- dibaca & ditulis
+  // js/presentation.js lewat kunci localStorage yang SAMA (lihat
+  // SCREEN_RES_KEY di sana) supaya jendela Layar 2 yang sungguh dibuka
+  // (window.open) memakai ukuran persis sama dengan yang dipilih di
+  // sini, dan kotak pratinjau (#psPreviewBoxWrap) dikunci ke rasio yang
+  // sama (lewat CSS var --ps-preview-ratio) -- itulah akar perbaikan
+  // "pratinjau tidak sama dengan Layar 2 sungguhan": sebelumnya kotak
+  // pratinjau berbentuk bebas (mengikuti sisa ruang kolom), sementara
+  // jendela Layar 2 sungguhan berbentuk lain -- jadi teks patah baris
+  // di titik yang berbeda. Dengan bentuk (rasio) yang dikunci sama,
+  // ukuran huruf proporsional (cqw, lihat css/style.css) jadi jauh
+  // lebih akurat meniru punya Layar 2 (vw).
+  // ------------------------------------------------------------
+  const SCREEN_RES_KEY = "bible_app_studio_screen_res_v1";
+  const SCREEN_RESOLUTIONS = {
+    "16:9": [
+      { w: 640,  h: 360,  name: "360p",              desc: "Sangat rendah" },
+      { w: 854,  h: 480,  name: "480p",               desc: "SD" },
+      { w: 960,  h: 540,  name: "540p",               desc: "qHD" },
+      { w: 1280, h: 720,  name: "720p / HD",          desc: "HD" },
+      { w: 1366, h: 768,  name: "HD",                 desc: "Sangat umum di laptop lama" },
+      { w: 1600, h: 900,  name: "900p",               desc: "HD+" },
+      { w: 1920, h: 1080, name: "1080p / Full HD",    desc: "Sangat umum" },
+      { w: 2560, h: 1440, name: "1440p / QHD",        desc: "2K" },
+      { w: 3840, h: 2160, name: "2160p / 4K UHD",     desc: "4K" },
+    ],
+    "4:3": [
+      { w: 800,  h: 600,  name: "SVGA", desc: "4:3 — lama tapi umum" },
+      { w: 1024, h: 768,  name: "XGA",  desc: "4:3 — proyektor klasik" },
+      { w: 1152, h: 864,  name: "XGA+", desc: "4:3" },
+      { w: 1280, h: 960,  name: "SXGA−", desc: "4:3" },
+      { w: 1400, h: 1050, name: "SXGA+", desc: "4:3" },
+      { w: 1600, h: 1200, name: "UXGA", desc: "4:3" },
+      { w: 2048, h: 1536, name: "QXGA", desc: "4:3" },
+    ],
+  };
+  const DEFAULT_RES_INDEX = { "16:9": 3, "4:3": 1 }; // 1280×720 / 1024×768
+  let screenRatio = "16:9";
+  let screenResIndex = DEFAULT_RES_INDEX["16:9"];
+
   // PENTING (perbaikan bug "ayat/tulisan tidak kelihatan"): setiap tema
   // Layar Proyeksi WAJIB punya pasangan `ink` (warna tulisan) yang
   // kontras dengan `bg`-nya. Sebelumnya hanya `bg` yang dikirim ke
@@ -1193,6 +1234,72 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // Terapkan / simpan pilihan rasio & resolusi Layar 2
+  // ------------------------------------------------------------
+  function applyScreenRes(persist) {
+    const list = SCREEN_RESOLUTIONS[screenRatio] || SCREEN_RESOLUTIONS["16:9"];
+    if (screenResIndex < 0) screenResIndex = list.length - 1;
+    if (screenResIndex >= list.length) screenResIndex = 0;
+    const entry = list[screenResIndex];
+
+    // Kunci bentuk kotak pratinjau (#psPreviewBoxWrap & #psNextBox) ke
+    // rasio yang sama persis dengan jendela Layar 2 yang akan dibuka.
+    document.documentElement.style.setProperty("--ps-preview-ratio", `${entry.w} / ${entry.h}`);
+
+    if (el("psResRatio169Btn")) el("psResRatio169Btn").classList.toggle("active", screenRatio === "16:9");
+    if (el("psResRatio43Btn")) el("psResRatio43Btn").classList.toggle("active", screenRatio === "4:3");
+    if (el("psResName")) el("psResName").textContent = entry.name;
+    if (el("psResDims")) el("psResDims").textContent = `${entry.w} × ${entry.h}`;
+    if (el("psResDesc")) el("psResDesc").textContent = entry.desc;
+    if (el("psResCount")) el("psResCount").textContent = `${screenResIndex + 1}/${list.length}`;
+
+    if (persist !== false) {
+      try { localStorage.setItem(SCREEN_RES_KEY, JSON.stringify({ ratio: screenRatio, w: entry.w, h: entry.h })); } catch (e) {}
+    }
+    // Kalau Layar 2 sedang terbuka, ikut ubah ukurannya langsung --
+    // supaya operator tidak perlu tutup/buka ulang untuk melihat hasilnya.
+    if (typeof Presentation !== "undefined" && Presentation.resizeWindow) {
+      Presentation.resizeWindow(entry.w, entry.h);
+    }
+  }
+
+  function setScreenRatio(ratio) {
+    if (!SCREEN_RESOLUTIONS[ratio] || ratio === screenRatio) { if (SCREEN_RESOLUTIONS[ratio]) applyScreenRes(); return; }
+    screenRatio = ratio;
+    screenResIndex = DEFAULT_RES_INDEX[ratio] || 0;
+    applyScreenRes();
+  }
+
+  function stepScreenRes(dir) {
+    const list = SCREEN_RESOLUTIONS[screenRatio] || SCREEN_RESOLUTIONS["16:9"];
+    screenResIndex = (screenResIndex + dir + list.length) % list.length;
+    applyScreenRes();
+  }
+
+  function wireScreenRes() {
+    if (el("psResRatio169Btn")) el("psResRatio169Btn").addEventListener("click", () => setScreenRatio("16:9"));
+    if (el("psResRatio43Btn")) el("psResRatio43Btn").addEventListener("click", () => setScreenRatio("4:3"));
+    if (el("psResPrevBtn")) el("psResPrevBtn").addEventListener("click", () => stepScreenRes(-1));
+    if (el("psResNextBtn")) el("psResNextBtn").addEventListener("click", () => stepScreenRes(1));
+
+    // Muat pilihan tersimpan (kalau ada) tanpa menulis ulang ke
+    // localStorage -- biar tidak "mengunci" nilai default begitu saja
+    // sebelum operator sungguh memilih apa pun.
+    try {
+      const raw = localStorage.getItem(SCREEN_RES_KEY);
+      if (raw) {
+        const r = JSON.parse(raw);
+        if (r && SCREEN_RESOLUTIONS[r.ratio]) {
+          screenRatio = r.ratio;
+          const idx = SCREEN_RESOLUTIONS[r.ratio].findIndex((e) => e.w === Number(r.w) && e.h === Number(r.h));
+          screenResIndex = idx >= 0 ? idx : (DEFAULT_RES_INDEX[r.ratio] || 0);
+        }
+      }
+    } catch (e) {}
+    applyScreenRes(false);
+  }
+
+  // ------------------------------------------------------------
   // Deteksi ukuran layar (khusus laptop/komputer) + gate mode tamu
   // ------------------------------------------------------------
   function refreshDeviceGate() {
@@ -1224,6 +1331,7 @@ const PresentationStudio = (() => {
     wireUiTheme();
     wireClock();
     wireYoutubeTab();
+    wireScreenRes();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
