@@ -220,7 +220,7 @@ const Presentation = (() => {
   // footnote/timer/pointer/pen) supaya "kirim ulang konten terakhir"
   // saat Layar 2 dibuka ulang tetap berupa konten utama (verse/text/
   // black/logo), bukan overlay sesaat.
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "pointer", "pen"];
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "pointer", "pen", "yt_control"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) {
