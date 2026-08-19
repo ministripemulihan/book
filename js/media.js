@@ -39,14 +39,31 @@ async function fetchMediaSheet(sheet) {
   if (!res.ok) throw new Error("Gagal mengambil data (" + res.status + ")");
   const text = await res.text();
   const records = parseCSV(text);
-  // Normalisasi nama kolom (huruf besar/kecil & "no"/"nomor" bebas)
-  const rows = records.map((r) => ({
-    no: r["no"] || r["nomor"] || "",
-    pembacaan: r["pembacaan"] || r["kitab perjanjian baru (nama kitab)"] || r["新约圣经书卷 (nama kitab)"] || r["new testament book (nama kitab)"] || "",
-    mp3: (r["link mp3"] || "").trim(),
-    mp4: (r["link mp4"] || "").trim(),
-    youtube: (r["youtube"] || "").trim(),
-  }));
+  // Normalisasi nama kolom (huruf besar/kecil & "no"/"nomor" bebas).
+  // Kolom "Pembacaan"/nama kitab SENGAJA dicek dengan beberapa nama
+  // header yang sudah diketahui DULU (Indonesia/Mandarin/Inggris) --
+  // tapi kalau sheet-nya ternyata pakai header lain lagi (mis. typo,
+  // spasi ekstra, atau bahasa lain), fallback ke KOLOM KE-2 apa adanya
+  // (Object.values mengikuti urutan kolom asli sheet, terlepas dari
+  // apa pun nama headernya) -- supaya tidak perlu menyeragamkan nama
+  // header di Google Sheet-nya sama sekali, urutan kolom (No | [nama
+  // kitab/pembacaan] | Link MP3 | Link MP4 | Youtube) sudah cukup.
+  const rows = records.map((r) => {
+    const values = Object.values(r);
+    return {
+      no: r["no"] || r["nomor"] || values[0] || "",
+      pembacaan:
+        r["pembacaan"] ||
+        r["kitab perjanjian baru (nama kitab)"] ||
+        r["新约圣经书卷 (nama kitab)"] ||
+        r["new testament book (nama kitab)"] ||
+        values[1] ||
+        "",
+      mp3: (r["link mp3"] || "").trim(),
+      mp4: (r["link mp4"] || "").trim(),
+      youtube: (r["youtube"] || "").trim(),
+    };
+  });
   saveMediaToCache(sheet.key, rows);
   return rows;
 }
@@ -88,9 +105,48 @@ function availableMediaSheets() {
 //  Memakai cache lokal dulu kalau ada (instan); kalau sheet itu belum
 //  pernah di-cache di perangkat ini, ambil sekali dari server.
 // ------------------------------------------------------------
-async function findMediaLinkForReference(bookNumber, chapter) {
+// ------------------------------------------------------------
+//  Memetakan kode bahasa TEKS Alkitab (CONFIG.LANGUAGES, mis. "ind",
+//  "eng", "chs" -- lihat js/config.js) ke KEY sheet Bacaan Bersuara
+//  yang sesuai (CONFIG.READING_MEDIA_SHEETS). Dipakai supaya saat
+//  sedang membaca dalam bahasa Mandarin/Inggris, tombol 🎵MP3 dsb.
+//  mengambil link dari sheet BAHASA YANG SAMA -- sebelumnya
+//  findMediaLinkForReference() mengecek SEMUA sheet berurutan dan
+//  berhenti di kecocokan PERTAMA (selalu sheet Indonesia lebih dulu di
+//  CONFIG.READING_MEDIA_SHEETS), jadi walau sedang membaca versi
+//  Mandarin/Inggris, link yang muncul selalu link BAHASA INDONESIA --
+//  itulah sebab laporan "link MP3 Mandarin/Inggris kok tidak sama".
+// ------------------------------------------------------------
+const MEDIA_LANG_SHEET_KEYS = {
+  ind: ["pl_ind", "pb_ind"],
+  rvind: ["pl_ind", "pb_ind"],
+  jawa: ["pl_ind", "pb_ind"],
+  kjv: ["pb_inggris"],
+  eng: ["pb_inggris"],
+  rveng: ["pb_inggris"],
+  chs: ["pb_mandarin"],
+  chssmp: ["pb_mandarin"],
+};
+
+// Susun ulang urutan sheet yang akan dicek: sheet yang cocok dengan
+// `lang` (bahasa teks yang sedang dibaca) DIDAHULUKAN, sisanya tetap
+// jadi cadangan (kalau sheet bahasa itu belum ada linknya untuk pasal
+// ini, tetap coba bahasa lain daripada tidak menampilkan apa-apa).
+function orderedMediaSheetsForLang(lang) {
+  const all = availableMediaSheets();
+  const preferredKeys = MEDIA_LANG_SHEET_KEYS[lang] || [];
+  if (!preferredKeys.length) return all;
+  const preferred = [];
+  const rest = [];
+  all.forEach((s) => {
+    (preferredKeys.includes(s.key) ? preferred : rest).push(s);
+  });
+  return preferred.concat(rest);
+}
+
+async function findMediaLinkForReference(bookNumber, chapter, lang) {
   if (!bookNumber || !chapter) return null;
-  for (const sheet of availableMediaSheets()) {
+  for (const sheet of orderedMediaSheetsForLang(lang)) {
     let cached = loadMediaFromCache(sheet.key);
     let rows = cached && cached.rows;
     if (!rows || !rows.length) {
@@ -302,6 +358,17 @@ function buildInlineMediaBlock(media, titleForSession) {
           iframe.allow = "autoplay";
           iframe.allowFullscreen = true;
           playerSlot.appendChild(iframe);
+          // Penyebab #1 kalau pemutarnya muncul tapi isinya kosong / minta
+          // izin ("You need permission") adalah file Drive-nya BELUM di-
+          // share sebagai "Anyone with the link" (masih private/terbatas).
+          // Kita tidak bisa mendeteksi ini secara otomatis dari sisi web
+          // (beda origin, iframe-nya sendiri yang menampilkan pesan itu),
+          // jadi cukup tampilkan pengingat + link buka langsung sebagai
+          // jalan pintas untuk mengecek/membetulkan share setting-nya.
+          const hint = document.createElement("div");
+          hint.className = "inline-media-drive-hint";
+          hint.innerHTML = 'Tidak muncul / minta izin? Pastikan file di Google Drive dibagikan sebagai "Siapa saja yang memiliki link" (Anyone with the link), lalu <a href="' + driveOpenUrl(rawUrl) + '" target="_blank" rel="noopener noreferrer">buka langsung di sini</a>.';
+          playerSlot.appendChild(hint);
           // Kita tidak bisa "mendengar" event play/pause dari isi iframe
           // Drive (beda origin), jadi layar dijaga tetap menyala selama
           // pemutarnya terbuka (bukan hanya saat benar-benar sedang play).
@@ -436,4 +503,3 @@ async function resyncMediaPlan(plan) {
   plan.completed = schedule.map((_, i) => !!oldCompleted[i]);
   return plan;
 }
-
