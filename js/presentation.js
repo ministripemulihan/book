@@ -101,6 +101,21 @@ const Presentation = (() => {
     return clampToScreen(w, h);
   }
 
+  // Bentuk (rasio) kotak pratinjau ("#presentPreviewBox" di panel ⋮ biasa
+  // dan "#psPreviewBoxWrap" di Studio Presentasi) dikunci lewat CSS var
+  // ini, diperbarui otomatis begitu Layar 2 melaporkan ukurannya yang
+  // SUNGGUH aktif (lihat "present_geometry" di present.html) -- jadi
+  // preview SELALU sama bentuk dengan Layar 2 sesungguhnya, tanpa
+  // operator perlu memilih resolusi apa pun secara manual.
+  function applyPreviewRatio(w, h) {
+    if (!(w > 0) || !(h > 0)) return;
+    document.documentElement.style.setProperty("--ps-preview-ratio", `${w} / ${h}`);
+    // Simpan sebagai "ukuran terakhir yang diketahui" supaya lain kali
+    // Layar 2 dibuka, ukurannya melanjutkan dari yang terakhir dipakai
+    // (bukan selalu balik ke ukuran bawaan 1280×720).
+    try { localStorage.setItem(SCREEN_RES_KEY, JSON.stringify({ w, h })); } catch (e) {}
+  }
+
   // ------------------------------------------------------------
   // Buka / tutup Layar 2
   // ------------------------------------------------------------
@@ -477,7 +492,12 @@ const Presentation = (() => {
     window.addEventListener("message", (e) => {
       if (e.origin !== location.origin) return;
       const data = e.data || {};
-      if (data.source === "bibleAppPresenter" && data.type === "present_ready") {
+      if (data.source !== "bibleAppPresenter") return;
+      if (data.type === "present_geometry") {
+        applyPreviewRatio(data.width, data.height);
+        return;
+      }
+      if (data.type === "present_ready") {
         winReady = true;
         updateStatusUi();
         // Kirim dulu semua pesan yang tertahan (mis. perintah timer
