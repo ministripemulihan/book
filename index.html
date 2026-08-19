@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260818a" />
+<link rel="stylesheet" href="css/style.css?v=20260818b" />
 </head>
 <body>
 
@@ -344,6 +344,8 @@
         </label>
         <p id="presentStatusText" class="announcement-compose-hint">Mode 1 Layar aktif.</p>
         <button type="button" id="presentOpenWindowBtn" class="chip-btn small" hidden>🖥️ Buka Layar 2</button>
+        <button type="button" id="presentOpenStudioBtn" class="chip-btn small" hidden>🎛️ Buka Studio Presentasi (2 Layar)</button>
+        <p class="announcement-compose-hint" id="presentStudioMobileHint" hidden>Studio Presentasi (tampilan 3 panel) hanya tersedia di laptop/komputer (layar lebar). Di HP, pakai kotak "Tulisan Bebas" di bawah ini.</p>
 
         <div id="presentControlsBody" hidden>
           <p class="announcement-compose-hint">
@@ -547,28 +549,246 @@
        tanggal hari itu) SETIAP kali men-deploy perubahan js/*.js atau
        css/style.css, supaya semua pengguna otomatis dipaksa ambil versi
        terbaru tanpa perlu diminta hard-refresh manual satu per satu. -->
-  <script src="js/config.js?v=20260818a"></script>
-  <script src="js/guest.js?v=20260818a"></script>
-  <script src="js/books.js?v=20260818a"></script>
-  <script src="js/csv.js?v=20260818a"></script>
-  <script src="js/db.js?v=20260818a"></script>
-  <script src="js/sync.js?v=20260818a"></script>
-  <script src="js/infokami.js?v=20260818a"></script>
-  <script src="js/levels.js?v=20260818a"></script>
-  <script src="js/activitylog.js?v=20260818a"></script>
-  <script src="js/notes.js?v=20260818a"></script>
-  <script src="js/highlights.js?v=20260818a"></script>
-  <script src="js/collections.js?v=20260818a"></script>
-  <script src="js/settings.js?v=20260818a"></script>
-  <script src="js/plans.js?v=20260818a"></script>
-  <script src="js/media.js?v=20260818a"></script>
-  <script src="js/outlines.js?v=20260818a"></script>
-  <script src="js/presentation.js?v=20260818a"></script>
-  <script src="js/signup.js?v=20260818a"></script>
-  <script src="js/adminbell.js?v=20260818a"></script>
-  <script src="js/app.js?v=20260818a"></script>
-  <script src="js/curhat.js?v=20260818a"></script>
-  <script src="js/aichat.js?v=20260818a"></script>
-  <script src="js/langcheck.js?v=20260818a"></script>
+  <!-- ===================== STUDIO PRESENTASI (Mode 2 Layar, khusus laptop/komputer) =====================
+       Layout 3 kolom ala OBS: kiri (Kumpulan Ayat / Pengumuman / Pesan + Timer),
+       tengah (Alkitab / Kidung / File), kanan (Preview + Aksi Cepat + Warta/FootNote + Tema).
+       Lihat js/presentation-studio.js. Disembunyikan di layar sempit (HP) lewat CSS. -->
+  <div id="presentStudio" class="present-studio" hidden>
+    <div class="ps-topbar">
+      <div class="ps-topbar-title">🎛️ Studio Presentasi</div>
+      <div class="ps-topbar-status" id="psStatusText">Layar 2 belum dibuka.</div>
+      <div class="ps-topbar-actions">
+        <button type="button" id="psOpenWindowBtn" class="chip-btn small">🖥️ Buka Layar 2</button>
+        <button type="button" id="psCloseStudioBtn" class="chip-btn small">✖️ Tutup Studio</button>
+      </div>
+    </div>
+
+    <div class="ps-columns">
+      <!-- ===================== KOLOM KIRI ===================== -->
+      <div class="ps-col ps-col-left">
+        <div class="ps-tabs" id="psLeftTabs">
+          <button type="button" class="ps-tab active" data-ps-left-tab="kumpulan">📚 Kumpulan Ayat</button>
+          <button type="button" class="ps-tab" data-ps-left-tab="media">🖼️ Media Tersimpan</button>
+          <button type="button" class="ps-tab" data-ps-left-tab="pengumuman">📢 Pengumuman</button>
+          <button type="button" class="ps-tab" data-ps-left-tab="pesan">💬 Pesan</button>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-left-panel="kumpulan">
+          <select id="psCollectionSelect" class="columns-lang-select"></select>
+          <div id="psCollectionList" class="ps-verse-list"></div>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-left-panel="media" hidden>
+          <p class="announcement-compose-hint">File yang ditekan "➕ Daftar" di tab File (tengah) muncul di sini. Klik nama untuk tayang, ◀ ▶ untuk pindah halaman/slide. Tersimpan hanya di perangkat ini (tidak ikut sinkron akun).</p>
+          <div id="psMediaList" class="ps-file-list"></div>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-left-panel="pengumuman" hidden>
+          <input type="text" id="psAnnTitle" class="columns-lang-select" placeholder="Judul pengumuman (1 baris)" />
+          <textarea id="psAnnBody" class="columns-lang-select" rows="5" placeholder="Isi pengumuman…" style="width:100%; box-sizing:border-box; resize:vertical; margin-top:8px;"></textarea>
+          <div class="ps-btn-row">
+            <button type="button" id="psAnnClearBtn" class="chip-btn small">🗑️ Hapus Isi</button>
+            <button type="button" id="psAnnInsertBtn" class="chip-btn small">➕ Sisipkan ke Kumpulan Ayat</button>
+          </div>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-left-panel="pesan" hidden>
+          <textarea id="psMsgText" class="columns-lang-select" rows="4" placeholder="Tulis pesan berjalan…" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          <label class="more-menu-toggle" for="psMsgRunning" style="margin-top:8px;">
+            <span>▶️ Berjalan (marquee berkedip)</span>
+            <span class="toggle-switch"><input type="checkbox" id="psMsgRunning" /><span class="toggle-slider"></span></span>
+          </label>
+          <div class="ps-field-label">Warna teks</div>
+          <div class="ps-color-row" id="psMsgColorRow">
+            <button type="button" class="ps-color-chip active" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+            <button type="button" class="ps-color-chip" data-color="#111111" style="background:#111111" title="Hitam"></button>
+            <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
+            <button type="button" class="ps-color-chip" data-color="#a8e6b0" style="background:#a8e6b0" title="Hijau pastel"></button>
+            <button type="button" class="ps-color-chip" data-color="#a9d4f5" style="background:#a9d4f5" title="Biru pastel"></button>
+            <button type="button" class="ps-color-chip" data-color="#e74c3c" style="background:#e74c3c" title="Merah"></button>
+            <button type="button" class="ps-color-chip" data-color="#f5b7d0" style="background:#f5b7d0" title="Merah muda pastel"></button>
+          </div>
+          <div class="ps-field-label">Posisi</div>
+          <div class="ps-btn-row" id="psMsgPosRow">
+            <button type="button" class="chip-btn small active" data-pos="top">⬆️ Atas</button>
+            <button type="button" class="chip-btn small" data-pos="middle">⏺️ Tengah</button>
+            <button type="button" class="chip-btn small" data-pos="bottom">⬇️ Bawah</button>
+          </div>
+          <button type="button" id="psMsgToggleBtn" class="chip-btn primary" style="margin-top:10px; width:100%;">▶️ Tayangkan</button>
+        </div>
+
+        <!-- ---- Timer (selalu tampil di bawah tab kiri) ---- -->
+        <div class="ps-timer-box">
+          <div class="ps-field-label">⏱️ Timer</div>
+          <input type="text" id="psTimerLabel" class="columns-lang-select" value="Sesi Bagi Nikmat" placeholder="Teks timer" />
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" data-timer-preset="180">3 menit</button>
+            <button type="button" class="chip-btn small" data-timer-preset="120">2 menit</button>
+            <button type="button" class="chip-btn small" data-timer-preset="60">1 menit</button>
+          </div>
+          <div class="ps-btn-row">
+            <input type="number" id="psTimerCustom" class="columns-lang-select" placeholder="Custom (detik)" min="1" style="width:110px;" />
+            <button type="button" id="psTimerCustomBtn" class="chip-btn small">Pakai</button>
+          </div>
+          <div class="ps-timer-label-preview" id="psTimerLabelPreview">Sesi Bagi Nikmat</div>
+          <div class="ps-timer-display" id="psTimerDisplay">00:00</div>
+          <label class="more-menu-toggle" for="psTimerBell" style="margin-top:2px;">
+            <span>🔔 Bel saat selesai</span>
+            <span class="toggle-switch"><input type="checkbox" id="psTimerBell" checked /><span class="toggle-slider"></span></span>
+          </label>
+          <div class="ps-btn-row">
+            <button type="button" id="psTimerStartBtn" class="chip-btn small primary" title="Mulai">▶️ Mulai</button>
+            <button type="button" id="psTimerStopBtn" class="chip-btn small" title="Stop">⏹️ Stop</button>
+            <button type="button" id="psTimerCancelBtn" class="chip-btn small danger" title="Batal">✖️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== KOLOM TENGAH ===================== -->
+      <div class="ps-col ps-col-mid">
+        <div class="ps-tabs" id="psMidTabs">
+          <button type="button" class="ps-tab active" data-ps-mid-tab="alkitab">📖 Alkitab</button>
+          <button type="button" class="ps-tab" data-ps-mid-tab="kidung">🎵 Kidung / Hymn</button>
+          <button type="button" class="ps-tab" data-ps-mid-tab="file">🖼️ File</button>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-mid-panel="alkitab">
+          <input type="text" id="psQuickRef" class="columns-lang-select" placeholder="mis. wahyu 2:2, 5; 2 tim 2:22; kej 3:15" />
+          <p class="announcement-compose-hint">Ketik 1 baris, boleh lebih dari 1 referensi dipisah titik-koma ( ; ), lalu Enter atau tekan Tampilkan.</p>
+          <div class="ps-field-label">Versi ayat</div>
+          <div class="ps-version-grid" id="psVersionGrid">
+            <label><input type="checkbox" value="ind" checked /> IND</label>
+            <label><input type="checkbox" value="rvind" /> IND-RC</label>
+            <label><input type="checkbox" value="eng" /> ENG</label>
+            <label><input type="checkbox" value="rveng" /> ENG-RC</label>
+            <label><input type="checkbox" value="chs" /> MDR</label>
+            <label><input type="checkbox" value="chssmp" /> MDR-S</label>
+            <label><input type="checkbox" value="kjv" /> KJV</label>
+            <label><input type="checkbox" value="jawa" /> JAWA</label>
+          </div>
+          <div id="psQuickPreview" class="ps-quick-preview"></div>
+          <div class="ps-btn-row">
+            <button type="button" id="psQuickShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psQuickAddBtn" class="chip-btn small">➕ Daftar</button>
+          </div>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-mid-panel="kidung" hidden>
+          <p class="announcement-compose-hint">Kidung/Hymn diambil dari daftar kidung yang sudah ada di menu utama. Buka lewat menu ⋮ untuk mencari &amp; kirim ke Layar 2 — integrasi langsung di tab ini menyusul.</p>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-mid-panel="file" hidden>
+          <div class="ps-dropzone" id="psFileDropzone">Seret file ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">pptx, pdf, jpg, png, webp, gif — maksimal 25MB per file</span></div>
+          <input type="file" id="psFileInput" accept=".pptx,.pdf,.jpg,.jpeg,.png,.webp,.gif" multiple hidden />
+          <p class="announcement-compose-hint">ℹ️ File .pptx diubah menjadi gambar per slide saat diunggah. Bila slide punya teks yang sangat penuh, hasilnya bisa sedikit berbeda dari PowerPoint — simpan sebagai PDF lalu unggah PDF-nya untuk hasil persis sama. File .ppt lama harus disimpan sebagai .pptx atau PDF dahulu.</p>
+          <div id="psFileList" class="ps-file-list"></div>
+        </div>
+      </div>
+
+      <!-- ===================== KOLOM KANAN ===================== -->
+      <div class="ps-col ps-col-right">
+        <div class="ps-field-label" id="psPreviewLabel">Pratinjau Layar 2</div>
+        <div class="ps-preview-row" id="psPreviewRow">
+          <div class="ps-preview-slot" id="psNextSlot" hidden>
+            <div class="ps-preview-slot-tag">Berikutnya</div>
+            <div class="ps-preview-box ps-preview-box-next" id="psNextBox"><div class="present-preview-idle">Belum ada antrean</div></div>
+            <button type="button" id="psNextShowBtn" class="chip-btn primary ps-preview-slot-btn" disabled>▶ Tayangkan</button>
+          </div>
+          <div class="ps-preview-slot" id="psLiveSlot">
+            <div class="ps-preview-slot-tag ps-preview-slot-tag-live" id="psLiveTag">Tayang</div>
+            <div class="ps-preview-box" id="psPreviewBox"><div class="present-preview-idle">Belum ada tayangan</div></div>
+          </div>
+        </div>
+
+        <div class="ps-field-label">Aksi Cepat</div>
+        <div class="ps-btn-row">
+          <button type="button" id="psActBlack" class="chip-btn small">⬛ Layar Hitam</button>
+          <button type="button" id="psActLogo" class="chip-btn small">◆ Logo</button>
+          <button type="button" id="psActClear" class="chip-btn small">✖️ Kosongkan</button>
+        </div>
+
+        <div class="ps-field-label">Warta (baris atas)</div>
+        <input type="text" id="psWartaInput" class="columns-lang-select" maxlength="120" placeholder="Teks warta berjalan…" />
+        <div class="ps-char-count"><span id="psWartaCount">0</span>/120 — teks panjang akan berjalan otomatis.</div>
+        <div class="ps-btn-row">
+          <button type="button" id="psWartaShowBtn" class="chip-btn small">Tampilkan</button>
+          <button type="button" id="psWartaHideBtn" class="chip-btn small">Hapus</button>
+        </div>
+
+        <div class="ps-field-label">FootNote (baris bawah)</div>
+        <input type="text" id="psFootInput" class="columns-lang-select" maxlength="120" placeholder="Teks footnote…" />
+        <div class="ps-char-count"><span id="psFootCount">0</span>/120</div>
+        <div class="ps-btn-row">
+          <button type="button" id="psFootShowBtn" class="chip-btn small">Tampilkan</button>
+          <button type="button" id="psFootHideBtn" class="chip-btn small">Hapus</button>
+        </div>
+
+        <div class="ps-field-label">Penunjuk &amp; Pen</div>
+        <div class="ps-btn-row">
+          <button type="button" id="psPointerToggle" class="chip-btn small">🔴 Penunjuk</button>
+          <button type="button" id="psPenToggle" class="chip-btn small">✏️ Pen</button>
+          <button type="button" id="psPenClear" class="chip-btn small">🧹 Hapus Coretan</button>
+        </div>
+        <div class="ps-color-row" id="psPointerColorRow">
+          <button type="button" class="ps-color-chip active" data-color="#ff3b30" style="background:#ff3b30" title="Merah"></button>
+          <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
+          <button type="button" class="ps-color-chip" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+        </div>
+        <div class="ps-pointer-pad" id="psPointerPad">Gerakkan kursor di sini saat Penunjuk/Pen aktif</div>
+
+        <div class="ps-field-label">Tema Layar Proyeksi</div>
+        <div class="ps-theme-grid" id="psThemeGrid">
+          <button type="button" class="ps-theme-swatch active" data-theme="gelap" style="background:#05070c; color:#f5f2e8;">Gelap</button>
+          <button type="button" class="ps-theme-swatch" data-theme="terang" style="background:#fdfaf3; color:#1a1a1a;">Terang</button>
+          <button type="button" class="ps-theme-swatch" data-theme="emas" style="background:#1a1206; color:#e9c977;">Emas Yasperin</button>
+          <button type="button" class="ps-theme-swatch" data-theme="biru" style="background:#0b1730; color:#dce8ff;">Biru Malam</button>
+          <button type="button" class="ps-theme-swatch" data-theme="sepia" style="background:#f4e8d0; color:#3a2c17;">Klasik Sepia</button>
+        </div>
+        <div class="ps-field-label">Huruf</div>
+        <select id="psFontSelect" class="columns-lang-select">
+          <option value="'Montserrat', Arial, sans-serif">Montserrat</option>
+          <option value="'Inter', Arial, sans-serif">Inter</option>
+          <option value="'Noto Sans', Arial, sans-serif">Noto Sans</option>
+          <option value="'Lora', Georgia, serif">Lora (serif)</option>
+          <option value="'Merriweather', Georgia, serif" selected>Merriweather (serif)</option>
+          <option value="'Comic Sans MS', 'Comic Sans', cursive">Comic Sans</option>
+          <option value="'Arial Black', Arial, sans-serif">Arial Black</option>
+        </select>
+        <div class="ps-field-label">Warna latar</div>
+        <input type="color" id="psBgColor" value="#05070c" class="ps-color-input" />
+        <div class="ps-field-label">Ukuran Teks</div>
+        <div class="ps-btn-row">
+          <button type="button" id="psFontDec" class="chip-btn small">A-</button>
+          <input type="range" id="psFontScale" min="60" max="160" value="100" style="flex:1;" />
+          <button type="button" id="psFontInc" class="chip-btn small">A+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js?v=20260818b"></script>
+  <script src="js/guest.js?v=20260818b"></script>
+  <script src="js/books.js?v=20260818b"></script>
+  <script src="js/csv.js?v=20260818b"></script>
+  <script src="js/db.js?v=20260818b"></script>
+  <script src="js/sync.js?v=20260818b"></script>
+  <script src="js/infokami.js?v=20260818b"></script>
+  <script src="js/levels.js?v=20260818b"></script>
+  <script src="js/activitylog.js?v=20260818b"></script>
+  <script src="js/notes.js?v=20260818b"></script>
+  <script src="js/highlights.js?v=20260818b"></script>
+  <script src="js/collections.js?v=20260818d"></script>
+  <script src="js/settings.js?v=20260818b"></script>
+  <script src="js/plans.js?v=20260818b"></script>
+  <script src="js/media.js?v=20260818b"></script>
+  <script src="js/outlines.js?v=20260818b"></script>
+  <script src="js/presentation.js?v=20260818b"></script>
+  <script src="js/presentation-studio.js?v=20260818d"></script>
+  <script src="js/signup.js?v=20260818b"></script>
+  <script src="js/adminbell.js?v=20260818b"></script>
+  <script src="js/app.js?v=20260818b"></script>
+  <script src="js/curhat.js?v=20260818b"></script>
+  <script src="js/aichat.js?v=20260818b"></script>
+  <script src="js/langcheck.js?v=20260818b"></script>
 </body>
 </html>
