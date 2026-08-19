@@ -175,17 +175,9 @@
   /* ---- Pen (coret-coret) ---- */
   #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
 
-  /* Label kecil ini SENGAJA dibuat nyaris tak terlihat (opacity rendah
-     tetap, bukan solid) supaya tidak mengganggu pandangan jemaat/
-     penonton saat diproyeksikan -- sebelumnya tampil solid terus-
-     menerus di pojok, mirip watermark debug. */
-  #closeHint {
-    position: fixed; bottom: 16px; right: 20px; z-index: 5;
-    font-family: "Inter", Arial, sans-serif;
-    font-size: 12px; letter-spacing: 0.02em;
-    color: color-mix(in srgb, var(--p-ink) 40%, transparent);
-    pointer-events: none;
-  }
+  /* Label "Layar 2 — Mode Presentasi" DIHAPUS (bukan cuma dipudarkan) --
+     operator minta tayangan Layar 2 bersih 100%, sama persis dengan apa
+     yang diproyeksikan ke jemaat, tanpa watermark/teks tambahan apa pun. */
 </style>
 </head>
 <body>
@@ -212,8 +204,6 @@
 
   <canvas id="penCanvas"></canvas>
   <div id="pointerDot"></div>
-
-  <div id="closeHint">Layar 2 — Mode Presentasi</div>
 
 <script>
   const stageEl = document.getElementById("stage");
