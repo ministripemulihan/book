@@ -5,14 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Layar 2 — Tampilan Presentasi</title>
 <style>
+  :root {
+    --p-bg: #05070c;
+    --p-ink: #f5f2e8;
+    --p-accent: #d8b45c;
+    --p-font: "Literata", Georgia, serif;
+    --p-scale: 1;
+  }
   html, body {
     margin: 0; padding: 0; height: 100%;
-    background: #05070c;
-    color: #f5f2e8;
-    font-family: "Literata", Georgia, serif;
+    background: var(--p-bg);
+    color: var(--p-ink);
+    font-family: var(--p-font);
     overflow: hidden;
   }
+  /* Vignette halus di tepi layar -- bikin layar proyektor terasa lebih
+     "dirancang" (broadcast-style) daripada sekadar warna polos rata. */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.28) 100%);
+  }
   #stage {
+    position: relative; z-index: 2;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -21,19 +36,23 @@
     text-align: center;
     padding: 5vh 6vw;
     box-sizing: border-box;
+    transition: background-color .3s ease, color .3s ease;
   }
   #ref {
     font-family: "Inter", Arial, sans-serif;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #d8b45c;
-    font-size: clamp(16px, 2.4vw, 30px);
+    color: var(--p-accent);
+    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale));
     margin-bottom: clamp(14px, 2.4vh, 34px);
     opacity: 0.92;
   }
+  #ref::before, #ref::after {
+    content: "—"; opacity: 0.55; margin: 0 0.6em; font-weight: 400;
+  }
   #text {
-    font-size: clamp(28px, 4.6vw, 68px);
+    font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
     line-height: 1.35;
     max-width: 1200px;
     white-space: pre-wrap;
@@ -44,21 +63,153 @@
     color: #6b7280;
     font-size: clamp(16px, 2vw, 22px);
   }
+  /* Blok tumpuk saat beberapa versi/terjemahan ditampilkan sekaligus
+     (checklist versi di Studio Presentasi). Ukuran font otomatis lebih
+     kecil supaya semua versi tetap muat 1 layar tanpa scroll. */
+  .verse-version-block {
+    display: block;
+    margin: 0 auto clamp(18px, 2.6vh, 30px);
+    font-size: calc(clamp(20px, 3vw, 42px) * var(--p-scale));
+  }
+  .verse-version-block:last-child { margin-bottom: 0; }
+  .verse-version-tag {
+    display: inline-block;
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.42em;
+    letter-spacing: 0.06em;
+    color: var(--p-accent);
+    background: color-mix(in srgb, var(--p-accent) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--p-accent) 45%, transparent);
+    border-radius: 6px;
+    padding: 0.15em 0.55em;
+    margin-right: 0.5em;
+    vertical-align: middle;
+    transform: translateY(-0.15em);
+  }
   #stage.fade-in #text, #stage.fade-in #ref { animation: fadeUp .5s ease both; }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
-  #closeHint {
-    position: fixed; bottom: 14px; right: 18px;
+
+  #logoView { max-width: 60vw; max-height: 60vh; object-fit: contain; }
+  /* Slide dari File tab (gambar/pptx/pdf yang sudah dikonversi
+     per-slide) -- tampil penuh 1 layar, beda dari #logoView yang
+     sengaja dibatasi kecil di tengah. */
+  #slideView { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
+
+  /* ---- Warta (atas) & FootNote (bawah): ticker 1 baris ----
+     Warna latar ticker sengaja TETAP hitam solid (bukan ikut var(--p-bg))
+     supaya tulisan putihnya selalu kontras tinggi apa pun tema latar
+     panggung yang sedang aktif. */
+  .ticker-bar {
+    position: fixed; left: 0; right: 0; z-index: 20;
+    background: rgba(10,10,14,0.82);
+    backdrop-filter: blur(2px);
+    color: #fff;
     font-family: "Inter", Arial, sans-serif;
-    font-size: 12px; color: #4b5563;
+    font-weight: 600;
+    font-size: clamp(15px, 1.6vw, 24px);
+    padding: 12px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    animation: fadeUp .3s ease both;
+  }
+  #wartaBar { top: 0; box-shadow: 0 6px 18px rgba(0,0,0,0.25); border-bottom: 1px solid rgba(216,180,92,0.35); }
+  #footBar { bottom: 0; box-shadow: 0 -6px 18px rgba(0,0,0,0.25); border-top: 1px solid rgba(216,180,92,0.35); }
+  .ticker-bar .ticker-inner {
+    display: inline-block;
+    padding-left: 100%;
+  }
+  .ticker-bar.scrolling .ticker-inner {
+    animation: tickerScroll linear infinite;
+  }
+  .ticker-bar.static { white-space: normal; text-align: center; padding: 10px 4vw; }
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-100%); }
+  }
+
+  /* ---- Timer ----
+     PENTING: jangan taruh `display:flex` langsung di #timerWrap. Selector
+     ID (#timerWrap) punya spesifisitas LEBIH TINGGI daripada selector
+     atribut bawaan browser `[hidden]{display:none}`, jadi kalau
+     `display:flex` ditulis langsung di sini, atribut hidden yang
+     dipasang/dilepas lewat JS (timerWrap.hidden = true/false) tidak
+     pernah benar-benar menyembunyikannya -- ini penyebab timer bisa
+     "nyangkut" tetap kelihatan menimpa ayat berikutnya, atau terlihat
+     tidak konsisten. Solusi: default-kan ke display:none, baru
+     `:not([hidden])` yang menaikkan ke flex -- jadi atribut hidden
+     TETAP jadi sumber kebenaran satu-satunya. */
+  #timerWrap { display: none; align-items: center; justify-content: center; gap: 6vw; }
+  #timerWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
+  #timerRing {
+    width: min(32vh, 30vw); height: min(32vh, 30vw);
+    filter: drop-shadow(0 4px 24px rgba(0,0,0,0.35));
+  }
+  #timerRing circle { fill: none; stroke-width: 7; }
+  #timerRingBg { stroke: color-mix(in srgb, var(--p-ink) 16%, transparent); }
+  #timerRingFg { stroke: var(--p-accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear, stroke .3s ease; }
+  #timerRingFg.done { stroke: #d9463a; }
+  #timerTime {
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 700;
+    fill: var(--p-ink);
+    font-size: 15px;
+  }
+  #timerLabel {
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    font-size: calc(clamp(22px, 3.6vw, 46px) * var(--p-scale));
+  }
+  #timerTime.done-text { fill: #d9463a; }
+
+  /* ---- Pointer (Penunjuk) ---- */
+  #pointerDot {
+    position: fixed; width: 22px; height: 22px; border-radius: 50%;
+    pointer-events: none; z-index: 50; display: none;
+    box-shadow: 0 0 14px 4px currentColor;
+    transform: translate(-50%, -50%);
+  }
+  /* ---- Pen (coret-coret) ---- */
+  #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
+
+  /* Label kecil ini SENGAJA dibuat nyaris tak terlihat (opacity rendah
+     tetap, bukan solid) supaya tidak mengganggu pandangan jemaat/
+     penonton saat diproyeksikan -- sebelumnya tampil solid terus-
+     menerus di pojok, mirip watermark debug. */
+  #closeHint {
+    position: fixed; bottom: 16px; right: 20px; z-index: 5;
+    font-family: "Inter", Arial, sans-serif;
+    font-size: 12px; letter-spacing: 0.02em;
+    color: color-mix(in srgb, var(--p-ink) 40%, transparent);
+    pointer-events: none;
   }
 </style>
 </head>
 <body>
+  <div id="wartaBar" class="ticker-bar" hidden><span class="ticker-inner" id="wartaText"></span></div>
+
   <div id="stage">
     <div id="ref" hidden></div>
     <div id="text"></div>
+    <img id="logoView" hidden />
+    <img id="slideView" hidden />
+    <div id="timerWrap" hidden>
+      <svg id="timerRing" viewBox="0 0 100 100">
+        <circle id="timerRingBg" cx="50" cy="50" r="44"></circle>
+        <circle id="timerRingFg" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"></circle>
+        <text id="timerTime" x="50" y="55" text-anchor="middle">00:00</text>
+      </svg>
+      <div id="timerLabel"></div>
+    </div>
     <div id="idle">Menunggu tayangan dari layar utama…</div>
   </div>
+
+  <div id="footBar" class="ticker-bar" hidden><span class="ticker-inner" id="footText"></span></div>
+
+  <canvas id="penCanvas"></canvas>
+  <div id="pointerDot"></div>
+
   <div id="closeHint">Layar 2 — Mode Presentasi</div>
 
 <script>
@@ -66,29 +217,202 @@
   const refEl = document.getElementById("ref");
   const textEl = document.getElementById("text");
   const idleEl = document.getElementById("idle");
+  const logoEl = document.getElementById("logoView");
+  const slideEl = document.getElementById("slideView");
+  const timerWrap = document.getElementById("timerWrap");
+  const timerTimeEl = document.getElementById("timerTime");
+  const timerLabelEl = document.getElementById("timerLabel");
+  const timerRingFg = document.getElementById("timerRingFg");
+  const wartaBar = document.getElementById("wartaBar");
+  const wartaText = document.getElementById("wartaText");
+  const footBar = document.getElementById("footBar");
+  const footText = document.getElementById("footText");
+  const pointerDot = document.getElementById("pointerDot");
+  const penCanvas = document.getElementById("penCanvas");
+  const penCtx = penCanvas.getContext("2d");
+
+  const RING_LEN = 2 * Math.PI * 44;
+  timerRingFg.style.strokeDasharray = String(RING_LEN);
+
+  let timerState = null; // { totalSeconds, endAt, label, bell }
+  let timerInterval = null;
+  let audioCtx = null;
+
+  function fmtMMSS(totalSec) {
+    const s = Math.max(0, Math.round(totalSec));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+  }
+
+  function beep() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.35, audioCtx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.9);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.9);
+    } catch (e) {}
+  }
+
+  function tickTimer() {
+    if (!timerState) return;
+    const remain = (timerState.endAt - Date.now()) / 1000;
+    const remainClamped = Math.max(0, remain);
+    timerTimeEl.textContent = fmtMMSS(remainClamped);
+    const frac = timerState.totalSeconds > 0 ? remainClamped / timerState.totalSeconds : 0;
+    timerRingFg.style.strokeDashoffset = String(RING_LEN * (1 - frac));
+    const isDone = remain <= 0;
+    timerRingFg.classList.toggle("done", isDone);
+    timerTimeEl.classList.toggle("done-text", isDone);
+    if (isDone && !timerState._rang) {
+      timerState._rang = true;
+      if (timerState.bell) beep();
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+  }
+
+  function showTimer(data) {
+    stopTimer(false);
+    timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, _rang: false };
+    timerLabelEl.textContent = timerState.label;
+    timerWrap.hidden = false;
+    idleEl.hidden = true;
+    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    tickTimer();
+    timerInterval = setInterval(tickTimer, 250);
+  }
+  function stopTimer(showIdle) {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerState = null;
+    timerWrap.hidden = true;
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  function applyTheme(theme) {
+    if (!theme) return;
+    const root = document.documentElement.style;
+    if (theme.font) root.setProperty("--p-font", theme.font);
+    if (theme.bgColor) root.setProperty("--p-bg", theme.bgColor);
+    // Perbaikan utama: dulu warna tulisan (--p-ink) TIDAK PERNAH ikut
+    // berubah saat ganti tema -- jadi tema latar terang (Terang/Klasik
+    // Sepia) membuat tulisan (krem-terang bawaan) nyaris tak kelihatan
+    // di atas latar yang juga terang. Sekarang ink dikirim & diterapkan
+    // bersamaan dengan bgColor supaya kontrasnya selalu terjaga.
+    if (theme.ink) root.setProperty("--p-ink", theme.ink);
+    if (theme.scale) root.setProperty("--p-scale", theme.scale);
+  }
+
+  function applyTicker(barEl, textEl2, data) {
+    if (!data.show || !data.text) { barEl.hidden = true; return; }
+    barEl.hidden = false;
+    textEl2.textContent = data.text + "     ";
+    const scrolling = data.text.length > 40;
+    barEl.classList.toggle("scrolling", scrolling);
+    barEl.classList.toggle("static", !scrolling);
+    if (scrolling) {
+      const secs = Math.max(8, data.text.length / 8);
+      textEl2.parentElement.style.animationDuration = secs + "s";
+    }
+  }
+
+  function showMain(kind, data) {
+    stopTimer(false);
+    idleEl.hidden = true;
+    logoEl.hidden = true;
+    slideEl.hidden = true;
+    stageEl.classList.remove("fade-in");
+    void stageEl.offsetWidth;
+    if (kind === "verse") {
+      refEl.hidden = false;
+      refEl.textContent = data.ref || "";
+      if (Array.isArray(data.texts) && data.texts.length) {
+        // Beberapa versi/terjemahan sekaligus (checklist versi di Studio
+        // Presentasi) -- tampil bertumpuk, tiap blok dengan label singkat
+        // versinya (mis. "ITB", "ENG-RC") di depan teksnya.
+        textEl.innerHTML = data.texts.map((t) => {
+          const label = (t.label || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+          const body = (t.text || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+          return `<div class="verse-version-block"><span class="verse-version-tag">${label}</span>${body}</div>`;
+        }).join("");
+      } else {
+        textEl.textContent = data.text || "";
+      }
+    } else if (kind === "text") {
+      refEl.hidden = true; refEl.textContent = "";
+      textEl.textContent = data.text || "";
+    } else if (kind === "black") {
+      refEl.hidden = true; refEl.textContent = "";
+      textEl.textContent = "";
+    } else if (kind === "logo") {
+      refEl.hidden = true; refEl.textContent = "";
+      textEl.textContent = "";
+      if (data.logoUrl) { logoEl.src = data.logoUrl; logoEl.hidden = false; }
+    } else if (kind === "slide") {
+      // Gambar penuh 1 layar -- hasil konversi File tab (gambar
+      // langsung, atau per-slide dari pptx/pdf yang sudah diubah jadi
+      // gambar saat diunggah).
+      refEl.hidden = true; refEl.textContent = "";
+      textEl.textContent = "";
+      if (data.imageUrl) { slideEl.src = data.imageUrl; slideEl.hidden = false; }
+    }
+    stageEl.classList.add("fade-in");
+  }
 
   function render(data) {
     if (!data) return;
     if (data.type === "clear") {
       refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
-      idleEl.hidden = false;
+      textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+      stopTimer(true);
       return;
     }
-    idleEl.hidden = true;
-    stageEl.classList.remove("fade-in");
-    // paksa reflow supaya animasi fade jalan lagi tiap konten berganti
-    void stageEl.offsetWidth;
-    if (data.type === "verse") {
-      refEl.hidden = false;
-      refEl.textContent = data.ref || "";
-      textEl.textContent = data.text || "";
-    } else if (data.type === "text") {
-      refEl.hidden = true;
-      refEl.textContent = "";
-      textEl.textContent = data.text || "";
+    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide") {
+      showMain(data.type, data);
+      return;
     }
-    stageEl.classList.add("fade-in");
+    if (data.type === "timer") {
+      if (data.action === "stop") { stopTimer(true); }
+      else { showTimer(data); }
+      return;
+    }
+    if (data.type === "theme") { applyTheme(data.theme); return; }
+    if (data.type === "warta") { applyTicker(wartaBar, wartaText, data); return; }
+    if (data.type === "footnote") { applyTicker(footBar, footText, data); return; }
+    if (data.type === "pointer") {
+      if (!data.on) { pointerDot.style.display = "none"; return; }
+      pointerDot.style.display = "block";
+      pointerDot.style.color = data.color || "#ff3b30";
+      pointerDot.style.background = data.color || "#ff3b30";
+      pointerDot.style.left = (data.x * window.innerWidth) + "px";
+      pointerDot.style.top = (data.y * window.innerHeight) + "px";
+      return;
+    }
+    if (data.type === "pen") {
+      if (data.clear) {
+        penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+        penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
+        penCanvas.style.display = "none";
+        return;
+      }
+      penCanvas.style.display = "block";
+      if (penCanvas.width !== window.innerWidth) { penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight; }
+      if (data.stroke && data.stroke.length > 1) {
+        penCtx.strokeStyle = data.color || "#ff3b30";
+        penCtx.lineWidth = 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
+        penCtx.beginPath();
+        data.stroke.forEach((pt, i) => {
+          const x = pt.x * window.innerWidth, y = pt.y * window.innerHeight;
+          if (i === 0) penCtx.moveTo(x, y); else penCtx.lineTo(x, y);
+        });
+        penCtx.stroke();
+      }
+      return;
+    }
   }
 
   window.addEventListener("message", (e) => {
@@ -100,7 +424,7 @@
 
   // Beri tahu jendela utama bahwa Layar 2 sudah siap menerima konten --
   // jendela utama akan mengirim ulang konten TERAKHIR begitu pesan ini
-  // diterima (lihat js/presentation.js, handler "present_ready").
+  // diterima (lihat js/presentation.js & js/presentation-studio.js).
   if (window.opener) {
     try {
       window.opener.postMessage({ source: "bibleAppPresenter", type: "present_ready" }, location.origin);
