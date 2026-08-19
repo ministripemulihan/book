@@ -36,14 +36,15 @@ const PresentationStudio = (() => {
   const THEME_KEY = "bible_app_studio_theme_v1";
   const LOGO_KEY = "bible_app_studio_logo_url_v1";
   const BLANK_MSG_KEY = "bible_app_studio_blank_msg_v1";
+  const UI_THEME_KEY = "bible_app_studio_ui_theme_v1"; // "dark" | "light" -- tema PANEL Studio (bukan Layar Proyeksi)
   const DESKTOP_MIN_WIDTH = 1100;
 
-  // Tiap tema BUTUH pasangan bg + ink (warna tulisan) yang kontras --
-  // sebelumnya hanya "bg" yang dikirim ke Layar 2, ink tulisan tidak
-  // pernah ikut berubah (tetap krem-terang bawaan), jadi tema "Terang"
-  // & "Klasik Sepia" (latar terang) membuat tulisan nyaris tak
-  // kelihatan di atas latar terang. ink di sini SAMA dengan warna teks
-  // tombol swatch di index.html supaya konsisten.
+  // PENTING (perbaikan bug "ayat/tulisan tidak kelihatan"): setiap tema
+  // Layar Proyeksi WAJIB punya pasangan `ink` (warna tulisan) yang
+  // kontras dengan `bg`-nya. Sebelumnya hanya `bg` yang dikirim ke
+  // present.html, jadi tema terang/sepia (latar cerah) memakai warna
+  // tulisan bawaan yang juga terang -- tulisan jadi nyaris tak
+  // kelihatan (bukan berarti "tidak tayang", tapi kelihatan kosong).
   const THEMES = {
     gelap:  { bg: "#05070c", ink: "#f5f2e8" },
     terang: { bg: "#fdfaf3", ink: "#1a1a1a" },
@@ -51,22 +52,6 @@ const PresentationStudio = (() => {
     biru:   { bg: "#0b1730", ink: "#dce8ff" },
     sepia:  { bg: "#f4e8d0", ink: "#3a2c17" },
   };
-
-  // Dipakai saat operator pilih warna latar SENDIRI lewat color-picker
-  // "Warna latar" (bukan lewat salah satu swatch tema di atas) --
-  // hitung otomatis apakah tulisan putih atau hitam yang lebih kontras
-  // terhadap warna latar itu, supaya tulisan tidak pernah "hilang"
-  // walau operator asal pilih warna latar terang/gelap.
-  function autoInkColor(bgHex) {
-    const hex = String(bgHex || "").replace("#", "");
-    if (hex.length !== 6) return "#f5f2e8";
-    const r = parseInt(hex.slice(0, 2), 16) / 255;
-    const g = parseInt(hex.slice(2, 4), 16) / 255;
-    const b = parseInt(hex.slice(4, 6), 16) / 255;
-    const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-    const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-    return luminance > 0.5 ? "#181818" : "#f5f2e8";
-  }
 
   let msgColor = "#ffffff";
   let msgPos = "top";
@@ -119,6 +104,7 @@ const PresentationStudio = (() => {
     }
     if (payload.type === "black") { box.innerHTML = '<div class="present-preview-black">⬛ Layar Hitam</div>'; return; }
     if (payload.type === "logo") { box.innerHTML = '<div class="present-preview-idle">◆ Logo ditampilkan</div>'; return; }
+    if (payload.type === "youtube") { box.innerHTML = '<div class="present-preview-idle">▶️ Video YouTube diputar</div>'; return; }
     if (payload.type === "slide") {
       box.innerHTML = payload.imageUrl
         ? `<img src="${payload.imageUrl}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;" />`
@@ -303,9 +289,18 @@ const PresentationStudio = (() => {
       row.className = "ps-verse-row";
       row.innerHTML = `<span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${v ? escapeHtml(v.text.slice(0, 50)) : ""}</span>`;
       row.addEventListener("click", () => {
+        // PERBAIKAN: sebelumnya klik di sini TIDAK memperbarui kotak
+        // pratinjau "Tayang" (psPreviewBox) milik Studio sendiri --
+        // Presentation.sendVerse() hanya memperbarui pratinjau mini di
+        // panel ⋮ lama (presentPreviewBox), bukan punya Studio. Ayat
+        // TETAP tayang ke Layar 2 seperti biasa, tapi operator tidak
+        // melihat konfirmasinya di kotak "Tayang" -- jadi terasa
+        // seperti "tidak tampil". Sekarang renderStudioPreview()
+        // dipanggil juga di sini, sama seperti Ayat Cepat & Media.
         const doSend = () => {
           if (v && typeof Presentation !== "undefined") Presentation.sendVerse(v, v.bookName);
           else post({ type: "text", text: ref });
+          renderStudioPreview({ type: "verse", ref, texts: [{ label: "", text: v ? v.text : ref }] });
         };
         stageOrSend(ref, v ? v.text : ref, doSend);
       });
@@ -332,11 +327,12 @@ const PresentationStudio = (() => {
     wrap.innerHTML = "";
     items.forEach((item) => {
       let idx = 0;
+      const isYt = item.type === "youtube";
       const images = item.images || [];
       const multi = images.length > 1;
       const row = document.createElement("div");
       row.className = "ps-file-row";
-      row.innerHTML = `<span class="ps-file-name">${escapeHtml(item.name)}</span>
+      row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${escapeHtml(item.name)}</span>
         <span class="ps-file-actions">
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
@@ -347,12 +343,15 @@ const PresentationStudio = (() => {
       function doSend() {
         const url = images[idx];
         if (!url) return;
-        rawPost({ type: "slide", imageUrl: url });
-        renderStudioPreview({ type: "slide", imageUrl: url });
+        if (isYt) { rawPost({ type: "youtube", embedUrl: url }); renderStudioPreview({ type: "youtube" }); }
+        else { rawPost({ type: "slide", imageUrl: url }); renderStudioPreview({ type: "slide", imageUrl: url }); }
       }
       row.querySelector('[data-act="play"]').addEventListener("click", () => stageOrSend(item.name, item.name, doSend));
       const prevBtn = row.querySelector('[data-act="prev"]');
       const nextBtn = row.querySelector('[data-act="next"]');
+      // ◀ ▶ pindah slide/video LANGSUNG (juga saat live di mode dual
+      // monitor) -- ini yang dipakai untuk "geser ke video berikutnya"
+      // saat presentasi sedang berjalan, sama seperti slide gambar/PDF.
       if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); doSend(); });
       if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); doSend(); });
       row.querySelector('[data-act="del"]').addEventListener("click", () => {
@@ -625,14 +624,20 @@ const PresentationStudio = (() => {
         // Kumpulan Ayat), tapi SEMUA versi tercentang untuk referensi
         // itu tayang sekaligus bertumpuk di Layar 2.
         const first = blocks[0];
+        // PERBAIKAN: renderStudioPreview() dipindah ke DALAM doSend()
+        // (bukan hanya di cabang 1-monitor) supaya saat dipakai di mode
+        // dual monitor lewat kotak "Berikutnya" -> "▶ Tayangkan", kotak
+        // "Tayang" juga ikut ter-update persis saat konten itu benar-
+        // benar didorong live (bukan cuma saat diketik/diantre).
         const doSend = () => {
           if (typeof Presentation !== "undefined" && Presentation.sendVerseMulti) {
             Presentation.sendVerseMulti(first.refLabel, first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text })));
           }
+          renderStudioPreview({ type: "verse", ref: first.refLabel, texts: first.versions });
         };
         const previewText = first.versions.map((v) => `[${v.label}] ${v.text}`).join("  ");
         if (isDualLive()) stageNext(first.refLabel, previewText, doSend);
-        else { doSend(); renderStudioPreview({ type: "verse", ref: first.refLabel, texts: first.versions }); }
+        else doSend();
       });
     }
     if (el("psQuickAddBtn")) {
@@ -799,6 +804,104 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // Tab YouTube -- tempel link video, langsung tayang penuh 1 layar
+  // di Layar 2 lewat <iframe> (present.html). KHUSUS laptop/komputer
+  // seperti fitur Studio lainnya (lihat refreshDeviceGate()); tidak
+  // pernah muncul di HP karena seluruh #presentStudio disembunyikan
+  // di layar sempit.
+  // ------------------------------------------------------------
+  function extractYoutubeId(url) {
+    if (!url) return null;
+    const s = url.trim();
+    const patterns = [
+      /youtu\.be\/([A-Za-z0-9_-]{6,})/,
+      /youtube\.com\/watch\?[^#]*v=([A-Za-z0-9_-]{6,})/,
+      /youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/,
+      /youtube\.com\/embed\/([A-Za-z0-9_-]{6,})/,
+    ];
+    for (const re of patterns) {
+      const m = s.match(re);
+      if (m) return m[1];
+    }
+    // Kalau yang ditempel sudah berupa ID video mentah (11 karakter khas)
+    if (/^[A-Za-z0-9_-]{10,15}$/.test(s)) return s;
+    return null;
+  }
+
+  function wireYoutubeTab() {
+    const input = el("psYtInput");
+    const showBtn = el("psYtShowBtn");
+    const addBtn = el("psYtAddQueueBtn");
+    const saveBtn = el("psYtSaveQueueBtn");
+    const queueList = el("psYtQueueList");
+    if (!input || !showBtn) return;
+
+    // Daftar sesi (di memori, belum tersimpan) -- dibangun dulu di sini
+    // sebelum ditekan "💾 Simpan ke Media Tersimpan" jadi 1 item dengan
+    // banyak video, persis pola PDF multi-halaman: kumpulkan dulu semua
+    // gambar/embed-URL, baru addMediaItem() sekali di akhir.
+    let queue = []; // [{ id, embedUrl, label }]
+
+    function renderQueue() {
+      if (!queueList) return;
+      if (!queue.length) {
+        queueList.innerHTML = '<p class="present-saved-empty">Belum ada video di daftar.</p>';
+        if (saveBtn) saveBtn.disabled = true;
+        return;
+      }
+      queueList.innerHTML = "";
+      queue.forEach((q, i) => {
+        const row = document.createElement("div");
+        row.className = "ps-file-row";
+        row.innerHTML = `<span class="ps-file-name">${i + 1}. ${escapeHtml(q.label)}</span>
+          <span class="ps-file-actions"><button type="button" class="chip-btn small danger" data-act="del">✖️</button></span>`;
+        row.querySelector('[data-act="del"]').addEventListener("click", () => {
+          queue = queue.filter((x) => x.id !== q.id);
+          renderQueue();
+        });
+        queueList.appendChild(row);
+      });
+      if (saveBtn) saveBtn.disabled = false;
+    }
+
+    function doShow() {
+      const id = extractYoutubeId(input.value);
+      if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
+      const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
+      const doSend = () => { rawPost({ type: "youtube", embedUrl }); renderStudioPreview({ type: "youtube" }); };
+      stageOrSend(`▶️ YouTube: ${id}`, embedUrl, doSend);
+    }
+    showBtn.addEventListener("click", doShow);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doShow(); } });
+
+    if (addBtn) addBtn.addEventListener("click", () => {
+      const id = extractYoutubeId(input.value);
+      if (!id) { alert("Link YouTube tidak dikenali."); return; }
+      const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
+      queue.push({ id: "q_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), embedUrl, label: id });
+      input.value = "";
+      renderQueue();
+    });
+
+    if (saveBtn) saveBtn.addEventListener("click", () => {
+      if (!queue.length || typeof addMediaItem !== "function") return;
+      const name = prompt("Nama untuk daftar video ini di Media Tersimpan:", "Video YouTube");
+      if (name === null) return; // dibatalkan
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const embedUrls = queue.map((q) => q.embedUrl);
+      const id = addMediaItem(username, name, embedUrls, name, "youtube");
+      if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh?)."); return; }
+      queue = [];
+      renderQueue();
+      renderMediaList();
+      saveBtn.textContent = "✅ Tersimpan";
+      setTimeout(() => { saveBtn.textContent = "💾 Simpan ke Media Tersimpan"; }, 1200);
+    });
+
+    renderQueue();
+  }
+
+  // ------------------------------------------------------------
   // Kanan: Aksi Cepat, Warta, FootNote, Penunjuk & Pen, Tema
   // ------------------------------------------------------------
   function wireQuickActions() {
@@ -877,11 +980,11 @@ const PresentationStudio = (() => {
     }
   }
 
-  const THEME_DEFAULT = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1 };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1 };
 
   function applyStoredTheme() {
     const raw = localStorage.getItem(THEME_KEY);
-    let theme = { ...THEME_DEFAULT };
+    let theme = { ...DEFAULT_STAGE_THEME };
     if (raw) { try { theme = { ...theme, ...JSON.parse(raw) }; } catch (e) {} }
     document.querySelectorAll("#psThemeGrid [data-theme]").forEach((b) => b.classList.toggle("active", b.dataset.theme === theme.swatch));
     if (el("psFontSelect")) el("psFontSelect").value = theme.font;
@@ -892,11 +995,63 @@ const PresentationStudio = (() => {
 
   function saveAndSendTheme(partial) {
     const raw = localStorage.getItem(THEME_KEY);
-    let theme = { ...THEME_DEFAULT };
+    let theme = { ...DEFAULT_STAGE_THEME };
     if (raw) { try { theme = { ...theme, ...JSON.parse(raw) }; } catch (e) {} }
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
+  }
+
+  // ------------------------------------------------------------
+  // Tema PANEL Studio (dark/light) -- terpisah total dari "Tema Layar
+  // Proyeksi" di atas. Ini hanya mengubah tampilan panel kontrol
+  // Studio itu sendiri (kolom kiri/tengah/kanan), lewat kelas
+  // .ps-ui-light di #presentStudio (lihat css/style.css). Tombol bulat
+  // ☀️/🌙 di ps-topbar.
+  // ------------------------------------------------------------
+  function applyUiTheme(mode) {
+    const studio = el("presentStudio");
+    const btn = el("psUiThemeToggle");
+    const isLight = mode === "light";
+    if (studio) studio.classList.toggle("ps-ui-light", isLight);
+    if (btn) btn.textContent = isLight ? "🌙" : "☀️";
+    if (btn) btn.title = isLight ? "Ganti ke tema gelap" : "Ganti ke tema terang";
+  }
+
+  function wireUiTheme() {
+    const stored = localStorage.getItem(UI_THEME_KEY) || "dark";
+    applyUiTheme(stored);
+    if (el("psUiThemeToggle")) {
+      el("psUiThemeToggle").addEventListener("click", () => {
+        const next = (localStorage.getItem(UI_THEME_KEY) || "dark") === "dark" ? "light" : "dark";
+        localStorage.setItem(UI_THEME_KEY, next);
+        applyUiTheme(next);
+      });
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Jam berjalan di ps-topbar -- memakai jam PERANGKAT (client), bukan
+  // permintaan khusus ke server, karena tidak ada endpoint waktu di
+  // proyek ini. Selama jam komputer/laptop operator sudah benar
+  // (biasanya otomatis tersinkron lewat internet/NTP), jam ini akan
+  // akurat. Diperbarui tiap detik.
+  // ------------------------------------------------------------
+  let clockInterval = null;
+  function wireClock() {
+    const clockEl = el("psTopbarClock");
+    if (!clockEl) return;
+    function tick() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const ss = String(now.getSeconds()).padStart(2, "0");
+      const tgl = now.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+      clockEl.textContent = `${tgl} — ${hh}:${mm}:${ss}`;
+    }
+    tick();
+    if (clockInterval) clearInterval(clockInterval);
+    clockInterval = setInterval(tick, 1000);
   }
 
   function wireTheme() {
@@ -906,22 +1061,11 @@ const PresentationStudio = (() => {
         btn.classList.add("active");
         const t = THEMES[btn.dataset.theme];
         if (el("psBgColor")) el("psBgColor").value = t.bg;
-        // Kirim swatch + bg + ink SEKALIGUS -- ini perbaikan utamanya:
-        // dulu ink (warna tulisan) tidak pernah dikirim, jadi ganti ke
-        // tema latar terang (Terang/Sepia) membuat tulisan nyaris tak
-        // kelihatan (tetap krem-terang di atas latar terang).
         saveAndSendTheme({ swatch: btn.dataset.theme, bgColor: t.bg, ink: t.ink });
       });
     });
     if (el("psFontSelect")) el("psFontSelect").addEventListener("change", () => saveAndSendTheme({ font: el("psFontSelect").value }));
-    if (el("psBgColor")) el("psBgColor").addEventListener("input", () => {
-      // Warna latar dipilih manual (bukan lewat swatch) -- hitung ulang
-      // ink otomatis supaya tulisan tetap kebaca berapa pun warna latar
-      // yang dipilih operator, dan lepas status "aktif" dari swatch
-      // manapun karena ini sudah jadi kombinasi kustom.
-      document.querySelectorAll("#psThemeGrid [data-theme]").forEach((b) => b.classList.remove("active"));
-      saveAndSendTheme({ swatch: "", bgColor: el("psBgColor").value, ink: autoInkColor(el("psBgColor").value) });
-    });
+    if (el("psBgColor")) el("psBgColor").addEventListener("input", () => saveAndSendTheme({ bgColor: el("psBgColor").value }));
     function applyScale() {
       const pct = Number(el("psFontScale").value);
       saveAndSendTheme({ scale: pct / 100 });
@@ -960,6 +1104,9 @@ const PresentationStudio = (() => {
     wirePointerPen();
     wireTheme();
     wireNextBox();
+    wireUiTheme();
+    wireClock();
+    wireYoutubeTab();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
