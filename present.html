@@ -394,6 +394,17 @@
       pointerDot.style.top = (data.y * window.innerHeight) + "px";
       return;
     }
+    if (data.type === "yt_control") {
+      // Kontrol Play/Pause/Mute dari tombol di Studio Presentasi -- dikirim
+      // lewat postMessage standar YouTube IFrame Player API. Butuh embedUrl
+      // yang sudah berisi "enablejsapi=1" (lihat wireYoutubeTab() di
+      // js/presentation-studio.js) supaya player mau menerima perintah ini.
+      // Kalau belum ada video yang tayang, abaikan saja (tidak error).
+      if (ytEl.hidden || !ytEl.src || !ytEl.contentWindow) return;
+      const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[data.action];
+      if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      return;
+    }
     if (data.type === "pen") {
       if (data.clear) {
         penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
