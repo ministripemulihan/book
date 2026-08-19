@@ -751,7 +751,11 @@
           </div>
           <div class="ps-preview-slot" id="psLiveSlot">
             <div class="ps-preview-slot-tag ps-preview-slot-tag-live" id="psLiveTag">Tayang</div>
-            <div class="ps-preview-box" id="psPreviewBox"><div class="present-preview-idle">Belum ada tayangan</div></div>
+            <div class="ps-preview-box-wrap" id="psPreviewBoxWrap">
+              <div class="ps-preview-box" id="psPreviewBox"><div class="present-preview-idle">Belum ada tayangan</div></div>
+              <canvas id="psPenCanvas" class="ps-pen-canvas"></canvas>
+              <div id="psPointerDot" class="ps-pointer-dot"></div>
+            </div>
           </div>
         </div>
 
@@ -789,7 +793,7 @@
           <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
           <button type="button" class="ps-color-chip" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
         </div>
-        <div class="ps-pointer-pad" id="psPointerPad">Gerakkan kursor di sini saat Penunjuk/Pen aktif</div>
+        <div class="ps-pointer-hint" id="psPointerHint">Gerakkan kursor di atas kotak pratinjau "Tayang" di kanan atas saat Penunjuk/Pen aktif.</div>
 
         <div class="ps-field-label">Tema Layar Proyeksi</div>
         <div class="ps-theme-grid" id="psThemeGrid">
