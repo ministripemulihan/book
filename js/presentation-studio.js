@@ -113,7 +113,19 @@ const PresentationStudio = (() => {
     }
     if (payload.type === "black") { box.innerHTML = '<div class="present-preview-black">⬛ Layar Hitam</div>'; return; }
     if (payload.type === "logo") { box.innerHTML = '<div class="present-preview-idle">◆ Logo ditampilkan</div>'; return; }
-    if (payload.type === "youtube") { box.innerHTML = '<div class="present-preview-idle">▶️ Video YouTube diputar</div>'; return; }
+    if (payload.type === "youtube") {
+      // PERBAIKAN (permintaan operator): dulu cuma teks placeholder
+      // "▶️ Video YouTube diputar" -- sekarang kotak "Tayang" mini ini
+      // betul-betul merender video-nya (iframe TERPISAH dari yang di
+      // Layar 2, sengaja dibisukan + autoplay HANYA di sini supaya
+      // operator bisa lihat video jalan meski kotaknya kecil; suara
+      // sungguhan tetap cuma dari Layar 2, dikontrol lewat tombol
+      // ▶️/⏸️/🔇 di atas -- lihat wireYtControls()).
+      box.innerHTML = payload.embedUrl
+        ? `<iframe src="${escapeHtml(toStudioPreviewEmbedUrl(payload.embedUrl))}" style="position:absolute; inset:0; width:100%; height:100%; border:0;" allow="autoplay; encrypted-media" title="Pratinjau video"></iframe>`
+        : '<div class="present-preview-idle">▶️ Video YouTube</div>';
+      return;
+    }
     if (payload.type === "slide") {
       box.innerHTML = payload.imageUrl
         ? `<img src="${payload.imageUrl}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;" />`
@@ -354,7 +366,7 @@ const PresentationStudio = (() => {
       function doSend() {
         const url = images[idx];
         if (!url) return;
-        if (isYt) { rawPost({ type: "youtube", embedUrl: url }); renderStudioPreview({ type: "youtube" }); }
+        if (isYt) { rawPost({ type: "youtube", embedUrl: url }); renderStudioPreview({ type: "youtube", embedUrl: url }); }
         else { rawPost({ type: "slide", imageUrl: url }); renderStudioPreview({ type: "slide", imageUrl: url }); }
       }
       row.querySelector('[data-act="play"]').addEventListener("click", () => stageOrSend(item.name, item.name, doSend));
@@ -857,11 +869,24 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
-  // Tab YouTube -- tempel link video, langsung tayang penuh 1 layar
-  // di Layar 2 lewat <iframe> (present.html). KHUSUS laptop/komputer
-  // seperti fitur Studio lainnya (lihat refreshDeviceGate()); tidak
-  // pernah muncul di HP karena seluruh #presentStudio disembunyikan
-  // di layar sempit.
+  // Tab YouTube -- tempel link video, tayang penuh 1 layar di Layar 2
+  // lewat <iframe> (present.html). KHUSUS laptop/komputer seperti
+  // fitur Studio lainnya (lihat refreshDeviceGate()); tidak pernah
+  // muncul di HP karena seluruh #presentStudio disembunyikan di layar
+  // sempit.
+  //
+  // PERBAIKAN (permintaan operator):
+  // 1. Video TIDAK LANGSUNG autoplay lagi begitu tayang di Layar 2 --
+  //    "autoplay=1" dihapus dari embedUrl, diganti "enablejsapi=1"
+  //    supaya bisa dikontrol lewat postMessage. Operator menekan
+  //    sendiri tombol ▶️ Play kalau sudah siap (lihat wireYtControls()
+  //    & yt_control di present.html).
+  // 2. Nama di "Daftar Video" sekarang JUDUL VIDEO + NAMA CHANNEL
+  //    (lewat endpoint publik oEmbed YouTube, tidak perlu API key)
+  //    + DURASI (lewat YouTube IFrame Player API, juga tidak perlu API
+  //    key -- video disiapkan sebentar tersembunyi off-screen cuma
+  //    untuk membaca durasinya, lalu langsung dibuang). Kalau internet
+  //    lambat/off, otomatis fallback tampilkan ID videonya saja.
   // ------------------------------------------------------------
   function extractYoutubeId(url) {
     if (!url) return null;
@@ -881,6 +906,86 @@ const PresentationStudio = (() => {
     return null;
   }
 
+  function buildYoutubeEmbedUrl(id) {
+    // TANPA autoplay -- video dimuat dalam keadaan siap/pause, bukan
+    // langsung jalan. "enablejsapi=1" wajib ada supaya tombol
+    // Play/Pause/Mute di Studio bisa mengontrolnya lewat postMessage.
+    return `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1`;
+  }
+
+  function toStudioPreviewEmbedUrl(embedUrl) {
+    // Khusus untuk kotak mini "Tayang" di Studio (bukan Layar 2 asli):
+    // dibuat autoplay + bisu, supaya operator langsung lihat videonya
+    // "hidup" di layar kecil tanpa perlu menekan apa pun & tanpa dobel
+    // suara dengan Layar 2 sungguhan.
+    if (!embedUrl) return "";
+    const sep = embedUrl.includes("?") ? "&" : "?";
+    return embedUrl + sep + "autoplay=1&mute=1";
+  }
+
+  function formatYtDuration(totalSeconds) {
+    if (!totalSeconds || !isFinite(totalSeconds) || totalSeconds <= 0) return "";
+    const secs = Math.round(totalSeconds);
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = String(secs % 60).padStart(2, "0");
+    return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+  }
+
+  // Judul + nama channel lewat oEmbed publik YouTube (tanpa API key).
+  async function fetchYoutubeTitleAuthor(id) {
+    try {
+      const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent("https://www.youtube.com/watch?v=" + id)}&format=json`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return { title: data.title || null, author: data.author_name || null };
+    } catch (e) {
+      return null; // offline / diblokir jaringan -- biarkan fallback ke ID
+    }
+  }
+
+  // Durasi video lewat YouTube IFrame Player API (juga tanpa API key) --
+  // memuat player tersembunyi sebentar, baca getDuration(), lalu buang.
+  let ytApiPromise = null;
+  function loadYoutubeIframeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (ytApiPromise) return ytApiPromise;
+    ytApiPromise = new Promise((resolve) => {
+      const prevReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (typeof prevReady === "function") prevReady(); resolve(); };
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      tag.onerror = () => resolve(); // gagal muat skrip -- tetap resolve, pemanggil akan fallback
+      document.head.appendChild(tag);
+    });
+    return ytApiPromise;
+  }
+  function fetchYoutubeDuration(id) {
+    return loadYoutubeIframeApi().then(() => new Promise((resolve) => {
+      if (!window.YT || !window.YT.Player) { resolve(null); return; }
+      const holder = document.createElement("div");
+      holder.style.cssText = "position:fixed; left:-9999px; top:-9999px; width:2px; height:2px;";
+      document.body.appendChild(holder);
+      let settled = false;
+      const finish = (secs) => {
+        if (settled) return;
+        settled = true;
+        try { player.destroy(); } catch (e) {}
+        holder.remove();
+        resolve(secs);
+      };
+      const timeout = setTimeout(() => finish(null), 7000);
+      var player = new YT.Player(holder, {
+        videoId: id,
+        playerVars: { autoplay: 0, controls: 0 },
+        events: {
+          onReady: (e) => { clearTimeout(timeout); finish(e.target.getDuration()); },
+          onError: () => { clearTimeout(timeout); finish(null); },
+        },
+      });
+    })).catch(() => null);
+  }
+
   function wireYoutubeTab() {
     const input = el("psYtInput");
     const showBtn = el("psYtShowBtn");
@@ -892,8 +997,15 @@ const PresentationStudio = (() => {
     // Daftar sesi (di memori, belum tersimpan) -- dibangun dulu di sini
     // sebelum ditekan "💾 Simpan ke Media Tersimpan" jadi 1 item dengan
     // banyak video, persis pola PDF multi-halaman: kumpulkan dulu semua
-    // gambar/embed-URL, baru addMediaItem() sekali di akhir.
-    let queue = []; // [{ id, embedUrl, label }]
+    // embed-URL, baru addMediaItem() sekali di akhir.
+    let queue = []; // [{ id, videoId, embedUrl, title, author, durationLabel, label }]
+
+    function labelFor(entry) {
+      const parts = [entry.title || entry.videoId];
+      if (entry.author) parts.push(entry.author);
+      if (entry.durationLabel) parts.push(entry.durationLabel);
+      return parts.join(" — ");
+    }
 
     function renderQueue() {
       if (!queueList) return;
@@ -906,7 +1018,7 @@ const PresentationStudio = (() => {
       queue.forEach((q, i) => {
         const row = document.createElement("div");
         row.className = "ps-file-row";
-        row.innerHTML = `<span class="ps-file-name">${i + 1}. ${escapeHtml(q.label)}</span>
+        row.innerHTML = `<span class="ps-file-name">${i + 1}. ${escapeHtml(labelFor(q))}${q.loading ? ' <span class="ps-file-status">(memuat info…)</span>' : ""}</span>
           <span class="ps-file-actions"><button type="button" class="chip-btn small danger" data-act="del">✖️</button></span>`;
         row.querySelector('[data-act="del"]').addEventListener("click", () => {
           queue = queue.filter((x) => x.id !== q.id);
@@ -920,8 +1032,8 @@ const PresentationStudio = (() => {
     function doShow() {
       const id = extractYoutubeId(input.value);
       if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
-      const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
-      const doSend = () => { rawPost({ type: "youtube", embedUrl }); renderStudioPreview({ type: "youtube" }); };
+      const embedUrl = buildYoutubeEmbedUrl(id);
+      const doSend = () => { rawPost({ type: "youtube", embedUrl }); renderStudioPreview({ type: "youtube", embedUrl }); };
       stageOrSend(`▶️ YouTube: ${id}`, embedUrl, doSend);
     }
     showBtn.addEventListener("click", doShow);
@@ -930,15 +1042,30 @@ const PresentationStudio = (() => {
     if (addBtn) addBtn.addEventListener("click", () => {
       const id = extractYoutubeId(input.value);
       if (!id) { alert("Link YouTube tidak dikenali."); return; }
-      const embedUrl = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0`;
-      queue.push({ id: "q_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6), embedUrl, label: id });
+      const embedUrl = buildYoutubeEmbedUrl(id);
+      const entry = {
+        id: "q_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        videoId: id, embedUrl, title: null, author: null, durationLabel: "", loading: true,
+      };
+      queue.push(entry);
       input.value = "";
       renderQueue();
+      // Ambil judul/channel & durasi secara paralel, update baris begitu siap.
+      fetchYoutubeTitleAuthor(id).then((meta) => {
+        if (meta) { entry.title = meta.title; entry.author = meta.author; }
+        entry.loading = false;
+        renderQueue();
+      });
+      fetchYoutubeDuration(id).then((secs) => {
+        entry.durationLabel = formatYtDuration(secs);
+        renderQueue();
+      });
     });
 
     if (saveBtn) saveBtn.addEventListener("click", () => {
       if (!queue.length || typeof addMediaItem !== "function") return;
-      const name = prompt("Nama untuk daftar video ini di Media Tersimpan:", "Video YouTube");
+      const defaultName = queue.length === 1 ? (queue[0].title || queue[0].videoId) : "Video YouTube";
+      const name = prompt("Nama untuk daftar video ini di Media Tersimpan:", defaultName);
       if (name === null) return; // dibatalkan
       const username = typeof currentUser !== "undefined" ? currentUser : null;
       const embedUrls = queue.map((q) => q.embedUrl);
@@ -952,6 +1079,26 @@ const PresentationStudio = (() => {
     });
 
     renderQueue();
+  }
+
+  // Tombol ▶️ Play / ⏸️ Pause / 🔇 Mute di baris ikon atas kotak "Tayang"
+  // -- mengontrol video YouTube yang SEDANG tayang di Layar 2 lewat
+  // postMessage (lihat yt_control di present.html). Tidak melakukan
+  // apa-apa kalau tidak ada video yang sedang tayang (present.html
+  // sendiri yang menjaga/abaikan kalau ytEl kosong).
+  function wireYtControls() {
+    const playBtn = el("psYtPlayBtn");
+    const pauseBtn = el("psYtPauseBtn");
+    const muteBtn = el("psYtMuteBtn");
+    let muted = false;
+    if (playBtn) playBtn.addEventListener("click", () => rawPost({ type: "yt_control", action: "play" }));
+    if (pauseBtn) pauseBtn.addEventListener("click", () => rawPost({ type: "yt_control", action: "pause" }));
+    if (muteBtn) muteBtn.addEventListener("click", () => {
+      muted = !muted;
+      rawPost({ type: "yt_control", action: muted ? "mute" : "unmute" });
+      muteBtn.textContent = muted ? "🔇 Bersuara" : "🔇 Mute";
+      muteBtn.classList.toggle("active", muted);
+    });
   }
 
   // ------------------------------------------------------------
@@ -1277,6 +1424,7 @@ const PresentationStudio = (() => {
     wireUiTheme();
     wireClock();
     wireYoutubeTab();
+    wireYtControls();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
