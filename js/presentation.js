@@ -26,6 +26,14 @@ const Presentation = (() => {
   const MODE_KEY = "bible_app_present_mode_v1"; // "1" | "2"
   const SAVED_KEY = "bible_app_present_saved_texts_v1";
   const WIN_NAME = "bibleAppPresentWindow2";
+  // Ukuran/rasio Layar 2 yang dipilih di Studio Presentasi (16:9 / 4:3 +
+  // resolusi detail, lihat js/presentation-studio.js: SCREEN_RES_KEY).
+  // Dibaca langsung dari localStorage (bukan lewat referensi ke modul
+  // PresentationStudio) supaya file ini tetap bisa dipakai sendirian
+  // (mis. panel ⋮ biasa di HP, yang tidak memuat Studio sama sekali).
+  const SCREEN_RES_KEY = "bible_app_studio_screen_res_v1";
+  const DEFAULT_SCREEN_W = 1280;
+  const DEFAULT_SCREEN_H = 720;
 
   let winRef = null;
   let lastPayload = null; // { type: "verse"|"text"|"clear", ref, text }
@@ -65,6 +73,35 @@ const Presentation = (() => {
   }
 
   // ------------------------------------------------------------
+  // Ukuran jendela Layar 2 -- dibaca dari resolusi tersimpan (Studio
+  // Presentasi), lalu diskalakan turun (menjaga rasio) supaya tidak
+  // pernah melebihi area layar yang tersedia di perangkat operator.
+  // ------------------------------------------------------------
+  function getStoredScreenSize() {
+    let w = DEFAULT_SCREEN_W, h = DEFAULT_SCREEN_H;
+    try {
+      const raw = localStorage.getItem(SCREEN_RES_KEY);
+      if (raw) {
+        const r = JSON.parse(raw);
+        if (r && Number(r.w) > 0 && Number(r.h) > 0) { w = Number(r.w); h = Number(r.h); }
+      }
+    } catch (e) {}
+    return { w, h };
+  }
+
+  function clampToScreen(w, h) {
+    const maxW = Math.max(320, (window.screen.availWidth || 1280) - 60);
+    const maxH = Math.max(240, (window.screen.availHeight || 800) - 80);
+    const scale = Math.min(1, maxW / w, maxH / h);
+    return { width: Math.round(w * scale), height: Math.round(h * scale) };
+  }
+
+  function getDesiredWindowSize() {
+    const { w, h } = getStoredScreenSize();
+    return clampToScreen(w, h);
+  }
+
+  // ------------------------------------------------------------
   // Buka / tutup Layar 2
   // ------------------------------------------------------------
   function openWindow() {
@@ -74,12 +111,25 @@ const Presentation = (() => {
     }
     winReady = false;
     msgQueue = [];
+    const { width, height } = getDesiredWindowSize();
     winRef = window.open(
       "present.html",
       WIN_NAME,
-      "width=1024,height=640,menubar=no,toolbar=no,location=no,status=no"
+      `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`
     );
     startPolling();
+  }
+
+  // Ubah ukuran Layar 2 yang SEDANG terbuka supaya langsung menyesuaikan
+  // begitu operator mengganti pilihan resolusi di Studio -- tanpa perlu
+  // menutup & membuka ulang jendelanya. Beberapa browser membatasi
+  // resizeTo() untuk jendela yang tidak dibuka lewat skrip; karena
+  // Layar 2 selalu dibuka lewat window.open() di atas, ini pada
+  // umumnya berhasil, tapi tetap dibungkus try/catch untuk jaga-jaga.
+  function resizeWindow(w, h) {
+    if (!winRef || winRef.closed) return;
+    const { width, height } = clampToScreen(w, h);
+    try { winRef.resizeTo(width, height); } catch (e) {}
   }
 
   function closeWindow() {
@@ -448,5 +498,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow };
 })();
