@@ -2347,7 +2347,7 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
     mediaSlot.innerHTML = "";
     const requestToken = (renderChapter._mediaToken = (renderChapter._mediaToken || 0) + 1);
     if (typeof findMediaLinkForReference === "function") {
-      findMediaLinkForReference(bookNum, chapter).then((media) => {
+      findMediaLinkForReference(bookNum, chapter, currentLang).then((media) => {
         if (renderChapter._mediaToken !== requestToken) return; // pasal sudah berpindah lagi
         if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
         mediaSlot.appendChild(buildInlineMediaBlock(media, `${displayName} ${chapter}`));
@@ -3904,7 +3904,7 @@ function renderCollectionDetailInto(container, id, col) {
     // ketemu. Lihat findMediaLinkForReference()/buildInlineMediaBlock() di
     // js/media.js -- pemutarnya muncul LANGSUNG di sini, bukan tab baru.
     if (v && typeof findMediaLinkForReference === "function") {
-      findMediaLinkForReference(v.bookNumber, v.chapter).then((media) => {
+      findMediaLinkForReference(v.bookNumber, v.chapter, v.lang).then((media) => {
         if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
         const actions = item.querySelector(".collection-verse-actions");
         if (!actions) return;
