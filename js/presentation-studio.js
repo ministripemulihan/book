@@ -1032,6 +1032,14 @@ const PresentationStudio = (() => {
     const ctx = canvas ? canvas.getContext("2d") : null;
     let color = "#ff3b30";
 
+    // Tombol Penunjuk/Pen kini ADA DI 2 TEMPAT (tab "Penunjuk & Pen" +
+    // akses cepat di atas kotak "Tayang") -- keduanya dicari lewat
+    // data-attribute yang sama supaya statusnya selalu sinkron, apa pun
+    // tombol mana yang diklik operator.
+    const pointerBtns = () => Array.from(document.querySelectorAll("[data-ps-pointer-toggle]"));
+    const penBtns = () => Array.from(document.querySelectorAll("[data-ps-pen-toggle]"));
+    const penClearBtns = () => Array.from(document.querySelectorAll("[data-ps-pen-clear]"));
+
     function syncCanvasSize() {
       if (!wrap || !canvas) return;
       const w = wrap.clientWidth, h = wrap.clientHeight;
@@ -1051,26 +1059,26 @@ const PresentationStudio = (() => {
         color = chip.dataset.color;
       });
     });
-    if (el("psPointerToggle")) el("psPointerToggle").addEventListener("click", () => {
+    pointerBtns().forEach((btn) => btn.addEventListener("click", () => {
       pointerActive = !pointerActive;
       penActive = false;
-      el("psPointerToggle").classList.toggle("active", pointerActive);
-      if (el("psPenToggle")) el("psPenToggle").classList.remove("active");
+      pointerBtns().forEach((b) => b.classList.toggle("active", pointerActive));
+      penBtns().forEach((b) => b.classList.remove("active"));
       if (!pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
       updateMode();
-    });
-    if (el("psPenToggle")) el("psPenToggle").addEventListener("click", () => {
+    }));
+    penBtns().forEach((btn) => btn.addEventListener("click", () => {
       penActive = !penActive;
       pointerActive = false;
-      el("psPenToggle").classList.toggle("active", penActive);
-      if (el("psPointerToggle")) el("psPointerToggle").classList.remove("active");
+      penBtns().forEach((b) => b.classList.toggle("active", penActive));
+      pointerBtns().forEach((b) => b.classList.remove("active"));
       if (!penActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
       updateMode();
-    });
-    if (el("psPenClear")) el("psPenClear").addEventListener("click", () => {
+    }));
+    penClearBtns().forEach((btn) => btn.addEventListener("click", () => {
       rawPost({ type: "pen", clear: true });
       if (ctx && canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; }
-    });
+    }));
     if (wrap) {
       wrap.addEventListener("mousemove", (e) => {
         const rect = wrap.getBoundingClientRect();
