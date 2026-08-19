@@ -2083,22 +2083,76 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    khusus laptop & komputer (>=1100px, lihat media query di bawah).
    ============================================================ */
 .present-studio {
+  /* ---- Variabel tema panel Studio (BUKAN tema Layar Proyeksi) ----
+     Toggle bulat ☀️/🌙 di ps-topbar menambah/melepas kelas .ps-ui-light
+     di elemen ini (lihat js/presentation-studio.js: wireUiTheme()).
+     Default = gelap (variabel di bawah), .ps-ui-light menimpanya. */
+  --ps-bg: #14100b;
+  --ps-ink: #f1ece0;
+  --ps-ink-soft: #cfc3ab;
+  --ps-topbar-bg: #1c1712;
+  --ps-border: #33291c;
+  --ps-col-border: #2a2216;
+  --ps-tab-bg: #241d14;
+  --ps-tab-ink: #cfc3ab;
+  --ps-tab-border: #3a2f1f;
+  --ps-card-bg: #221b12;
+  --ps-card-border: #382c1c;
+  --ps-muted: #9c9078;
+  --ps-preview-bg: #05070c;
+  --ps-preview-ink: #f5f2e8;
+  --ps-dropzone-border: #4a3c28;
+
   position: fixed; inset: 0; z-index: 900;
-  background: #14100b;
-  color: #f1ece0;
+  background: var(--ps-bg);
+  color: var(--ps-ink);
   display: flex; flex-direction: column;
   font-family: var(--font-ui);
+}
+.present-studio.ps-ui-light {
+  --ps-bg: #f6f2e6;
+  --ps-ink: #241d12;
+  --ps-ink-soft: #6b5d3f;
+  --ps-topbar-bg: #efe6d0;
+  --ps-border: #ddcda2;
+  --ps-col-border: #e2d3ac;
+  --ps-tab-bg: #ffffff;
+  --ps-tab-ink: #5c5033;
+  --ps-tab-border: #ddcda2;
+  --ps-card-bg: #ffffff;
+  --ps-card-border: #e2d3ac;
+  --ps-muted: #8a7c5c;
+  --ps-preview-bg: #fffdf6;
+  --ps-preview-ink: #241d12;
+  --ps-dropzone-border: #c9b482;
 }
 .ps-topbar {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 18px;
-  background: #1c1712;
-  border-bottom: 1px solid #33291c;
+  background: var(--ps-topbar-bg);
+  border-bottom: 1px solid var(--ps-border);
   flex: 0 0 auto;
 }
 .ps-topbar-title { font-weight: 800; font-size: 15px; color: var(--brass-soft); }
-.ps-topbar-status { font-size: 12.5px; color: #b8ac97; flex: 1; }
-.ps-topbar-actions { display: flex; gap: 8px; }
+.ps-topbar-status { font-size: 12.5px; color: var(--ps-ink-soft); flex: 1; }
+.ps-topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+/* Jam waktu berjalan (sesuai jam perangkat) + toggle tema bulat */
+.ps-topbar-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px; font-weight: 700; color: var(--ps-ink-soft);
+  padding: 5px 10px; border-radius: 999px;
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border);
+  white-space: nowrap;
+}
+.ps-ui-theme-toggle {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border);
+  color: var(--ps-ink); font-size: 15px; cursor: pointer; padding: 0;
+  flex: 0 0 auto;
+}
+.ps-ui-theme-toggle:hover { border-color: var(--brass); }
 
 .ps-columns {
   flex: 1 1 auto;
@@ -2110,30 +2164,30 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   min-height: 0;
   overflow-y: auto;
   padding: 14px 16px;
-  border-right: 1px solid #2a2216;
+  border-right: 1px solid var(--ps-col-border);
 }
 .ps-col-right { border-right: none; }
 
 .ps-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .ps-tab {
-  background: #241d14; color: #cfc3ab; border: 1px solid #3a2f1f;
+  background: var(--ps-tab-bg); color: var(--ps-tab-ink); border: 1px solid var(--ps-tab-border);
   border-radius: 8px; padding: 7px 10px; font-size: 12.5px; cursor: pointer;
   font-weight: 600;
 }
 .ps-tab.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
 
-.ps-field-label { font-size: 12px; font-weight: 700; color: #cbbf9e; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.ps-field-label { font-size: 12px; font-weight: 700; color: var(--ps-ink-soft); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
 .ps-btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 .ps-btn-row [data-pos].active, .ps-btn-row [data-timer-preset].active { background: var(--brass); color: #1a1206; }
 
 .ps-verse-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .ps-verse-row {
-  text-align: left; background: #221b12; border: 1px solid #382c1c; border-radius: 8px;
-  padding: 8px 10px; cursor: pointer; color: #f1ece0;
+  text-align: left; background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px;
+  padding: 8px 10px; cursor: pointer; color: var(--ps-ink);
 }
 .ps-verse-row:hover { border-color: var(--brass); }
 .ps-verse-ref { display: block; font-weight: 700; font-size: 12.5px; color: var(--brass-soft); }
-.ps-verse-snippet { display: block; font-size: 12px; color: #cfc3ab; margin-top: 2px; }
+.ps-verse-snippet { display: block; font-size: 12px; color: var(--ps-ink-soft); margin-top: 2px; }
 
 .ps-color-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .ps-color-chip {
@@ -2142,9 +2196,9 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-color-chip.active { border-color: var(--brass); }
 .ps-color-input { width: 100%; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer; }
 
-.ps-timer-box { margin-top: 16px; padding-top: 12px; border-top: 1px solid #33291c; }
+.ps-timer-box { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ps-border); }
 .ps-timer-label-preview {
-  text-align: center; font-size: 13px; font-weight: 600; color: #cfc3ab;
+  text-align: center; font-size: 13px; font-weight: 600; color: var(--ps-ink-soft);
   margin-top: 8px; min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ps-timer-display {
@@ -2152,12 +2206,12 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   font-variant-numeric: tabular-nums; color: var(--brass-soft);
 }
 .ps-timer-display.done { color: #e35b4b; }
-.ps-timer-display.ps-timer-idle { color: #6b6250; }
+.ps-timer-display.ps-timer-idle { color: var(--ps-muted); }
 .ps-timer-box .chip-btn.active { background: var(--brass-soft); color: #1a1206; border-color: var(--brass-soft); }
 
-.ps-quick-preview { max-height: 160px; overflow-y: auto; margin-top: 8px; font-size: 12.5px; color: #cfc3ab; }
-.ps-quick-preview-row { padding: 4px 0; border-bottom: 1px solid #2a2216; }
-.ps-quick-preview-block { padding: 6px 0; border-bottom: 1px solid #2a2216; }
+.ps-quick-preview { max-height: 160px; overflow-y: auto; margin-top: 8px; font-size: 12.5px; color: var(--ps-ink-soft); }
+.ps-quick-preview-row { padding: 4px 0; border-bottom: 1px solid var(--ps-col-border); }
+.ps-quick-preview-block { padding: 6px 0; border-bottom: 1px solid var(--ps-col-border); }
 .ps-quick-preview-block:last-child { border-bottom: none; }
 .ps-quick-preview-block b { display: block; margin-bottom: 3px; }
 .ps-quick-preview-vrow { padding: 2px 0; }
@@ -2170,25 +2224,31 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-version-grid label { display: flex; align-items: center; gap: 4px; }
 
 .ps-dropzone {
-  border: 2px dashed #4a3c28; border-radius: 10px; padding: 26px 14px; text-align: center;
-  font-size: 13px; color: #cfc3ab; cursor: pointer; margin-top: 8px;
+  border: 2px dashed var(--ps-dropzone-border); border-radius: 10px; padding: 26px 14px; text-align: center;
+  font-size: 13px; color: var(--ps-ink-soft); cursor: pointer; margin-top: 8px;
 }
-.ps-dropzone.dragover { border-color: var(--brass); background: #241d14; }
-.ps-dropzone-sub { font-size: 11px; color: #9c9078; }
+.ps-dropzone.dragover { border-color: var(--brass); background: var(--ps-tab-bg); }
+.ps-dropzone-sub { font-size: 11px; color: var(--ps-muted); }
 .ps-file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .ps-file-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  background: #221b12; border: 1px solid #382c1c; border-radius: 8px; padding: 6px 10px; font-size: 12.5px;
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;
 }
 .ps-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-file-actions { display: flex; gap: 4px; flex: 0 0 auto; align-items: center; }
-.ps-file-status { font-style: normal; font-size: 11px; color: #9a8f74; margin-left: 6px; }
-.ps-file-slide-count { font-size: 11px; color: #cfc3ab; min-width: 34px; text-align: center; }
+.ps-file-status { font-style: normal; font-size: 11px; color: var(--ps-muted); margin-left: 6px; }
+.ps-file-slide-count { font-size: 11px; color: var(--ps-ink-soft); min-width: 34px; text-align: center; }
+
+/* Tab "▶️ YouTube" (di dalam panel File) -- link ditayangkan langsung
+   sebagai iframe penuh 1 layar di Layar 2 (khusus laptop/komputer). */
+.ps-yt-row { display: flex; gap: 8px; margin-top: 8px; }
+.ps-yt-row input { flex: 1 1 auto; }
+.ps-yt-hint { font-size: 11px; color: var(--ps-muted); margin-top: 6px; }
 
 .ps-preview-box {
-  background: #05070c; border-radius: 10px; padding: 16px; min-height: 120px;
+  background: var(--ps-preview-bg); border-radius: 10px; padding: 16px; min-height: 120px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  color: #f5f2e8; border: 1px solid #2a2216;
+  color: var(--ps-preview-ink); border: 1px solid var(--ps-col-border);
 }
 .present-preview-black { color: #6b7280; font-weight: 700; }
 
@@ -2214,8 +2274,8 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-theme-swatch.active { border-color: var(--brass); }
 
 .ps-pointer-pad {
-  margin-top: 8px; height: 70px; border-radius: 8px; border: 1px dashed #4a3c28;
-  display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: #9c9078;
+  margin-top: 8px; height: 70px; border-radius: 8px; border: 1px dashed var(--ps-dropzone-border);
+  display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: var(--ps-muted);
   cursor: crosshair;
 }
 
