@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Alkitab — Baca &amp; Cari Ayat</title>
+<title>Alkitab VP — Baca &amp; Cari Ayat</title>
 <meta name="description" content="Aplikasi pembacaan Alkitab dengan data lokal, pencarian ayat dan kata cepat." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -755,26 +755,35 @@
       <div class="ps-preview-panel" id="psPreviewPanel">
         <div class="ps-preview-panel-head">
           <div class="ps-field-label" id="psPreviewLabel">Pratinjau Layar 2</div>
-          <!-- Akses cepat Penunjuk/Pen -- SENGAJA diduplikasi di sini (di
-               luar tab "✏️ Penunjuk & Pen" di kolom kanan) supaya selalu
-               kelihatan langsung di atas kotak "Tayang", tidak perlu
-               pindah tab dulu untuk mengaktifkannya (sebelumnya terasa
-               seperti "hilang" karena tersembunyi di dalam tab). Tombol
-               di sini & di dalam tab saling sinkron (lihat data-ps-*
-               di js/presentation-studio.js: wirePointerPen()). -->
+          <!-- Akses cepat Penunjuk/Pen + Ukuran huruf (A-/A+) -- SENGAJA
+               diduplikasi di sini (di luar tab "Penunjuk & Pen" / "Tampilan"
+               di kolom kanan) supaya selalu kelihatan langsung di atas kotak
+               "Tayang", tidak perlu pindah tab dulu (sebelumnya A-/A+ terasa
+               "hilang" karena tersembunyi di dalam tab "🎨 Tampilan"). Tombol
+               di sini & di dalam tab saling sinkron lewat id yang sama
+               (js/presentation-studio.js: wirePointerPen(), applyScale()). -->
           <div class="ps-preview-quicktools" id="psPreviewQuickTools">
             <button type="button" class="chip-btn small" data-ps-pointer-toggle title="Nyalakan Penunjuk (titik merah)">🔴 Penunjuk</button>
             <button type="button" class="chip-btn small" data-ps-pen-toggle title="Nyalakan Pen (coret-coret)">✏️ Pen</button>
             <button type="button" class="chip-btn small" data-ps-pen-clear title="Hapus semua coretan">🧹</button>
+            <span class="ps-quicktools-sep"></span>
+            <button type="button" id="psFontDecTop" class="chip-btn small" title="Perkecil huruf di Layar 2">A-</button>
+            <button type="button" id="psFontIncTop" class="chip-btn small" title="Perbesar huruf di Layar 2">A+</button>
           </div>
         </div>
+        <!-- Tombol "Tayangkan" SEKARANG di TENGAH, di antara kotak
+             "Berikutnya" (kiri) & "Tayang" (kanan) -- bukan lagi menempel
+             di bawah kotak Berikutnya -- supaya jelas fungsinya "mendorong"
+             isi dari kiri ke kanan (lihat .ps-preview-center di CSS). -->
         <div class="ps-preview-row" id="psPreviewRow">
           <div class="ps-preview-slot ps-preview-slot-next" id="psNextSlot" hidden>
             <div class="ps-preview-slot-tag">Berikutnya</div>
             <div class="ps-preview-box-wrap ps-preview-box-wrap-next">
               <div class="ps-preview-box" id="psNextBox"><div class="present-preview-idle">Belum ada antrean</div></div>
             </div>
-            <button type="button" id="psNextShowBtn" class="chip-btn primary ps-preview-slot-btn" disabled>▶ Tayangkan</button>
+          </div>
+          <div class="ps-preview-center" id="psPreviewCenter">
+            <button type="button" id="psNextShowBtn" class="ps-preview-push-btn" disabled title="Dorong isi Berikutnya ke Tayang (Layar 2)">▶<span>Tayangkan</span></button>
           </div>
           <div class="ps-preview-slot" id="psLiveSlot">
             <div class="ps-preview-slot-tag ps-preview-slot-tag-live" id="psLiveTag">Tayang</div>
