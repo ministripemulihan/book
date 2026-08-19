@@ -2262,6 +2262,25 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-file-status { font-style: normal; font-size: 11px; color: var(--ps-muted); margin-left: 6px; }
 .ps-file-slide-count { font-size: 11px; color: var(--ps-ink-soft); min-width: 34px; text-align: center; }
 
+/* Sub-daftar judul + durasi tiap video di dalam 1 item YouTube tersimpan
+   (lihat renderMediaList() di js/presentation-studio.js) -- ditaruh
+   menempel tepat di bawah baris nama item, sedikit menjorok ke dalam
+   supaya jelas ini "isi" dari item di atasnya. */
+.ps-yt-sublist {
+  display: flex; flex-direction: column; gap: 3px;
+  margin: -2px 0 6px 10px; padding-left: 8px;
+  border-left: 2px solid var(--ps-col-border);
+}
+.ps-yt-subrow {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  padding: 3px 6px; border-radius: 6px; font-size: 11.5px; color: var(--ps-ink-soft);
+  font-family: var(--font-ui);
+}
+.ps-yt-subrow:hover { background: var(--ps-tab-bg); color: var(--ps-ink); }
+.ps-yt-subrow-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+.ps-yt-subrow-dur { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--ps-muted); }
+
 /* Tab "▶️ YouTube" (di dalam panel File) -- link ditayangkan langsung
    sebagai iframe penuh 1 layar di Layar 2 (khusus laptop/komputer). */
 .ps-yt-row { display: flex; gap: 8px; margin-top: 8px; }
@@ -2406,6 +2425,22 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-preview-slot-btn { margin-top: 8px; width: 100%; }
 .ps-preview-slot-btn:disabled { opacity: .45; cursor: not-allowed; }
 
+/* Splitter -- seret naik/turun untuk membesar/mengecilkan baris pratinjau
+   dual monitor (lihat wirePreviewResize() di js/presentation-studio.js).
+   Disembunyikan total di mode 1 monitor (cuma relevan saat dual monitor,
+   waktu kotak "Berikutnya" & "Tayang" tampil berdampingan). */
+.ps-preview-resize-handle { display: none; }
+.present-studio.ps-dual-live .ps-preview-resize-handle {
+  display: block;
+  position: absolute; left: 0; right: 0; bottom: -6px; height: 12px;
+  cursor: ns-resize; z-index: 6; touch-action: none;
+}
+.ps-preview-resize-handle::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 46px; height: 4px; border-radius: 3px; background: var(--ps-muted); opacity: .5;
+}
+.ps-preview-resize-handle:hover::after { opacity: .85; background: var(--brass); }
+
 .ps-theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .ps-theme-swatch {
   border-radius: 8px; padding: 10px 6px; font-size: 11.5px; font-weight: 700; cursor: pointer;
@@ -2498,7 +2533,14 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
      (monitor ke-3 = jendela Layar 2 fisik). */
 .present-studio.ps-dual-live .ps-columns {
   grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: minmax(120px, 16vh) 1fr;
+  /* PERBAIKAN (permintaan operator): baris ini dulu terkunci "16vh" --
+     di banyak layar itu LEBIH PENDEK daripada kotak 16:9 di dalamnya,
+     jadi kotak "Tayang"/"Berikutnya" ikut TERPOTONG (overflow tersembunyi).
+     Sekarang defaultnya cukup tinggi supaya kotak selalu utuh (tidak
+     terpotong), DAN bisa diseret membesar/mengecil lewat splitter
+     (#psPreviewResizeHandle, lihat wirePreviewResize() di
+     js/presentation-studio.js) yang menyetel variabel --ps-preview-row-h. */
+  grid-template-rows: var(--ps-preview-row-h, minmax(190px, 30vh)) 1fr;
   grid-template-areas:
     "preview preview preview"
     "controls-left controls-mid controls-right";
@@ -2507,6 +2549,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   grid-area: preview;
   padding: 10px 16px 8px;
   border-bottom: 1px solid var(--ps-col-border);
+  position: relative; /* jangkar untuk splitter di bawahnya */
 }
 .present-studio.ps-dual-live .ps-preview-row {
   flex-direction: row;
@@ -2525,16 +2568,31 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
    antara keduanya (.ps-preview-center), bukan lagi menempel di kotak
    Berikutnya. `!important` dipakai supaya pasti menang dari aturan
    flex/max-width lain yang mungkin sudah ada sebelumnya. */
+/* PERBAIKAN (permintaan operator): dulu lebar kotak dikunci ANGKA TETAP
+   (280px) tak peduli seberapa tinggi barisnya -- jadi menyeret baris jadi
+   lebih tinggi tidak pernah membuat kotaknya ikut membesar. Sekarang
+   lebar kotak MENGIKUTI TINGGINYA (lewat aspect-ratio di
+   .ps-preview-box-wrap di bawah), jadi keduanya membesar/mengecil BERSAMA
+   saat splitter diseret -- persis "seperti membesar sesuai ukuran". */
 .present-studio.ps-dual-live .ps-preview-slot-next,
 .present-studio.ps-dual-live .ps-preview-slot:not(.ps-preview-slot-next) {
-  flex: 0 0 280px !important;
-  width: 280px !important;
-  max-width: 280px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: 47% !important;
   min-width: 0 !important;
+  height: 100% !important;
 }
 .present-studio.ps-dual-live .ps-preview-center { display: flex; }
 .present-studio.ps-dual-live .ps-preview-box-wrap {
+  /* Tinggi persis = tinggi baris dikurangi label "Berikutnya/Tayang" di
+     atasnya (lihat --ps-preview-box-h, disetel bareng --ps-preview-row-h
+     oleh wirePreviewResize()) -- lebar dibiarkan "auto" supaya otomatis
+     mengikuti rasio 16:9 dari tinggi ini, bukan lagi angka tetap. */
+  height: var(--ps-preview-box-h, 156px) !important;
+  width: auto !important;
+  max-width: 100% !important;
   min-height: 0;
+  margin: 0 auto;
 }
 .present-studio.ps-dual-live .ps-preview-box {
   font-size: 15px;
