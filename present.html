@@ -184,6 +184,22 @@
   /* ---- Pen (coret-coret) ---- */
   #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
 
+  /* ---- Lapisan "aktifkan kontrol suara" (lihat komentar HTML-nya) ---- */
+  #activateOverlay {
+    position: fixed; inset: 0; z-index: 90;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(5, 7, 12, 0.86);
+    padding: 24px; box-sizing: border-box;
+  }
+  #activateOverlay.hidden-activated { display: none; }
+  #activateBtn {
+    font-family: "Inter", Arial, sans-serif; font-weight: 700; font-size: clamp(14px, 2vw, 20px);
+    color: #1a1206; background: #d8b45c; border: none; border-radius: 12px;
+    padding: 18px 26px; cursor: pointer; max-width: 620px; line-height: 1.4;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+  #activateBtn:hover { background: #e6c374; }
+
   /* Label "Layar 2 — Mode Presentasi" DIHAPUS (bukan cuma dipudarkan) --
      operator minta tayangan Layar 2 bersih 100%, sama persis dengan apa
      yang diproyeksikan ke jemaat, tanpa watermark/teks tambahan apa pun. */
@@ -215,6 +231,17 @@
   <canvas id="penCanvas"></canvas>
   <div id="pointerDot"></div>
 
+  <!-- Lapisan "aktifkan kontrol suara" -- browser (Chrome dkk) TIDAK
+       mengizinkan jendela ini diputar/dibunyikan lewat perintah dari
+       jendela lain (Studio di Monitor 1) SEBELUM jendela ini sendiri
+       pernah menerima 1 klik asli dari operator. Klik SEKALI di sini
+       saat pertama buka Layar 2 -- setelah itu tombol Play/Pause/Mute
+       dari Studio akan langsung bekerja tanpa perlu klik apa pun lagi
+       di layar ini. -->
+  <div id="activateOverlay">
+    <button type="button" id="activateBtn">🔊 Klik sekali untuk aktifkan kontrol Play/Pause/Suara dari Monitor 1</button>
+  </div>
+
 <script>
   const stageEl = document.getElementById("stage");
   const refEl = document.getElementById("ref");
@@ -236,6 +263,24 @@
   const penCanvas = document.getElementById("penCanvas");
   const penCtx = penCanvas.getContext("2d");
   penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+
+  // Sekali diklik, browser akan menganggap operator sudah "berinteraksi"
+  // dengan halaman/domain ini -- setelah itu perintah Play/Pause/Mute
+  // yang dikirim dari Studio (jendela lain) lewat postMessage akan
+  // benar-benar jalan (sebelum diklik, kebijakan autoplay Chrome dkk
+  // memblokir suara/putar yang dipicu dari jendela LAIN, bukan dari
+  // klik asli di halaman ini sendiri).
+  const activateOverlay = document.getElementById("activateOverlay");
+  function hideActivateOverlay() {
+    if (activateOverlay) activateOverlay.classList.add("hidden-activated");
+  }
+  if (document.getElementById("activateBtn")) {
+    document.getElementById("activateBtn").addEventListener("click", hideActivateOverlay);
+  }
+  // Klik di mana pun di halaman ini (bukan cuma tombolnya) juga otomatis
+  // menghitung sebagai "sudah aktif", supaya tidak keliru operator kalau
+  // ternyata menekan area lain dulu.
+  document.addEventListener("click", hideActivateOverlay, { once: true });
 
   const RING_LEN = 2 * Math.PI * 44;
   timerRingFg.style.strokeDasharray = String(RING_LEN);
