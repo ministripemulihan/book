@@ -554,6 +554,48 @@ const PresentationStudio = (() => {
     chs: "MDR", chssmp: "MDR-S", kjv: "KJV", jawa: "JAWA",
   };
 
+  // Pecah 1 baris ketik-cepat jadi daftar referensi tunggal, dengan
+  // dukungan notasi "rantai" umum ala Alkitab cetak:
+  //   "wahyu 2:2,5,10, 3:10" -> Wahyu 2:2, Wahyu 2:5, Wahyu 2:10, Wahyu 3:10
+  // Aturan:
+  //   - ";" (titik-koma) atau baris baru = batas antar KELOMPOK, tiap
+  //     kelompok WAJIB diawali nama kitab sendiri (kitab tidak
+  //     "menular" lintas ";").
+  //   - "," (koma) di DALAM 1 kelompok = referensi lain di kitab yang
+  //     sama; kalau token setelah koma cuma "pasal:ayat" atau "ayat"
+  //     saja (tanpa nama kitab), kitab (dan utk token "ayat" saja,
+  //     pasal juga) dipakai dari token SEBELUMNYA dalam kelompok itu.
+  function parseReferenceList(raw) {
+    if (!raw || typeof parseReference !== "function") return [];
+    const groups = raw.split(/[;\n]+/).map((g) => g.trim()).filter(Boolean);
+    const out = [];
+    groups.forEach((group) => {
+      const tokens = group.split(/,+/).map((t) => t.trim()).filter(Boolean);
+      let ctxBook = null;
+      let ctxChapter = null;
+      tokens.forEach((tok) => {
+        // 1) Coba format lengkap "<kitab> <pasal>[:ayat[-ayatAkhir]]".
+        const full = parseReference(tok);
+        if (full) { ctxBook = full.book; ctxChapter = full.chapter; out.push(full); return; }
+        // 2) "pasal:ayat[-ayatAkhir]" saja -- pakai kitab dari konteks.
+        let m = tok.match(/^(\d+):(\d+)(?:-(\d+))?$/);
+        if (m && ctxBook) {
+          ctxChapter = parseInt(m[1], 10);
+          out.push({ book: ctxBook, chapter: ctxChapter, verseStart: parseInt(m[2], 10), verseEnd: m[3] ? parseInt(m[3], 10) : null });
+          return;
+        }
+        // 3) "ayat[-ayatAkhir]" saja -- pakai kitab & pasal dari konteks.
+        m = tok.match(/^(\d+)(?:-(\d+))?$/);
+        if (m && ctxBook && ctxChapter) {
+          out.push({ book: ctxBook, chapter: ctxChapter, verseStart: parseInt(m[1], 10), verseEnd: m[2] ? parseInt(m[2], 10) : null });
+          return;
+        }
+        // Token tidak bisa diartikan (mis. salah ketik) -- lewati saja.
+      });
+    });
+    return out;
+  }
+
   function wireQuickVerse() {
     const input = el("psQuickRef");
     const preview = el("psQuickPreview");
@@ -568,17 +610,17 @@ const PresentationStudio = (() => {
       return codes.length ? codes : [typeof currentLang !== "undefined" ? currentLang : "ind"];
     }
 
-    // Untuk tiap referensi (dipisah ";"), kumpulkan teks dari SEMUA versi
-    // tercentang yang punya data untuk pasal itu -- hasilnya dipakai baik
-    // untuk pratinjau ketik-cepat maupun untuk ditayangkan ke Layar 2.
+    // Untuk tiap referensi (dipisah ";" antar kitab, "," dalam kitab
+    // yang sama -- lihat parseReferenceList), kumpulkan teks dari SEMUA
+    // versi tercentang yang punya data untuk pasal itu -- hasilnya
+    // dipakai baik untuk pratinjau ketik-cepat maupun untuk ditayangkan
+    // ke Layar 2.
     function resolveRefBlocks() {
       if (!input || typeof parseReference !== "function" || typeof getChapterVerses !== "function") return [];
-      const parts = input.value.split(/[;\n]+/).map((p) => p.trim()).filter(Boolean);
+      const refs = parseReferenceList(input.value);
       const versions = getCheckedVersions();
       const out = [];
-      parts.forEach((p) => {
-        const ref = parseReference(p);
-        if (!ref) return;
+      refs.forEach((ref) => {
         const vStart = ref.verseStart || 1;
         const vEnd = ref.verseEnd || vStart;
         const versionBlocks = [];
@@ -591,7 +633,7 @@ const PresentationStudio = (() => {
           versionBlocks.push({ code, label: VERSION_LABELS[code] || code.toUpperCase(), text, verses: matched });
         });
         if (!versionBlocks.length) return;
-        const bookName = (versionBlocks[0].verses[0] && versionBlocks[0].verses[0].bookName) || ref.book.name || p;
+        const bookName = (versionBlocks[0].verses[0] && versionBlocks[0].verses[0].bookName) || ref.book.name;
         const refLabel = ref.verseStart
           ? `${bookName} ${ref.chapter}:${vStart}${ref.verseEnd && ref.verseEnd !== vStart ? "-" + ref.verseEnd : ""}`
           : `${bookName} ${ref.chapter}`;
@@ -1040,6 +1082,20 @@ const PresentationStudio = (() => {
 
   const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1 };
 
+  // Selain dikirim ke Layar 2, font & warna tema juga diterapkan ke
+  // kotak pratinjau Studio sendiri (#psPreviewBoxWrap) -- supaya
+  // pratinjau "Tayang" benar-benar 1:1 mirip Layar 2 (bukan cuma warna
+  // gelap default), termasuk untuk akurasi posisi Penunjuk/Pen yang
+  // bergantung pada baris kalimat patah di titik yang sama.
+  function applyThemeToStudioPreview(theme) {
+    const wrap = el("psPreviewBoxWrap");
+    if (!wrap) return;
+    wrap.style.setProperty("--ps-preview-bg", theme.bgColor || DEFAULT_STAGE_THEME.bgColor);
+    wrap.style.setProperty("--ps-preview-ink", theme.ink || DEFAULT_STAGE_THEME.ink);
+    const box = el("psPreviewBox");
+    if (box) box.style.fontFamily = theme.font || DEFAULT_STAGE_THEME.font;
+  }
+
   function applyStoredTheme() {
     const raw = localStorage.getItem(THEME_KEY);
     let theme = { ...DEFAULT_STAGE_THEME };
@@ -1048,6 +1104,7 @@ const PresentationStudio = (() => {
     if (el("psFontSelect")) el("psFontSelect").value = theme.font;
     if (el("psBgColor")) el("psBgColor").value = theme.bgColor;
     if (el("psFontScale")) el("psFontScale").value = String(Math.round(theme.scale * 100));
+    applyThemeToStudioPreview(theme);
     rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
   }
 
@@ -1057,8 +1114,10 @@ const PresentationStudio = (() => {
     if (raw) { try { theme = { ...theme, ...JSON.parse(raw) }; } catch (e) {} }
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+    applyThemeToStudioPreview(theme);
     rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
   }
+
 
   // ------------------------------------------------------------
   // Tema PANEL Studio (dark/light) -- terpisah total dari "Tema Layar
