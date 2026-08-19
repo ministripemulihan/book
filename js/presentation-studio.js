@@ -38,13 +38,35 @@ const PresentationStudio = (() => {
   const BLANK_MSG_KEY = "bible_app_studio_blank_msg_v1";
   const DESKTOP_MIN_WIDTH = 1100;
 
+  // Tiap tema BUTUH pasangan bg + ink (warna tulisan) yang kontras --
+  // sebelumnya hanya "bg" yang dikirim ke Layar 2, ink tulisan tidak
+  // pernah ikut berubah (tetap krem-terang bawaan), jadi tema "Terang"
+  // & "Klasik Sepia" (latar terang) membuat tulisan nyaris tak
+  // kelihatan di atas latar terang. ink di sini SAMA dengan warna teks
+  // tombol swatch di index.html supaya konsisten.
   const THEMES = {
-    gelap:  { bg: "#05070c" },
-    terang: { bg: "#fdfaf3" },
-    emas:   { bg: "#1a1206" },
-    biru:   { bg: "#0b1730" },
-    sepia:  { bg: "#f4e8d0" },
+    gelap:  { bg: "#05070c", ink: "#f5f2e8" },
+    terang: { bg: "#fdfaf3", ink: "#1a1a1a" },
+    emas:   { bg: "#1a1206", ink: "#e9c977" },
+    biru:   { bg: "#0b1730", ink: "#dce8ff" },
+    sepia:  { bg: "#f4e8d0", ink: "#3a2c17" },
   };
+
+  // Dipakai saat operator pilih warna latar SENDIRI lewat color-picker
+  // "Warna latar" (bukan lewat salah satu swatch tema di atas) --
+  // hitung otomatis apakah tulisan putih atau hitam yang lebih kontras
+  // terhadap warna latar itu, supaya tulisan tidak pernah "hilang"
+  // walau operator asal pilih warna latar terang/gelap.
+  function autoInkColor(bgHex) {
+    const hex = String(bgHex || "").replace("#", "");
+    if (hex.length !== 6) return "#f5f2e8";
+    const r = parseInt(hex.slice(0, 2), 16) / 255;
+    const g = parseInt(hex.slice(2, 4), 16) / 255;
+    const b = parseInt(hex.slice(4, 6), 16) / 255;
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    return luminance > 0.5 ? "#181818" : "#f5f2e8";
+  }
 
   let msgColor = "#ffffff";
   let msgPos = "top";
@@ -855,24 +877,26 @@ const PresentationStudio = (() => {
     }
   }
 
+  const THEME_DEFAULT = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1 };
+
   function applyStoredTheme() {
     const raw = localStorage.getItem(THEME_KEY);
-    let theme = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", scale: 1 };
+    let theme = { ...THEME_DEFAULT };
     if (raw) { try { theme = { ...theme, ...JSON.parse(raw) }; } catch (e) {} }
     document.querySelectorAll("#psThemeGrid [data-theme]").forEach((b) => b.classList.toggle("active", b.dataset.theme === theme.swatch));
     if (el("psFontSelect")) el("psFontSelect").value = theme.font;
     if (el("psBgColor")) el("psBgColor").value = theme.bgColor;
     if (el("psFontScale")) el("psFontScale").value = String(Math.round(theme.scale * 100));
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, scale: theme.scale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
   }
 
   function saveAndSendTheme(partial) {
     const raw = localStorage.getItem(THEME_KEY);
-    let theme = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", scale: 1 };
+    let theme = { ...THEME_DEFAULT };
     if (raw) { try { theme = { ...theme, ...JSON.parse(raw) }; } catch (e) {} }
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, scale: theme.scale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
   }
 
   function wireTheme() {
@@ -882,11 +906,22 @@ const PresentationStudio = (() => {
         btn.classList.add("active");
         const t = THEMES[btn.dataset.theme];
         if (el("psBgColor")) el("psBgColor").value = t.bg;
-        saveAndSendTheme({ swatch: btn.dataset.theme, bgColor: t.bg });
+        // Kirim swatch + bg + ink SEKALIGUS -- ini perbaikan utamanya:
+        // dulu ink (warna tulisan) tidak pernah dikirim, jadi ganti ke
+        // tema latar terang (Terang/Sepia) membuat tulisan nyaris tak
+        // kelihatan (tetap krem-terang di atas latar terang).
+        saveAndSendTheme({ swatch: btn.dataset.theme, bgColor: t.bg, ink: t.ink });
       });
     });
     if (el("psFontSelect")) el("psFontSelect").addEventListener("change", () => saveAndSendTheme({ font: el("psFontSelect").value }));
-    if (el("psBgColor")) el("psBgColor").addEventListener("input", () => saveAndSendTheme({ bgColor: el("psBgColor").value }));
+    if (el("psBgColor")) el("psBgColor").addEventListener("input", () => {
+      // Warna latar dipilih manual (bukan lewat swatch) -- hitung ulang
+      // ink otomatis supaya tulisan tetap kebaca berapa pun warna latar
+      // yang dipilih operator, dan lepas status "aktif" dari swatch
+      // manapun karena ini sudah jadi kombinasi kustom.
+      document.querySelectorAll("#psThemeGrid [data-theme]").forEach((b) => b.classList.remove("active"));
+      saveAndSendTheme({ swatch: "", bgColor: el("psBgColor").value, ink: autoInkColor(el("psBgColor").value) });
+    });
     function applyScale() {
       const pct = Number(el("psFontScale").value);
       saveAndSendTheme({ scale: pct / 100 });
