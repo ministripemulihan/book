@@ -2195,6 +2195,11 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-tab.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
 
 .ps-field-label { font-size: 12px; font-weight: 700; color: var(--ps-ink-soft); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+.ps-preview-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ps-preview-panel-head .ps-field-label { margin: 0 0 6px; }
+.ps-preview-quicktools { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.ps-preview-quicktools .chip-btn.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+.ps-quicktools-sep { width: 1px; align-self: stretch; background: var(--ps-col-border); margin: 0 2px; }
 .ps-btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 .ps-btn-row [data-pos].active, .ps-btn-row [data-timer-preset].active { background: var(--brass); color: #1a1206; }
 
@@ -2292,7 +2297,22 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-preview-slot { min-width: 0; display: flex; flex-direction: column; }
 .ps-preview-slot .ps-preview-box { flex: 1 1 auto; }
 .ps-preview-slot-next .ps-preview-box-wrap-next { opacity: .82; }
-.ps-preview-slot-next .ps-preview-slot-btn { margin-top: 8px; }
+
+/* Tombol "▶ Tayangkan" -- SEKARANG DI TENGAH, di antara kotak
+   "Berikutnya" (kiri) & "Tayang" (kanan), bukan lagi menempel di bawah
+   kotak Berikutnya -- lebih jelas menggambarkan fungsinya: mendorong
+   isi dari kiri ke kanan. Disembunyikan di 1 monitor (default) karena
+   kotak Berikutnya juga disembunyikan di sana; dimunculkan lagi lewat
+   block .ps-dual-live di bawah. */
+.ps-preview-center { display: none; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0 4px; }
+.ps-preview-push-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--brass); color: #1a1206; border: none; border-radius: 10px;
+  font-weight: 800; font-size: 18px; padding: 10px 12px; cursor: pointer; min-width: 54px;
+}
+.ps-preview-push-btn span { font-size: 10px; font-weight: 700; }
+.ps-preview-push-btn:disabled { opacity: .35; cursor: not-allowed; }
+.ps-preview-push-btn:not(:disabled):hover { filter: brightness(1.08); }
 
 /* Bungkus kotak "Tayang" (psPreviewBox) supaya Penunjuk (titik) & Pen
    (coretan) bisa digambar LANGSUNG DI ATASNYA -- 1:1 sama seperti
@@ -2425,43 +2445,59 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    (class .ps-dual-live ditambah lewat JS di refreshStatusUi()).
    Tata letak 1 monitor (.present-studio TANPA .ps-dual-live) sama
    sekali TIDAK berubah oleh blok ini.
-   Terinspirasi tampilan "LifeStream": pratinjau (Berikutnya + Tayang
-   berdampingan) memenuhi 1 baris PENUH LEBAR di paling atas, lalu
-   TEPAT DI BAWAHNYA 3 kolom kontrol yang SAMA TINGGI & SAMA LEBAR
-   (Kumpulan Ayat/Media/Pengumuman/Pesan+Timer -- Alkitab/Kidung/File/
-   YouTube -- Aksi&Tema/Warta/Penunjuk/Tampilan), masing-masing sudah
-   pakai tab sendiri supaya tidak perlu scroll panjang. Sebelumnya
-   seluruh kolom kanan (termasuk Aksi Cepat/Warta/Tema) ikut nyempil
-   di ATAS berdampingan dgn pratinjau -- sekarang HANYA pratinjau yang
-   ada di atas, kontrolnya konsisten di baris bawah seperti 2 kolom
-   lainnya. */
+
+   PERBAIKAN ukuran (permintaan operator): sebelumnya baris pratinjau
+   ini setinggi 40vh & kotak "Tayang" melebar mengikuti SISA ruang
+   (flex:1 1 auto) sementara "Berikutnya" cuma 30% -- hasilnya kotak
+   "Tayang" jadi RAKSASA edge-to-edge dengan huruf ikut raksasa
+   (font-size di sini pakai cqw = % dari lebar kotaknya sendiri).
+   Sekarang:
+   - tinggi baris dikecilkan jadi ~separuhnya (20vh, bukan 40vh),
+   - "Berikutnya" & "Tayang" dibuat 50/50 SAMA LEBAR (bukan 30/70) --
+     supaya terlihat seperti SEPASANG monitor kecil yang identik,
+   - kotak dibungkus bingkai ala monitor sungguhan (.ps-monitor-mock)
+     dengan rasio 16:9 tetap terkunci (lihat --ps-preview-ratio),
+     supaya perbandingannya persis dengan Layar 2 yang sesungguhnya
+     (monitor ke-3 = jendela Layar 2 fisik). */
 .present-studio.ps-dual-live .ps-columns {
   grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: minmax(200px, 40vh) 1fr;
+  grid-template-rows: minmax(120px, 16vh) 1fr;
   grid-template-areas:
     "preview preview preview"
     "controls-left controls-mid controls-right";
 }
 .present-studio.ps-dual-live .ps-preview-panel {
   grid-area: preview;
-  padding: 14px 16px 10px;
+  padding: 10px 16px 8px;
   border-bottom: 1px solid var(--ps-col-border);
 }
 .present-studio.ps-dual-live .ps-preview-row {
   flex-direction: row;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   height: 100%;
+  gap: 14px;
 }
-.present-studio.ps-dual-live .ps-preview-slot-next {
-  flex: 0 0 30%;
-  min-width: 180px;
-}
+/* PERMINTAAN OPERATOR: kotak "Tayang" dulu jauh lebih besar/dominan
+   daripada "Berikutnya" (mengisi sisa ruang lewat flex:1). Sekarang
+   KEDUANYA dikunci ke lebar TETAP yang SAMA PERSIS (bukan lagi
+   flex-grow mengikuti sisa ruang) -- jadi selalu terlihat seperti
+   sepasang monitor kecil kembar, dan ukurannya lebih ringkas/kecil
+   secara keseluruhan (280px, sebelumnya ikut melebar sampai 360px
+   bahkan lebih). Tombol "▶ Tayangkan" sekarang jadi elemen KETIGA di
+   antara keduanya (.ps-preview-center), bukan lagi menempel di kotak
+   Berikutnya. `!important` dipakai supaya pasti menang dari aturan
+   flex/max-width lain yang mungkin sudah ada sebelumnya. */
+.present-studio.ps-dual-live .ps-preview-slot-next,
 .present-studio.ps-dual-live .ps-preview-slot:not(.ps-preview-slot-next) {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 280px !important;
+  width: 280px !important;
+  max-width: 280px !important;
+  min-width: 0 !important;
 }
+.present-studio.ps-dual-live .ps-preview-center { display: flex; }
 .present-studio.ps-dual-live .ps-preview-box-wrap {
-  min-height: 160px;
+  min-height: 0;
 }
 .present-studio.ps-dual-live .ps-preview-box {
   font-size: 15px;
@@ -2469,3 +2505,23 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .present-studio.ps-dual-live .ps-col-left { grid-area: controls-left; border-right: 1px solid var(--ps-col-border); }
 .present-studio.ps-dual-live .ps-col-mid { grid-area: controls-mid; border-right: 1px solid var(--ps-col-border); }
 .present-studio.ps-dual-live .ps-col-right { grid-area: controls-right; border-right: none; }
+
+/* Bingkai ala "monitor kecil" -- dipakai di KEDUA mode (1 & 2 monitor)
+   supaya kotak "Berikutnya"/"Tayang" selalu terasa seperti mockup layar
+   sungguhan (bezel gelap + kaki tipis), bukan cuma kotak polos. Rasio
+   16:9-nya sendiri sudah dikunci lewat --ps-preview-ratio (lihat
+   .ps-preview-slot .ps-preview-box-wrap di atas) -- ini cuma bingkainya. */
+.ps-preview-slot { position: relative; }
+.ps-preview-box-wrap {
+  box-shadow: 0 0 0 6px #1a1a1a, 0 0 0 7px #000, 0 10px 22px rgba(0,0,0,0.35);
+}
+.ps-preview-slot::after {
+  content: "";
+  display: block;
+  width: 34%;
+  height: 6px;
+  margin: 0 auto;
+  background: #1a1a1a;
+  border-radius: 0 0 3px 3px;
+}
+.ps-preview-slot .ps-preview-slot-btn { margin-top: 8px; }
