@@ -1014,6 +1014,7 @@ function applyGuestModeUi() {
 
   // Mode Presentasi 2 Layar (js/presentation.js) khusus pengguna login.
   if (typeof Presentation !== "undefined") Presentation.refreshGuestGate();
+  if (typeof PresentationStudio !== "undefined") PresentationStudio.refreshGuestGate();
 }
 
 // ------------------------------------------------------------
@@ -6077,6 +6078,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initUIEvents();
   initAuth();
   if (typeof Presentation !== "undefined") Presentation.init();
+  if (typeof PresentationStudio !== "undefined") PresentationStudio.init();
   if (typeof Signup !== "undefined") Signup.init();
   if (typeof UserApproval !== "undefined") UserApproval.init();
   if (typeof AdminBell !== "undefined") AdminBell.init();
