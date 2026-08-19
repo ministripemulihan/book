@@ -162,8 +162,13 @@ function saveMediaItems(username, items) {
 // array embed-URL YouTube (untuk type "youtube") -- lihat wireYoutubeTab()
 // di js/presentation-studio.js. `type` opsional, default "image" supaya
 // pemanggil lama (gambar/PDF) tidak perlu berubah.
+// `labels` OPSIONAL: array sejajar dengan `images`, khusus type "youtube"
+// -- [{ title, durationLabel }, ...] per video, supaya panel "Media
+// Tersimpan" bisa menampilkan judul & durasi tiap video di dalam daftar,
+// bukan cuma nama gabungan + hitungan slide. Diisi dari queue di
+// wireYoutubeTab(); untuk gambar/PDF cukup dibiarkan undefined.
 // Mengembalikan id item baru, atau null kalau gagal.
-function addMediaItem(username, name, images, fileName, type) {
+function addMediaItem(username, name, images, fileName, type, labels) {
   const trimmedName = (name || fileName || "Media").trim();
   if (!images || !images.length) return null;
   const items = loadMediaItems(username);
@@ -175,6 +180,7 @@ function addMediaItem(username, name, images, fileName, type) {
     type: type || "image",
     addedAt: new Date().toISOString(),
   };
+  if (labels && labels.length) item.videoLabels = labels;
   items.push(item);
   if (!saveMediaItems(username, items)) return null;
   return item.id;
