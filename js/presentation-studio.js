@@ -10,7 +10,7 @@
 //  STATUS (lihat jawaban chat untuk detail per tahap):
 //   1) Struktur & layout 3 kolom — SELESAI.
 //   2) Timer/Countdown — SELESAI.
-//   3) Checklist 8 versi Alkitab (IND/ITB, IND-RC, ENG, ENG-RC, MDR,
+//   3) Checklist 8 versi Alkitab (IND/ITB, IND-RCV, ENG, ENG-RCV, MDR,
 //      MDR-S, KJV, JAWA) tersambung ke data ayat asli, tayang
 //      bertumpuk sekaligus di Layar 2 — SELESAI.
 //   4) File tab: gambar (jpg/png/webp/gif) & PDF (dikonversi per
@@ -550,7 +550,7 @@ const PresentationStudio = (() => {
   // sekaligus di #psVersionGrid (harus sama persis dengan atribut value=
   // checkbox-nya di index.html & kode bahasa di js/config.js).
   const VERSION_LABELS = {
-    ind: "ITB", rvind: "IND-RC", eng: "ENG", rveng: "ENG-RC",
+    ind: "ITB", rvind: "IND-RCV", eng: "ENG", rveng: "ENG-RCV",
     chs: "MDR", chssmp: "MDR-S", kjv: "KJV", jawa: "JAWA",
   };
 
