@@ -1282,8 +1282,11 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .present-preview-idle { color: #6b7280; font-size: 12.5px; font-family: var(--font-ui); }
 .present-preview-ref {
-  font-family: var(--font-ui); font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-  color: #d8b45c; font-size: 11px; margin-bottom: 6px;
+  font-family: var(--font-ui); font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: #d8b45c; font-size: 15px; margin-bottom: 10px; opacity: .92;
+}
+.present-preview-ref::before, .present-preview-ref::after {
+  content: "—"; opacity: .55; font-weight: 400; letter-spacing: 0; margin: 0 0.5em;
 }
 .present-preview-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .present-preview-version { font-size: 14px; line-height: 1.5; white-space: pre-wrap; margin-bottom: 8px; }
@@ -2250,6 +2253,12 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   color: var(--ps-preview-ink); border: 1px solid var(--ps-col-border);
 }
+/* Saat isinya melebihi tinggi kotak (mis. banyak versi Alkitab
+   dicentang sekaligus), JANGAN pusatkan lalu potong tengah kalimat --
+   mulai dari atas & biarkan scroll (lihat overflow-y:auto di
+   .ps-preview-box-wrap .ps-preview-box) supaya semua versi tetap bisa
+   dibaca penuh, bukan terpotong. */
+.ps-preview-box-wrap .ps-preview-box { justify-content: flex-start; }
 .present-preview-black { color: #6b7280; font-weight: 700; }
 
 /* Baris pratinjau "Berikutnya" + "Tayang". Di 1 monitor slot Berikutnya
@@ -2267,7 +2276,7 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    ditaruh sebagai saudara (sibling), bukan anak, dari psPreviewBox,
    supaya tidak ikut terhapus tiap tayangan berganti. */
 .ps-preview-slot .ps-preview-box-wrap { flex: 1 1 auto; position: relative; border-radius: 10px; overflow: hidden; min-height: 120px; }
-.ps-preview-box-wrap .ps-preview-box { position: absolute; inset: 0; }
+.ps-preview-box-wrap .ps-preview-box { position: absolute; inset: 0; overflow-y: auto; }
 .ps-preview-box-wrap.ps-pointer-mode { cursor: crosshair; }
 
 /* Titik Penunjuk -- ukuran & glow SAMA PERSIS dengan #pointerDot di
@@ -2326,7 +2335,7 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    ------------------------------------------------------------ */
 .present-studio.ps-dual-live .ps-columns {
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: minmax(200px, 32vh) 1fr;
+  grid-template-rows: minmax(220px, 46vh) 1fr;
   grid-template-areas:
     "preview preview"
     "controls-left controls-mid";
