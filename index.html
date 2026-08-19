@@ -366,6 +366,40 @@
           </div>
           <div class="more-menu-section-title" style="margin-top:10px;">🕘 Tulisan Tersimpan</div>
           <div id="presentSavedList" class="present-saved-list"></div>
+
+          <!-- ==== Pengumuman & Timer -- sebelumnya HANYA ada di Studio
+               Presentasi (khusus laptop/komputer, layar ≥1100px).
+               Ditambahkan juga di sini supaya tetap bisa dipakai dari
+               panel sederhana ini (HP / layar sempit), tidak wajib buka
+               Studio hanya untuk mengumumkan sesuatu atau pasang timer. ==== -->
+          <div class="more-menu-section-title" style="margin-top:14px;">📢 Pengumuman</div>
+          <input type="text" id="presentAnnTitle" class="columns-lang-select" placeholder="Judul pengumuman (1 baris)" />
+          <textarea id="presentAnnBody" class="columns-lang-select" rows="3" placeholder="Isi pengumuman…" style="width:100%; box-sizing:border-box; resize:vertical; margin-top:8px;"></textarea>
+          <div class="present-freetext-actions">
+            <button type="button" id="presentAnnShowBtn" class="chip-btn small primary">📤 Tayangkan Pengumuman</button>
+            <button type="button" id="presentAnnClearBtn" class="chip-btn small">🗑️ Hapus Isi</button>
+          </div>
+
+          <div class="more-menu-section-title" style="margin-top:14px;">⏱️ Timer</div>
+          <input type="text" id="presentTimerLabel" class="columns-lang-select" value="Sesi Bagi Nikmat" placeholder="Teks timer" />
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" data-present-timer-preset="180">3 menit</button>
+            <button type="button" class="chip-btn small" data-present-timer-preset="120">2 menit</button>
+            <button type="button" class="chip-btn small" data-present-timer-preset="60">1 menit</button>
+          </div>
+          <div class="ps-btn-row">
+            <input type="number" id="presentTimerCustom" class="columns-lang-select" placeholder="Custom (detik)" min="1" style="width:110px;" />
+            <button type="button" id="presentTimerCustomBtn" class="chip-btn small">Pakai</button>
+          </div>
+          <div class="ps-timer-display" id="presentTimerDisplay">00:00</div>
+          <label class="more-menu-toggle" for="presentTimerBell" style="margin-top:2px;">
+            <span>🔔 Bel saat selesai</span>
+            <span class="toggle-switch"><input type="checkbox" id="presentTimerBell" checked /><span class="toggle-slider"></span></span>
+          </label>
+          <div class="ps-btn-row">
+            <button type="button" id="presentTimerStartBtn" class="chip-btn small primary">▶️ Mulai</button>
+            <button type="button" id="presentTimerStopBtn" class="chip-btn small">⏹️ Stop</button>
+          </div>
         </div>
       </div>
 
