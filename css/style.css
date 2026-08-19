@@ -2275,12 +2275,19 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   font-family: "Merriweather", Georgia, serif;
 }
 
-/* Saat isinya melebihi tinggi kotak (mis. banyak versi Alkitab
-   dicentang sekaligus), JANGAN pusatkan lalu potong tengah kalimat --
-   mulai dari atas & biarkan scroll (lihat overflow-y:auto di
-   .ps-preview-box-wrap .ps-preview-box) supaya semua versi tetap bisa
-   dibaca penuh, bukan terpotong. */
-.ps-preview-box-wrap .ps-preview-box { justify-content: flex-start; }
+/* PERBAIKAN (permintaan operator): kotak "Tayang" HARUS terlihat SAMA
+   PERSIS dengan Layar 2 sungguhan (present.html: #stage pakai
+   align-items:center + justify-content:center, teks selalu di TENGAH
+   layar) -- soalnya posisi titik Penunjuk dikirim sebagai % dari kotak
+   ini, jadi kalau tata letaknya beda (dulu rata atas di sini vs
+   center di Layar 2), titik Penunjuk di kotak pratinjau ini jadi
+   MELESET dari kata yang sungguh ditunjuk di Layar 2. Makanya baris di
+   bawah ini DIHAPUS (dulu override jadi flex-start/rata-atas) --
+   overflow-y:auto tetap dipertahankan sebagai jaring pengaman kalau
+   suatu saat isinya jauh melebihi tinggi kotak (mis. banyak versi
+   Alkitab dicentang sekaligus), supaya tetap bisa discroll, bukan
+   error/hilang -- hanya saja sekarang mulai dari TENGAH seperti
+   Layar 2, bukan dari atas. */
 .present-preview-black { color: #6b7280; font-weight: 700; }
 
 /* Baris pratinjau "Berikutnya" + "Tayang". PENTING: kedua kotak sekarang
@@ -2439,6 +2446,17 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 @media (max-width: 1300px) {
   .ps-columns { grid-template-columns: 260px 1fr 280px; }
 }
+
+/* BUG: class "ps-open" ditambahkan ke <body> saat Studio dibuka
+   (js/presentation-studio.js: openStudio()) tapi TIDAK PERNAH ada
+   aturan CSS untuknya -- akibatnya halaman index.html DI BELAKANG
+   Studio (yang sebetulnya sudah tertutup penuh oleh .present-studio
+   posisi fixed) tetap dianggap browser sebagai "bisa discroll", jadi
+   scrollbar bawaan browser tetap muncul di tepi kanan layar (terlihat
+   menembus di atas panel Studio, karena scrollbar adalah elemen
+   chrome browser, bukan bagian dari z-index halaman). Solusi: matikan
+   scroll html/body selama Studio terbuka. */
+body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 
 /* ------------------------------------------------------------
    MODE DUAL MONITOR -- hanya aktif saat Layar 2 sungguh terbuka
