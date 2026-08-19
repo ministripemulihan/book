@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Layar 2</title>
+<title>Layar 2 — Tampilan Presentasi</title>
 <style>
   :root {
     --p-bg: #05070c;
@@ -97,6 +97,15 @@
   #slideView { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
   /* Video YouTube -- penuh 1 layar, sama seperti #slideView. */
   #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; }
+  /* Audio Latar YouTube ("Latar suara saja" di Studio) -- video ASLI
+     tetap dimuat & diputar (supaya suaranya jalan), tapi disembunyikan
+     SECARA VISUAL (opacity:0, bukan display:none/hidden -- display:none
+     pada sebagian browser ikut menghentikan audionya). pointer-events:
+     none supaya tidak menghalangi klik/Penunjuk di ayat yang tampil di
+     atasnya. z-index di bawah #stage supaya ayat/pengumuman tetap yang
+     "aktif" terlihat (meski secara visual video ini memang tidak kelihatan
+     sama sekali karena opacity 0). */
+  #ytBg { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; opacity: 0; pointer-events: none; z-index: 0; }
 
   /* ---- Warta (atas) & FootNote (bawah): ticker 1 baris ----
      Warna latar ticker sengaja TETAP hitam solid (bukan ikut var(--p-bg))
@@ -189,6 +198,7 @@
     <img id="logoView" hidden />
     <img id="slideView" hidden />
     <iframe id="ytView" hidden allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
+    <iframe id="ytBg" allow="autoplay; encrypted-media" frameborder="0" tabindex="-1"></iframe>
     <div id="timerWrap" hidden>
       <svg id="timerRing" viewBox="0 0 100 100">
         <circle id="timerRingBg" cx="50" cy="50" r="44"></circle>
@@ -213,6 +223,7 @@
   const logoEl = document.getElementById("logoView");
   const slideEl = document.getElementById("slideView");
   const ytEl = document.getElementById("ytView");
+  const ytBgEl = document.getElementById("ytBg");
   const timerWrap = document.getElementById("timerWrap");
   const timerTimeEl = document.getElementById("timerTime");
   const timerLabelEl = document.getElementById("timerLabel");
@@ -224,6 +235,7 @@
   const pointerDot = document.getElementById("pointerDot");
   const penCanvas = document.getElementById("penCanvas");
   const penCtx = penCanvas.getContext("2d");
+  penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
 
   const RING_LEN = 2 * Math.PI * 44;
   timerRingFg.style.strokeDasharray = String(RING_LEN);
@@ -405,27 +417,71 @@
       if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
       return;
     }
+    // ------------------------------------------------------------
+    // Audio Latar YouTube ("Latar suara saja" di tab ▶️ YouTube Studio) --
+    // JALUR TERPISAH dari #ytView/showMain() di atas: sengaja TIDAK
+    // menyentuh ref/text/stage sama sekali, supaya ayat/pengumuman yang
+    // sedang tayang tetap terlihat & tetap bisa diganti-ganti normal
+    // SAMBIL video ini terus main sebagai suara latar (lihat CSS #ytBg --
+    // opacity:0, bukan display:none, supaya audionya tidak ikut berhenti).
+    // ------------------------------------------------------------
+    if (data.type === "yt_bg") {
+      if (data.embedUrl) ytBgEl.src = data.embedUrl;
+      return;
+    }
+    if (data.type === "yt_bg_control") {
+      if (!ytBgEl.src || !ytBgEl.contentWindow) return;
+      const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[data.action];
+      if (cmd) ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      return;
+    }
+    if (data.type === "yt_bg_clear") {
+      ytBgEl.src = "";
+      return;
+    }
     if (data.type === "pen") {
       if (data.clear) {
+        penStrokeHistory = [];
         penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
         penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
         penCanvas.style.display = "none";
         return;
       }
       penCanvas.style.display = "block";
-      if (penCanvas.width !== window.innerWidth) { penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight; }
       if (data.stroke && data.stroke.length > 1) {
-        penCtx.strokeStyle = data.color || "#ff3b30";
-        penCtx.lineWidth = 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
-        penCtx.beginPath();
-        data.stroke.forEach((pt, i) => {
-          const x = pt.x * window.innerWidth, y = pt.y * window.innerHeight;
-          if (i === 0) penCtx.moveTo(x, y); else penCtx.lineTo(x, y);
-        });
-        penCtx.stroke();
+        // Simpan koordinat ASLI (pecahan 0..1, bukan px) supaya bisa
+        // digambar ulang secara akurat kalau jendela di-resize/di-split --
+        // sebelumnya canvas cuma di-resize (otomatis menghapus isi) lalu
+        // cuma segmen BARU yang digambar, jadi coretan lama hilang/
+        // terlihat terpotong saat jendela ditarik-ubah ukurannya.
+        penStrokeHistory.push({ pts: data.stroke, color: data.color || "#ff3b30" });
+        if (penCanvas.width !== window.innerWidth || penCanvas.height !== window.innerHeight) {
+          redrawAllPenStrokes();
+        } else {
+          drawPenSegment(data.stroke, data.color || "#ff3b30");
+        }
       }
       return;
     }
+  }
+
+  // Riwayat semua segmen coretan Pen (koordinat pecahan 0..1) supaya bisa
+  // digambar ulang penuh & akurat tiap kali ukuran jendela berubah.
+  let penStrokeHistory = [];
+  function drawPenSegment(stroke, color) {
+    penCtx.strokeStyle = color;
+    penCtx.lineWidth = 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
+    penCtx.beginPath();
+    stroke.forEach((pt, i) => {
+      const x = pt.x * penCanvas.width, y = pt.y * penCanvas.height;
+      if (i === 0) penCtx.moveTo(x, y); else penCtx.lineTo(x, y);
+    });
+    penCtx.stroke();
+  }
+  function redrawAllPenStrokes() {
+    penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+    penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
+    penStrokeHistory.forEach((s) => drawPenSegment(s.pts, s.color));
   }
 
   window.addEventListener("message", (e) => {
@@ -471,7 +527,10 @@
   let geomResizeTimer = null;
   window.addEventListener("resize", () => {
     if (geomResizeTimer) clearTimeout(geomResizeTimer);
-    geomResizeTimer = setTimeout(reportGeometry, 120);
+    geomResizeTimer = setTimeout(() => {
+      reportGeometry();
+      if (penStrokeHistory.length) redrawAllPenStrokes();
+    }, 120);
   });
 </script>
 </body>
