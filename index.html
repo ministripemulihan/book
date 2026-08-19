@@ -753,7 +753,21 @@
            teks dipotong ala "strip" vs kotak besar) -- itulah sebabnya dulu keduanya
            terlihat tidak "sama". -->
       <div class="ps-preview-panel" id="psPreviewPanel">
-        <div class="ps-field-label" id="psPreviewLabel">Pratinjau Layar 2</div>
+        <div class="ps-preview-panel-head">
+          <div class="ps-field-label" id="psPreviewLabel">Pratinjau Layar 2</div>
+          <!-- Akses cepat Penunjuk/Pen -- SENGAJA diduplikasi di sini (di
+               luar tab "✏️ Penunjuk & Pen" di kolom kanan) supaya selalu
+               kelihatan langsung di atas kotak "Tayang", tidak perlu
+               pindah tab dulu untuk mengaktifkannya (sebelumnya terasa
+               seperti "hilang" karena tersembunyi di dalam tab). Tombol
+               di sini & di dalam tab saling sinkron (lihat data-ps-*
+               di js/presentation-studio.js: wirePointerPen()). -->
+          <div class="ps-preview-quicktools" id="psPreviewQuickTools">
+            <button type="button" class="chip-btn small" data-ps-pointer-toggle title="Nyalakan Penunjuk (titik merah)">🔴 Penunjuk</button>
+            <button type="button" class="chip-btn small" data-ps-pen-toggle title="Nyalakan Pen (coret-coret)">✏️ Pen</button>
+            <button type="button" class="chip-btn small" data-ps-pen-clear title="Hapus semua coretan">🧹</button>
+          </div>
+        </div>
         <div class="ps-preview-row" id="psPreviewRow">
           <div class="ps-preview-slot ps-preview-slot-next" id="psNextSlot" hidden>
             <div class="ps-preview-slot-tag">Berikutnya</div>
@@ -835,9 +849,9 @@
         <div class="ps-tab-panel" data-ps-right-panel="pointer" hidden>
           <div class="ps-field-label" style="margin-top:0;">Penunjuk &amp; Pen</div>
           <div class="ps-btn-row">
-            <button type="button" id="psPointerToggle" class="chip-btn small">🔴 Penunjuk</button>
-            <button type="button" id="psPenToggle" class="chip-btn small">✏️ Pen</button>
-            <button type="button" id="psPenClear" class="chip-btn small">🧹 Hapus Coretan</button>
+            <button type="button" id="psPointerToggle" class="chip-btn small" data-ps-pointer-toggle>🔴 Penunjuk</button>
+            <button type="button" id="psPenToggle" class="chip-btn small" data-ps-pen-toggle>✏️ Pen</button>
+            <button type="button" id="psPenClear" class="chip-btn small" data-ps-pen-clear>🧹 Hapus Coretan</button>
           </div>
           <div class="ps-color-row" id="psPointerColorRow">
             <button type="button" class="ps-color-chip active" data-color="#ff3b30" style="background:#ff3b30" title="Merah"></button>
