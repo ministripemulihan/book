@@ -1233,6 +1233,12 @@ const PresentationStudio = (() => {
     if (el("psFontScale")) el("psFontScale").addEventListener("input", applyScale);
     if (el("psFontDec")) el("psFontDec").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
     if (el("psFontInc")) el("psFontInc").addEventListener("click", () => { el("psFontScale").value = Math.min(160, Number(el("psFontScale").value) + 10); applyScale(); });
+    // Duplikat A-/A+ di baris ps-preview-quicktools (selalu kelihatan di
+    // atas kotak "Tayang") -- pakai fungsi applyScale() & psFontScale yang
+    // SAMA (sumber kebenaran tetap 1: psFontScale), jadi kedua pasang
+    // tombol (di sini & di tab "🎨 Tampilan") selalu sinkron satu sama lain.
+    if (el("psFontDecTop")) el("psFontDecTop").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
+    if (el("psFontIncTop")) el("psFontIncTop").addEventListener("click", () => { el("psFontScale").value = Math.min(160, Number(el("psFontScale").value) + 10); applyScale(); });
   }
 
   // ------------------------------------------------------------
