@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260819a" />
+<link rel="stylesheet" href="css/style.css?v=20260819b" />
 </head>
 <body>
 
@@ -742,31 +742,14 @@
 
       <!-- ===================== KOLOM KANAN ===================== -->
       <div class="ps-col ps-col-right">
-        <div class="ps-field-label">Ukuran Layar 2</div>
-        <div class="ps-res-picker" id="psResPicker">
-          <div class="ps-btn-row" style="margin-top:0;">
-            <button type="button" id="psResRatio169Btn" class="chip-btn small active">16:9</button>
-            <button type="button" id="psResRatio43Btn" class="chip-btn small">4:3</button>
-          </div>
-          <div class="ps-res-carousel">
-            <button type="button" id="psResPrevBtn" class="ps-res-arrow ps-res-arrow-prev" title="Resolusi sebelumnya" aria-label="Resolusi sebelumnya"></button>
-            <div class="ps-res-card">
-              <div class="ps-res-card-name" id="psResName">720p / HD</div>
-              <div class="ps-res-card-dims" id="psResDims">1280 × 720</div>
-              <div class="ps-res-card-desc" id="psResDesc">HD</div>
-              <div class="ps-res-card-count" id="psResCount">4/9</div>
-            </div>
-            <button type="button" id="psResNextBtn" class="ps-res-arrow ps-res-arrow-next" title="Resolusi berikutnya" aria-label="Resolusi berikutnya"></button>
-          </div>
-          <div class="ps-res-hint">Menentukan bentuk &amp; ukuran jendela Layar 2 supaya sama persis dengan kotak pratinjau "Tayang" di bawah. Layar 2 yang sedang terbuka ikut menyesuaikan otomatis.</div>
-        </div>
-
         <div class="ps-field-label" id="psPreviewLabel">Pratinjau Layar 2</div>
         <div class="ps-preview-row" id="psPreviewRow">
-          <div class="ps-preview-slot" id="psNextSlot" hidden>
-            <div class="ps-preview-slot-tag">Berikutnya</div>
-            <div class="ps-preview-box ps-preview-box-next" id="psNextBox"><div class="present-preview-idle">Belum ada antrean</div></div>
-            <button type="button" id="psNextShowBtn" class="chip-btn primary ps-preview-slot-btn" disabled>▶ Tayangkan</button>
+          <div class="ps-preview-slot ps-preview-slot-next" id="psNextSlot" hidden>
+            <div class="ps-next-strip">
+              <span class="ps-preview-slot-tag">Berikutnya</span>
+              <div class="ps-preview-box ps-preview-box-next" id="psNextBox"><div class="present-preview-idle">Belum ada antrean</div></div>
+              <button type="button" id="psNextShowBtn" class="chip-btn primary ps-preview-slot-btn" disabled>▶ Tayangkan</button>
+            </div>
           </div>
           <div class="ps-preview-slot" id="psLiveSlot">
             <div class="ps-preview-slot-tag ps-preview-slot-tag-live" id="psLiveTag">Tayang</div>
@@ -860,8 +843,8 @@
   <script src="js/plans.js?v=20260818b"></script>
   <script src="js/media.js?v=20260818b"></script>
   <script src="js/outlines.js?v=20260818b"></script>
-  <script src="js/presentation.js?v=20260819a"></script>
-  <script src="js/presentation-studio.js?v=20260819a"></script>
+  <script src="js/presentation.js?v=20260819b"></script>
+  <script src="js/presentation-studio.js?v=20260819b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260818b"></script>
   <script src="js/app.js?v=20260818b"></script>
