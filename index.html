@@ -166,6 +166,13 @@
           <button data-width="full" class="width-btn" title="Lebar Penuh">↔️</button>
           <input type="range" id="widthSlider" min="320" max="2200" value="720" title="Atur lebar bebas" />
         </div>
+        <!-- Jalan pintas ke Studio Presentasi (Layar 2) -- KHUSUS laptop/
+             komputer, disembunyikan otomatis di HP lewat refreshDeviceGate()
+             (js/presentation-studio.js), sama seperti tombol Studio yang
+             sudah ada di menu "⋮" -> "🖥️ Mode Presentasi". Ditaruh di sini
+             (paling atas, di baris ikon header) supaya operator bisa
+             langsung buka Studio tanpa masuk menu "⋮" dulu. -->
+        <button type="button" id="headerStudioBtn" class="icon-btn" title="Buka Studio Presentasi (Layar 2)" aria-label="Buka Studio Presentasi (Layar 2)" hidden>🎛️</button>
         <!-- BARU -- lonceng notifikasi khusus administrator: jumlah
              pencarian ayat HARI INI (gabungan pengguna login + tamu),
              lihat js/adminbell.js. Disembunyikan untuk selain
@@ -802,6 +809,11 @@
             </div>
           </div>
         </div>
+        <!-- Splitter -- seret ke bawah/atas untuk membesar/mengecilkan baris
+             pratinjau "Berikutnya" + "Tayang" di mode dual monitor. Hanya
+             kelihatan (display:block) saat class .ps-dual-live aktif -- lihat
+             css/style.css & wirePreviewResize() di js/presentation-studio.js. -->
+        <div id="psPreviewResizeHandle" class="ps-preview-resize-handle" title="Seret untuk memperbesar/memperkecil pratinjau"></div>
       </div>
 
       <!-- ===================== KOLOM KANAN (kontrol) =====================
