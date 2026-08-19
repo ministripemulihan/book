@@ -95,6 +95,8 @@
      per-slide) -- tampil penuh 1 layar, beda dari #logoView yang
      sengaja dibatasi kecil di tengah. */
   #slideView { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
+  /* Video YouTube -- penuh 1 layar, sama seperti #slideView. */
+  #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; }
 
   /* ---- Warta (atas) & FootNote (bawah): ticker 1 baris ----
      Warna latar ticker sengaja TETAP hitam solid (bukan ikut var(--p-bg))
@@ -194,6 +196,7 @@
     <div id="text"></div>
     <img id="logoView" hidden />
     <img id="slideView" hidden />
+    <iframe id="ytView" hidden allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
     <div id="timerWrap" hidden>
       <svg id="timerRing" viewBox="0 0 100 100">
         <circle id="timerRingBg" cx="50" cy="50" r="44"></circle>
@@ -219,6 +222,7 @@
   const idleEl = document.getElementById("idle");
   const logoEl = document.getElementById("logoView");
   const slideEl = document.getElementById("slideView");
+  const ytEl = document.getElementById("ytView");
   const timerWrap = document.getElementById("timerWrap");
   const timerTimeEl = document.getElementById("timerTime");
   const timerLabelEl = document.getElementById("timerLabel");
@@ -283,6 +287,7 @@
     timerWrap.hidden = false;
     idleEl.hidden = true;
     refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // hentikan video kalau timer ditayangkan menimpanya
     tickTimer();
     timerInterval = setInterval(tickTimer, 250);
   }
@@ -325,6 +330,7 @@
     idleEl.hidden = true;
     logoEl.hidden = true;
     slideEl.hidden = true;
+    if (kind !== "youtube" && !ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // stop video saat pindah ke konten lain
     stageEl.classList.remove("fade-in");
     void stageEl.offsetWidth;
     if (kind === "verse") {
@@ -359,6 +365,11 @@
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = "";
       if (data.imageUrl) { slideEl.src = data.imageUrl; slideEl.hidden = false; }
+    } else if (kind === "youtube") {
+      // Video YouTube penuh 1 layar (tab "▶️ YouTube" di Studio Presentasi).
+      refEl.hidden = true; refEl.textContent = "";
+      textEl.textContent = "";
+      if (data.embedUrl) { ytEl.src = data.embedUrl; ytEl.hidden = false; }
     }
     stageEl.classList.add("fade-in");
   }
@@ -368,10 +379,11 @@
     if (data.type === "clear") {
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+      if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
       stopTimer(true);
       return;
     }
-    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide") {
+    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube") {
       showMain(data.type, data);
       return;
     }
