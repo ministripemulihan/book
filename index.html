@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260819b" />
+<link rel="stylesheet" href="css/style.css?v=20260819c" />
 </head>
 <body>
 
@@ -741,15 +741,26 @@
       </div>
 
       <!-- ===================== KOLOM KANAN ===================== -->
-      <div class="ps-col ps-col-right">
+      <!-- ===================== PRATINJAU (Berikutnya + Tayang) =====================
+           SENGAJA dijadikan elemen sendiri, TERPISAH dari ps-col-right, supaya di mode
+           dual monitor (.ps-dual-live) dia bisa ditaruh sebagai 1 baris PENUH LEBAR di
+           paling atas (area grid "preview") -- persis acuan mockup LifeStream -- sementara
+           semua kontrol (kiri/tengah/kanan) rapi di 1 baris yang sama tingginya di
+           bawahnya. Di 1 monitor, grid-area membuatnya tetap menempel di atas kolom kanan
+           seperti sebelumnya (lihat css/style.css: .ps-columns / .ps-preview-panel).
+           Kedua kotak (Berikutnya & Tayang) SENGAJA memakai class ps-preview-box-wrap yang
+           SAMA supaya skala huruf & proporsinya identik satu sama lain (bukan lagi 1 baris
+           teks dipotong ala "strip" vs kotak besar) -- itulah sebabnya dulu keduanya
+           terlihat tidak "sama". -->
+      <div class="ps-preview-panel" id="psPreviewPanel">
         <div class="ps-field-label" id="psPreviewLabel">Pratinjau Layar 2</div>
         <div class="ps-preview-row" id="psPreviewRow">
           <div class="ps-preview-slot ps-preview-slot-next" id="psNextSlot" hidden>
-            <div class="ps-next-strip">
-              <span class="ps-preview-slot-tag">Berikutnya</span>
-              <div class="ps-preview-box ps-preview-box-next" id="psNextBox"><div class="present-preview-idle">Belum ada antrean</div></div>
-              <button type="button" id="psNextShowBtn" class="chip-btn primary ps-preview-slot-btn" disabled>▶ Tayangkan</button>
+            <div class="ps-preview-slot-tag">Berikutnya</div>
+            <div class="ps-preview-box-wrap ps-preview-box-wrap-next">
+              <div class="ps-preview-box" id="psNextBox"><div class="present-preview-idle">Belum ada antrean</div></div>
             </div>
+            <button type="button" id="psNextShowBtn" class="chip-btn primary ps-preview-slot-btn" disabled>▶ Tayangkan</button>
           </div>
           <div class="ps-preview-slot" id="psLiveSlot">
             <div class="ps-preview-slot-tag ps-preview-slot-tag-live" id="psLiveTag">Tayang</div>
@@ -760,68 +771,101 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="ps-field-label">Aksi Cepat</div>
-        <div class="ps-btn-row">
-          <button type="button" id="psActBlack" class="chip-btn small">⬛ Layar Hitam</button>
+      <!-- ===================== KOLOM KANAN (kontrol) =====================
+           Dulu semua bagian ini (Aksi Cepat, Warta, FootNote, Penunjuk & Pen, Tema,
+           Huruf, Warna latar, Ukuran Teks) ditumpuk memanjang ke bawah dalam 1 kolom --
+           di mode dual monitor jadi ikut nyempil di ATAS bersama pratinjau (terasa
+           "nempel" & tidak rapi). Sekarang: Aksi Cepat + Tema digabung jadi 1 baris
+           ringkas (ps-quickbar, mirip baris tombol pada mockup LifeStream), sisanya
+           (Warta/FootNote, Penunjuk & Pen, Tampilan) dirapikan jadi TAB -- konsisten
+           dengan pola tab yang sudah dipakai kolom kiri & tengah. -->
+      <div class="ps-col ps-col-right">
+        <div class="ps-field-label" style="margin-top:0;">Aksi &amp; Tema</div>
+        <div class="ps-quickbar">
+          <button type="button" id="psActBlack" class="chip-btn small">⬛ Hitam</button>
+          <button type="button" id="psActBlank" class="chip-btn small">🌫️ Latar Saja</button>
           <button type="button" id="psActLogo" class="chip-btn small">◆ Logo</button>
           <button type="button" id="psActClear" class="chip-btn small">✖️ Kosongkan</button>
+          <span class="ps-quickbar-sep"></span>
+          <div class="ps-theme-grid ps-theme-grid-inline" id="psThemeGrid">
+            <button type="button" class="ps-theme-swatch active" data-theme="gelap" style="background:#05070c; color:#f5f2e8;">Gelap</button>
+            <button type="button" class="ps-theme-swatch" data-theme="terang" style="background:#fdfaf3; color:#1a1a1a;">Terang</button>
+            <button type="button" class="ps-theme-swatch" data-theme="emas" style="background:#1a1206; color:#e9c977;">Emas</button>
+            <button type="button" class="ps-theme-swatch" data-theme="biru" style="background:#0b1730; color:#dce8ff;">Biru Malam</button>
+            <button type="button" class="ps-theme-swatch" data-theme="sepia" style="background:#f4e8d0; color:#3a2c17;">Sepia</button>
+          </div>
         </div>
 
-        <div class="ps-field-label">Warta (baris atas)</div>
-        <input type="text" id="psWartaInput" class="columns-lang-select" maxlength="120" placeholder="Teks warta berjalan…" />
-        <div class="ps-char-count"><span id="psWartaCount">0</span>/120 — teks panjang akan berjalan otomatis.</div>
-        <div class="ps-btn-row">
-          <button type="button" id="psWartaShowBtn" class="chip-btn small">Tampilkan</button>
-          <button type="button" id="psWartaHideBtn" class="chip-btn small">Hapus</button>
+        <div class="ps-tabs" id="psRightTabs">
+          <button type="button" class="ps-tab active" data-ps-right-tab="teks">📝 Teks Cepat</button>
+          <button type="button" class="ps-tab" data-ps-right-tab="warta">📰 Warta / FootNote</button>
+          <button type="button" class="ps-tab" data-ps-right-tab="pointer">✏️ Penunjuk &amp; Pen</button>
+          <button type="button" class="ps-tab" data-ps-right-tab="tampilan">🎨 Tampilan</button>
         </div>
 
-        <div class="ps-field-label">FootNote (baris bawah)</div>
-        <input type="text" id="psFootInput" class="columns-lang-select" maxlength="120" placeholder="Teks footnote…" />
-        <div class="ps-char-count"><span id="psFootCount">0</span>/120</div>
-        <div class="ps-btn-row">
-          <button type="button" id="psFootShowBtn" class="chip-btn small">Tampilkan</button>
-          <button type="button" id="psFootHideBtn" class="chip-btn small">Hapus</button>
+        <div class="ps-tab-panel" data-ps-right-panel="teks">
+          <p class="announcement-compose-hint" style="margin-top:0;">Ketik bebas &amp; langsung tayang -- untuk kalimat sekali pakai (mis. sapaan, instruksi) yang tidak perlu disimpan. Untuk pengumuman yang dipakai berulang, pakai tab "📢 Pengumuman" di kolom kiri.</p>
+          <textarea id="psQuickTextArea" class="columns-lang-select" rows="4" placeholder="Tulis teks lalu tekan Tayangkan…" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          <div class="ps-btn-row">
+            <button type="button" id="psQuickTextShowBtn" class="chip-btn primary">▶️ Tayangkan</button>
+            <button type="button" id="psQuickTextClearBtn" class="chip-btn small">🗑️ Hapus Isi</button>
+          </div>
         </div>
 
-        <div class="ps-field-label">Penunjuk &amp; Pen</div>
-        <div class="ps-btn-row">
-          <button type="button" id="psPointerToggle" class="chip-btn small">🔴 Penunjuk</button>
-          <button type="button" id="psPenToggle" class="chip-btn small">✏️ Pen</button>
-          <button type="button" id="psPenClear" class="chip-btn small">🧹 Hapus Coretan</button>
-        </div>
-        <div class="ps-color-row" id="psPointerColorRow">
-          <button type="button" class="ps-color-chip active" data-color="#ff3b30" style="background:#ff3b30" title="Merah"></button>
-          <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
-          <button type="button" class="ps-color-chip" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
-        </div>
-        <div class="ps-pointer-hint" id="psPointerHint">Gerakkan kursor di atas kotak pratinjau "Tayang" di kanan atas saat Penunjuk/Pen aktif.</div>
+        <div class="ps-tab-panel" data-ps-right-panel="warta" hidden>
+          <div class="ps-field-label" style="margin-top:0;">Warta (baris atas)</div>
+          <input type="text" id="psWartaInput" class="columns-lang-select" maxlength="120" placeholder="Teks warta berjalan…" />
+          <div class="ps-char-count"><span id="psWartaCount">0</span>/120 — teks panjang akan berjalan otomatis.</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psWartaShowBtn" class="chip-btn small">Tampilkan</button>
+            <button type="button" id="psWartaHideBtn" class="chip-btn small">Hapus</button>
+          </div>
 
-        <div class="ps-field-label">Tema Layar Proyeksi</div>
-        <div class="ps-theme-grid" id="psThemeGrid">
-          <button type="button" class="ps-theme-swatch active" data-theme="gelap" style="background:#05070c; color:#f5f2e8;">Gelap</button>
-          <button type="button" class="ps-theme-swatch" data-theme="terang" style="background:#fdfaf3; color:#1a1a1a;">Terang</button>
-          <button type="button" class="ps-theme-swatch" data-theme="emas" style="background:#1a1206; color:#e9c977;">Emas Yasperin</button>
-          <button type="button" class="ps-theme-swatch" data-theme="biru" style="background:#0b1730; color:#dce8ff;">Biru Malam</button>
-          <button type="button" class="ps-theme-swatch" data-theme="sepia" style="background:#f4e8d0; color:#3a2c17;">Klasik Sepia</button>
+          <div class="ps-field-label">FootNote (baris bawah)</div>
+          <input type="text" id="psFootInput" class="columns-lang-select" maxlength="120" placeholder="Teks footnote…" />
+          <div class="ps-char-count"><span id="psFootCount">0</span>/120</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psFootShowBtn" class="chip-btn small">Tampilkan</button>
+            <button type="button" id="psFootHideBtn" class="chip-btn small">Hapus</button>
+          </div>
         </div>
-        <div class="ps-field-label">Huruf</div>
-        <select id="psFontSelect" class="columns-lang-select">
-          <option value="'Montserrat', Arial, sans-serif">Montserrat</option>
-          <option value="'Inter', Arial, sans-serif">Inter</option>
-          <option value="'Noto Sans', Arial, sans-serif">Noto Sans</option>
-          <option value="'Lora', Georgia, serif">Lora (serif)</option>
-          <option value="'Merriweather', Georgia, serif" selected>Merriweather (serif)</option>
-          <option value="'Comic Sans MS', 'Comic Sans', cursive">Comic Sans</option>
-          <option value="'Arial Black', Arial, sans-serif">Arial Black</option>
-        </select>
-        <div class="ps-field-label">Warna latar</div>
-        <input type="color" id="psBgColor" value="#05070c" class="ps-color-input" />
-        <div class="ps-field-label">Ukuran Teks</div>
-        <div class="ps-btn-row">
-          <button type="button" id="psFontDec" class="chip-btn small">A-</button>
-          <input type="range" id="psFontScale" min="60" max="160" value="100" style="flex:1;" />
-          <button type="button" id="psFontInc" class="chip-btn small">A+</button>
+
+        <div class="ps-tab-panel" data-ps-right-panel="pointer" hidden>
+          <div class="ps-field-label" style="margin-top:0;">Penunjuk &amp; Pen</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psPointerToggle" class="chip-btn small">🔴 Penunjuk</button>
+            <button type="button" id="psPenToggle" class="chip-btn small">✏️ Pen</button>
+            <button type="button" id="psPenClear" class="chip-btn small">🧹 Hapus Coretan</button>
+          </div>
+          <div class="ps-color-row" id="psPointerColorRow">
+            <button type="button" class="ps-color-chip active" data-color="#ff3b30" style="background:#ff3b30" title="Merah"></button>
+            <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
+            <button type="button" class="ps-color-chip" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+          </div>
+          <div class="ps-pointer-hint" id="psPointerHint">Gerakkan kursor di atas kotak pratinjau "Tayang" di atas saat Penunjuk/Pen aktif.</div>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-right-panel="tampilan" hidden>
+          <div class="ps-field-label" style="margin-top:0;">Huruf</div>
+          <select id="psFontSelect" class="columns-lang-select">
+            <option value="'Montserrat', Arial, sans-serif">Montserrat</option>
+            <option value="'Inter', Arial, sans-serif">Inter</option>
+            <option value="'Noto Sans', Arial, sans-serif">Noto Sans</option>
+            <option value="'Lora', Georgia, serif">Lora (serif)</option>
+            <option value="'Merriweather', Georgia, serif" selected>Merriweather (serif)</option>
+            <option value="'Comic Sans MS', 'Comic Sans', cursive">Comic Sans</option>
+            <option value="'Arial Black', Arial, sans-serif">Arial Black</option>
+          </select>
+          <div class="ps-field-label">Warna latar</div>
+          <input type="color" id="psBgColor" value="#05070c" class="ps-color-input" />
+          <div class="ps-field-label">Ukuran Teks</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psFontDec" class="chip-btn small">A-</button>
+            <input type="range" id="psFontScale" min="60" max="160" value="100" style="flex:1;" />
+            <button type="button" id="psFontInc" class="chip-btn small">A+</button>
+          </div>
         </div>
       </div>
     </div>
@@ -844,7 +888,7 @@
   <script src="js/media.js?v=20260818b"></script>
   <script src="js/outlines.js?v=20260818b"></script>
   <script src="js/presentation.js?v=20260819b"></script>
-  <script src="js/presentation-studio.js?v=20260819b"></script>
+  <script src="js/presentation-studio.js?v=20260819c"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260818b"></script>
   <script src="js/app.js?v=20260818b"></script>
