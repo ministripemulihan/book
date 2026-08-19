@@ -2157,19 +2157,34 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .ps-ui-theme-toggle:hover { border-color: var(--brass); }
 
+/* 1 monitor (default): 3 kolom seperti sebelumnya, TAPI pratinjau
+   (ps-preview-panel) & kontrol (ps-col-right) sekarang 2 elemen terpisah
+   yang sama-sama ditaruh di kolom ke-3 lewat grid-template-areas --
+   pratinjau nempel di atas (row "preview", tinggi otomatis), kontrol
+   mengisi sisanya di bawahnya (row "right", scroll sendiri). Susunan
+   ini juga yang dipakai ulang & disusun ULANG di mode dual monitor
+   (lihat blok .ps-dual-live di bawah) supaya pratinjau bisa melebar
+   jadi 1 baris penuh di atas SEMUA kolom, bukan cuma di kolom kanan. */
 .ps-columns {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: 300px 1fr 320px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "left mid preview"
+    "left mid right";
   min-height: 0;
 }
+.ps-col-left { grid-area: left; }
+.ps-col-mid { grid-area: mid; }
+.ps-preview-panel { grid-area: preview; min-height: 0; overflow-y: auto; padding: 14px 16px 0; }
+.ps-col-right { grid-area: right; min-height: 0; overflow-y: auto; padding: 10px 16px 14px; border-right: none; }
 .ps-col {
   min-height: 0;
   overflow-y: auto;
   padding: 14px 16px;
   border-right: 1px solid var(--ps-col-border);
 }
-.ps-col-right { border-right: none; }
 
 .ps-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 .ps-tab {
@@ -2263,39 +2278,21 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-preview-box-wrap .ps-preview-box { justify-content: flex-start; }
 .present-preview-black { color: #6b7280; font-weight: 700; }
 
-/* Baris pratinjau "Berikutnya" + "Tayang". Di 1 monitor slot Berikutnya
-   disembunyikan (hidden lewat HTML/JS) supaya tampilan sama seperti
-   sebelumnya -- cuma 1 kotak pratinjau live. Di mode dual monitor,
-   "Berikutnya" ditumpuk sebagai STRIP TIPIS menempel langsung di atas
-   kotak "Tayang" (bukan lagi kotak sebesar sendiri di sampingnya) --
-   supaya keduanya terlihat seperti SATU kesatuan, dan kotak "Tayang"
-   di bawahnya tetap yang paling dominan/besar (mirip acuan LifeStream). */
-.ps-preview-row { display: flex; flex-direction: column; gap: 0; }
+/* Baris pratinjau "Berikutnya" + "Tayang". PENTING: kedua kotak sekarang
+   memakai class ps-preview-box-wrap yang SAMA (lihat index.html), jadi
+   keduanya otomatis kena aturan skala huruf proporsional (cqw/cqh) yang
+   sama persis satu sama lain -- inilah perbaikan supaya "Berikutnya" &
+   "Tayang" terlihat KONSISTEN (dulu Berikutnya cuma strip 1 baris teks
+   dipotong ellipsis, jadi terasa "beda sendiri" dari kotak Tayang).
+   Di 1 monitor slot Berikutnya disembunyikan (hidden lewat JS) -- cuma
+   1 kotak pratinjau live seperti sebelumnya. Di mode dual monitor,
+   keduanya disusun BERDAMPINGAN (mirip acuan LifeStream): Berikutnya
+   lebih kecil di kiri, Tayang tetap paling dominan/besar di kanan. */
+.ps-preview-row { display: flex; flex-direction: column; gap: 10px; }
 .ps-preview-slot { min-width: 0; display: flex; flex-direction: column; }
 .ps-preview-slot .ps-preview-box { flex: 1 1 auto; }
-
-.ps-preview-slot-next { margin-bottom: 8px; }
-.ps-next-strip {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 10px;
-  padding: 6px 10px;
-}
-.ps-next-strip .ps-preview-slot-tag { margin: 0; flex: 0 0 auto; }
-.ps-next-strip .ps-preview-box-next {
-  flex: 1 1 auto; min-width: 0; min-height: 0;
-  background: none; border: none; padding: 0;
-  display: block; text-align: left;
-}
-.ps-next-strip .ps-preview-box-next .present-preview-idle { font-size: 12px; }
-.ps-next-strip .ps-preview-box-next .present-preview-ref,
-.ps-next-strip .ps-preview-box-next .present-preview-text {
-  display: inline; font-size: 12.5px !important; margin: 0 !important;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ps-next-strip .ps-preview-box-next .present-preview-ref::before,
-.ps-next-strip .ps-preview-box-next .present-preview-ref::after { content: none; }
-.ps-next-strip .ps-preview-box-next .present-preview-ref { color: var(--brass-soft); font-weight: 700; margin-right: 6px !important; }
-.ps-next-strip .ps-preview-slot-btn { flex: 0 0 auto; margin: 0; width: auto; padding: 6px 12px; font-size: 12px; }
+.ps-preview-slot-next .ps-preview-box-wrap-next { opacity: .82; }
+.ps-preview-slot-next .ps-preview-slot-btn { margin-top: 8px; }
 
 /* Bungkus kotak "Tayang" (psPreviewBox) supaya Penunjuk (titik) & Pen
    (coretan) bisa digambar LANGSUNG DI ATASNYA -- 1:1 sama seperti
@@ -2389,6 +2386,24 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .ps-theme-swatch.active { border-color: var(--brass); }
 
+/* Baris "Aksi & Tema" -- gabungan tombol Aksi Cepat + swatch Tema jadi
+   1 baris ringkas (mirip baris tombol Teks/Latar saja/Hitam/TAYANGKAN
+   + tema pada acuan mockup LifeStream), supaya tidak lagi jadi 2 blok
+   terpisah yang sama-sama minta 1 baris "Field label" sendiri. */
+.ps-quickbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px; margin-top: 8px;
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 10px;
+}
+.ps-quickbar-sep { flex: 1 1 auto; min-width: 4px; }
+.ps-theme-grid.ps-theme-grid-inline {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.ps-theme-grid-inline .ps-theme-swatch { padding: 6px 10px; font-size: 11px; }
+@media (max-width: 1300px) {
+  .ps-quickbar-sep { flex-basis: 100%; height: 0; }
+}
+
 .chip-btn.primary { background: var(--brass); color: #1a1206; border-color: var(--brass); font-weight: 700; }
 .chip-btn.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
 .chip-btn.blinking { animation: psBlink 1s step-start infinite; }
@@ -2410,37 +2425,47 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    (class .ps-dual-live ditambah lewat JS di refreshStatusUi()).
    Tata letak 1 monitor (.present-studio TANPA .ps-dual-live) sama
    sekali TIDAK berubah oleh blok ini.
-   Terinspirasi tampilan "LifeStream": pratinjau besar (Berikutnya /
-   Tayang) memenuhi bagian atas, kontrol dipadatkan jadi 2 kolom di
-   bawahnya supaya operator tidak perlu scroll panjang ke bawah.
-   ------------------------------------------------------------ */
+   Terinspirasi tampilan "LifeStream": pratinjau (Berikutnya + Tayang
+   berdampingan) memenuhi 1 baris PENUH LEBAR di paling atas, lalu
+   TEPAT DI BAWAHNYA 3 kolom kontrol yang SAMA TINGGI & SAMA LEBAR
+   (Kumpulan Ayat/Media/Pengumuman/Pesan+Timer -- Alkitab/Kidung/File/
+   YouTube -- Aksi&Tema/Warta/Penunjuk/Tampilan), masing-masing sudah
+   pakai tab sendiri supaya tidak perlu scroll panjang. Sebelumnya
+   seluruh kolom kanan (termasuk Aksi Cepat/Warta/Tema) ikut nyempil
+   di ATAS berdampingan dgn pratinjau -- sekarang HANYA pratinjau yang
+   ada di atas, kontrolnya konsisten di baris bawah seperti 2 kolom
+   lainnya. */
 .present-studio.ps-dual-live .ps-columns {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: minmax(220px, 46vh) 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: minmax(200px, 40vh) 1fr;
   grid-template-areas:
-    "preview preview"
-    "controls-left controls-mid";
+    "preview preview preview"
+    "controls-left controls-mid controls-right";
 }
-/* Kolom kanan (Pratinjau + Aksi Cepat + Warta + Penunjuk + Tema) pindah
-   jadi baris besar penuh di atas, gaya "Berikutnya/Tayang" ala LifeStream. */
-.present-studio.ps-dual-live .ps-col-right {
+.present-studio.ps-dual-live .ps-preview-panel {
   grid-area: preview;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 14px;
-  align-content: start;
-  padding-bottom: 10px;
-  border-right: none;
-  border-bottom: 1px solid #2a2216;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--ps-col-border);
 }
-.present-studio.ps-dual-live .ps-col-right > .ps-preview-row {
-  grid-column: 1 / -1;
+.present-studio.ps-dual-live .ps-preview-row {
+  flex-direction: row;
+  align-items: flex-start;
+  height: 100%;
+}
+.present-studio.ps-dual-live .ps-preview-slot-next {
+  flex: 0 0 30%;
+  min-width: 180px;
+}
+.present-studio.ps-dual-live .ps-preview-slot:not(.ps-preview-slot-next) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .present-studio.ps-dual-live .ps-preview-box-wrap {
-  min-height: 190px;
+  min-height: 160px;
 }
 .present-studio.ps-dual-live .ps-preview-box {
   font-size: 15px;
 }
-.present-studio.ps-dual-live .ps-col-left { grid-area: controls-left; }
-.present-studio.ps-dual-live .ps-col-mid { grid-area: controls-mid; }
+.present-studio.ps-dual-live .ps-col-left { grid-area: controls-left; border-right: 1px solid var(--ps-col-border); }
+.present-studio.ps-dual-live .ps-col-mid { grid-area: controls-mid; border-right: 1px solid var(--ps-col-border); }
+.present-studio.ps-dual-live .ps-col-right { grid-area: controls-right; border-right: none; }
