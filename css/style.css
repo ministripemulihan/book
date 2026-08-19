@@ -2258,6 +2258,32 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-preview-row { display: flex; gap: 12px; }
 .ps-preview-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
 .ps-preview-slot .ps-preview-box { flex: 1 1 auto; }
+
+/* Bungkus kotak "Tayang" (psPreviewBox) supaya Penunjuk (titik) & Pen
+   (coretan) bisa digambar LANGSUNG DI ATASNYA -- 1:1 sama seperti
+   #pointerDot / #penCanvas di present.html (Layar 2) -- bukan lagi di
+   pad terpisah di bawah. psPreviewBox sendiri sering diganti isinya
+   lewat innerHTML (renderStudioPreview()), jadi dot & canvas SENGAJA
+   ditaruh sebagai saudara (sibling), bukan anak, dari psPreviewBox,
+   supaya tidak ikut terhapus tiap tayangan berganti. */
+.ps-preview-slot .ps-preview-box-wrap { flex: 1 1 auto; position: relative; border-radius: 10px; overflow: hidden; min-height: 120px; }
+.ps-preview-box-wrap .ps-preview-box { position: absolute; inset: 0; }
+.ps-preview-box-wrap.ps-pointer-mode { cursor: crosshair; }
+
+/* Titik Penunjuk -- ukuran & glow SAMA PERSIS dengan #pointerDot di
+   present.html (22px, box-shadow currentColor). Diposisikan pakai %
+   (bukan px) supaya tetap akurat walau kotak pratinjau di-resize. */
+.ps-pointer-dot {
+  position: absolute; width: 22px; height: 22px; border-radius: 50%;
+  pointer-events: none; z-index: 6; display: none;
+  box-shadow: 0 0 14px 4px currentColor;
+  transform: translate(-50%, -50%);
+}
+/* Kanvas coretan Pen -- SAMA PERSIS dengan #penCanvas di present.html
+   (lineWidth 4, round cap/join, warna sama dengan yang dikirim). */
+.ps-pen-canvas { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: none; }
+
+.ps-pointer-hint { margin-top: 8px; font-size: 11.5px; color: var(--ps-muted); line-height: 1.4; }
 .ps-preview-slot-tag {
   font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
   color: #cbbf9e; margin-bottom: 6px;
@@ -2272,12 +2298,6 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   border: 2px solid transparent;
 }
 .ps-theme-swatch.active { border-color: var(--brass); }
-
-.ps-pointer-pad {
-  margin-top: 8px; height: 70px; border-radius: 8px; border: 1px dashed var(--ps-dropzone-border);
-  display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: var(--ps-muted);
-  cursor: crosshair;
-}
 
 .chip-btn.primary { background: var(--brass); color: #1a1206; border-color: var(--brass); font-weight: 700; }
 .chip-btn.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
@@ -2326,8 +2346,10 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .present-studio.ps-dual-live .ps-col-right > .ps-preview-row {
   grid-column: 1 / -1;
 }
-.present-studio.ps-dual-live .ps-preview-box {
+.present-studio.ps-dual-live .ps-preview-box-wrap {
   min-height: 190px;
+}
+.present-studio.ps-dual-live .ps-preview-box {
   font-size: 15px;
 }
 .present-studio.ps-dual-live .ps-col-left { grid-area: controls-left; }
