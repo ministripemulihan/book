@@ -339,7 +339,7 @@
       if (Array.isArray(data.texts) && data.texts.length) {
         // Beberapa versi/terjemahan sekaligus (checklist versi di Studio
         // Presentasi) -- tampil bertumpuk, tiap blok dengan label singkat
-        // versinya (mis. "ITB", "ENG-RC") di depan teksnya.
+        // versinya (mis. "ITB", "ENG-RCV") di depan teksnya.
         textEl.innerHTML = data.texts.map((t) => {
           const label = (t.label || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
           const body = (t.text || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
