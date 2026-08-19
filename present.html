@@ -442,6 +442,36 @@
       window.opener.postMessage({ source: "bibleAppPresenter", type: "present_ready" }, location.origin);
     } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
   }
+
+  // ------------------------------------------------------------
+  // Laporkan bentuk (rasio) jendela Layar 2 yang SUNGGUH aktif ke
+  // jendela utama -- dipakai untuk mengunci bentuk kotak pratinjau
+  // (#psPreviewBoxWrap di Studio Presentasi / #presentPreviewBox di
+  // panel ⋮ biasa) supaya SELALU sama persis dengan Layar 2 yang
+  // sesungguhnya, apa pun ukurannya (termasuk kalau operator
+  // menggeser-ubah ukuran jendelanya secara manual, atau proyektor
+  // punya resolusi yang tidak standar). Ini menggantikan pendekatan
+  // "pilih resolusi manual" sebelumnya -- sekarang otomatis mengikuti
+  // kenyataan, jadi posisi Penunjuk/Pen & titik patah baris teks juga
+  // ikut akurat tanpa operator perlu mengatur apa pun.
+  // ------------------------------------------------------------
+  function reportGeometry() {
+    if (!window.opener) return;
+    try {
+      window.opener.postMessage({
+        source: "bibleAppPresenter",
+        type: "present_geometry",
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }, location.origin);
+    } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
+  }
+  reportGeometry();
+  let geomResizeTimer = null;
+  window.addEventListener("resize", () => {
+    if (geomResizeTimer) clearTimeout(geomResizeTimer);
+    geomResizeTimer = setTimeout(reportGeometry, 120);
+  });
 </script>
 </body>
 </html>
