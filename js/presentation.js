@@ -128,7 +128,7 @@ const Presentation = (() => {
   // sekaligus (checklist versi di Studio Presentasi) -- `versions` adalah
   // [{ code, label, text }, ...]. present.html menyusunnya sebagai
   // beberapa blok bertumpuk, masing-masing dengan label singkat versi
-  // (mis. "ITB", "ENG-RC") di depan teksnya, mirip 1 pasal berbahasa
+  // (mis. "ITB", "ENG-RCV") di depan teksnya, mirip 1 pasal berbahasa
   // ganda di aplikasi Alkitab pada umumnya.
   function sendVerseMulti(ref, versions) {
     if (!isTwoScreenMode()) return;
