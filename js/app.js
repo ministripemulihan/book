@@ -5874,7 +5874,7 @@ function initUIEvents() {
     }
   });
 
-  // Dulu ada 2 tombol terpisah ("Sinkronkan ulang Alkitab" & "Unduh Data
+  // Dulu ada 2 tombol terpisah ("Sinkronkan ulang Alkitab" & "Unduh Data 
   // Alkitab") yang ternyata memanggil fungsi persis sama begitu data lokal
   // sudah ada (kondisi normal) -- digabung jadi SATU tombol saja supaya
   // tidak membingungkan. Kalau data lokal masih kosong sama sekali,
