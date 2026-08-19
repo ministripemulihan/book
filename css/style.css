@@ -2458,6 +2458,25 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    scroll html/body selama Studio terbuka. */
 body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 
+/* PERMINTAAN OPERATOR: scrollbar abu-abu bawaan browser di tepi kanan
+   (di kolom "AKSI & TEMA", yang kebetulan jadi kolom PALING KANAN --
+   jadi scrollbar bawaannya nempel persis di tepi layar, terlihat
+   seperti "progress bar" mengganggu). Diganti jadi garis tipis senada
+   tema (bukan dihilangkan total -- kolom ini tetap perlu discroll
+   kalau suatu saat isinya lebih panjang dari layar), supaya jauh lebih
+   halus & tidak mengganggu. Berlaku untuk SEMUA kolom Studio yang bisa
+   discroll (.ps-col, .ps-preview-panel), bukan cuma kolom kanan. */
+.ps-col, .ps-preview-panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-card-border) transparent;
+}
+.ps-col::-webkit-scrollbar, .ps-preview-panel::-webkit-scrollbar { width: 7px; }
+.ps-col::-webkit-scrollbar-track, .ps-preview-panel::-webkit-scrollbar-track { background: transparent; }
+.ps-col::-webkit-scrollbar-thumb, .ps-preview-panel::-webkit-scrollbar-thumb {
+  background: var(--ps-card-border); border-radius: 999px;
+}
+.ps-col::-webkit-scrollbar-thumb:hover, .ps-preview-panel::-webkit-scrollbar-thumb:hover { background: var(--ps-muted); }
+
 /* ------------------------------------------------------------
    MODE DUAL MONITOR -- hanya aktif saat Layar 2 sungguh terbuka
    (class .ps-dual-live ditambah lewat JS di refreshStatusUi()).
