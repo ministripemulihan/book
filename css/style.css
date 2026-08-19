@@ -2255,34 +2255,6 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   font-family: "Merriweather", Georgia, serif;
 }
 
-/* ---- Pemilih ukuran/rasio Layar 2 (16:9 / 4:3 + resolusi detail) ----
-   Kartu resolusi ala "carousel" dengan panah segitiga kiri/kanan --
-   sengaja dibuat kecil/ringkas (bukan daftar panjang yang turun terus
-   ke bawah) supaya tetap muat di kolom kanan yang sempit. Nilai rasio
-   terpilih disimpan sebagai CSS var --ps-preview-ratio di :root (lihat
-   applyScreenRes() di js/presentation-studio.js) dan dipakai kotak
-   pratinjau di bawah supaya bentuknya SAMA PERSIS dengan jendela
-   Layar 2 yang akan/sedang dibuka. */
-.ps-res-picker { margin-bottom: 14px; }
-.ps-res-carousel { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.ps-res-arrow {
-  flex: 0 0 auto; width: 0; height: 0; padding: 0; margin: 0; cursor: pointer;
-  background: none; border-top: 8px solid transparent; border-bottom: 8px solid transparent;
-  opacity: .7;
-}
-.ps-res-arrow:hover { opacity: 1; }
-.ps-res-arrow-prev { border-right: 11px solid var(--brass-soft); }
-.ps-res-arrow-next { border-left: 11px solid var(--brass-soft); }
-.ps-res-card {
-  flex: 1 1 auto; min-width: 0; text-align: center;
-  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px;
-  padding: 6px 8px;
-}
-.ps-res-card-name { font-size: 12px; font-weight: 700; color: var(--ps-ink); }
-.ps-res-card-dims { font-size: 16px; font-weight: 800; color: var(--brass-soft); font-variant-numeric: tabular-nums; margin: 1px 0; }
-.ps-res-card-desc { font-size: 11px; color: var(--ps-ink-soft); }
-.ps-res-card-count { font-size: 10px; color: var(--ps-muted); margin-top: 2px; }
-.ps-res-hint { font-size: 11px; color: var(--ps-muted); margin-top: 8px; line-height: 1.4; }
 /* Saat isinya melebihi tinggi kotak (mis. banyak versi Alkitab
    dicentang sekaligus), JANGAN pusatkan lalu potong tengah kalimat --
    mulai dari atas & biarkan scroll (lihat overflow-y:auto di
@@ -2293,10 +2265,37 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 
 /* Baris pratinjau "Berikutnya" + "Tayang". Di 1 monitor slot Berikutnya
    disembunyikan (hidden lewat HTML/JS) supaya tampilan sama seperti
-   sebelumnya -- cuma 1 kotak pratinjau live. */
-.ps-preview-row { display: flex; gap: 12px; }
-.ps-preview-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+   sebelumnya -- cuma 1 kotak pratinjau live. Di mode dual monitor,
+   "Berikutnya" ditumpuk sebagai STRIP TIPIS menempel langsung di atas
+   kotak "Tayang" (bukan lagi kotak sebesar sendiri di sampingnya) --
+   supaya keduanya terlihat seperti SATU kesatuan, dan kotak "Tayang"
+   di bawahnya tetap yang paling dominan/besar (mirip acuan LifeStream). */
+.ps-preview-row { display: flex; flex-direction: column; gap: 0; }
+.ps-preview-slot { min-width: 0; display: flex; flex-direction: column; }
 .ps-preview-slot .ps-preview-box { flex: 1 1 auto; }
+
+.ps-preview-slot-next { margin-bottom: 8px; }
+.ps-next-strip {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 10px;
+  padding: 6px 10px;
+}
+.ps-next-strip .ps-preview-slot-tag { margin: 0; flex: 0 0 auto; }
+.ps-next-strip .ps-preview-box-next {
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  background: none; border: none; padding: 0;
+  display: block; text-align: left;
+}
+.ps-next-strip .ps-preview-box-next .present-preview-idle { font-size: 12px; }
+.ps-next-strip .ps-preview-box-next .present-preview-ref,
+.ps-next-strip .ps-preview-box-next .present-preview-text {
+  display: inline; font-size: 12.5px !important; margin: 0 !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ps-next-strip .ps-preview-box-next .present-preview-ref::before,
+.ps-next-strip .ps-preview-box-next .present-preview-ref::after { content: none; }
+.ps-next-strip .ps-preview-box-next .present-preview-ref { color: var(--brass-soft); font-weight: 700; margin-right: 6px !important; }
+.ps-next-strip .ps-preview-slot-btn { flex: 0 0 auto; margin: 0; width: auto; padding: 6px 12px; font-size: 12px; }
 
 /* Bungkus kotak "Tayang" (psPreviewBox) supaya Penunjuk (titik) & Pen
    (coretan) bisa digambar LANGSUNG DI ATASNYA -- 1:1 sama seperti
@@ -2305,18 +2304,20 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    lewat innerHTML (renderStudioPreview()), jadi dot & canvas SENGAJA
    ditaruh sebagai saudara (sibling), bukan anak, dari psPreviewBox,
    supaya tidak ikut terhapus tiap tayangan berganti. */
-/* Bentuk (rasio) kotak "Tayang" DIKUNCI sama persis dengan jendela
-   Layar 2 sungguhan lewat --ps-preview-ratio (diatur oleh pemilih
-   16:9/4:3 + resolusi di atas -- lihat applyScreenRes() di
-   js/presentation-studio.js). Sebelumnya kotak ini hanya mengisi sisa
-   ruang kolom (flex:1 1 auto) tanpa rasio tertentu, jadi bentuknya
-   nyaris tidak pernah sama dengan jendela Layar 2 -- itulah sebab
-   utama teks di pratinjau patah baris di titik berbeda dari yang
-   sungguh tayang. `flex: 0 0 auto` + `aspect-ratio` di sini membuatnya
-   selebar kolom lalu tingginya mengikuti rasio (bukan lagi meregang
-   mengikuti sisa tinggi kolom). container-type: size (bukan lagi
-   inline-size) supaya unit cqh/cqb ikut tersedia untuk padding
-   vertikal proporsional di bawah. */
+/* Bentuk (rasio) kotak "Tayang" DIKUNCI sama persis dengan Layar 2
+   yang SUNGGUH aktif lewat --ps-preview-ratio -- variabel ini
+   diperbarui OTOMATIS begitu present.html melaporkan ukuran jendelanya
+   yang sesungguhnya (lihat "present_geometry" di present.html &
+   applyPreviewRatio() di js/presentation.js), jadi operator tidak
+   perlu memilih resolusi apa pun secara manual. Sebelumnya kotak ini
+   hanya mengisi sisa ruang kolom (flex:1 1 auto) tanpa rasio tertentu,
+   jadi bentuknya nyaris tidak pernah sama dengan jendela Layar 2 --
+   itulah sebab utama teks & posisi Penunjuk di pratinjau meleset dari
+   yang sungguh tayang. `flex: 0 0 auto` + `aspect-ratio` di sini
+   membuatnya selebar kolom lalu tingginya mengikuti rasio (bukan lagi
+   meregang mengikuti sisa tinggi kolom). container-type: size supaya
+   unit cqh/cqb ikut tersedia untuk padding vertikal proporsional di
+   bawah. */
 .ps-preview-slot .ps-preview-box-wrap {
   flex: 0 0 auto; width: 100%; max-width: 100%;
   aspect-ratio: var(--ps-preview-ratio, 16 / 9);
@@ -2326,12 +2327,6 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .ps-preview-box-wrap .ps-preview-box { position: absolute; inset: 0; overflow-y: auto; }
 .ps-preview-box-wrap.ps-pointer-mode { cursor: crosshair; }
-/* Kotak "Berikutnya" (antrean) memakai rasio yang sama supaya bentuknya
-   konsisten dengan kotak "Tayang" di sebelahnya. */
-.ps-preview-slot .ps-preview-box-next {
-  flex: 0 0 auto; width: 100%;
-  aspect-ratio: var(--ps-preview-ratio, 16 / 9);
-}
 
 /* Skala font di kotak pratinjau Studio dibuat PROPORSIONAL terhadap
    lebar kotak itu sendiri (container query units, "cqw") -- meniru
