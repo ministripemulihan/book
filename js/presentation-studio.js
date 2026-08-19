@@ -383,6 +383,29 @@ const PresentationStudio = (() => {
         renderMediaList();
       });
       wrap.appendChild(row);
+
+      // Daftar judul + durasi tiap video (khusus item YouTube yang disimpan
+      // dengan videoLabels -- lihat addMediaItem() di js/collections.js).
+      // Ditaruh sebagai sub-baris di bawah nama item, supaya operator bisa
+      // langsung lihat judul & durasi TANPA harus klik ◀ ▶ satu-satu dulu.
+      // Klik salah satu baris = langsung tayang video itu (sama seperti ▶ ▶).
+      if (isYt && item.videoLabels && item.videoLabels.length) {
+        const sub = document.createElement("div");
+        sub.className = "ps-yt-sublist";
+        item.videoLabels.forEach((lbl, i) => {
+          const subRow = document.createElement("button");
+          subRow.type = "button";
+          subRow.className = "ps-yt-subrow";
+          subRow.innerHTML = `<span class="ps-yt-subrow-title">${i + 1}. ${escapeHtml(lbl.title || `Video ${i + 1}`)}</span>${lbl.durationLabel ? `<span class="ps-yt-subrow-dur">${escapeHtml(lbl.durationLabel)}</span>` : ""}`;
+          subRow.addEventListener("click", () => {
+            idx = i;
+            updateCount();
+            stageOrSend(item.name, item.name, doSend);
+          });
+          sub.appendChild(subRow);
+        });
+        wrap.appendChild(sub);
+      }
     });
   }
 
@@ -1069,7 +1092,11 @@ const PresentationStudio = (() => {
       if (name === null) return; // dibatalkan
       const username = typeof currentUser !== "undefined" ? currentUser : null;
       const embedUrls = queue.map((q) => q.embedUrl);
-      const id = addMediaItem(username, name, embedUrls, name, "youtube");
+      // Judul + durasi per video (kalau sempat termuat) ikut disimpan supaya
+      // panel Media Tersimpan bisa menampilkan daftarnya -- lihat
+      // renderMediaList() & addMediaItem() di js/collections.js.
+      const labels = queue.map((q) => ({ title: q.title || q.videoId, durationLabel: q.durationLabel || "" }));
+      const id = addMediaItem(username, name, embedUrls, name, "youtube", labels);
       if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh?)."); return; }
       queue = [];
       renderQueue();
@@ -1391,12 +1418,82 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // Splitter kotak pratinjau dual monitor (#psPreviewResizeHandle) --
+  // seret naik/turun untuk membesar/mengecilkan baris "Berikutnya" +
+  // "Tayang" (permintaan operator: dulu terpotong & tidak bisa
+  // diperbesar). Menyetel 2 variabel CSS di elemen #presentStudio:
+  //   --ps-preview-row-h : tinggi baris grid (dipakai .ps-columns)
+  //   --ps-preview-box-h : tinggi kotak Berikutnya/Tayang itu sendiri
+  //                        (row dikurangi tinggi label kecil di atasnya)
+  // Lebar kotak TIDAK disetel langsung -- otomatis ikut membesar lewat
+  // aspect-ratio 16:9 di CSS (.ps-preview-box-wrap), jadi menyeret lebih
+  // tinggi = kotak (lebar & tinggi) membesar bersama sampai sebesar
+  // layar mengizinkan. Ukuran terakhir diingat lewat localStorage per
+  // perangkat (bukan disinkron akun -- sama seperti Media Tersimpan).
+  // ------------------------------------------------------------
+  function wirePreviewResize() {
+    const handle = el("psPreviewResizeHandle");
+    const studio = el("presentStudio");
+    if (!handle || !studio) return;
+    const STORAGE_KEY = "bible_app_studio_preview_row_h_v1";
+    const LABEL_OVERHEAD = 60; // tinggi label "Berikutnya/Tayang" + padding panel
+    const MIN_ROW = 190;
+    function maxRow() { return Math.round(window.innerHeight * 0.82); }
+    function apply(rowPx) {
+      const clamped = Math.max(MIN_ROW, Math.min(maxRow(), Math.round(rowPx)));
+      studio.style.setProperty("--ps-preview-row-h", clamped + "px");
+      studio.style.setProperty("--ps-preview-box-h", Math.max(90, clamped - LABEL_OVERHEAD) + "px");
+      try { localStorage.setItem(STORAGE_KEY, String(clamped)); } catch (e) {}
+    }
+    try {
+      const saved = Number(localStorage.getItem(STORAGE_KEY));
+      if (saved) apply(saved);
+    } catch (e) {}
+    let dragging = false, startY = 0, startRow = 0;
+    function currentRowH() {
+      const panel = el("psPreviewPanel");
+      return panel ? panel.getBoundingClientRect().height : 220;
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      const y = e.touches ? e.touches[0].clientY : e.clientY;
+      apply(startRow + (y - startY));
+      e.preventDefault();
+    }
+    function onUp() {
+      dragging = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    }
+    function onDown(e) {
+      dragging = true;
+      startY = e.touches ? e.touches[0].clientY : e.clientY;
+      startRow = currentRowH();
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, { passive: false });
+      document.addEventListener("touchend", onUp);
+      e.preventDefault();
+    }
+    handle.addEventListener("mousedown", onDown);
+    handle.addEventListener("touchstart", onDown, { passive: false });
+    window.addEventListener("resize", () => apply(currentRowH()));
+  }
+
+  // ------------------------------------------------------------
   // Deteksi ukuran layar (khusus laptop/komputer) + gate mode tamu
   // ------------------------------------------------------------
   function refreshDeviceGate() {
     const desktop = isDesktop();
+    const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").hidden = !desktop;
     if (el("presentStudioMobileHint")) el("presentStudioMobileHint").hidden = desktop;
+    // headerStudioBtn juga digerbangi Mode Tamu (lihat refreshGuestGate() di
+    // js/presentation.js) -- dicek ulang di sini juga supaya resize jendela
+    // tidak diam-diam memunculkannya lagi untuk tamu.
+    if (el("headerStudioBtn")) el("headerStudioBtn").hidden = !desktop || isGuestNow;
     if (!desktop) closeStudio();
   }
 
@@ -1427,8 +1524,14 @@ const PresentationStudio = (() => {
     wireYtControls();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
+    // Jalan pintas di header utama (index.html, ikon 🎛️ -- khusus laptop/
+    // komputer, lihat refreshDeviceGate()) supaya operator tidak perlu
+    // buka menu "⋮" dulu untuk sampai ke tombol "Buka Studio Presentasi".
+    if (el("headerStudioBtn")) el("headerStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
     if (el("psCloseStudioBtn")) el("psCloseStudioBtn").addEventListener("click", closeStudio);
+
+    wirePreviewResize();
 
     window.addEventListener("resize", refreshDeviceGate);
     refreshDeviceGate();
