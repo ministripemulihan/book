@@ -957,6 +957,13 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------
   function wireQuickActions() {
     if (el("psActBlack")) el("psActBlack").addEventListener("click", () => { rawPost({ type: "black" }); renderStudioPreview({ type: "black" }); });
+    if (el("psActBlank")) el("psActBlank").addEventListener("click", () => {
+      // Beda dari "Kosongkan": SELALU latar tema polos tanpa teks,
+      // apa pun pesan default yang diatur untuk "Kosongkan" (lihat
+      // BLANK_MSG_KEY di js/settings.js) -- tombol cepat terpisah
+      // supaya operator tidak perlu ganti pengaturan dulu.
+      post({ type: "clear" });
+    });
     if (el("psActLogo")) el("psActLogo").addEventListener("click", () => {
       let url = localStorage.getItem(LOGO_KEY) || "";
       const entered = prompt("Link gambar logo (JPG/PNG):", url);
@@ -970,6 +977,25 @@ const PresentationStudio = (() => {
       if (blank) post({ type: "text", text: blank });
       else post({ type: "clear" });
     });
+  }
+
+  // ------------------------------------------------------------
+  // "Teks Cepat" -- kalimat sekali pakai langsung tayang, tanpa perlu
+  // disimpan dulu ke Pengumuman (kolom kiri). Ikut aturan antre di
+  // mode dual monitor lewat stageOrSend(), sama seperti tipe konten
+  // lain (ayat, YouTube, dst.).
+  // ------------------------------------------------------------
+  function wireQuickText() {
+    const ta = el("psQuickTextArea");
+    const showBtn = el("psQuickTextShowBtn");
+    const clearBtn = el("psQuickTextClearBtn");
+    function doShow() {
+      const text = (ta && ta.value.trim()) || "";
+      if (!text) return;
+      stageOrSend("📝 Teks Cepat", text, () => post({ type: "text", text }));
+    }
+    if (showBtn) showBtn.addEventListener("click", doShow);
+    if (clearBtn) clearBtn.addEventListener("click", () => { if (ta) ta.value = ""; });
   }
 
   function wireTicker(prefix, type) {
@@ -1219,12 +1245,14 @@ const PresentationStudio = (() => {
   function init() {
     wireTabs("[data-ps-left-tab]", "data-ps-left-panel", "data-ps-left-tab");
     wireTabs("[data-ps-mid-tab]", "data-ps-mid-panel", "data-ps-mid-tab");
+    wireTabs("[data-ps-right-tab]", "data-ps-right-panel", "data-ps-right-tab");
     wireAnnouncement();
     wireMessage();
     wireTimer();
     wireQuickVerse();
     wireFileTab();
     wireQuickActions();
+    wireQuickText();
     wireTicker("psWarta", "warta");
     wireTicker("psFoot", "footnote");
     wirePointerPen();
