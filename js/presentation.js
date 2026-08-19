@@ -454,6 +454,10 @@ const Presentation = (() => {
     const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
     const row = el("presentModeRow");
     if (row) row.hidden = isGuestNow;
+    // Jalan pintas header (🎛️, lihat index.html & PresentationStudio.init())
+    // -- disembunyikan juga untuk Mode Tamu, sama seperti presentModeRow.
+    const headerBtn = el("headerStudioBtn");
+    if (headerBtn) headerBtn.hidden = isGuestNow;
     if (isGuestNow && isTwoScreenMode()) {
       // Kalau entah bagaimana sempat aktif lalu masuk sebagai tamu, matikan.
       setMode(false);
