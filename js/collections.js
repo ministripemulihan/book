@@ -122,3 +122,65 @@ async function refreshCollectionsFromRemote(username) {
 
   return changed;
 }
+
+// ============================================================
+//  MEDIA TERSIMPAN (File/PPTX/PDF/Gambar yang di-"+ Daftar"-kan dari
+//  tab File Studio Presentasi) — sengaja terpisah dari Kumpulan Ayat
+//  di atas: item di sini berisi gambar (data-URL) yang bisa besar,
+//  jadi HANYA disimpan lokal di perangkat ini (localStorage), TIDAK
+//  disinkronkan ke Google Sheet (beda dari Kumpulan Ayat/verseIds).
+//  Tampil sebagai tab "🖼️ Media Tersimpan" di kolom kiri Studio,
+//  bisa dibuka & ditayangkan lagi di mode 1 monitor maupun dual
+//  monitor (sama seperti item ayat di Kumpulan Ayat).
+// ============================================================
+function mediaStorageKey(username) {
+  return "bible_app_studio_media_v1_" + (username || "guest");
+}
+
+function loadMediaItems(username) {
+  try {
+    const raw = localStorage.getItem(mediaStorageKey(username));
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveMediaItems(username, items) {
+  try {
+    localStorage.setItem(mediaStorageKey(username), JSON.stringify(items));
+    return true;
+  } catch (e) {
+    // Kemungkinan besar localStorage penuh (banyak gambar besar) --
+    // beri tahu lewat return false, biar pemanggil bisa kasih alert.
+    return false;
+  }
+}
+
+// Menambah 1 file (bisa multi-halaman/slide) ke Media Tersimpan.
+// `images`: array data-URL (untuk type "image", dari gambar/PDF) ATAU
+// array embed-URL YouTube (untuk type "youtube") -- lihat wireYoutubeTab()
+// di js/presentation-studio.js. `type` opsional, default "image" supaya
+// pemanggil lama (gambar/PDF) tidak perlu berubah.
+// Mengembalikan id item baru, atau null kalau gagal.
+function addMediaItem(username, name, images, fileName, type) {
+  const trimmedName = (name || fileName || "Media").trim();
+  if (!images || !images.length) return null;
+  const items = loadMediaItems(username);
+  const item = {
+    id: "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    name: trimmedName,
+    fileName: fileName || trimmedName,
+    images,
+    type: type || "image",
+    addedAt: new Date().toISOString(),
+  };
+  items.push(item);
+  if (!saveMediaItems(username, items)) return null;
+  return item.id;
+}
+
+function removeMediaItem(username, id) {
+  const items = loadMediaItems(username).filter((it) => it.id !== id);
+  saveMediaItems(username, items);
+}
