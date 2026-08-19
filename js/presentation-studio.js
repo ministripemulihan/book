@@ -359,6 +359,7 @@ const PresentationStudio = (() => {
         <span class="ps-file-actions">
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
+          ${isYt ? `<button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai audio latar (video disembunyikan)">🎧</button>` : ""}
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
       const countEl = row.querySelector('[data-role="count"]');
@@ -370,6 +371,11 @@ const PresentationStudio = (() => {
         else { rawPost({ type: "slide", imageUrl: url }); renderStudioPreview({ type: "slide", imageUrl: url }); }
       }
       row.querySelector('[data-act="play"]').addEventListener("click", () => stageOrSend(item.name, item.name, doSend));
+      const bgBtn = row.querySelector('[data-act="bg"]');
+      if (bgBtn) bgBtn.addEventListener("click", () => {
+        const url = images[idx];
+        if (url && typeof window.playAsYtBackground === "function") window.playAsYtBackground(url, item.name);
+      });
       const prevBtn = row.querySelector('[data-act="prev"]');
       const nextBtn = row.querySelector('[data-act="next"]');
       // ◀ ▶ pindah slide/video LANGSUNG (juga saat live di mode dual
@@ -393,15 +399,28 @@ const PresentationStudio = (() => {
         const sub = document.createElement("div");
         sub.className = "ps-yt-sublist";
         item.videoLabels.forEach((lbl, i) => {
-          const subRow = document.createElement("button");
-          subRow.type = "button";
-          subRow.className = "ps-yt-subrow";
-          subRow.innerHTML = `<span class="ps-yt-subrow-title">${i + 1}. ${escapeHtml(lbl.title || `Video ${i + 1}`)}</span>${lbl.durationLabel ? `<span class="ps-yt-subrow-dur">${escapeHtml(lbl.durationLabel)}</span>` : ""}`;
-          subRow.addEventListener("click", () => {
+          const subRow = document.createElement("div");
+          subRow.className = "ps-yt-subrow-wrap";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ps-yt-subrow";
+          btn.innerHTML = `<span class="ps-yt-subrow-title">${i + 1}. ${escapeHtml(lbl.title || `Video ${i + 1}`)}</span>${lbl.durationLabel ? `<span class="ps-yt-subrow-dur">${escapeHtml(lbl.durationLabel)}</span>` : ""}`;
+          btn.addEventListener("click", () => {
             idx = i;
             updateCount();
             stageOrSend(item.name, item.name, doSend);
           });
+          subRow.appendChild(btn);
+          const subBg = document.createElement("button");
+          subBg.type = "button";
+          subBg.className = "ps-yt-subrow-bg";
+          subBg.title = "Putar sebagai audio latar (video disembunyikan)";
+          subBg.textContent = "🎧";
+          subBg.addEventListener("click", () => {
+            const url = images[i];
+            if (url && typeof window.playAsYtBackground === "function") window.playAsYtBackground(url, lbl.title || item.name);
+          });
+          subRow.appendChild(subBg);
           sub.appendChild(subRow);
         });
         wrap.appendChild(sub);
@@ -1056,11 +1075,40 @@ const PresentationStudio = (() => {
       const id = extractYoutubeId(input.value);
       if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
       const embedUrl = buildYoutubeEmbedUrl(id);
+      const bgMode = el("psYtBgMode") && el("psYtBgMode").checked;
+      if (bgMode) {
+        // Mode "Latar suara saja": video TIDAK menggantikan tampilan
+        // ayat/pengumuman yang sedang tayang -- diputar TERSEMBUNYI di
+        // #ytBg (lihat present.html), cuma suaranya yang terdengar.
+        // Tidak lewat stageOrSend (itu untuk konten utama 1-layar-penuh);
+        // audio latar langsung dikirim, terlepas dari mode 1/dual monitor.
+        rawPost({ type: "yt_bg", embedUrl });
+        setYtBgStatus(`🎧 Latar: ${id} (tekan ▶ Play di bawah untuk mulai)`);
+        return;
+      }
       const doSend = () => { rawPost({ type: "youtube", embedUrl }); renderStudioPreview({ type: "youtube", embedUrl }); };
       stageOrSend(`▶️ YouTube: ${id}`, embedUrl, doSend);
     }
     showBtn.addEventListener("click", doShow);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doShow(); } });
+
+    function setYtBgStatus(text) {
+      const s = el("psYtBgStatus");
+      if (s) s.textContent = text;
+    }
+    if (el("psYtBgPlayBtn")) el("psYtBgPlayBtn").addEventListener("click", () => rawPost({ type: "yt_bg_control", action: "play" }));
+    if (el("psYtBgPauseBtn")) el("psYtBgPauseBtn").addEventListener("click", () => rawPost({ type: "yt_bg_control", action: "pause" }));
+    if (el("psYtBgStopBtn")) el("psYtBgStopBtn").addEventListener("click", () => {
+      rawPost({ type: "yt_bg_clear" });
+      setYtBgStatus("Belum ada audio latar yang diputar.");
+    });
+    // Dipanggil dari renderMediaList() (tombol 🎧 per item Media
+    // Tersimpan) supaya 1 cara yang sama dipakai baik untuk link baru
+    // maupun video yang sudah tersimpan.
+    window.playAsYtBackground = function playAsYtBackground(embedUrl, label) {
+      rawPost({ type: "yt_bg", embedUrl });
+      setYtBgStatus(`🎧 Latar: ${label || "video"} (tekan ▶ Play di bawah untuk mulai)`);
+    };
 
     if (addBtn) addBtn.addEventListener("click", () => {
       const id = extractYoutubeId(input.value);
