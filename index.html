@@ -591,7 +591,9 @@
     <div class="ps-topbar">
       <div class="ps-topbar-title">🎛️ Studio Presentasi</div>
       <div class="ps-topbar-status" id="psStatusText">Layar 2 belum dibuka.</div>
+      <div class="ps-topbar-clock" id="psTopbarClock">00:00:00</div>
       <div class="ps-topbar-actions">
+        <button type="button" id="psUiThemeToggle" class="ps-ui-theme-toggle" title="Ganti ke tema terang">☀️</button>
         <button type="button" id="psOpenWindowBtn" class="chip-btn small">🖥️ Buka Layar 2</button>
         <button type="button" id="psCloseStudioBtn" class="chip-btn small">✖️ Tutup Studio</button>
       </div>
@@ -684,6 +686,7 @@
           <button type="button" class="ps-tab active" data-ps-mid-tab="alkitab">📖 Alkitab</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="kidung">🎵 Kidung / Hymn</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="file">🖼️ File</button>
+          <button type="button" class="ps-tab" data-ps-mid-tab="youtube">▶️ YouTube</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="alkitab">
@@ -716,6 +719,24 @@
           <input type="file" id="psFileInput" accept=".pptx,.pdf,.jpg,.jpeg,.png,.webp,.gif" multiple hidden />
           <p class="announcement-compose-hint">ℹ️ File .pptx diubah menjadi gambar per slide saat diunggah. Bila slide punya teks yang sangat penuh, hasilnya bisa sedikit berbeda dari PowerPoint — simpan sebagai PDF lalu unggah PDF-nya untuk hasil persis sama. File .ppt lama harus disimpan sebagai .pptx atau PDF dahulu.</p>
           <div id="psFileList" class="ps-file-list"></div>
+        </div>
+
+        <div class="ps-tab-panel" data-ps-mid-panel="youtube" hidden>
+          <p class="announcement-compose-hint">Tempel link video YouTube. "▶️ Tampilkan" langsung memutar 1 video. Untuk beberapa video berurutan yang bisa dipindah pakai ◀ ▶ saat live (tersimpan di "🖼️ Media Tersimpan" kolom kiri), tambahkan ke daftar dulu lalu simpan. Khusus laptop/komputer (dual layar); tidak tersedia di HP.</p>
+          <div class="ps-yt-row">
+            <input type="text" id="psYtInput" class="columns-lang-select" placeholder="https://www.youtube.com/watch?v=..." />
+          </div>
+          <div class="ps-btn-row">
+            <button type="button" id="psYtShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psYtAddQueueBtn" class="chip-btn small">➕ Tambah ke Daftar</button>
+          </div>
+          <div class="ps-yt-hint">Mendukung link youtube.com/watch, youtu.be, dan YouTube Shorts.</div>
+
+          <div class="ps-field-label">Daftar video (urut tayang ◀ ▶)</div>
+          <div id="psYtQueueList" class="ps-file-list"><p class="present-saved-empty">Belum ada video di daftar.</p></div>
+          <div class="ps-btn-row">
+            <button type="button" id="psYtSaveQueueBtn" class="chip-btn small" disabled>💾 Simpan ke Media Tersimpan</button>
+          </div>
         </div>
       </div>
 
