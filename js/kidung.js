@@ -324,6 +324,56 @@ async function getKidungSummaryByCategory(bukuFilter) {
 }
 
 // ============================================================
+//  PENCARIAN LENGKAP (judul + ISI SYAIR/koor) — ditambahkan 20 Agu 2026
+//  atas permintaan: sebelumnya "🔍 Cari Judul" di js/kidung-ui.js cuma
+//  mencocokkan field `judul`, jadi cari kata seperti "kasih" yang ada DI
+//  DALAM syair (bukan di judul) tidak ketemu apa-apa. Fungsi ini
+//  mencocokkan query ke judul, pengarang, MAUPUN ke teks tiap baris
+//  bait/koor kidung tsb -- dipakai renderKidungSearch() di kidung-ui.js.
+//
+//  Kenapa TIDAK butuh index/struktur data baru: data Kidung sengaja
+//  kecil (~800 KB, lihat CONFIG.KIDUNG_DATA_APPROX_KB) dan SUDAH semua
+//  ada di IndexedDB lokal (LocalDB.getAllKidungRows(), tanpa perlu
+//  network sama sekali) -- jadi scan penuh semua baris tiap kali cari
+//  tetap instan (ribuan baris, bukan jutaan). Tiap baris SUDAH punya id
+//  unik (`buku + "_" + noKidung + "_" + urutan`, lihat forwardFillKidungRows/
+//  resyncKidungSheet di atas & LocalDB.open() di js/db.js) yang dipakai
+//  sebagai primary key IndexedDB + index "byBukuNo" -- itu SUDAH cukup
+//  cepat untuk kebutuhan ini, jadi TIDAK perlu nomor unik tambahan di
+//  Sheet-nya sendiri.
+//
+//  Balikan: { matches: [...meta kidung yang cocok, bentuk sama seperti
+//  getKidungList()...], total: jumlah SEMUA kidung buku ini (buat
+//  tampilan "ketemu X/Y kidung") }.
+async function searchKidungFull(query, bukuFilter) {
+  const q = String(query || "").trim().toLowerCase();
+  const list = await getKidungList(bukuFilter);
+  const total = list.length;
+  if (!q) return { matches: [], total };
+
+  const allRows = await LocalDB.getAllKidungRows();
+  // Kelompokkan baris per kidung (kunci buku+noKidung) supaya gampang
+  // dicek "ada baris yang cocok" tanpa query IndexedDB terpisah per
+  // kidung (yang lebih lambat untuk pencarian lintas semua kidung).
+  const rowsByKey = new Map();
+  allRows.forEach((r) => {
+    if (bukuFilter && r.buku !== bukuFilter) return;
+    const key = r.buku + "_" + r.noKidung;
+    if (!rowsByKey.has(key)) rowsByKey.set(key, []);
+    rowsByKey.get(key).push(r);
+  });
+
+  const matches = list.filter((k) => {
+    if ((k.judul || "").toLowerCase().includes(q)) return true;
+    if ((k.pengarang || "").toLowerCase().includes(q)) return true;
+    const rows = rowsByKey.get(k.buku + "_" + k.noKidung) || [];
+    return rows.some((r) => (r.teks || "").toLowerCase().includes(q));
+  });
+
+  return { matches, total };
+}
+
+// ============================================================
 //  BAGIKAN (SHARE) 1 KIDUNG UTUH — §8 Rancangan_Fitur_Kidung.docx.
 //  Beda dari mode tampil slide (splitKidungIntoSlides di atas, yang
 //  hanya menampilkan koor bait TERAKHIR per slide supaya tidak
