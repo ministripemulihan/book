@@ -861,7 +861,7 @@ async function syncFromServer(isFirstTime) {
   setLoadingText(
     isFirstTime
       ? `Mengunduh data awal (${dlInfo.label}) dari server — hanya sekali ini saja, mohon tunggu…`
-      : "Menyinkronkan ulang data Alkitab dari server…"
+      : `Menyinkronkan ulang data Alkitab dari server… (${dlInfo.label})`
   );
   setLoadingProgress(1);
 
