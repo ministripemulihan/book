@@ -134,14 +134,60 @@ function kidungAlkitabButton() {
   return btn;
 }
 
+// Kontrol ukuran huruf "A- / A+" KHUSUS supaya tetap kelihatan di HP
+// walau tombol yang sama di header (id="fontSizeControl") sengaja
+// disembunyikan di layar sempit (<600px, lihat css/style.css) --
+// pola SAMA PERSIS seperti "#searchFontSizeControl" yang sudah ada di
+// panel hasil pencarian Alkitab (index.html + initFontSizeControl() di
+// js/app.js), supaya perilakunya konsisten satu app. PENTING: tombol
+// ini TIDAK butuh CSS variable baru -- ukuran teks Kidung (.kidung-verse
+// & .kidung-koor di css/style.css) MEMANG SUDAH memakai
+// `var(--verse-font-size)` yang SAMA dengan Alkitab sejak awal, jadi
+// begitu diklik di sini pun teks Kidung ikut membesar/mengecil, dan
+// ukurannya SAMA dengan ukuran huruf ayat Alkitab (1 pengaturan untuk
+// semua, tersimpan lewat CONFIG.FONT_SIZE_STORAGE_KEY) -- klik di
+// Alkitab lalu buka Kidung (atau sebaliknya) akan tetap ukuran yang
+// sama, tidak perlu diatur ulang.
+function kidungFontSizeControl() {
+  const wrap = document.createElement("div");
+  wrap.className = "font-size-control search-font-size-control kidung-font-size-control";
+  const decBtn = document.createElement("button");
+  decBtn.type = "button";
+  decBtn.className = "icon-btn font-btn";
+  decBtn.title = "Perkecil huruf syair Kidung";
+  decBtn.setAttribute("aria-label", "Perkecil huruf syair Kidung");
+  decBtn.textContent = "A-";
+  const incBtn = document.createElement("button");
+  incBtn.type = "button";
+  incBtn.className = "icon-btn font-btn";
+  incBtn.title = "Perbesar huruf syair Kidung";
+  incBtn.setAttribute("aria-label", "Perbesar huruf syair Kidung");
+  incBtn.textContent = "A+";
+  decBtn.addEventListener("click", () => {
+    if (typeof applyFontSize !== "function") return;
+    const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+    applyFontSize(current - CONFIG.FONT_SIZE_STEP);
+  });
+  incBtn.addEventListener("click", () => {
+    if (typeof applyFontSize !== "function") return;
+    const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+    applyFontSize(current + CONFIG.FONT_SIZE_STEP);
+  });
+  wrap.appendChild(decBtn);
+  wrap.appendChild(incBtn);
+  return wrap;
+}
+
 // Baris atas standar tiap layar Kidung: "← Kembali" (opsional, kosongkan
 // `onBack` untuk layar paling depan yang tidak punya "atas"-nya lagi di
-// dalam Kidung) + "📖 Alkitab" (selalu ada, di SEMUA layar Kidung).
+// dalam Kidung) + "📖 Alkitab" (selalu ada, di SEMUA layar Kidung) +
+// A-/A+ (selalu ada juga -- lihat kidungFontSizeControl() di atas).
 function kidungTopRow(onBack) {
   const row = document.createElement("div");
   row.className = "kidung-top-row";
   if (onBack) row.appendChild(kidungBackButton(onBack));
   row.appendChild(kidungAlkitabButton());
+  row.appendChild(kidungFontSizeControl());
   return row;
 }
 
@@ -317,9 +363,19 @@ async function renderKidungList(bukuFilter) {
   panel.appendChild(box);
 }
 
-async function renderKidungSearch() {
+// UPDATE (20 Agu 2026, permintaan lanjutan #2): sekarang menerima 2
+// parameter OPSIONAL supaya layar ini bisa "dipulihkan" persis seperti
+// sebelumnya saat pengguna menekan "← Kembali" dari layar baca kidung
+// yang dibuka lewat hasil pencarian ini (lihat kidungSearchReturn_ &
+// openKidungReader() di bawah) -- `presetBuku` menimpa kidungCurrentBuku
+// (kalau diisi), `presetQuery` mengisi kotak ketik otomatis lalu
+// langsung menjalankan pencarian yang sama lagi, jadi hasilnya
+// (termasuk hitungan "X/Y") langsung tampil lagi tanpa pengguna perlu
+// mengetik ulang.
+async function renderKidungSearch(presetBuku, presetQuery) {
   const panel = el("kidungPanel");
   if (!panel) return;
+  if (presetBuku) kidungCurrentBuku = presetBuku;
   panel.innerHTML = "";
   panel.appendChild(kidungTopRow(() => renderKidungHome()));
 
@@ -338,6 +394,7 @@ async function renderKidungSearch() {
   input.type = "text";
   input.placeholder = "Ketik judul atau kata dalam syair (mis. \"kasih\")…";
   input.className = "kidung-search-input";
+  if (presetQuery) input.value = presetQuery;
   panel.appendChild(input);
 
   const countLabel = document.createElement("p");
@@ -382,12 +439,36 @@ async function renderKidungSearch() {
       resultsBox.appendChild(p);
       return;
     }
+    // UPDATE (20 Agu 2026, permintaan lanjutan #2): dulu tiap baris hasil
+    // cuma menampilkan JUDUL, walau yang cocok kata itu ada di DALAM
+    // syairnya -- jadi pengguna tidak tahu bagian mana yang cocok tanpa
+    // membuka satu-satu. Sekarang kalau ketemunya di syair/koor
+    // (k.snippet terisi, lihat searchKidungFull()), baris hasil
+    // menampilkan No. kidung + label bait/koor + POTONGAN teks 2 kata
+    // sebelum & sesudah kata yang dicari (kata yang dicari digarisbawahi
+    // kuning lewat <mark>) -- kalau yang cocok cuma judul/pengarang,
+    // tetap tampil format lama (No. — Judul).
     matches.slice(0, 100).forEach((k) => {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "kidung-list-item";
-      item.textContent = k.buku + " " + formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
-      item.addEventListener("click", () => openKidungReader(k.buku, k.noKidung));
+      const noLabel = k.buku + " " + formatKidungNo(k.buku, k.noKidung);
+      if (k.snippet) {
+        item.innerHTML =
+          "<strong>" + escapeHtml(noLabel) + "</strong>" +
+          (k.snippetBaitLabel ? ' <span class="kidung-search-baitlabel">(' + escapeHtml(k.snippetBaitLabel) + ")</span>" : "") +
+          '<br><span class="kidung-search-snippet">' + highlightKidungQuery(k.snippet, q) + "</span>";
+      } else {
+        item.innerHTML = "<strong>" + escapeHtml(noLabel) + "</strong> — " + escapeHtml(k.judul || "");
+      }
+      // Simpan konteks pencarian ini (buku + kata kunci yang sedang
+      // diketik SAAT INI diklik) supaya kalau nanti pengguna menekan
+      // "← Kembali" dari layar baca kidung, bisa balik ke SINI lagi
+      // dengan hasil yang sama persis (lihat openKidungReader() di
+      // bawah & kidungTopRow di renderKidungReader()).
+      item.addEventListener("click", () => {
+        openKidungReader(k.buku, k.noKidung, { type: "search", buku: bukuFilter, query: input.value.trim() });
+      });
       resultsBox.appendChild(item);
     });
     if (matches.length > 100) {
@@ -397,11 +478,31 @@ async function renderKidungSearch() {
     }
   }
   input.addEventListener("input", runSearch);
-  runSearch(); // tampilkan daftar semua kidung dulu, sebelum ada ketikan
-  input.focus();
+  runSearch(); // tampilkan daftar semua kidung dulu, sebelum ada ketikan (atau hasil preset kalau dipulihkan dari "← Kembali")
+  if (!presetQuery) input.focus(); // jangan rebut fokus kalau baru dipulihkan (supaya tidak langsung buka keyboard HP)
 }
 
-async function openKidungReader(buku, no) {
+// Bungkus teks snippet (SUDAH di-escape lewat escapeHtml di dalam sini)
+// dengan <mark> di kemunculan PERTAMA kata yang dicari (tidak peka huruf
+// besar/kecil) -- dipakai runSearch() di atas untuk menyorot kata yang
+// ketemu di tengah potongan syair.
+function highlightKidungQuery(text, q) {
+  const escaped = escapeHtml(text || "");
+  if (!q) return escaped;
+  const qEsc = escapeHtml(q);
+  const idx = escaped.toLowerCase().indexOf(qEsc.toLowerCase());
+  if (idx === -1) return escaped;
+  return escaped.slice(0, idx) + "<mark>" + escaped.slice(idx, idx + qEsc.length) + "</mark>" + escaped.slice(idx + qEsc.length);
+}
+
+// `backCtx` (OPSIONAL) menentukan ke mana tombol "← Kembali" di layar
+// baca ini mengarah: kosongkan untuk balik ke layar depan Kidung
+// (perilaku lama), atau isi { type: "search", buku, query } supaya
+// balik ke hasil pencarian yang sama persis (lihat renderKidungSearch()
+// di atas) -- diteruskan juga ke tombol ⬅️/➡️ next/prev di toolbar
+// (buildKidungToolbar() di bawah) supaya konteks "asal dari pencarian
+// ini" tidak hilang walau pengguna geser beberapa nomor kidung dulu.
+async function openKidungReader(buku, no, backCtx) {
   const panel = el("kidungPanel");
   if (!panel) return;
   panel.hidden = false;
@@ -444,15 +545,26 @@ async function openKidungReader(buku, no) {
   }
 
   kidungCurrentBuku = buku;
-  renderKidungReader(result.meta || { buku, noKidung: no, judul: "" }, result.baits);
+  renderKidungReader(result.meta || { buku, noKidung: no, judul: "" }, result.baits, backCtx);
 }
 
-function renderKidungReader(meta, baits) {
+// Bangun callback "← Kembali" yang sesuai dari `backCtx` (lihat
+// openKidungReader() di atas) -- dipakai renderKidungReader() &
+// diteruskan ke buildKidungToolbar() supaya tombol ⬅️/➡️ juga ikut
+// membawa konteks yang sama.
+function kidungBackTarget(backCtx) {
+  if (backCtx && backCtx.type === "search") {
+    return () => renderKidungSearch(backCtx.buku, backCtx.query);
+  }
+  return () => renderKidungHome();
+}
+
+function renderKidungReader(meta, baits, backCtx) {
   const panel = el("kidungPanel");
   if (!panel) return;
   panel.innerHTML = "";
 
-  panel.appendChild(kidungTopRow(() => renderKidungHome()));
+  panel.appendChild(kidungTopRow(kidungBackTarget(backCtx)));
 
   const header = document.createElement("div");
   header.className = "kidung-reader-header";
@@ -481,7 +593,7 @@ function renderKidungReader(meta, baits) {
   });
   panel.appendChild(body);
 
-  panel.appendChild(buildKidungToolbar(meta, baits));
+  panel.appendChild(buildKidungToolbar(meta, baits, backCtx));
 }
 
 // ------------------------------------------------------------
@@ -497,7 +609,7 @@ function renderKidungReader(meta, baits) {
 // syair saat sedang dibaca/dinyanyikan (lihat .kidung-toolbar di
 // css/style.css, jadi sticky di bagian bawah layar khusus di lebar HP).
 // ------------------------------------------------------------
-function buildKidungToolbar(meta, baits) {
+function buildKidungToolbar(meta, baits, backCtx) {
   const wrap = document.createElement("div");
   wrap.className = "kidung-toolbar";
 
@@ -528,7 +640,7 @@ function buildKidungToolbar(meta, baits) {
   prevBtn.title = "Kidung nomor sebelumnya";
   prevBtn.setAttribute("aria-label", "Kidung nomor sebelumnya");
   prevBtn.disabled = isNaN(noInt) || noInt <= 1;
-  prevBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt - 1)));
+  prevBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt - 1), backCtx));
 
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
@@ -537,7 +649,7 @@ function buildKidungToolbar(meta, baits) {
   nextBtn.title = "Kidung nomor selanjutnya";
   nextBtn.setAttribute("aria-label", "Kidung nomor selanjutnya");
   nextBtn.disabled = isNaN(noInt);
-  nextBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt + 1)));
+  nextBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt + 1), backCtx));
 
   navRow.appendChild(prevBtn);
   navRow.appendChild(buildKidungCopyButton(meta, baits));
