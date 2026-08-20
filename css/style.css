@@ -1753,6 +1753,13 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   padding-bottom: 18px;
   border-bottom: 1px dashed var(--rule);
 }
+/* Dipasang sesaat sebelum tahu baris "📌 Pokok" dkk akhirnya terisi
+   tombol atau kosong sama sekali (lihat renderChapterPickerExtraReserved
+   di js/app.js) -- mencadangkan tinggi satu baris tombol dari awal,
+   supaya grid nomor pasal di bawahnya (yang sudah tampil duluan, tidak
+   menunggu baris ini) tidak pernah ikut bergeser turun kalau baris ini
+   ternyata terisi belakangan. */
+.chapter-picker-extra--reserved { min-height: 40px; }
 .chapter-picker-loading {
   margin: 0; font-size: 0.85rem; color: var(--ink-muted, #8a8272); font-style: italic;
 }
