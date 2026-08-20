@@ -1043,7 +1043,7 @@ function updateLevelGatedMenus() {
 // Curhat, AI Chat, serta highlight/catatan per-ayat (tombol nomor ayat) --
 // lihat buildVerseBlock().
 // ------------------------------------------------------------
-const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "curhatBtn", "aiChatBtn"];
+const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "curhatBtn", "aiChatBtn", "kidungMenuBtn"];
 
 function applyGuestModeUi() {
   const guest = !!(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest());
@@ -5054,6 +5054,7 @@ function hideAllPanels() {
   if (el("announcementPanel")) el("announcementPanel").hidden = true;
   if (el("notesPanel")) el("notesPanel").hidden = true;
   if (el("collectionsPanel")) el("collectionsPanel").hidden = true;
+  if (el("kidungPanel")) el("kidungPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
   if (el("curhatPanel")) el("curhatPanel").hidden = true;
@@ -6135,6 +6136,23 @@ function initUIEvents() {
     el("collectionsMenuBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
       showCollectionsPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("kidungMenuBtn")) {
+    el("kidungMenuBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showKidungPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  // Jalan pintas header (☝️ lihat index.html #kidungHeaderBtn) -- perilaku
+  // sama persis dengan kidungMenuBtn di atas, cuma 1 sentuh lebih dekat
+  // (tidak perlu buka menu "⋮" dulu), sama untuk HP maupun komputer.
+  if (el("kidungHeaderBtn")) {
+    el("kidungHeaderBtn").addEventListener("click", () => {
+      if (el("moreMenu")) el("moreMenu").hidden = true;
+      showKidungPanel();
       closeSidebarOnMobile();
     });
   }
