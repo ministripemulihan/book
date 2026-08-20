@@ -395,6 +395,7 @@ function buildKidungToolbar(meta, baits) {
   nextBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt + 1)));
 
   navRow.appendChild(prevBtn);
+  navRow.appendChild(buildKidungCopyButton(meta, baits));
   navRow.appendChild(buildKidungShareButton(meta, baits));
   navRow.appendChild(nextBtn);
   body.appendChild(navRow);
