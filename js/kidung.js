@@ -1,5 +1,5 @@
 // ============================================================
-//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG. 
+//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG.
 //  KIDUNG_SHEET_CSV_URL di js/config.js), disimpan lokal di IndexedDB
 //  (store "kidung", lihat js/db.js), lalu dibaca ulang dari sini
 //  tanpa perlu internet lagi -- pola SAMA PERSIS seperti Alkitab
@@ -345,11 +345,19 @@ async function getKidungSummaryByCategory(bukuFilter) {
 //  Balikan: { matches: [...meta kidung yang cocok, bentuk sama seperti
 //  getKidungList()...], total: jumlah SEMUA kidung buku ini (buat
 //  tampilan "ketemu X/Y kidung") }.
+//
+//  UPDATE (20 Agu 2026, permintaan lanjutan): query KOSONG sekarang
+//  mengembalikan SEMUA kidung buku ini (matches = list lengkap, urut
+//  nomor -- sudah begitu dari getKidungList()) alih-alih daftar kosong
+//  seperti sebelumnya. Ini supaya layar "🔍 Cari" bisa langsung
+//  menampilkan SEMUA kidung dulu (list panjang ke bawah) sebelum
+//  pengguna mengetik apa pun -- diminta karena sebelumnya layar
+//  pencarian tampak kosong melompong sampai ada ketikan.
 async function searchKidungFull(query, bukuFilter) {
   const q = String(query || "").trim().toLowerCase();
   const list = await getKidungList(bukuFilter);
   const total = list.length;
-  if (!q) return { matches: [], total };
+  if (!q) return { matches: list, total };
 
   const allRows = await LocalDB.getAllKidungRows();
   // Kelompokkan baris per kidung (kunci buku+noKidung) supaya gampang
