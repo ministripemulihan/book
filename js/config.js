@@ -118,8 +118,8 @@ const CONFIG = {
     { code: "kjv", label: "Inggris (King James)" },
     { code: "eng", label: "Inggris (English)" },
     { code: "rveng", label: "Inggris (Recovery)" },
-    { code: "chs", label: "Tionghoa (中文)" },
-    { code: "chssmp", label: "Tionghoa Sederhana" },
+    { code: "chs", label: "Mandarin (中文)" },
+    { code: "chssmp", label: "Mandarin Sederhana (简体中文)" },
     { code: "jawa", label: "Jawa (Perjanjian Baru)" },
   ],
   DEFAULT_LANGUAGE: "ind",
@@ -158,9 +158,25 @@ const CONFIG = {
   // DB_VERSION dinaikkan (dari versi sebelumnya) supaya store "users" baru
   // otomatis ditambahkan tanpa menghapus data Alkitab yang sudah tersimpan.
   DB_NAME: "bible_local_db",
-  DB_VERSION: 2,
+  // v3 (20 Agu 2026): menambah store "studioMedia" -- pindahan "Media
+  // Tersimpan" (gambar/PDF-jadi-gambar/daftar YouTube) dari localStorage
+  // ke IndexedDB. Sebabnya: localStorage total per origin biasanya cuma
+  // ~5-10MB (SEMUA key digabung), sedangkan 1 file PDF hasil render jadi
+  // gambar (skala 2x, base64) gampang > 10MB walau file aslinya cuma
+  // beberapa MB -- itu kenapa muncul "penyimpanan perangkat penuh" padahal
+  // batas upload di UI ditulis 25MB (itu cuma batas ukuran file ASLI yang
+  // diunggah, bukan batas hasil render/penyimpanannya). IndexedDB tidak
+  // punya batas sekecil itu (umumnya ratusan MB - beberapa GB tergantung
+  // browser/disk kosong), jadi masalah ini hilang dengan pindah ke sini.
+  DB_VERSION: 4,
   STORE_NAME: "verses",
   USERS_STORE_NAME: "users",
+  MEDIA_STORE_NAME: "studioMedia",
+  // v4 (20 Agu 2026): menambah store "kidung" -- teks Kidung/Hymn (lihat
+  // js/kidung.js). Dipilih IndexedDB juga (bukan localStorage seperti
+  // js/outlines.js) supaya bisa diindeks per no_kidung untuk pencarian
+  // cepat & konsisten dengan pola store lain di sini.
+  KIDUNG_STORE_NAME: "kidung",
 
   // ----------------------------------------------------------
   // 4) UKURAN HURUF AYAT (tombol A- / A+ di header)
@@ -235,6 +251,46 @@ const CONFIG = {
     // Kolom: Book Number | Book Name | Link Peta/Gambar (Google Drive)
     petaGambarCsvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSl5CNXQb3q5wMaTF7egAzlAhYtyvX30x2NtlsWiT4mtOfvpKimM61RYWHK81jgwjJZ0oy-Mbrwbv8v/pub?output=csv",
   },
+
+  // ----------------------------------------------------------
+  // 7b) KIDUNG / HYMN — Google Sheet TERPISAH (bukan sheet Alkitab)
+  // ----------------------------------------------------------
+  // Sama pola-nya dengan BIBLE_SHEET_CSV_URL di atas -- Publish to web >
+  // CSV, dibaca read-only oleh app (BUKAN Apps Script -- data ini
+  // diisi/diedit admin langsung di Sheet-nya, app cuma baca & cache
+  // lokal). Kalau nanti butuh fitur EDIT LANGSUNG dari dalam app (mis.
+  // benerin typo tanpa buka Sheet), itu perlu endpoint Apps Script
+  // terpisah (pola sama seperti apps-script/Code.gs) -- BELUM dibuat,
+  // lihat catatan di js/kidung.js.
+  //
+  // Format kolom (1 baris = 1 bait ATAU 1 koor):
+  //   no_kidung | judul | pengarang | kategori | urutan | jenis | no_bait | teks | koor_group
+  // - no_kidung : nomor kidung, WAJIB diisi di SETIAP baris (bahkan yang
+  //               judul/pengarang/kategori-nya dikosongkan karena sudah
+  //               ditulis di baris pertama kidung itu).
+  // - judul/pengarang/kategori : cukup diisi di baris PERTAMA tiap
+  //               kidung; baris berikutnya boleh dikosongkan (otomatis
+  //               "ikut" nilai terakhir yang terisi -- lihat
+  //               forwardFillKidungRows() di js/kidung.js).
+  // - urutan    : urutan baris DI DALAM kidung itu (1, 2, 3, ... apa
+  //               adanya sesuai baris di Sheet -- termasuk baris koor).
+  // - jenis     : "bait" atau "koor".
+  // - no_bait   : nomor bait (1, 2, 3, ...) -- KOSONGKAN untuk baris
+  //               jenis "koor".
+  // - teks      : isi bait/koor.
+  // - koor_group: penanda kelompok koor (mis. "K1", "K2") -- baris bait
+  //               & baris koor yang SATU KELOMPOK dikasih kode yang
+  //               SAMA, supaya kidung yang punya lebih dari 1 koor (mis.
+  //               bait 1-4 pakai koor pertama, bait 5-7 pakai koor
+  //               kedua) tetap bisa dipetakan dengan benar. Bait yang
+  //               TIDAK pakai koor sama sekali -> kosongkan kolom ini.
+  KIDUNG_SHEET_CSV_URL: "",
+
+  // Perkiraan ukuran (KB) data Kidung -- HANYA untuk teks info di layar
+  // sinkron, tidak wajib akurat (beda dengan BIBLE_DATA_APPROX_SIZE_MB
+  // yang punya mekanisme ukur-otomatis; data Kidung jauh lebih kecil
+  // jadi tidak perlu progress bar rumit).
+  KIDUNG_DATA_APPROX_KB: 800,
 
   // ----------------------------------------------------------
   // 8) PENGETAHUAN TAMBAHAN AI CHAT (istilah/kategori & topik) -- OPSIONAL
