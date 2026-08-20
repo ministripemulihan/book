@@ -238,6 +238,79 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
    CATATAN SAYA
    ============================================================ */
 .notes-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
+
+/* ---------------- 🎵 Kidung (menu utama, js/kidung-ui.js) ---------------- */
+.kidung-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
+.kidung-book-toggle { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.kidung-book-toggle-btn {
+  padding: 8px 16px; border-radius: 999px; border: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink-soft); font-size: 0.95rem; cursor: pointer;
+}
+.kidung-book-toggle-btn.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+.kidung-number-form { display: flex; gap: 8px; margin-bottom: 14px; max-width: 320px; }
+.kidung-number-input, .kidung-search-input {
+  flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink); font-size: 1rem;
+}
+.kidung-search-input { max-width: 320px; margin-bottom: 14px; display: block; }
+.kidung-icons-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.kidung-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-width: 520px; }
+.kidung-list-item {
+  text-align: left; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink); cursor: pointer; font-size: 0.95rem;
+}
+.kidung-list-item:hover { border-color: var(--petrol); color: var(--petrol); }
+.kidung-reader-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.kidung-reader-header { margin-bottom: 16px; font-family: var(--font-display); }
+.kidung-reader-header div:first-child { font-size: 1.1rem; color: var(--ink-soft); }
+.kidung-reader-header div:nth-child(2) { font-size: 1.4rem; font-weight: 700; margin: 4px 0; }
+.kidung-reader-body { max-width: 640px; line-height: 1.7; }
+.kidung-verse { margin: 0 0 10px; }
+.kidung-koor { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--brass); color: var(--ink-soft); }
+.kidung-reader-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; max-width: 400px; }
+
+/* Baris atas standar di semua layar Kidung: "← Kembali" (kalau ada) +
+   "📖 Alkitab" (selalu ada -- lihat kidungTopRow() di js/kidung-ui.js). */
+.kidung-top-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.kidung-alkitab-btn { border-color: var(--petrol); color: var(--petrol); }
+.kidung-alkitab-btn:hover { background: var(--petrol); color: #fff; }
+
+/* Toolbar bawah layar baca Kidung: panah sebelumnya/sesudahnya + bagikan
+   + pemutar MP3/MP4/YouTube, bisa disembunyikan/ditampilkan lewat tombol
+   "▾/▸ Tombol" (lihat buildKidungToolbar() di js/kidung-ui.js) supaya
+   tidak terus menutupi syair saat sedang dibaca/dinyanyikan, terutama
+   di layar HP yang sempit. */
+.kidung-toolbar { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.kidung-toolbar-toggle {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 10px; padding: 6px 14px;
+  border-radius: 999px; border: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink-soft);
+  font-family: var(--font-ui); font-size: 13px; cursor: pointer;
+}
+.kidung-toolbar-toggle:hover { border-color: var(--petrol); color: var(--petrol); }
+.kidung-toolbar-body { display: flex; flex-direction: column; gap: 12px; }
+.kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
+.kidung-toolbar-nav { display: flex; align-items: center; gap: 14px; }
+.kidung-nav-btn { font-size: 19px; }
+.kidung-toolbar-midi { display: flex; }
+
+@media (max-width: 640px) {
+  /* Di HP, toolbar menempel di bawah layar (bukan ikut men-scroll
+     bersama syair) supaya panah/bagikan/putar selalu terjangkau tanpa
+     harus gulung ke bawah dulu -- tombol "▾/▸ Tombol" tetap bisa
+     menyembunyikannya kalau dianggap mengganggu bacaan. */
+  .kidung-toolbar {
+    position: sticky; bottom: 0;
+    background: var(--paper);
+    margin-left: -14px; margin-right: -14px; margin-bottom: -14px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 10px rgba(0,0,0,.10);
+    border-radius: 14px 14px 0 0;
+    z-index: 5;
+  }
+  .kidung-toolbar-toggle { width: 100%; justify-content: center; margin-bottom: 8px; }
+}
 .notes-menu-list { display: flex; flex-direction: column; gap: 10px; }
 .notes-menu-item .result-item { width: 100%; text-align: left; }
 
@@ -1041,7 +1114,7 @@ input { font-family: inherit; }
 }
 .chapter-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: 8px;
+  gap: 8px; margin-top: 4px;
 }
 .chapter-grid button {
   aspect-ratio: 1; border: 1px solid var(--rule); background: var(--paper-raised);
@@ -1675,10 +1748,18 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    POKOK KITAB / GARIS BESAR (nested) / PETA+GAMBAR
    ============================================================ */
 .chapter-picker-extra {
-  display: flex; flex-wrap: wrap; gap: 8px;
-  margin: 4px 0 16px;
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 4px 0 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed var(--rule);
 }
-.book-info-btn { border-color: var(--petrol); color: var(--petrol); }
+.chapter-picker-loading {
+  margin: 0; font-size: 0.85rem; color: var(--ink-muted, #8a8272); font-style: italic;
+}
+.book-info-btn {
+  border-color: var(--petrol); color: var(--petrol);
+  min-height: 40px; padding: 8px 14px !important; font-size: 0.9rem !important;
+}
 .book-info-btn:hover { background: var(--petrol); color: #fff; }
 
 .book-info-panel { max-width: 720px; margin: 0 auto; }
