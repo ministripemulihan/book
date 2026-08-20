@@ -6,8 +6,12 @@
 //  (js/csv.js: normalizeVerseRecord + js/app.js: syncFromServer()),
 //  hanya jauh lebih ringan karena datanya jauh lebih kecil.
 //
-//  STATUS (20 Agu 2026): loader + parser SELESAI (file ini + fungsi
-//  normalizeKidungRecord() di js/csv.js + store "kidung" di js/db.js).
+//  STATUS (20 Agu 2026): loader + parser SELESAI, DIPERLUAS hari ini
+//  mengikuti kolom final di rancangan_Kidung.xlsx -- sekarang menangkap
+//  `buku` (Kidung/Suplemen, 1 sheet sama), `tags` (SPR/Pemuda/Remaja/
+//  Anak/Gugus/Injil/Sehari-hari), & 5 link media (mp3×2/video/youtube/
+//  midi) per kidung. Mesin pemecah bait->slide (splitKidungIntoSlides)
+//  & ringkasan per kategori juga sudah ada.
 //  BELUM ada:
 //   - Tab "🎵 Kidung/Hymn" di Studio Presentasi (UI pemilihan kidung +
 //     mode tampilan slide) -- lihat rencana di komentar bawah.
@@ -34,8 +38,11 @@
 // ============================================================
 
 // Nama field IndexedDB (lihat CONFIG.KIDUNG_STORE_NAME di js/db.js):
-// { id, noKidung, judul, pengarang, kategori, urutan, jenis, noBait, teks, koorGroup }
-// `id` = noKidung + "_" + urutan (unik per baris di dalam 1 kidung).
+// { id, buku, noKidung, judul, pengarang, birama, kategori, tags, urutan,
+//   jenis, noBait, teks, koorGroup, linkMp3_1, linkMp3_2, linkVideo,
+//   linkYoutube, linkMidi }
+// `id` = buku + "_" + noKidung + "_" + urutan (unik per baris, termasuk
+// lintas-buku -- Kidung No.95 & Suplemen No.95 tidak akan bentrok).
 
 // Baris ke-2 dst tiap kidung sengaja mengosongkan judul/pengarang/
 // kategori di Sheet (lihat contoh rancangan_Kidung.xlsx) -- fungsi ini
@@ -43,18 +50,31 @@
 // berikutnya YANG MASIH no_kidung SAMA. Dipanggil SEKALI setelah semua
 // baris CSV selesai di-parse (urutan baris CSV harus apa adanya, belum
 // diacak) -- lihat resyncKidungSheet() di bawah.
+// Ikut diperluas untuk `buku`, `tags`, & 5 kolom link media -- di contoh
+// rancangan_Kidung.xlsx kolom tag (SPR/Pemuda/dst) diisi di SETIAP baris
+// (bukan cuma baris pertama), jadi forward-fill di sini murni JAGA-JAGA
+// kalau suatu saat operator sheet cuma mengisi baris pertama saja seperti
+// judul/pengarang/kategori -- tidak menimpa nilai yang memang sudah diisi.
 function forwardFillKidungRows(rows) {
-  let last = { noKidung: null, judul: "", pengarang: "", kategori: "" };
+  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", kategori: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "" };
   return rows.map((r) => {
-    if (r.noKidung !== last.noKidung) {
+    if (r.noKidung !== last.noKidung || r.buku !== last.buku) {
       // Kidung baru mulai -- reset "ingatan" forward-fill supaya tidak
-      // ketularan judul/pengarang/kategori kidung sebelumnya kalau baris
-      // pertama kidung baru ini entah kenapa kosong juga.
-      last = { noKidung: r.noKidung, judul: r.judul, pengarang: r.pengarang, kategori: r.kategori };
+      // ketularan metadata kidung sebelumnya kalau baris pertama kidung
+      // baru ini entah kenapa kosong juga.
+      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, kategori: r.kategori, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi };
     } else {
+      if (!r.buku || r.buku === "Kidung") r.buku = last.buku; else last.buku = r.buku;
       if (!r.judul) r.judul = last.judul; else last.judul = r.judul;
       if (!r.pengarang) r.pengarang = last.pengarang; else last.pengarang = r.pengarang;
+      if (!r.birama) r.birama = last.birama; else last.birama = r.birama;
       if (!r.kategori) r.kategori = last.kategori; else last.kategori = r.kategori;
+      if (!r.tags || !r.tags.length) r.tags = last.tags; else last.tags = r.tags;
+      if (!r.linkMp3_1) r.linkMp3_1 = last.linkMp3_1; else last.linkMp3_1 = r.linkMp3_1;
+      if (!r.linkMp3_2) r.linkMp3_2 = last.linkMp3_2; else last.linkMp3_2 = r.linkMp3_2;
+      if (!r.linkVideo) r.linkVideo = last.linkVideo; else last.linkVideo = r.linkVideo;
+      if (!r.linkYoutube) r.linkYoutube = last.linkYoutube; else last.linkYoutube = r.linkYoutube;
+      if (!r.linkMidi) r.linkMidi = last.linkMidi; else last.linkMidi = r.linkMidi;
     }
     return r;
   });
@@ -77,7 +97,7 @@ async function resyncKidungSheet() {
   const rawRows = parseCSV(csvText).map(normalizeKidungRecord).filter((r) => r.noKidung);
   const rows = forwardFillKidungRows(rawRows).map((r) => ({
     ...r,
-    id: r.noKidung + "_" + r.urutan,
+    id: r.buku + "_" + r.noKidung + "_" + r.urutan,
   }));
 
   await LocalDB.clearKidung();
@@ -86,31 +106,67 @@ async function resyncKidungSheet() {
   return rows.length;
 }
 
-// Daftar ringkas SEMUA kidung (1 entri per no_kidung, bukan per baris) --
-// buat menu pemilihan/pencarian nanti di tab Kidung Studio Presentasi.
-// { noKidung, judul, pengarang, kategori, jumlahBait }
-async function getKidungList() {
+// Daftar ringkas SEMUA kidung (1 entri per buku+no_kidung, bukan per baris)
+// -- buat menu pemilihan/pencarian nanti di tab Kidung Studio Presentasi.
+// `bukuFilter` opsional ("Kidung"/"Suplemen"/dst) -- kosongkan untuk semua
+// buku sekaligus (dipakai pencarian/ringkasan lintas buku).
+// { buku, noKidung, judul, pengarang, kategori, tags, jumlahBait,
+//   linkMp3_1, linkMp3_2, linkVideo, linkYoutube, linkMidi }
+async function getKidungList(bukuFilter) {
   const all = await LocalDB.getAllKidungRows();
   const map = new Map();
   all.forEach((r) => {
-    if (!map.has(r.noKidung)) {
-      map.set(r.noKidung, { noKidung: r.noKidung, judul: r.judul, pengarang: r.pengarang, kategori: r.kategori, jumlahBait: 0 });
+    if (bukuFilter && r.buku !== bukuFilter) return;
+    const key = r.buku + "_" + r.noKidung;
+    if (!map.has(key)) {
+      map.set(key, {
+        buku: r.buku, noKidung: r.noKidung, judul: r.judul, pengarang: r.pengarang, birama: r.birama || "",
+        kategori: r.kategori, tags: r.tags || [], jumlahBait: 0,
+        linkMp3_1: r.linkMp3_1 || "", linkMp3_2: r.linkMp3_2 || "", linkVideo: r.linkVideo || "",
+        linkYoutube: r.linkYoutube || "", linkMidi: r.linkMidi || "",
+      });
     }
-    if (r.jenis === "bait") map.get(r.noKidung).jumlahBait++;
+    if (r.jenis === "bait") map.get(key).jumlahBait++;
   });
-  // Urut oleh nomor kidung secara numerik kalau bisa (bukan alfabetis --
-  // "10" tidak boleh muncul sebelum "2").
+  // Urut oleh buku dulu, baru nomor kidung secara numerik kalau bisa
+  // ("10" tidak boleh muncul sebelum "2").
   return Array.from(map.values()).sort((a, b) => {
+    if (a.buku !== b.buku) return String(a.buku).localeCompare(String(b.buku));
     const na = parseInt(a.noKidung, 10), nb = parseInt(b.noKidung, 10);
     if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
     return String(a.noKidung).localeCompare(String(b.noKidung));
   });
 }
 
+// Semua daftar BUKU yang sungguh dipakai di Sheet (mis. ["Kidung"] saja
+// selama Suplemen belum ditambahkan, otomatis jadi ["Kidung","Suplemen"]
+// begitu kolom `buku` diisi "Suplemen" di baris manapun) -- dipakai
+// tombol pilih Kidung/Suplemen di keypad, TIDAK di-hardcode supaya
+// otomatis ikut kalau nanti ditambah buku lain (mis. "Kidung Anak").
+async function getKidungBooks() {
+  const list = await getKidungList();
+  const set = new Set();
+  list.forEach((k) => set.add(k.buku || "Kidung"));
+  return Array.from(set).sort();
+}
+
+// Semua tag pemakaian yang sungguh dipakai (SPR/Pemuda/Remaja/Anak/
+// Gugus/Injil/Sehari-hari, atau tag baru apa pun yang ditambah di Sheet)
+// -- dipakai untuk daftar filter, dihitung dari data supaya otomatis
+// ikut kalau nanti ada tag baru.
+async function getKidungTags() {
+  const list = await getKidungList();
+  const set = new Set();
+  list.forEach((k) => (k.tags || []).forEach((t) => set.add(t)));
+  return Array.from(set).sort();
+}
+
 // Semua baris 1 kidung, TERURUT sesuai `urutan` -- bentuk paling
 // "mentah" (apa adanya seperti di Sheet, bait & koor berselang-seling).
-async function getKidungRows(noKidung) {
-  const rows = await LocalDB.getKidungRowsByNo(String(noKidung));
+// `buku` WAJIB diisi (mis. "Kidung"/"Suplemen") supaya nomor yang sama
+// di buku berbeda tidak tertukar.
+async function getKidungRows(buku, noKidung) {
+  const rows = await LocalDB.getKidungRowsByBukuNo(buku || "Kidung", String(noKidung));
   return rows.sort((a, b) => a.urutan - b.urutan);
 }
 
@@ -122,8 +178,8 @@ async function getKidungRows(noKidung) {
 // getKidungRows() supaya pemanggil bisa pilih mau bentuk "mentah" (ikut
 // urutan Sheet) atau bentuk "siap pakai" (ikut no_bait + koor terpasang)
 // tanpa perlu menghitung ulang pemetaan koorGroup di banyak tempat.
-async function getKidungBaitsWithKoor(noKidung) {
-  const rows = await getKidungRows(noKidung);
+async function getKidungBaitsWithKoor(buku, noKidung) {
+  const rows = await getKidungRows(buku, noKidung);
   const koorByGroup = {};
   rows.forEach((r) => { if (r.jenis === "koor" && r.koorGroup) koorByGroup[r.koorGroup] = r.teks; });
   return rows
@@ -140,8 +196,9 @@ async function getKidungBaitsWithKoor(noKidung) {
 // Semua kategori yang benar-benar dipakai (buat filter/menu nanti) --
 // dihitung dari data yang sudah tersimpan, BUKAN daftar tetap, supaya
 // otomatis ikut kalau admin menambah kategori baru di Sheet.
-async function getKidungCategories() {
-  const list = await getKidungList();
+// `bukuFilter` opsional, sama seperti getKidungList().
+async function getKidungCategories(bukuFilter) {
+  const list = await getKidungList(bukuFilter);
   const set = new Set();
   list.forEach((k) => { if (k.kategori) set.add(k.kategori); });
   return Array.from(set).sort();
@@ -223,6 +280,31 @@ function splitKidungIntoSlides(baits, mode, groupSizes) {
   return slides;
 }
 
+// ------------------------------------------------------------
+// Alur keypad: operator ketik angka, lalu tekan tombol "Kidung" atau
+// "Suplemen" -- baru saat itu nomornya dikunci ke buku yang ditekan
+// (bukan otomatis dari format angka). Fungsi ini 1 pintu masuk untuk
+// alur itu: kembalikan bait+koor siap pakai, atau null kalau nomor itu
+// tidak ada di buku yang dipilih.
+async function openKidungByKeypad(buku, noRaw) {
+  const no = String(noRaw || "").trim().replace(/^0+(?=\d)/, ""); // buang nol di depan input mentah
+  if (!no) return null;
+  const baits = await getKidungBaitsWithKoor(buku, no);
+  if (!baits.length) return null;
+  const list = await getKidungList(buku);
+  const meta = list.find((k) => String(k.noKidung) === no) || null;
+  return { meta, baits };
+}
+
+// Format nomor untuk TAMPILAN saja (bukan untuk disimpan/dicari) --
+// keputusan final: Kidung selalu 3 digit dengan nol di depan (No. 095),
+// Suplemen TANPA nol di depan (apa adanya, mis. No. 200).
+function formatKidungNo(buku, no) {
+  const n = String(no || "").trim();
+  if (buku === "Kidung") return n.padStart(3, "0");
+  return n; // Suplemen & buku lain: polos, tanpa padding
+}
+
 // Ringkasan SEMUA kidung dikelompokkan per kategori -- buat "slide
 // ringkasan" (semua nomor kidung tampil, tinggal cari mana yang mau
 // dinyanyikan) yang diminta: kategori tetap "Memuji Tuhan",
@@ -230,13 +312,118 @@ function splitKidungIntoSlides(baits, mode, groupSizes) {
 // yang ternyata dipakai di Sheet -- lihat getKidungCategories(), TIDAK
 // dihardcode di sini supaya otomatis ikut kalau ditambah/diganti).
 // Balikannya: [{ kategori, kidungs: [{noKidung, judul}, ...] }, ...]
-async function getKidungSummaryByCategory() {
-  const list = await getKidungList();
+async function getKidungSummaryByCategory(bukuFilter) {
+  const list = await getKidungList(bukuFilter);
   const map = new Map();
   list.forEach((k) => {
     const kat = k.kategori || "(Tanpa Kategori)";
     if (!map.has(kat)) map.set(kat, []);
-    map.get(kat).push({ noKidung: k.noKidung, judul: k.judul });
+    map.get(kat).push({ buku: k.buku, noKidung: k.noKidung, judul: k.judul });
   });
   return Array.from(map.entries()).map(([kategori, kidungs]) => ({ kategori, kidungs }));
+}
+
+// ============================================================
+//  BAGIKAN (SHARE) 1 KIDUNG UTUH — §8 Rancangan_Fitur_Kidung.docx.
+//  Beda dari mode tampil slide (splitKidungIntoSlides di atas, yang
+//  hanya menampilkan koor bait TERAKHIR per slide supaya tidak
+//  berulang-ulang di layar): teks yang DIBAGIKAN/DI-SALIN justru
+//  SENGAJA menuliskan ulang koornya lengkap SETIAP SELESAI 1 bait --
+//  supaya begitu ditempel ke WhatsApp/dokumen lain, orang yang
+//  membaca tidak perlu bolak-balik cari "Koor" di atas, dan hasilnya
+//  langsung siap dipakai/dicetak apa adanya (persis seperti contoh
+//  yang diminta: kidung No. 095, 3 bait, 3x tulisan koor lengkap).
+// ============================================================
+
+// Susun teks 1 kidung LENGKAP siap bagikan/salin:
+//   No. {nomor}
+//   {judul}{ (pengarang)}
+//   {birama}
+//   1. {baris 1 bait 1}
+//   {baris 2 bait 1}
+//   ...
+//   Koor: {baris 1 koor}
+//   {baris 2 koor}
+//   ...
+//   2. {baris 1 bait 2}
+//   ...
+// PENTING: baris baru DI DALAM `teks`/`koorTeks` (mis. tiap baris syair
+// ditulis di baris terpisah dalam 1 sel Sheet, pakai Alt+Enter di Excel/
+// Google Sheets) TIDAK digabung jadi 1 paragraf -- ditulis ulang APA
+// ADANYA persis seperti tersimpan di sel, karena itulah yang diminta:
+// baris syairnya sendiri-sendiri, "Koor:" di baris barunya sendiri,
+// lalu baris-baris koor menyusul di bawahnya juga apa adanya. Tidak ada
+// baris kosong pemisah antar bait -- langsung sambung ke nomor bait
+// berikutnya, sesuai contoh yang diberikan.
+// `meta`  = 1 entri dari getKidungList() / openKidungByKeypad().meta
+//           ({ buku, noKidung, judul, pengarang, birama, ... }).
+// `baits` = hasil getKidungBaitsWithKoor(buku, noKidung) (array
+//           { noBait, teks, koorGroup, koorTeks }, koorTeks sudah
+//           ditempel otomatis per bait -- bait tanpa koor otomatis
+//           koorTeks-nya null & baris "Koor:" ikut dilewati; bait 1-4
+//           pakai koor A & bait 5-7 pakai koor B otomatis ikut benar
+//           juga, tinggal dari koor_group di Sheet).
+// Baris judul/pengarang/birama otomatis dilewati kalau memang kosong
+// (mis. birama belum diisi di Sheet), supaya tidak ada baris kosong
+// aneh nempel di hasil salinan.
+function buildKidungShareText(meta, baits) {
+  if (!meta || !baits || !baits.length) return "";
+
+  const headerLines = [];
+  headerLines.push("No. " + formatKidungNo(meta.buku, meta.noKidung));
+  let titleLine = (meta.judul || "").trim();
+  if (meta.pengarang && meta.pengarang.trim()) titleLine += (titleLine ? " " : "") + "(" + meta.pengarang.trim() + ")";
+  if (titleLine) headerLines.push(titleLine);
+  if (meta.birama && meta.birama.trim()) headerLines.push(meta.birama.trim());
+
+  const verseBlocks = baits.map((b) => {
+    let block = `${b.noBait}. ${b.teks}`;
+    if (b.koorTeks && b.koorTeks.trim()) block += `\nKoor: ${b.koorTeks}`;
+    return block;
+  });
+
+  return headerLines.join("\n") + "\n" + verseBlocks.join("\n");
+}
+
+// Tombol "🔗 Bagikan" siap-pasang: dipakai layar baca Kidung nanti.
+// Memakai Web Share API kalau didukung (muncul kotak pilih WhatsApp/
+// Telegram/dll bawaan HP, sama seperti shareMediaButton() di
+// js/media.js) -- fallback SALIN ke clipboard (dengan umpan-balik ✓ di
+// tombol, lewat copyTextWithFeedback() di js/app.js) kalau Web Share
+// tidak didukung (mis. di komputer).
+// CATATAN (belum diaktifkan di sini, lihat §6 & §9 Rancangan_Fitur_
+// Kidung.docx "tamu_kidung"): begitu flag tamu 2-tingkat itu dibuat,
+// tombol ini perlu disembunyikan untuk tamu (baca-saja) -- cukup jangan
+// panggil fungsi ini sama sekali kalau isTamuKidungReadOnly() true,
+// sama seperti pola tombol copy Alkitab yang sudah ada.
+function buildKidungShareButton(meta, baits) {
+  const text = buildKidungShareText(meta, baits);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "chip-btn small kidung-share-btn";
+  btn.textContent = "🔗 Bagikan";
+  btn.title = "Bagikan teks lengkap kidung ini (semua bait + koor ditulis ulang)";
+  if (!text) { btn.disabled = true; return btn; }
+  btn.addEventListener("click", async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: (meta.judul || "Kidung No. " + meta.noKidung),
+          text,
+        });
+        return; // pengguna berhasil pilih tujuan share -- selesai
+      } catch (e) {
+        // dibatalkan pengguna, atau perangkat tidak sungguh mendukung --
+        // lanjut ke fallback salin di bawah, jangan biarkan tombol diam saja.
+      }
+    }
+    if (typeof copyTextWithFeedback === "function") {
+      copyTextWithFeedback(text, btn);
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    } else {
+      window.prompt("Salin teks kidung ini:", text);
+    }
+  });
+  return btn;
 }
