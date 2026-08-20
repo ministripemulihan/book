@@ -1,5 +1,5 @@
 // ============================================================
-//  MODE TAMU (akses tanpa login/daftar)
+//  MODE TAMU (akses tanpa login/daftar) 
 // ============================================================
 // File ini SATU tempat untuk semua logika mode tamu:
 //   - Identitas perangkat (device-id acak, tersimpan di browser)
