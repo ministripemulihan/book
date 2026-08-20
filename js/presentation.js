@@ -421,6 +421,13 @@ const Presentation = (() => {
   // ------------------------------------------------------------
   // UI: toggle 1/2 Layar + wiring tombol panel
   // ------------------------------------------------------------
+  // Tombol "🖥️ Buka Layar 2" cuma relevan untuk laptop/komputer yang
+  // punya monitor kedua sungguhan -- di HP tidak ada gunanya (tidak ada
+  // layar kedua untuk dibuka) dan cuma memenuhi layar kecil. Pakai
+  // ambang lebar yang sama dengan Studio Presentasi (1100px, lihat
+  // DESKTOP_MIN_WIDTH di js/presentation-studio.js) supaya konsisten.
+  function isDesktopScreen_() { return window.innerWidth >= 1100; }
+
   function updateStatusUi() {
     document.body.classList.toggle("present-mode-on", isTwoScreenMode());
     const status = el("presentStatusText");
@@ -434,9 +441,12 @@ const Presentation = (() => {
       }
     }
     if (el("presentModeToggle")) el("presentModeToggle").checked = isTwoScreenMode();
-    if (el("presentOpenWindowBtn")) el("presentOpenWindowBtn").hidden = !isTwoScreenMode();
+    if (el("presentOpenWindowBtn")) el("presentOpenWindowBtn").hidden = !isTwoScreenMode() || !isDesktopScreen_();
     if (el("presentControlsBody")) el("presentControlsBody").hidden = !isTwoScreenMode();
   }
+
+  window.addEventListener("resize", () => { if (el("presentOpenWindowBtn")) updateStatusUi(); });
+
 
   function setMode(twoScreen) {
     localStorage.setItem(MODE_KEY, twoScreen ? "2" : "1");
