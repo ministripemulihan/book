@@ -1,5 +1,5 @@
 /* ============================================================
-   TOKEN DESAIN 
+   TOKEN DESAIN
    Tema: "manuskrip & kuningan" — kertas hangat, tinta cokelat gelap,
    aksen hijau petrol (sampul kitab berjilid kain) dan kuningan pudar
    untuk nomor ayat. Serif "Literata" untuk teks bacaan (dirancang
@@ -264,9 +264,9 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .kidung-reader-header { margin-bottom: 16px; font-family: var(--font-display); }
 .kidung-reader-header div:first-child { font-size: 1.1rem; color: var(--ink-soft); }
 .kidung-reader-header div:nth-child(2) { font-size: 1.4rem; font-weight: 700; margin: 4px 0; }
-.kidung-reader-body { max-width: 640px; line-height: 1.7; }
-.kidung-verse { margin: 0 0 10px; }
-.kidung-koor { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--brass); color: var(--ink-soft); }
+.kidung-reader-body { line-height: 1.7; }
+.kidung-verse { margin: 0 0 10px; font-size: var(--verse-font-size, 16px); }
+.kidung-koor { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--brass); color: var(--ink-soft); font-size: var(--verse-font-size, 16px); }
 .kidung-reader-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; max-width: 400px; }
 
 /* Baris atas standar di semua layar Kidung: "← Kembali" (kalau ada) +
