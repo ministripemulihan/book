@@ -1320,17 +1320,49 @@ function openChapterPicker(bookNum) {
 
   hideAllPanels();
   el("chapterPickerTitle").textContent = book.name;
+  el("chapterGrid").innerHTML = ""; // grid dikosongkan dulu, BELUM diisi sama sekali
 
-  // PENTING (perbaikan bug salah pencet nomor pasal): render baris info
-  // kitab ("📌 Pokok" dkk) DULU -- kalau datanya sudah ada di cache
-  // (localStorage, kasus paling umum setelah sinkron pertama), ini
-  // langsung selesai TANPA await sama sekali. Baru SETELAH ITU grid
-  // nomor pasal ditampilkan (el("chapterPicker").hidden = false), jadi
-  // keduanya muncul BERSAMAAN dalam satu kali cat layar -- nomor pasal
-  // tidak akan tergeser turun lagi oleh baris info yang nongol belakangan.
+  // PENTING (perbaikan bug salah pencet nomor pasal): baris info kitab
+  // ("📌 Pokok" dkk) HARUS SELALU muncul (atau sudah dipastikan memang
+  // tidak ada datanya) SEBELUM nomor pasal ditampilkan -- urutan ini
+  // TIDAK BOLEH DIBALIK, baik di komputer maupun di HP. Kalau nomor
+  // pasal sudah tampil duluan lalu baris info menyusul belakangan,
+  // nomor-nomor itu akan tergeser turun tepat saat jari sudah bersiap
+  // menekan salah satu nomor -- akibatnya nomor yang lebih kecil yang
+  // kena tekan (mis. mau pasal 10, kena pasal 2 karena sudah tergeser).
   const extraDoneSync = renderChapterPickerExtra(bookNum);
 
+  if (extraDoneSync) {
+    // Cache sudah ada -> baris info & grid nomor pasal langsung tampil
+    // BERSAMAAN dalam satu kali cat layar, tidak ada yang menyusul.
+    fillChapterGrid(bookNum, sorted);
+    el("chapterPicker").hidden = false;
+    return;
+  }
+
+  // Cache belum ada (jarang -- lihat catatan panjang di bawah) -> jangan
+  // tampilkan grid nomor pasal SAMA SEKALI dulu. Tampilkan panel dengan
+  // baris info dalam keadaan "Memuat…", BARU setelah baris info itu
+  // selesai (berhasil ada isinya ATAU dipastikan memang kosong), grid
+  // nomor pasal baru diisi & ditampilkan menyusul SETELAHNYA -- supaya
+  // urutan kemunculan tetap benar: baris info duluan, nomor pasal
+  // kemudian, tidak pernah kebalik.
+  const box = el("chapterPickerExtra");
+  if (box) {
+    box.hidden = false;
+    box.innerHTML = '<p class="chapter-picker-loading">Memuat info kitab…</p>';
+  }
   el("chapterPicker").hidden = false;
+  renderChapterPickerExtraAsync(bookNum).then(() => {
+    // Kalau pengguna sudah keburu pindah ke kitab lain selama menunggu,
+    // jangan isi grid kitab yang lama ini lagi.
+    if (!el("chapterPicker") || el("chapterPicker").hidden) return;
+    if (el("chapterPickerTitle").textContent !== book.name) return;
+    fillChapterGrid(bookNum, sorted);
+  });
+}
+
+function fillChapterGrid(bookNum, sorted) {
   const grid = el("chapterGrid");
   grid.innerHTML = "";
   sorted.forEach((ch) => {
@@ -1339,13 +1371,6 @@ function openChapterPicker(bookNum) {
     btn.addEventListener("click", () => renderChapter(bookNum, ch));
     grid.appendChild(btn);
   });
-
-  // Kalau cache-nya belum ada sama sekali (baru kali pertama pakai app
-  // ini, belum pernah sinkron) -- baru jatuh balik ke cara lama (async,
-  // datanya nongol belakangan). Ini SEKALI saja & jarang terjadi karena
-  // sinkronisasi Pokok Kitab dkk berjalan otomatis di latar belakang
-  // begitu app dibuka -- lihat js/sync.js.
-  if (!extraDoneSync) renderChapterPickerExtraAsync(bookNum);
 }
 
 // ------------------------------------------------------------
