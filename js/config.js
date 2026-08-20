@@ -1,5 +1,5 @@
 // ============================================================
-//  KONFIGURASI  —  ubah bagian ini sesuai kebutuhan Anda
+//  KONFIGURASI  —  ubah bagian ini sesuai kebutuhan Anda 
 // ============================================================
 const CONFIG = {
   // Judul yang muncul di header aplikasi
