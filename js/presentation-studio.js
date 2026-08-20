@@ -8,6 +8,23 @@
 //  jendela Layar 2.
 //
 //  STATUS (lihat jawaban chat untuk detail per tahap):
+//   0b) BARU 19 Agu 2026: saat menyimpan ayat ke Kumpulan Ayat lewat
+//      tombol "➕ Daftar" di tab Alkitab (tanpa kumpulan aktif dipilih
+//      di dropdown kiri), dulu pakai prompt() browser polos yang cuma
+//      minta ketik nama dari nol. Sekarang muncul dialog kecil
+//      (#collectionNamePicker di index.html) yang menyarankan nama
+//      kumpulan yang SUDAH ADA -- diurutkan dari yang paling BARU
+//      dipakai (chip paling kiri/menyala) -- tinggal diklik, atau
+//      tetap bisa ketik nama baru. Lihat promptCollectionName() &
+//      getRecentCollectionNames() (js/collections.js).
+//   0) PERBAIKAN 19 Agu 2026: pratinjau mini video YouTube di Studio
+//      (kotak "Tayang") dulu bisa diklik langsung (kontrol bawaan
+//      YouTube-nya) -- operator kira menjeda di situ ikut menjeda
+//      Layar 2, padahal itu iframe/pemutar TERPISAH. Sekarang
+//      pratinjau itu tidak bisa diklik (pointer-events:none) + label
+//      kecil, dan tombol ▶️/⏸️/🔇 di atasnya sekarang mengontrol
+//      KEDUANYA (Layar 2 & pratinjau) sekaligus lewat postMessage --
+//      lihat renderStudioPreview() (kasus "youtube") & wireYtControls().
 //   1) Struktur & layout 3 kolom — SELESAI.
 //   2) Timer/Countdown — SELESAI.
 //   3) Checklist 8 versi Alkitab (IND/ITB, IND-RCV, ENG, ENG-RCV, MDR,
@@ -30,6 +47,24 @@
 //      tersambung) -- perlu diputuskan dulu sumbernya (mis. Google
 //      Sheet baru "Kidung" dgn kolom nomor/judul/syair, mirip pola
 //      Alkitab di js/db.js) sebelum tab ini bisa diisi sungguhan.
+//      Lihat rancangan sheet & mode tampil di jawaban chat 20 Agu 2026.
+//   8) BARU 20 Agu 2026: "Media Tersimpan" (PDF/gambar/daftar YouTube)
+//      dipindah dari localStorage ke IndexedDB (LocalDB di js/db.js,
+//      store "studioMedia") -- ini yang memperbaiki bug "Gagal
+//      menyimpan (penyimpanan perangkat penuh?)" pada PDF yang bahkan
+//      di bawah 25MB: akar masalahnya BUKAN batas 25MB itu (itu cuma
+//      mengecek file ASLI sebelum dirender), tapi kuota localStorage
+//      per origin yang cuma ~5-10MB TOTAL, sedangkan hasil render PDF
+//      jadi gambar (skala 2x + base64) gampang lebih besar dari itu.
+//      Data lama otomatis dipindahkan sekali (lihat
+//      migrateLegacyMediaItemsIfNeeded() di js/collections.js), tidak
+//      hilang. Sekaligus tombol "➕ Daftar" (tab File) & "💾 Simpan ke
+//      Media Tersimpan" (tab YouTube) sekarang JUGA pakai dialog
+//      rekomendasi nama terakhir (promptSaveName("media", ...)) --
+//      sebelumnya cuma tersedia di tab Alkitab (Kumpulan Ayat).
+//      Kumpulan Ayat & Media Tersimpan SENGAJA TETAP 2 penyimpanan
+//      terpisah (bukan digabung 1 nama) -- lihat penjelasan di
+//      jawaban chat kenapa ini pilihan yang lebih aman.
 // ============================================================
 
 const PresentationStudio = (() => {
@@ -114,15 +149,23 @@ const PresentationStudio = (() => {
     if (payload.type === "black") { box.innerHTML = '<div class="present-preview-black">⬛ Layar Hitam</div>'; return; }
     if (payload.type === "logo") { box.innerHTML = '<div class="present-preview-idle">◆ Logo ditampilkan</div>'; return; }
     if (payload.type === "youtube") {
-      // PERBAIKAN (permintaan operator): dulu cuma teks placeholder
-      // "▶️ Video YouTube diputar" -- sekarang kotak "Tayang" mini ini
-      // betul-betul merender video-nya (iframe TERPISAH dari yang di
-      // Layar 2, sengaja dibisukan + autoplay HANYA di sini supaya
-      // operator bisa lihat video jalan meski kotaknya kecil; suara
-      // sungguhan tetap cuma dari Layar 2, dikontrol lewat tombol
-      // ▶️/⏸️/🔇 di atas -- lihat wireYtControls()).
+      // PERBAIKAN (laporan operator, 19 Agu 2026): kotak pratinjau ini
+      // adalah iframe YouTube TERPISAH dari yang sungguh tayang di Layar 2
+      // (present.html) -- 2 pemutar video yang berlainan sepenuhnya.
+      // Sebelumnya iframe ini dibiarkan bisa diklik langsung (kontrol
+      // bawaan YouTube-nya sendiri), jadi operator yang menekan ⏸️ pada
+      // video di sini MENGIRA itu ikut menjeda Layar 2 -- padahal tidak,
+      // karena 2 iframe itu tidak saling tersambung. Sekarang iframe ini
+      // dibuat tidak bisa diklik (pointer-events:none) + label kecil,
+      // supaya operator SELALU pakai tombol ▶️/⏸️/🔇 di atas (baris
+      // wireYtControls()) -- dan tombol itu sekarang ikut mengontrol
+      // pratinjau mini ini juga (lihat syncPreviewYtControl()), supaya
+      // keduanya (pratinjau & Layar 2) selalu terlihat sinkron.
       box.innerHTML = payload.embedUrl
-        ? `<iframe src="${escapeHtml(toStudioPreviewEmbedUrl(payload.embedUrl))}" style="position:absolute; inset:0; width:100%; height:100%; border:0;" allow="autoplay; encrypted-media" title="Pratinjau video"></iframe>`
+        ? `<div style="position:absolute; inset:0;">
+             <iframe id="psYtPreviewFrame" src="${escapeHtml(toStudioPreviewEmbedUrl(payload.embedUrl))}" style="position:absolute; inset:0; width:100%; height:100%; border:0; pointer-events:none;" allow="autoplay; encrypted-media" title="Pratinjau video (bisu, tidak bisa diklik)"></iframe>
+             <div style="position:absolute; left:0; right:0; bottom:0; padding:3px 8px; font-size:11px; background:rgba(0,0,0,.55); color:#fff; pointer-events:none;">🔇 Pratinjau (bisu) — pakai ▶️/⏸️/🔇 di atas untuk Layar 2</div>
+           </div>`
         : '<div class="present-preview-idle">▶️ Video YouTube</div>';
       return;
     }
@@ -338,12 +381,12 @@ const PresentationStudio = (() => {
   // Tayang sama seperti tab File: 1 monitor langsung tayang, dual
   // monitor diantre dulu (stageOrSend), dan ◀ ▶ pindah halaman/slide.
   // ------------------------------------------------------------
-  function renderMediaList() {
+  async function renderMediaList() {
     const wrap = el("psMediaList");
     if (!wrap || typeof loadMediaItems !== "function") return;
     if (typeof window.populateYtBgPicker === "function") window.populateYtBgPicker();
     const username = typeof currentUser !== "undefined" ? currentUser : null;
-    const items = loadMediaItems(username);
+    const items = await loadMediaItems(username);
     if (!items.length) {
       wrap.innerHTML = '<p class="present-saved-empty">Belum ada media tersimpan.</p>';
       return;
@@ -354,15 +397,23 @@ const PresentationStudio = (() => {
       const isYt = item.type === "youtube";
       const images = item.images || [];
       const multi = images.length > 1;
+      const itemWrap = document.createElement("div");
+      itemWrap.className = "ps-file-item";
       const row = document.createElement("div");
       row.className = "ps-file-row";
+      // Tombol "🔳" (grid mini-preview halaman) HANYA untuk item gambar/PDF
+      // bertumpuk (bukan YouTube -- video sudah punya sub-daftar judul
+      // sendiri di bawah, lihat videoLabels di bawah).
+      const showGrid = multi && !isYt;
       row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${escapeHtml(item.name)}</span>
         <span class="ps-file-actions">
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
+          ${showGrid ? `<button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
           ${isYt ? `<button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai audio latar (video disembunyikan)">🎧</button>` : ""}
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
+      itemWrap.appendChild(row);
       const countEl = row.querySelector('[data-role="count"]');
       function updateCount() { if (countEl) countEl.textContent = `${idx + 1}/${images.length}`; }
       function doSend() {
@@ -379,17 +430,26 @@ const PresentationStudio = (() => {
       });
       const prevBtn = row.querySelector('[data-act="prev"]');
       const nextBtn = row.querySelector('[data-act="next"]');
+      let thumbApi = null;
       // ◀ ▶ pindah slide/video LANGSUNG (juga saat live di mode dual
       // monitor) -- ini yang dipakai untuk "geser ke video berikutnya"
       // saat presentasi sedang berjalan, sama seperti slide gambar/PDF.
-      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); doSend(); });
-      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); doSend(); });
-      row.querySelector('[data-act="del"]').addEventListener("click", () => {
+      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
+      const gridBtn = row.querySelector('[data-act="grid"]');
+      if (gridBtn && showGrid) {
+        const gridWrap = document.createElement("div");
+        gridWrap.className = "ps-thumbgrid";
+        gridWrap.hidden = true;
+        itemWrap.appendChild(gridWrap);
+        thumbApi = wireThumbGrid(gridWrap, images, gridBtn, () => idx, (i) => { idx = i; updateCount(); doSend(); });
+      }
+      row.querySelector('[data-act="del"]').addEventListener("click", async () => {
         if (!confirm(`Hapus "${item.name}" dari Media Tersimpan?`)) return;
-        removeMediaItem(username, item.id);
+        await removeMediaItem(username, item.id);
         renderMediaList();
       });
-      wrap.appendChild(row);
+      wrap.appendChild(itemWrap);
 
       // Daftar judul + durasi tiap video (khusus item YouTube yang disimpan
       // dengan videoLabels -- lihat addMediaItem() di js/collections.js).
@@ -424,7 +484,7 @@ const PresentationStudio = (() => {
           subRow.appendChild(subBg);
           sub.appendChild(subRow);
         });
-        wrap.appendChild(sub);
+        itemWrap.appendChild(sub);
       }
     });
   }
@@ -749,7 +809,7 @@ const PresentationStudio = (() => {
       });
     }
     if (el("psQuickAddBtn")) {
-      el("psQuickAddBtn").addEventListener("click", () => {
+      el("psQuickAddBtn").addEventListener("click", async () => {
         // Kumpulan Ayat tersimpan per-ayat 1 bahasa (format lama) --
         // dipakai versi PERTAMA yang tercentang supaya format
         // penyimpanan yang sudah ada tidak berubah.
@@ -760,12 +820,84 @@ const PresentationStudio = (() => {
         if (!verses.length) return;
         const sel = el("psCollectionSelect");
         const username = typeof currentUser !== "undefined" ? currentUser : null;
-        const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : prompt("Nama Kumpulan Ayat:", "Kumpulan Baru");
+        const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
         if (!name) return;
         verses.forEach((v) => addVerseToCollection(username, name, v.id));
         renderCollectionSelect();
       });
     }
+  }
+
+  // ------------------------------------------------------------
+  // Picker "Simpan ke Kumpulan Ayat / Media Tersimpan" (menggantikan
+  // prompt() browser polos) -- menampilkan nama yang SUDAH PERNAH
+  // dipakai sebagai rekomendasi klik-langsung, diurutkan dari yang
+  // PALING BARU dipakai, plus kotak teks untuk ketik nama baru.
+  // Dipanggil dengan `await`, mengembalikan nama yang dipilih/diketik,
+  // atau null kalau Batal.
+  //
+  // `kind`: "collection" (default, dari getRecentCollectionNames --
+  // js/collections.js, sinkron ke Sheet) ATAU "media" (dari
+  // getRecentMediaNames -- js/collections.js, IndexedDB lokal per
+  // perangkat). Dipisah 20 Agu 2026 supaya tombol "➕ Daftar" di tab
+  // File & "💾 Simpan ke Media Tersimpan" di tab YouTube JUGA dapat
+  // rekomendasi nama terakhir (sebelumnya cuma tab Alkitab yang punya
+  // ini) -- 1 komponen dipakai bersama, judul dialognya menyesuaikan.
+  // ------------------------------------------------------------
+  function promptSaveName(kind, username, defaultName) {
+    const isMedia = kind === "media";
+    return new Promise((resolve) => {
+      const overlay = el("collectionNamePicker");
+      const titleEl = el("collectionNamePickerTitle");
+      const hintEl = el("collectionNamePickerHint");
+      const recentWrap = el("collectionNamePickerRecent");
+      const input = el("collectionNamePickerInput");
+      const saveBtn = el("collectionNamePickerSaveBtn");
+      const cancelBtn = el("collectionNamePickerCancelBtn");
+      const recentFn = isMedia ? getRecentMediaNames : getRecentCollectionNames;
+      if (!overlay || !input || typeof recentFn !== "function") {
+        // Fallback kalau markup/fungsi belum ada (mis. versi lama) --
+        // tetap jalan seperti sebelumnya.
+        resolve(prompt(isMedia ? "Nama untuk item ini di Media Tersimpan:" : "Nama Kumpulan Ayat:", defaultName || (isMedia ? "" : "Kumpulan Baru")));
+        return;
+      }
+      if (titleEl) titleEl.textContent = isMedia ? "Simpan ke Media Tersimpan" : "Simpan ke Kumpulan Ayat";
+      if (hintEl) hintEl.textContent = isMedia
+        ? "Pilih nama yang pernah dipakai, atau ketik nama baru."
+        : "Pilih kumpulan yang sudah ada, atau ketik nama baru.";
+      Promise.resolve(recentFn(username, 8)).then((recent) => {
+        recent = recent || [];
+        recentWrap.innerHTML = recent.length
+          ? recent.map((n, i) => `<button type="button" class="cnp-chip${i === 0 ? " newest" : ""}">${escapeHtml(n)}</button>`).join("")
+          : `<span class="cnp-empty">${isMedia ? "Belum ada Media Tersimpan sebelumnya." : "Belum ada Kumpulan Ayat tersimpan."}</span>`;
+        recentWrap.querySelectorAll(".cnp-chip").forEach((chip, i) => {
+          chip.addEventListener("click", () => { input.value = recent[i]; input.focus(); });
+        });
+        input.value = defaultName || (isMedia ? "" : recent[0] || "");
+        setTimeout(() => { input.focus(); input.select(); }, 30);
+      });
+
+      function cleanup(result) {
+        overlay.hidden = true;
+        saveBtn.removeEventListener("click", onSave);
+        cancelBtn.removeEventListener("click", onCancel);
+        input.removeEventListener("keydown", onKeydown);
+        resolve(result);
+      }
+      function onSave() { cleanup((input.value || "").trim() || null); }
+      function onCancel() { cleanup(null); }
+      function onKeydown(e) { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }
+
+      saveBtn.addEventListener("click", onSave);
+      cancelBtn.addEventListener("click", onCancel);
+      input.addEventListener("keydown", onKeydown);
+      overlay.hidden = false;
+    });
+  }
+  // Nama lama tetap ada (dipakai tab Alkitab) supaya tidak perlu ubah
+  // pemanggil lain -- sekarang tinggal pembungkus tipis promptSaveName().
+  function promptCollectionName(username, defaultName) {
+    return promptSaveName("collection", username, defaultName);
   }
 
   // ------------------------------------------------------------
@@ -813,6 +945,45 @@ const PresentationStudio = (() => {
     return images;
   }
 
+  // ------------------------------------------------------------
+  // Grid mini-preview (thumbnail) untuk file bertumpuk halaman (PDF/
+  // pptx-jadi-gambar) -- dipakai di tab File (sebelum disimpan) MAUPUN
+  // di "🖼️ Media Tersimpan" (sesudah disimpan), supaya operator bisa
+  // langsung KLIK halaman mana pun yang mau ditayangkan (bukan cuma
+  // geser ◀ ▶ satu-satu). Dipanggil dengan array `images` (data-URL),
+  // `getIdx`/`onPick(i)` untuk baca & set slide aktif punya pemanggil,
+  // dan `toggleBtn` (tombol "🔳" yang sudah ada di baris) untuk
+  // menunjukkan/menyembunyikan grid ini.
+  // ------------------------------------------------------------
+  function wireThumbGrid(container, images, toggleBtn, getIdx, onPick) {
+    if (!container || !toggleBtn) return;
+    let built = false;
+    function build() {
+      if (built) return;
+      built = true;
+      container.innerHTML = "";
+      images.forEach((url, i) => {
+        const th = document.createElement("button");
+        th.type = "button";
+        th.className = "ps-thumb";
+        th.innerHTML = `<img src="${url}" alt="Halaman ${i + 1}" loading="lazy" /><span class="ps-thumb-num">${i + 1}</span>`;
+        th.addEventListener("click", () => { onPick(i); refreshActive(); });
+        container.appendChild(th);
+      });
+    }
+    function refreshActive() {
+      const cur = getIdx();
+      container.querySelectorAll(".ps-thumb").forEach((th, i) => th.classList.toggle("active", i === cur));
+    }
+    toggleBtn.addEventListener("click", () => {
+      build();
+      container.hidden = !container.hidden;
+      toggleBtn.classList.toggle("active", !container.hidden);
+      if (!container.hidden) refreshActive();
+    });
+    return { refreshActive };
+  }
+
   function wireFileTab() {
     const dz = el("psFileDropzone");
     const input = el("psFileInput");
@@ -837,17 +1008,20 @@ const PresentationStudio = (() => {
     function buildRow(file, images, statusText) {
       // `images`: array data-URL (1 gambar biasa = 1 elemen; PDF = 1 per
       // halaman). `idx` = slide yang sedang aktif untuk file ini.
+      const wrapper = document.createElement("div");
+      wrapper.className = "ps-file-item";
       const row = document.createElement("div");
       row.className = "ps-file-row";
       let idx = 0;
       const multi = images.length > 1;
       row.innerHTML = `<span class="ps-file-name">${escapeHtml(file.name)}${statusText ? ` <em class="ps-file-status">${escapeHtml(statusText)}</em>` : ""}</span>
         <span class="ps-file-actions">
-          ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
+          ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button><button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
           <button type="button" class="chip-btn small" data-act="add" title="Simpan ke Media Tersimpan (kolom kiri)">➕ Daftar</button>
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
+      wrapper.appendChild(row);
       const countEl = row.querySelector('[data-role="count"]');
       function updateCount() { if (countEl) countEl.textContent = `${idx + 1}/${images.length}`; }
       const playBtn = row.querySelector('[data-act="play"]');
@@ -855,23 +1029,32 @@ const PresentationStudio = (() => {
       playBtn.addEventListener("click", () => sendSlide(images, idx));
       const prevBtn = row.querySelector('[data-act="prev"]');
       const nextBtn = row.querySelector('[data-act="next"]');
-      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); sendSlide(images, idx); });
-      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); sendSlide(images, idx); });
+      let thumbApi = null;
+      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); sendSlide(images, idx); if (thumbApi) thumbApi.refreshActive(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); sendSlide(images, idx); if (thumbApi) thumbApi.refreshActive(); });
+      const gridBtn = row.querySelector('[data-act="grid"]');
+      if (gridBtn && multi) {
+        const gridWrap = document.createElement("div");
+        gridWrap.className = "ps-thumbgrid";
+        gridWrap.hidden = true;
+        wrapper.appendChild(gridWrap);
+        thumbApi = wireThumbGrid(gridWrap, images, gridBtn, () => idx, (i) => { idx = i; updateCount(); sendSlide(images, idx); });
+      }
       const addBtn = row.querySelector('[data-act="add"]');
       if (!images.length) addBtn.disabled = true;
-      addBtn.addEventListener("click", () => {
+      addBtn.addEventListener("click", async () => {
         if (typeof addMediaItem !== "function") return;
         const username = typeof currentUser !== "undefined" ? currentUser : null;
-        const name = prompt("Nama untuk item ini di Media Tersimpan:", file.name.replace(/\.[^.]+$/, ""));
+        const name = await promptSaveName("media", username, file.name.replace(/\.[^.]+$/, ""));
         if (name === null) return; // dibatalkan
-        const id = addMediaItem(username, name, images, file.name);
-        if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh?). Coba hapus item Media Tersimpan lama dulu."); return; }
+        const id = await addMediaItem(username, name, images, file.name);
+        if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh? coba hapus item Media Tersimpan lama, atau kosongkan sedikit ruang penyimpanan perangkat)."); return; }
         renderMediaList();
         addBtn.textContent = "✅ Tersimpan";
         setTimeout(() => { addBtn.textContent = "➕ Daftar"; }, 1200);
       });
-      row.querySelector('[data-act="del"]').addEventListener("click", () => row.remove());
-      return row;
+      row.querySelector('[data-act="del"]').addEventListener("click", () => wrapper.remove());
+      return wrapper;
     }
 
     function handleFiles(files) {
@@ -1113,11 +1296,11 @@ const PresentationStudio = (() => {
     // (kolom kiri) yang bertipe YouTube. Diisi ulang tiap kali tab ini
     // dibuka (lihat pemanggilan populateYtBgPicker() di refreshDeviceGate/
     // openStudio) supaya ikut daftar terbaru.
-    function populateYtBgPicker() {
+    async function populateYtBgPicker() {
       const picker = el("psYtBgSavedPicker");
       if (!picker || typeof loadMediaItems !== "function") return;
       const username = typeof currentUser !== "undefined" ? currentUser : null;
-      const items = loadMediaItems(username).filter((it) => it.type === "youtube");
+      const items = (await loadMediaItems(username)).filter((it) => it.type === "youtube");
       picker.innerHTML = '<option value="">-- pilih video tersimpan untuk diputar sebagai latar --</option>';
       items.forEach((item) => {
         const images = item.images || [];
@@ -1169,18 +1352,18 @@ const PresentationStudio = (() => {
       });
     });
 
-    if (saveBtn) saveBtn.addEventListener("click", () => {
+    if (saveBtn) saveBtn.addEventListener("click", async () => {
       if (!queue.length || typeof addMediaItem !== "function") return;
       const defaultName = queue.length === 1 ? (queue[0].title || queue[0].videoId) : "Video YouTube";
-      const name = prompt("Nama untuk daftar video ini di Media Tersimpan:", defaultName);
-      if (name === null) return; // dibatalkan
       const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const name = await promptSaveName("media", username, defaultName);
+      if (name === null) return; // dibatalkan
       const embedUrls = queue.map((q) => q.embedUrl);
       // Judul + durasi per video (kalau sempat termuat) ikut disimpan supaya
       // panel Media Tersimpan bisa menampilkan daftarnya -- lihat
       // renderMediaList() & addMediaItem() di js/collections.js.
       const labels = queue.map((q) => ({ title: q.title || q.videoId, durationLabel: q.durationLabel || "" }));
-      const id = addMediaItem(username, name, embedUrls, name, "youtube", labels);
+      const id = await addMediaItem(username, name, embedUrls, name, "youtube", labels);
       if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh?)."); return; }
       queue = [];
       renderQueue();
@@ -1194,19 +1377,33 @@ const PresentationStudio = (() => {
 
   // Tombol ▶️ Play / ⏸️ Pause / 🔇 Mute di baris ikon atas kotak "Tayang"
   // -- mengontrol video YouTube yang SEDANG tayang di Layar 2 lewat
-  // postMessage (lihat yt_control di present.html). Tidak melakukan
-  // apa-apa kalau tidak ada video yang sedang tayang (present.html
-  // sendiri yang menjaga/abaikan kalau ytEl kosong).
+  // postMessage (lihat yt_control di present.html), DAN skrng juga ikut
+  // mengontrol iframe pratinjau mini di Studio (#psYtPreviewFrame) lewat
+  // postMessage yang sama, supaya pratinjau & Layar 2 terlihat sinkron
+  // (pratinjau sendiri sudah dibuat tidak bisa diklik langsung -- lihat
+  // renderStudioPreview()). Tidak melakukan apa-apa kalau tidak ada video
+  // yang sedang tayang (present.html sendiri yang menjaga/abaikan kalau
+  // ytEl kosong; iframe pratinjau juga dicek dulu keberadaannya).
   function wireYtControls() {
     const playBtn = el("psYtPlayBtn");
     const pauseBtn = el("psYtPauseBtn");
     const muteBtn = el("psYtMuteBtn");
     let muted = false;
-    if (playBtn) playBtn.addEventListener("click", () => rawPost({ type: "yt_control", action: "play" }));
-    if (pauseBtn) pauseBtn.addEventListener("click", () => rawPost({ type: "yt_control", action: "pause" }));
+
+    function sendYtCommand(action) {
+      rawPost({ type: "yt_control", action }); // -> Layar 2 (present.html)
+      const previewFrame = el("psYtPreviewFrame"); // -> pratinjau mini di Studio
+      if (previewFrame && previewFrame.contentWindow) {
+        const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[action];
+        if (cmd) previewFrame.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      }
+    }
+
+    if (playBtn) playBtn.addEventListener("click", () => sendYtCommand("play"));
+    if (pauseBtn) pauseBtn.addEventListener("click", () => sendYtCommand("pause"));
     if (muteBtn) muteBtn.addEventListener("click", () => {
       muted = !muted;
-      rawPost({ type: "yt_control", action: muted ? "mute" : "unmute" });
+      sendYtCommand(muted ? "mute" : "unmute");
       muteBtn.textContent = muted ? "🔇 Bersuara" : "🔇 Mute";
       muteBtn.classList.toggle("active", muted);
     });
