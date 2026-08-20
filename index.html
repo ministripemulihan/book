@@ -180,6 +180,14 @@
         </div>
         <button id="fullscreenToggle" class="icon-btn" title="Layar penuh" aria-label="Layar penuh">⛶</button>
         <button id="planToggle" class="icon-btn" title="Rencana Baca" aria-label="Rencana Baca">📅</button>
+        <!-- Jalan pintas langsung ke panel 🎵 Kidung -- sebelumnya cuma
+             ada di dalam menu "⋮" -> "🎵 Kidung" (masih ada juga di sana,
+             lihat #kidungMenuBtn), ditaruh di sini juga supaya pindah
+             Alkitab -> Kidung cukup 1 sentuh dari HP MAUPUN komputer,
+             tidak perlu buka menu "⋮" dulu. Pasangannya (Kidung -> Alkitab)
+             ada di tombol "📖 Alkitab" pada setiap layar panel Kidung,
+             lihat kidungAlkitabButton() di js/kidung-ui.js. -->
+        <button type="button" id="kidungHeaderBtn" class="icon-btn" title="Buka Kidung" aria-label="Buka Kidung">🎵</button>
         <select id="langSelect" class="lang-select" aria-label="Pilih bahasa"></select>
         <div class="width-control" id="widthControl">
           <button data-width="mobile" class="width-btn" title="Lebar HP">📱</button>
@@ -228,6 +236,7 @@
       <button id="infoKamiBtn" class="more-menu-btn">ℹ️ Info Kami</button>
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
       <button id="collectionsMenuBtn" class="more-menu-btn">📚 Kumpulan Ayat</button>
+      <button id="kidungMenuBtn" class="more-menu-btn">🎵 Kidung</button>
       <!-- Tampil untuk semua orang yang login; isi lengkap (balas + umur) hanya untuk level gembala (lihat js/curhat.js) -->
       <button id="curhatBtn" class="more-menu-btn">💬 Curhat</button>
       <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala (lihat updateLevelGatedMenus() di js/app.js) -->
@@ -491,6 +500,7 @@
           <!-- panel catatan pribadi saya (semua ayat yang pernah dicatat) -->
           <div id="notesPanel" class="notes-panel" hidden></div>
           <div id="collectionsPanel" class="collections-panel" hidden></div>
+          <div id="kidungPanel" class="kidung-panel" hidden></div>
 
           <!-- panel pantau pembacaan 7 hari (level gembala dst) -->
           <div id="monitorPanel" class="monitor-panel" hidden></div>
@@ -969,6 +979,7 @@
   <script src="js/media.js?v=20260818b"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260820a"></script>
+  <script src="js/kidung-ui.js?v=20260820a"></script>
   <script src="js/presentation.js?v=20260819b"></script>
   <script src="js/presentation-studio.js?v=20260820a"></script>
   <script src="js/signup.js?v=20260818b"></script>
