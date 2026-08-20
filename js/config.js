@@ -284,7 +284,11 @@ const CONFIG = {
   //               bait 1-4 pakai koor pertama, bait 5-7 pakai koor
   //               kedua) tetap bisa dipetakan dengan benar. Bait yang
   //               TIDAK pakai koor sama sekali -> kosongkan kolom ini.
-  KIDUNG_SHEET_CSV_URL: "",
+  // - SPR	Pemuda	Remaja	Anak	Gugus	Injil	Sehari-hari	Link_midi	link_mp3_1	Link_mp3_2	link_video	link_youtube: adalah penanda kalau ada data dipakai
+  //               SPR, Pemuda, remaja, anak, gugus, injil, sehari-hari adalah penanda yang dipakai untuk acara khusus
+  //               Link_midi	link_mp3_1	Link_mp3_2	link_video	link_youtube  adalah link yang bisa diputar di dalam kidung dan bisa di share
+  
+  KIDUNG_SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7oBVFEnqPn9ipvycG0zuFO4DVwo1tuRpV4EO-zuDfinFAyXtDOBIFzIEvd_GtKXRJBLqKoH3CpaTe/pub?output=csv",
 
   // Perkiraan ukuran (KB) data Kidung -- HANYA untuk teks info di layar
   // sinkron, tidak wajib akurat (beda dengan BIBLE_DATA_APPROX_SIZE_MB
