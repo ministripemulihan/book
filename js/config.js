@@ -168,7 +168,7 @@ const CONFIG = {
   // diunggah, bukan batas hasil render/penyimpanannya). IndexedDB tidak
   // punya batas sekecil itu (umumnya ratusan MB - beberapa GB tergantung
   // browser/disk kosong), jadi masalah ini hilang dengan pindah ke sini.
-  DB_VERSION: 4,
+  DB_VERSION: 5,
   STORE_NAME: "verses",
   USERS_STORE_NAME: "users",
   MEDIA_STORE_NAME: "studioMedia",
