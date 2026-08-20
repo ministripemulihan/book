@@ -1,10 +1,13 @@
 // ============================================================
 //  LAPISAN PENYIMPANAN LOKAL (IndexedDB)
-//  Menyimpan dua hal secara lokal:
+//  Menyimpan secara lokal:
 //   1) Seluruh teks Alkitab (store "verses") — dari Google Sheet #1
 //   2) Daftar akun pengguna (store "users") — dari Google Sheet #2
+//   3) Media Tersimpan Studio Presentasi (store "studioMedia")
+//   4) Teks Kidung/Hymn (store "kidung") — dari Google Sheet Kidung,
+//      lihat js/kidung.js
 //  Setelah tersimpan, aplikasi TIDAK perlu memanggil server lagi
-//  untuk membaca Alkitab maupun untuk login berikutnya.
+//  untuk membaca Alkitab/Kidung maupun untuk login berikutnya.
 // ============================================================
 const LocalDB = {
   _db: null,
@@ -26,6 +29,42 @@ const LocalDB = {
         }
         if (!db.objectStoreNames.contains("meta")) {
           db.createObjectStore("meta", { keyPath: "key" });
+        }
+        // v3: "Media Tersimpan" (gambar/PDF-jadi-gambar/daftar YouTube) --
+        // dulu di localStorage (lihat js/collections.js), dipindah ke sini
+        // karena localStorage terlalu kecil untuk PDF hasil render jadi
+        // gambar. Diindeks per `username` supaya tiap akun/perangkat cuma
+        // melihat medianya sendiri, dan per `addedAt` untuk urutan terbaru.
+        if (!db.objectStoreNames.contains(CONFIG.MEDIA_STORE_NAME)) {
+          const mediaStore = db.createObjectStore(CONFIG.MEDIA_STORE_NAME, { keyPath: "id" });
+          mediaStore.createIndex("byUsername", "username", { unique: false });
+          mediaStore.createIndex("byAddedAt", "addedAt", { unique: false });
+        }
+        // v4: teks Kidung/Hymn (lihat js/kidung.js) -- keyPath "id" =
+        // noKidung + "_" + urutan (unik per baris di dalam 1 kidung).
+        // Diindeks per `noKidung` supaya semua baris 1 kidung bisa
+        // diambil cepat (lihat getKidungRows() di bawah), dan per
+        // `kategori` untuk nanti daftar per kategori (Memuji Tuhan,
+        // Pemecahan Roti, dst.) di tab Kidung Studio Presentasi.
+        // v5: ditambah kolom `buku` (Kidung/Suplemen, 1 sheet yang sama --
+        // lihat catatan normalizeKidungRecord() di js/csv.js) supaya
+        // nomor yang SAMA di 2 buku berbeda (mis. Kidung No.95 vs
+        // Suplemen No.95) tidak bentrok satu sama lain. keyPath "id"
+        // sekarang buku + "_" + noKidung + "_" + urutan, dan ditambah
+        // index komposit "byBukuNo" ([buku, noKidung]) untuk pencarian
+        // langsung per buku (dipakai alur keypad "ketik angka -> tekan
+        // tombol Kidung/Suplemen"). Index lama "byNoKidung" TETAP
+        // dipertahankan (tidak menghalangi apa pun, berguna kalau nanti
+        // perlu cari lintas-buku berdasar nomor saja).
+        if (!db.objectStoreNames.contains(CONFIG.KIDUNG_STORE_NAME)) {
+          const kidungStore = db.createObjectStore(CONFIG.KIDUNG_STORE_NAME, { keyPath: "id" });
+          kidungStore.createIndex("byNoKidung", "noKidung", { unique: false });
+          kidungStore.createIndex("byKategori", "kategori", { unique: false });
+        } else if (db.objectStoreNames.contains(CONFIG.KIDUNG_STORE_NAME)) {
+          const kidungStore = e.target.transaction.objectStore(CONFIG.KIDUNG_STORE_NAME);
+          if (!kidungStore.indexNames.contains("byBukuNo")) {
+            kidungStore.createIndex("byBukuNo", ["buku", "noKidung"], { unique: false });
+          }
         }
       };
       req.onsuccess = (e) => {
@@ -147,6 +186,113 @@ const LocalDB = {
       const tx = db.transaction(["meta"], "readonly");
       const req = tx.objectStore("meta").get(key);
       req.onsuccess = () => resolve(req.result ? req.result.value : null);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // ---------------- Media Tersimpan (Studio Presentasi) ----------------
+  // Lihat js/collections.js (loadMediaItems/addMediaItem/removeMediaItem)
+  // untuk lapisan yang dipakai oleh UI -- fungsi di sini murni akses IndexedDB.
+  async putMediaItem(item) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_STORE_NAME], "readwrite");
+      tx.objectStore(CONFIG.MEDIA_STORE_NAME).put(item);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async getMediaItemsByUsername(username) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_STORE_NAME], "readonly");
+      const idx = tx.objectStore(CONFIG.MEDIA_STORE_NAME).index("byUsername");
+      const req = idx.getAll(IDBKeyRange.only(username || "guest"));
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async deleteMediaItem(id) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_STORE_NAME], "readwrite");
+      tx.objectStore(CONFIG.MEDIA_STORE_NAME).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // ---------------- Kidung / Hymn ----------------
+  // Lihat js/kidung.js (resyncKidungSheet/getKidungList/getKidungRows)
+  // untuk lapisan yang dipakai UI -- fungsi di sini murni akses IndexedDB,
+  // pola sama persis seperti store "verses" di atas.
+  async clearKidung() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readwrite");
+      tx.objectStore(CONFIG.KIDUNG_STORE_NAME).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async bulkPutKidung(rows) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readwrite");
+      const store = tx.objectStore(CONFIG.KIDUNG_STORE_NAME);
+      rows.forEach((r) => store.put(r));
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async getAllKidungRows() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
+      const req = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // Semua baris (bait+koor) milik 1 no_kidung, TIDAK diurutkan di sini --
+  // pemanggil (getKidungRows() di js/kidung.js) yang mengurutkan pakai
+  // field `urutan` supaya logikanya di 1 tempat saja.
+  async getKidungRowsByNo(noKidung) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
+      const idx = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).index("byNoKidung");
+      const req = idx.getAll(IDBKeyRange.only(noKidung));
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // Sama seperti di atas, tapi dipersempit per BUKU juga (Kidung vs
+  // Suplemen) -- dipakai supaya nomor yang sama di 2 buku berbeda tidak
+  // ikut tercampur (lihat catatan index "byBukuNo" di open() di atas).
+  async getKidungRowsByBukuNo(buku, noKidung) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
+      const idx = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).index("byBukuNo");
+      const req = idx.getAll(IDBKeyRange.only([buku, noKidung]));
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async countKidungRows() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
+      const req = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).count();
+      req.onsuccess = () => resolve(req.result);
       req.onerror = (e) => reject(e.target.error);
     });
   },
