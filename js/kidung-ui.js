@@ -52,13 +52,59 @@ let kidungCurrentBuku = "Kidung";
 // tapi tetap tidak perlu diulang tiap beberapa detik).
 let kidungLastBgSyncAt = 0;
 
+// FIX (20 Agu 2026, permintaan lanjutan) — "di komputer sudah bagus,
+// kenapa di HP tidak bisa tampil?": sampai sekarang, KALAU ada error
+// JavaScript yang tidak tertangkap di dalam renderKidungHome() (mis.
+// IndexedDB gagal dibuka -- ini beda-beda perilakunya antar browser,
+// beberapa browser HP/mode Penyamaran/kuota penyimpanan penuh bisa
+// menolak IndexedDB diam-diam), panel Kidung akan tampak KOSONG
+// MELOMPONG tanpa pesan apa pun -- tidak ada cara bagi pengguna di HP
+// untuk tahu APA yang gagal, jadi "refresh"/"logout-login" kelihatan
+// tidak membantu padahal penyebabnya belum ketahuan sama sekali.
+// Sekarang showKidungPanel() membungkus renderKidungHome() dengan
+// try/catch: kalau ADA error, panel menampilkan kotak pesan jelas +
+// tombol "🔄 Coba Lagi" + baris kecil detail teknis error-nya (supaya
+// bisa di-screenshot & dikirim untuk didiagnosis lebih lanjut), alih-
+// alih diam-diam kosong. Ini TIDAK memperbaiki penyebab error itu
+// sendiri (penyebabnya bisa macam-macam per perangkat) -- tapi
+// membuat penyebabnya KELIHATAN, yang sebelumnya sama sekali tidak.
 async function showKidungPanel() {
   hideAllPanels();
   const panel = el("kidungPanel");
   if (!panel) return;
   panel.hidden = false;
   logActivity && typeof logActivity === "function" && logActivity("Kidung");
-  await renderKidungHome();
+  try {
+    await renderKidungHome();
+  } catch (e) {
+    console.error("Kidung: renderKidungHome() gagal:", e);
+    showKidungFatalError(e);
+  }
+}
+
+// Kotak error terlihat (dipakai showKidungPanel() di atas) -- dibuat
+// fungsi terpisah supaya bisa dipanggil ulang dari tombol "Coba Lagi".
+function showKidungFatalError(e) {
+  const panel = el("kidungPanel");
+  if (!panel) return;
+  panel.innerHTML = "";
+  panel.appendChild(kidungTopRow(null));
+  const box = document.createElement("div");
+  box.className = "kidung-fatal-error";
+  const p1 = document.createElement("p");
+  p1.textContent = "⚠️ Kidung gagal dimuat di perangkat ini.";
+  const p2 = document.createElement("p");
+  p2.className = "kidung-fatal-error-detail";
+  p2.textContent = "Detail teknis: " + (e && (e.message || String(e)) || "(tidak ada pesan error)");
+  const retryBtn = document.createElement("button");
+  retryBtn.type = "button";
+  retryBtn.className = "chip-btn small";
+  retryBtn.textContent = "🔄 Coba Lagi";
+  retryBtn.addEventListener("click", () => showKidungPanel());
+  box.appendChild(p1);
+  box.appendChild(p2);
+  box.appendChild(retryBtn);
+  panel.appendChild(box);
 }
 
 function kidungBackButton(onClick) {
@@ -309,18 +355,26 @@ async function renderKidungSearch() {
   const bukuFilter = kidungCurrentBuku;
   let searchSeq = 0; // penanda supaya hasil pencarian LAMA yang telat selesai tidak menimpa hasil BARU (ketik cepat berturut-turut)
 
+  // UPDATE (20 Agu 2026, permintaan lanjutan): dulu kotak input kosong
+  // = daftar hasil KOSONG (harus ketik dulu baru kelihatan apa-apa).
+  // Sekarang `runSearch()` dipanggil SEKALI begitu layar ini dibuka
+  // (lihat pemanggilan di bawah fungsi ini), dan searchKidungFull()
+  // (js/kidung.js) sudah diubah supaya query kosong = SEMUA kidung buku
+  // ini -- jadi begitu layar "🔍 Cari" dibuka, daftar PANJANG semua
+  // kidung (No. 1, 2, 3, ... urut ke bawah) langsung kelihatan duluan,
+  // baru pengguna mempersempitnya dengan mengetik. Label penghitung
+  // dibedakan: "Menampilkan semua X kidung" (query kosong) vs "Ketemu
+  // X/Y kidung" (ada ketikan) seperti diminta.
   async function runSearch() {
     const q = input.value.trim();
     const mySeq = ++searchSeq;
-    if (!q) {
-      resultsBox.innerHTML = "";
-      countLabel.textContent = "";
-      return;
-    }
+
     const { matches, total } = await searchKidungFull(q, bukuFilter).catch(() => ({ matches: [], total: 0 }));
     if (mySeq !== searchSeq) return; // sudah ada pencarian lebih baru, buang hasil ini
 
-    countLabel.textContent = "Ketemu " + matches.length + "/" + total + " kidung";
+    countLabel.textContent = q
+      ? "Ketemu " + matches.length + "/" + total + " kidung"
+      : "Menampilkan semua " + total + " kidung — ketik untuk mencari judul/isi syair";
     resultsBox.innerHTML = "";
     if (!matches.length) {
       const p = document.createElement("p");
@@ -338,11 +392,12 @@ async function renderKidungSearch() {
     });
     if (matches.length > 100) {
       const more = document.createElement("p");
-      more.textContent = "(menampilkan 100 pertama dari " + matches.length + " yang ketemu -- ketik kata lebih spesifik untuk mempersempit)";
+      more.textContent = "(menampilkan 100 pertama dari " + matches.length + " -- ketik kata lebih spesifik untuk mempersempit)";
       resultsBox.appendChild(more);
     }
   }
   input.addEventListener("input", runSearch);
+  runSearch(); // tampilkan daftar semua kidung dulu, sebelum ada ketikan
   input.focus();
 }
 
