@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Alkitab VP — Baca &amp; Cari Ayat</title>
+<title>Alkitab — Baca &amp; Cari Ayat</title>
 <meta name="description" content="Aplikasi pembacaan Alkitab dengan data lokal, pencarian ayat dan kata cepat." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260819c" />
+<link rel="stylesheet" href="css/style.css?v=20260820c" />
 </head>
 <body>
 
@@ -73,6 +73,28 @@
           <button type="button" id="signupCloseBtn" class="guest-modal-btn">Batal</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ===================== PICKER "SIMPAN KE KUMPULAN AYAT" =====================
+       Menggantikan prompt() browser polos yang lama. Dipakai tiap kali
+       menyisipkan sesuatu ke Kumpulan Ayat dari Studio Presentasi (js/
+       presentation-studio.js, fungsi promptCollectionName()) -- kasih
+       rekomendasi nama kumpulan yang SUDAH ADA, diurutkan dari yang
+       PALING BARU dipakai (lihat getRecentCollectionNames() di js/
+       collections.js), supaya operator tinggal klik nama lama alih-alih
+       ketik ulang persis sama tiap kali. Bisa juga ketik nama baru. -->
+  <div id="collectionNamePicker" class="guest-modal-overlay" hidden>
+    <div class="guest-modal-box collection-name-picker-box">
+      <div class="guest-modal-icon">📚</div>
+      <h2 id="collectionNamePickerTitle">Simpan ke Kumpulan Ayat</h2>
+      <p id="collectionNamePickerHint">Pilih kumpulan yang sudah ada, atau ketik nama baru.</p>
+      <div id="collectionNamePickerRecent" class="collection-name-picker-recent"></div>
+      <input type="text" id="collectionNamePickerInput" class="collection-name-picker-input" placeholder="Nama kumpulan..." autocomplete="off" />
+      <div class="guest-modal-actions">
+        <button type="button" id="collectionNamePickerSaveBtn" class="guest-modal-btn primary">💾 Simpan</button>
+        <button type="button" id="collectionNamePickerCancelBtn" class="guest-modal-btn">Batal</button>
+      </div>
     </div>
   </div>
 
@@ -930,27 +952,28 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20260818b"></script>
+  <script src="js/config.js?v=20260820a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260818b"></script>
-  <script src="js/csv.js?v=20260818b"></script>
-  <script src="js/db.js?v=20260818b"></script>
+  <script src="js/csv.js?v=20260820b"></script>
+  <script src="js/db.js?v=20260820b"></script>
   <script src="js/sync.js?v=20260818b"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
   <script src="js/notes.js?v=20260818b"></script>
   <script src="js/highlights.js?v=20260818b"></script>
-  <script src="js/collections.js?v=20260818d"></script>
+  <script src="js/collections.js?v=20260820a"></script>
   <script src="js/settings.js?v=20260818b"></script>
   <script src="js/plans.js?v=20260818b"></script>
   <script src="js/media.js?v=20260818b"></script>
-  <script src="js/outlines.js?v=20260818b"></script>
+  <script src="js/outlines.js?v=20260820b"></script>
+  <script src="js/kidung.js?v=20260820a"></script>
   <script src="js/presentation.js?v=20260819b"></script>
-  <script src="js/presentation-studio.js?v=20260819c"></script>
+  <script src="js/presentation-studio.js?v=20260820a"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260818b"></script>
-  <script src="js/app.js?v=20260818b"></script>
+  <script src="js/app.js?v=20260820d"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260818b"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
