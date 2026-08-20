@@ -285,7 +285,10 @@ async function openKidungReader(buku, no) {
   panel.hidden = false;
   panel.innerHTML = '<p class="chapter-picker-loading">Memuat kidung…</p>';
 
-  const result = await openKidungByKeypad(buku, no).catch(() => null);
+  const result = await openKidungByKeypad(buku, no).catch((e) => {
+    console.error("openKidungReader gagal:", e);
+    return null;
+  });
   if (!result || !result.baits || !result.baits.length) {
     panel.innerHTML = "";
     panel.appendChild(kidungTopRow(() => renderKidungHome()));
