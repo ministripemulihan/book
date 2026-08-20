@@ -195,8 +195,17 @@ async function parseCSVChunked(text, { batchSize = 3000, onBatch, onProgress } =
 function cleanVerseText(t) {
   if (!t) return t;
   return t
-    .replace(/<FR>\s*<sup>[^<]*<\/sup>\s*<Fr>/gi, "")
-    .replace(/<\/?(FR|Fr|sup)>/gi, "")
+    // PENTING: diganti jadi SPASI (bukan string kosong) -- penanda
+    // catatan kaki di sumber data biasanya menempel LANGSUNG ke kata
+    // di sebelahnya tanpa spasi (mis. "Tetapi<FR><sup>2a</sup><Fr>oleh"),
+    // karena aslinya cuma superscript kecil, bukan kata terpisah. Kalau
+    // dibuang jadi string kosong, dua kata di kiri-kanannya jadi
+    // NEMPEL ("Tetapioleh") -- itulah bug "1 Korintus 1:30" yang
+    // dilaporkan. Spasi ekstra yang timbul (termasuk di awal/akhir
+    // ayat) langsung dirapikan oleh dua baris .replace() + .trim() di
+    // bawah, jadi aman dipakai di mana saja tag ini muncul.
+    .replace(/<FR>\s*<sup>[^<]*<\/sup>\s*<Fr>/gi, " ")
+    .replace(/<\/?(FR|Fr|sup)>/gi, " ")
     .replace(/\{\(?[HG]\d+\)?\}/g, "")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
@@ -306,6 +315,78 @@ function parseApprovedField(raw) {
   const v = String(raw || "").trim().toLowerCase();
   if (!v) return true;
   return !["false", "belum", "pending", "tidak", "0", "no"].includes(v);
+}
+
+// ============================================================
+//  PARSER KIDUNG / HYMN — lihat CONFIG.KIDUNG_SHEET_CSV_URL di
+//  js/config.js untuk format kolom lengkapnya. Dipakai oleh
+//  resyncKidungSheet() di js/kidung.js.
+// ============================================================
+
+// Mengubah 1 baris CSV mentah Kidung jadi objek baris yang rapi.
+// TIDAK melakukan forward-fill judul/pengarang/kategori di sini (baris
+// ke-2 dst tiap kidung sengaja kosong di Sheet) -- itu dikerjakan
+// forwardFillKidungRows() di js/kidung.js SETELAH semua baris di-parse,
+// supaya urutan antar baris tetap terjaga persis seperti apa adanya
+// dari CSV (parser per-baris ini tidak menyimpan "state" apa pun).
+// Kolom TAG pemakaian (checkbox 1/kosong di Sheet) -- BEDA dari `kategori`
+// (nilai TUNGGAL: Memuji Tuhan/Pemecahan Roti/dst). Tag di sini BOLEH lebih
+// dari 1 per kidung (mis. sebuah kidung dipakai untuk SPR & Sehari-hari
+// sekaligus) -- makanya disimpan array `tags`, bukan 1 kolom seperti
+// kategori. Nama kolom di Sheet ikut apa adanya (lihat rancangan_Kidung.xlsx);
+// tinggal tambah nama baru di array ini kalau nanti ada tag baru (mis. "Anak
+// Kecil") -- TIDAK perlu ubah kode lain, getKidungTags()/filter otomatis ikut.
+const KIDUNG_TAG_COLUMNS = ["SPR", "Pemuda", "Remaja", "Anak", "Gugus", "Injil", "Sehari-hari"];
+
+function normalizeKidungRecord(rec) {
+  const get = (...keys) => {
+    for (const k of keys) {
+      if (rec[k] !== undefined) return rec[k];
+    }
+    return "";
+  };
+  const noKidung = (get("no_kidung", "no kidung", "nokidung", "no", "nomor") || "").trim();
+  const urutanRaw = get("urutan", "urutan baris", "order");
+  const jenisRaw = (get("jenis", "tipe", "type") || "").trim().toLowerCase();
+  const jenis = jenisRaw === "koor" || jenisRaw === "chorus" || jenisRaw === "reff" ? "koor" : "bait";
+  const noBaitRaw = get("no_bait", "no bait", "nobait", "bait ke", "bait_ke");  // "buku" BELUM ada di rancangan_Kidung.xlsx sekarang (isinya baru Kidung
+  // saja) -- kolom ini OPSIONAL: kalau belum ditambahkan di Sheet, semua
+  // baris otomatis dianggap buku "Kidung". Begitu Suplemen mau ditambah
+  // (di SHEET YANG SAMA, sesuai keputusan "1 sheet saja"), tinggal tambah
+  // kolom "buku" lalu isi "Suplemen" di baris-baris Suplemen -- baris
+  // Kidung yang sudah ada TIDAK perlu diubah (kosong = tetap "Kidung").
+  const buku = (get("buku", "book") || "Kidung").trim() || "Kidung";
+  // Tag pemakaian (SPR/Pemuda/Remaja/Anak/Gugus/Injil/Sehari-hari) --
+  // kolom bernilai APAPUN yang tidak kosong (paling umum diisi "1")
+  // dianggap tag itu aktif untuk kidung ini.
+  const tags = KIDUNG_TAG_COLUMNS.filter((col) => String(get(col, col.toLowerCase()) || "").trim() !== "");
+  return {
+    buku,
+    noKidung,
+    judul: (get("judul", "title") || "").trim(),
+    pengarang: (get("pengarang", "penulis", "author", "composer") || "").trim(),
+    // "Birama"/notasi (mis. "A 3/4") -- TEKS SAJA, tidak perlu gambar not
+    // balok (sesuai keputusan §1 di Rancangan_Fitur_Kidung.docx). Kolom
+    // ini OPSIONAL sama seperti `buku`: kalau belum ditambahkan di
+    // Sheet, cukup jadi string kosong -- baris header teks share/tampil
+    // otomatis melewatkan baris ini kalau kosong (lihat buildKidungShareText
+    // di js/kidung.js).
+    birama: (get("birama", "notasi", "time signature", "birama/notasi") || "").trim(),
+    kategori: (get("kategori", "category") || "").trim(),
+    tags,
+    urutan: parseInt(urutanRaw, 10) || 0,
+    jenis,
+    noBait: jenis === "koor" ? null : (parseInt(noBaitRaw, 10) || null),
+    teks: cleanVerseText(get("teks", "text", "isi", "lirik")),
+    koorGroup: (get("koor_group", "koor group", "koorgroup", "kelompok koor") || "").trim(),
+    // Link media (kosong = tombolnya nanti tampil abu-abu/nonaktif di UI,
+    // BUKAN disembunyikan -- lihat rancangan bar media HP/laptop).
+    linkMp3_1: (get("link_mp3_1", "link mp3 1", "mp3_1", "mp3-1") || "").trim(),
+    linkMp3_2: (get("link_mp3_2", "link mp3 2", "mp3_2", "mp3-2") || "").trim(),
+    linkVideo: (get("link_video", "link video", "video") || "").trim(),
+    linkYoutube: (get("link_youtube", "link youtube", "youtube") || "").trim(),
+    linkMidi: (get("link_midi", "link midi", "midi") || "").trim(),
+  };
 }
 
 // Mengubah isi kolom "Level" (boleh lebih dari satu, dipisah koma / titik
