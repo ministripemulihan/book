@@ -815,13 +815,52 @@ async function fetchTextWithProgress(url, timeoutMs, onProgress) {
   }
 }
 
+// Tamu ("Coba Tanpa Daftar") HANYA berhak dapat data Alkitab -- Kidung
+// (dan nanti Pengumuman/File/YouTube kalau ikut disinkron massal suatu
+// saat) memang sudah disembunyikan dari UI tamu lewat gate di
+// js/presentation-studio.js (refreshGuestGate/refreshDeviceGate), tapi
+// TANPA cek di sini juga, resyncKidungSheet() tadinya tetap dipanggil
+// untuk tamu -- diam-diam mengunduh & menyimpan data yang toh tidak
+// akan pernah bisa mereka pakai (buang-buang kuota + storage perangkat
+// tamu). Dipakai oleh syncFromServer() & getInitialDownloadInfo() di
+// bawah supaya KEDUANYA (proses unduh sungguhan & teks info sebelum
+// unduh) selalu sinkron/konsisten satu sama lain.
+function currentUserHasFullAccess_() {
+  return !(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest());
+}
+
+// Info ringkas ukuran unduhan AWAL, dibedakan per level akses -- dipakai
+// utk teks di layar unduhan (syncFromServer) MAUPUN kalau mau ditampilkan
+// duluan sebelum orang menekan "Unduh" (mis. di layar login/tamu).
+// Tamu: cuma Alkitab. Yang sudah punya akses (login): Alkitab + Kidung.
+// Pengumuman/File PDF-gambar/link YouTube SENGAJA tidak dihitung di sini
+// -- itu bukan data yang di-"unduh massal" ke tiap perangkat, melainkan
+// dibuat langsung oleh operator per-sesi di Studio Presentasi & hanya
+// tersimpan di perangkat operator itu sendiri (lihat js/collections.js).
+async function getInitialDownloadInfo() {
+  const bibleMb = await getEffectiveBibleSizeMb();
+  const hasAccess = currentUserHasFullAccess_();
+  const kidungMb = hasAccess ? (CONFIG.KIDUNG_DATA_APPROX_KB || 0) / 1024 : 0;
+  const totalMb = Math.round((bibleMb + kidungMb) * 10) / 10;
+  return {
+    hasAccess,
+    bibleMb,
+    kidungMb: Math.round(kidungMb * 10) / 10,
+    totalMb,
+    label: hasAccess
+      ? `~${totalMb} MB (Alkitab ~${bibleMb} MB + Kidung ~${(Math.round(kidungMb * 100) / 100)} MB)`
+      : `~${bibleMb} MB (Alkitab saja -- Kidung/Pengumuman/File/YouTube perlu akses login)`,
+  };
+}
+
 async function syncFromServer(isFirstTime) {
   const overlay = el("loadingOverlay");
   overlay.hidden = false;
-  const sizeMB = await getEffectiveBibleSizeMb();
+  const dlInfo = await getInitialDownloadInfo();
+  const sizeMB = dlInfo.bibleMb;
   setLoadingText(
     isFirstTime
-      ? `Mengunduh seluruh data Alkitab (semua bahasa, ~${sizeMB} MB) dari server — hanya sekali ini saja, mohon tunggu…`
+      ? `Mengunduh data awal (${dlInfo.label}) dari server — hanya sekali ini saja, mohon tunggu…`
       : "Menyinkronkan ulang data Alkitab dari server…"
   );
   setLoadingProgress(1);
@@ -881,6 +920,21 @@ async function syncFromServer(isFirstTime) {
     if (typeof resyncAllOutlineSheets === "function") {
       setLoadingText("Menyinkronkan Pokok Kitab, Garis Besar & Peta/Gambar…");
       await resyncAllOutlineSheets().catch(() => {});
+    }
+
+    // Kidung/Hymn (opsional -- lihat js/kidung.js). Diam-diam dilewati
+    // kalau CONFIG.KIDUNG_SHEET_CSV_URL masih kosong (fitur belum
+    // diaktifkan admin), atau kalau gagal (mis. sheet belum ada isinya)
+    // -- tidak sampai menggagalkan sinkron Alkitab yang sudah berhasil.
+    // JUGA dilewati untuk TAMU (dlInfo.hasAccess === false) -- fiturnya
+    // toh sudah disembunyikan dari UI tamu (Studio Presentasi), jadi
+    // tidak perlu diam-diam mengunduh & menyimpan data yang tidak akan
+    // pernah dipakai (hemat kuota + storage perangkat tamu). Kalau
+    // tamu ini nanti LOGIN (jadi bukan tamu lagi), sinkron berikutnya
+    // otomatis ikut mengambil Kidung seperti biasa.
+    if (typeof resyncKidungSheet === "function" && dlInfo.hasAccess) {
+      setLoadingText("Menyinkronkan data Kidung…");
+      await resyncKidungSheet().catch(() => {});
     }
     setLoadingProgress(100);
 
@@ -961,7 +1015,15 @@ async function updateStatusPanel() {
 function updateLevelGatedMenus() {
   if (el("logViewerBtn")) el("logViewerBtn").hidden = !isAdministrator();
   if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
-  if (el("aiChatBtn")) el("aiChatBtn").hidden = typeof isAiChatAllowed === "function" ? !isAiChatAllowed() : true;
+  // aiChatBtn: untuk TAMU jangan disembunyikan sama sekali -- biar tetap
+  // kelihatan tapi "diabu-abukan" (lihat GUEST_GATED_MENU_IDS di bawah,
+  // yang menangani abu-abu + kunci klik-nya). Disembunyikan HANYA untuk
+  // pengguna yang SUDAH LOGIN tapi levelnya memang tidak diizinkan.
+  if (el("aiChatBtn")) {
+    const allowedNow = typeof isAiChatAllowed === "function" ? isAiChatAllowed() : false;
+    const guestNow = !!(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest());
+    el("aiChatBtn").hidden = !allowedNow && !guestNow;
+  }
   if (el("langCheckBtn")) el("langCheckBtn").hidden = typeof isLangCheckAllowed === "function" ? !isLangCheckAllowed() : true;
   // BARU -- "🗂️ Kelola Pengguna" (persetujuan akun baru) & lonceng 🔔
   // notifikasi jumlah pencarian hari ini, khusus administrator.
@@ -978,10 +1040,10 @@ function updateLevelGatedMenus() {
 // (copy) ayat, unduh/sinkron Alkitab, pengaturan tampilan (huruf,
 // lebar, bahasa), Pengumuman & Info Kami.
 // Yang DIKUNCI untuk tamu: Rencana Baca, Kumpulan Ayat, Catatan Saya,
-// Curhat, serta highlight/catatan per-ayat (tombol nomor ayat) --
+// Curhat, AI Chat, serta highlight/catatan per-ayat (tombol nomor ayat) --
 // lihat buildVerseBlock().
 // ------------------------------------------------------------
-const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "curhatBtn"];
+const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "curhatBtn", "aiChatBtn"];
 
 function applyGuestModeUi() {
   const guest = !!(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest());
@@ -1257,8 +1319,18 @@ function openChapterPicker(bookNum) {
   }
 
   hideAllPanels();
-  el("chapterPicker").hidden = false;
   el("chapterPickerTitle").textContent = book.name;
+
+  // PENTING (perbaikan bug salah pencet nomor pasal): render baris info
+  // kitab ("📌 Pokok" dkk) DULU -- kalau datanya sudah ada di cache
+  // (localStorage, kasus paling umum setelah sinkron pertama), ini
+  // langsung selesai TANPA await sama sekali. Baru SETELAH ITU grid
+  // nomor pasal ditampilkan (el("chapterPicker").hidden = false), jadi
+  // keduanya muncul BERSAMAAN dalam satu kali cat layar -- nomor pasal
+  // tidak akan tergeser turun lagi oleh baris info yang nongol belakangan.
+  const extraDoneSync = renderChapterPickerExtra(bookNum);
+
+  el("chapterPicker").hidden = false;
   const grid = el("chapterGrid");
   grid.innerHTML = "";
   sorted.forEach((ch) => {
@@ -1267,26 +1339,110 @@ function openChapterPicker(bookNum) {
     btn.addEventListener("click", () => renderChapter(bookNum, ch));
     grid.appendChild(btn);
   });
-  renderChapterPickerExtra(bookNum);
+
+  // Kalau cache-nya belum ada sama sekali (baru kali pertama pakai app
+  // ini, belum pernah sinkron) -- baru jatuh balik ke cara lama (async,
+  // datanya nongol belakangan). Ini SEKALI saja & jarang terjadi karena
+  // sinkronisasi Pokok Kitab dkk berjalan otomatis di latar belakang
+  // begitu app dibuka -- lihat js/sync.js.
+  if (!extraDoneSync) renderChapterPickerExtraAsync(bookNum);
 }
 
 // ------------------------------------------------------------
-//  Baris tambahan di atas daftar nomor pasal: "📋 Garis Besar Kitab"
-//  (tombol tersendiri sebelum tombol pasal 1, sesuai permintaan),
-//  lalu "📌 Pokok" & "🗺️ Peta+Gambar" -- masing-masing hanya muncul
-//  kalau sheet-nya sudah diisi URL & ada datanya untuk kitab ini.
-//  Cek dilakukan di latar belakang (async) supaya daftar pasal tetap
-//  tampil instan; baris ini menyusul begitu datanya siap.
+//  Baris tombol tambahan di atas daftar nomor pasal: "📌 Pokok",
+//  "📋 Garis Besar Kitab" & "🗺️ Peta+Gambar" -- masing² tetap berupa
+//  TOMBOL (diklik dulu baru bukan panel-nya sendiri, posisinya tetap
+//  sama seperti semula), hanya muncul kalau sheet-nya sudah diisi
+//  URL & ada datanya untuk kitab ini.
+//
+//  KENAPA ADA DUA VERSI (SYNC vs ASYNC) DI BAWAH INI:
+//  Dulu baris tombol ini SELALU dirender async (nunggu fetch/cache
+//  dulu, BARU disisipkan) SETELAH grid nomor pasal sudah muncul
+//  duluan. Akibatnya baris tombol nongol belakangan, mendorong
+//  nomor-nomor pasal di bawahnya turun -- kalau pengguna sudah
+//  keburu mengarahkan/menekan ke posisi nomor pasal, jarinya malah
+//  kena tombol yang baru muncul itu. Perbaikannya:
+//   1) renderChapterPickerExtra() (SYNC, di bawah) dipanggil DULU dari
+//      openChapterPicker() SEBELUM grid nomor pasal ditampilkan --
+//      kalau datanya sudah ada di cache localStorage (kasus normal
+//      sehari-hari, karena Pokok Kitab dkk disinkron otomatis di latar
+//      belakang saat app dibuka), baris tombol & grid nomor pasal
+//      muncul BERSAMAAN dalam satu kali cat layar, tidak ada apa pun
+//      yang "menyusul belakangan" lagi -- posisi tombol & nomor pasal
+//      tetap seperti semula, sudah pasti dari awal.
+//   2) Kalau cache-nya benar² belum ada (baru pertama kali pakai app,
+//      belum pernah sinkron sama sekali) -- baru jatuh balik ke
+//      renderChapterPickerExtraAsync() (async, sama seperti versi lama),
+//      tapi ini kasus langka & cuma terjadi sekali.
 // ------------------------------------------------------------
-async function renderChapterPickerExtra(bookNum) {
+function buildOutlineButtonIfAny(box, book, bookNum, outline) {
+  if (!outline.length) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "chip-btn small book-info-btn";
+  b.textContent = "📋 Garis Besar Kitab";
+  b.title = "Lihat daftar isi/garis besar seluruh kitab " + book.name;
+  b.addEventListener("click", () => openBookInfoPanel(bookNum, "outline"));
+  box.appendChild(b);
+}
+function buildPokokButtonIfAny(box, book, bookNum, pokokHtml) {
+  if (!pokokHtml) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "chip-btn small book-info-btn";
+  b.textContent = "📌 Pokok";
+  b.title = "Lihat pokok/inti kitab " + book.name;
+  b.addEventListener("click", () => openBookInfoPanel(bookNum, "pokok"));
+  box.appendChild(b);
+}
+function buildMapsButtonIfAny(box, book, bookNum, maps) {
+  if (!maps.length) return;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "chip-btn small book-info-btn";
+  b.textContent = "🗺️ Peta+Gambar";
+  b.title = "Lihat peta/gambar kitab " + book.name;
+  b.addEventListener("click", () => openBookInfoPanel(bookNum, "maps"));
+  box.appendChild(b);
+}
+
+// Versi SYNC (tanpa await): mengembalikan true kalau berhasil dirender
+// tuntas dari cache (termasuk kalau memang tidak ada datanya sama
+// sekali -- itu juga "tuntas"), atau false kalau cache belum tersedia
+// sama sekali sehingga pemanggil perlu jatuh balik ke versi async.
+function renderChapterPickerExtra(bookNum) {
   const box = el("chapterPickerExtra");
-  if (!box) return;
+  if (!box) return true;
   box.hidden = true;
   box.innerHTML = "";
+  if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) return true;
+
+  const outlineRows = (typeof garisBesarRowsFromCacheOnly === "function") ? garisBesarRowsFromCacheOnly() : null;
+  const pokokRows = (typeof pokokKitabRowsFromCacheOnly === "function") ? pokokKitabRowsFromCacheOnly() : null;
+  const mapRows = (typeof petaGambarRowsFromCacheOnly === "function") ? petaGambarRowsFromCacheOnly() : null;
+  if (outlineRows === null || pokokRows === null || mapRows === null) return false;
+
+  const book = BOOKS.find((b) => b.num === bookNum);
+  const outline = pickOutlineRowsForBook(outlineRows, bookNum, currentLang);
+  const pokokHit = pickPokokRowFor(pokokRows, bookNum, currentLang);
+  const maps = mapRows.filter((r) => r.bookNum === bookNum);
+
+  buildPokokButtonIfAny(box, book, bookNum, pokokHit ? pokokHit.pokok : null);
+  buildOutlineButtonIfAny(box, book, bookNum, outline);
+  buildMapsButtonIfAny(box, book, bookNum, maps);
+  box.hidden = box.children.length === 0;
+  return true;
+}
+
+// Versi ASYNC (fallback langka -- lihat catatan panjang di atas): sama
+// seperti versi lama, dipanggil hanya kalau cache belum ada sama sekali.
+async function renderChapterPickerExtraAsync(bookNum) {
+  const box = el("chapterPickerExtra");
+  if (!box) return;
   if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) return;
 
   const book = BOOKS.find((b) => b.num === bookNum);
-  const [outline, pokok, maps] = await Promise.all([
+  const [outline, pokokHtml, maps] = await Promise.all([
     getOutlineForBook(bookNum, currentLang).catch(() => []),
     getPokokKitabFor(bookNum, currentLang).catch(() => null),
     getMapImagesForBook(bookNum).catch(() => []),
@@ -1295,33 +1451,10 @@ async function renderChapterPickerExtra(bookNum) {
   if (!el("chapterPicker") || el("chapterPicker").hidden) return;
   if (el("chapterPickerTitle").textContent !== book.name) return;
 
-  if (outline.length) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "chip-btn small book-info-btn";
-    b.textContent = "📋 Garis Besar Kitab";
-    b.title = "Lihat daftar isi/garis besar seluruh kitab " + book.name;
-    b.addEventListener("click", () => openBookInfoPanel(bookNum, "outline"));
-    box.appendChild(b);
-  }
-  if (pokok) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "chip-btn small book-info-btn";
-    b.textContent = "📌 Pokok";
-    b.title = "Lihat pokok/inti kitab " + book.name;
-    b.addEventListener("click", () => openBookInfoPanel(bookNum, "pokok"));
-    box.appendChild(b);
-  }
-  if (maps.length) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "chip-btn small book-info-btn";
-    b.textContent = "🗺️ Peta+Gambar";
-    b.title = "Lihat peta/gambar kitab " + book.name;
-    b.addEventListener("click", () => openBookInfoPanel(bookNum, "maps"));
-    box.appendChild(b);
-  }
+  box.innerHTML = "";
+  buildPokokButtonIfAny(box, book, bookNum, pokokHtml);
+  buildOutlineButtonIfAny(box, book, bookNum, outline);
+  buildMapsButtonIfAny(box, book, bookNum, maps);
   box.hidden = box.children.length === 0;
 }
 
@@ -1345,8 +1478,8 @@ async function openBookInfoPanel(bookNum, mode) {
     const h = document.createElement("h2");
     h.textContent = "📌 Pokok Kitab " + book.name;
     const box = document.createElement("div");
-    box.className = "pokok-box";
-    box.textContent = pokok || "Belum ada isinya untuk kitab ini.";
+    box.className = "pokok-box pokok-box-html";
+    box.innerHTML = pokok || "Belum ada isinya untuk kitab ini.";
     panel.appendChild(back);
     panel.appendChild(h);
     panel.appendChild(box);
@@ -1463,7 +1596,8 @@ async function showAllPokokPanel() {
       label.className = "pokok-box-label";
       label.textContent = book.name;
       const text = document.createElement("div");
-      text.textContent = pokok;
+      text.className = "pokok-box-html";
+      text.innerHTML = pokok;
       const openBtn = document.createElement("button");
       openBtn.type = "button";
       openBtn.className = "chip-btn small";
@@ -2297,21 +2431,36 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
     pokokSlot.hidden = true;
     pokokSlot.innerHTML = "";
     if (chapter === 1 && typeof getPokokKitabFor === "function") {
-      const pokokToken = (renderChapter._pokokToken = (renderChapter._pokokToken || 0) + 1);
-      getPokokKitabFor(bookNum, currentLang).then((pokok) => {
-        if (renderChapter._pokokToken !== pokokToken || !pokok) return;
+      const buildPokokBox = (pokok) => {
         const box = document.createElement("div");
-        box.className = "pokok-box pokok-box-inline";
+        box.className = "pokok-box pokok-box-inline pokok-box-html";
         const label = document.createElement("div");
         label.className = "pokok-box-label";
         label.textContent = "📌 Pokok Kitab " + displayName;
         const text = document.createElement("div");
-        text.textContent = pokok;
+        text.innerHTML = pokok;
         box.appendChild(label);
         box.appendChild(text);
-        pokokSlot.appendChild(box);
-        pokokSlot.hidden = false;
-      }).catch(() => {});
+        return box;
+      };
+      // Coba SEKETIKA dari cache (tanpa await) dulu supaya tidak ada jeda
+      // "nongol belakangan" yang menggeser ayat-ayat di bawahnya kalau
+      // pembaca sudah mulai menggulir/membaca.
+      const cachedRows = (typeof pokokKitabRowsFromCacheOnly === "function") ? pokokKitabRowsFromCacheOnly() : null;
+      if (cachedRows !== null) {
+        const hit = pickPokokRowFor(cachedRows, bookNum, currentLang);
+        if (hit && hit.pokok) {
+          pokokSlot.appendChild(buildPokokBox(hit.pokok));
+          pokokSlot.hidden = false;
+        }
+      } else {
+        const pokokToken = (renderChapter._pokokToken = (renderChapter._pokokToken || 0) + 1);
+        getPokokKitabFor(bookNum, currentLang).then((pokok) => {
+          if (renderChapter._pokokToken !== pokokToken || !pokok) return;
+          pokokSlot.appendChild(buildPokokBox(pokok));
+          pokokSlot.hidden = false;
+        }).catch(() => {});
+      }
     }
   }
 
@@ -3667,7 +3816,14 @@ function showSimpleDialog(title, bodyBuilderFn, onConfirm, confirmLabel) {
 function handleAddToCollection(verse) {
   if (!verse) return;
   const collections = loadCollections(currentUser);
-  const ids = Object.keys(collections).sort((a, b) => collections[a].name.localeCompare(collections[b].name));
+  // Diurutkan TERBARU DI ATAS (pakai updatedAt, jatuh ke createdAt kalau
+  // belum pernah diupdate) -- dulu sempat alfabetis nama (localeCompare),
+  // makanya "17 agustus" nongol di atas "23 Agustus" walau yang terakhir
+  // itu yang lebih baru dipakai/diisi.
+  const ids = Object.keys(collections).sort(
+    (a, b) => new Date(collections[b].updatedAt || collections[b].createdAt || 0)
+      - new Date(collections[a].updatedAt || collections[a].createdAt || 0)
+  );
 
   showSimpleDialog("📚 Simpan ke Kumpulan Ayat", (box) => {
     const field1 = document.createElement("div");
@@ -3821,7 +3977,7 @@ function renderCollectionDetailInto(container, id, col) {
   const backBtn = document.createElement("button");
   backBtn.className = "chip-btn";
   backBtn.textContent = "← Semua Kumpulan";
-  backBtn.addEventListener("click", () => renderCollectionsPanel());
+  backBtn.addEventListener("click", () => { stopCollectionVersePlayback(); renderCollectionsPanel(); });
   container.appendChild(backBtn);
 
   const titleRow = document.createElement("div");
@@ -3846,6 +4002,49 @@ function renderCollectionDetailInto(container, id, col) {
   titleRow.appendChild(titleBtns);
   container.appendChild(titleRow);
 
+  // Baris pilihan "Bahasa suara" (Google Voice) khusus panel Kumpulan Ayat --
+  // dipakai oleh tombol ▶️ Putar di tiap ayat & di Mode Layar Penuh di bawah.
+  // Memakai pengaturan TTS yang SAMA (ttsSettings/pickVoice() dari bagian 13
+  // di atas) supaya pilihan suara konsisten dengan menu Pembaca biasa --
+  // hanya saja di sini kotak pilihnya ditaruh langsung di panel ini supaya
+  // tidak perlu pindah ke menu Pembaca dulu hanya untuk ganti bahasa suara.
+  if (col.verseIds.length && ttsSupported) {
+    const voiceRow = document.createElement("div");
+    voiceRow.className = "collection-voice-row";
+    const voiceLabel = document.createElement("label");
+    voiceLabel.textContent = "🔊 Bahasa suara: ";
+    voiceLabel.htmlFor = "colTtsLangSelect";
+    const voiceSel = document.createElement("select");
+    voiceSel.id = "colTtsLangSelect";
+    voiceSel.className = "columns-lang-select";
+    [
+      { value: "id-ID", label: "Indonesia" },
+      { value: "en-US", label: "Inggris" },
+      { value: "zh-CN", label: "Mandarin" },
+    ].forEach((o) => {
+      const opt = document.createElement("option");
+      opt.value = o.value;
+      opt.textContent = o.label;
+      voiceSel.appendChild(opt);
+    });
+    voiceSel.value = ttsSettings.lang;
+    voiceSel.addEventListener("change", () => {
+      ttsSettings.lang = voiceSel.value;
+      saveTTSSettings(ttsSettings);
+      stopCollectionVersePlayback();
+      const readerSel = el("ttsLangSelect");
+      if (readerSel) readerSel.value = voiceSel.value; // ikut disamakan di menu Pembaca
+    });
+    voiceLabel.appendChild(voiceSel);
+    voiceRow.appendChild(voiceLabel);
+    container.appendChild(voiceRow);
+  } else if (col.verseIds.length && !ttsSupported) {
+    const warn = document.createElement("p");
+    warn.className = "media-empty";
+    warn.textContent = "Perangkat/browser ini tidak mendukung pembacaan suara (Google Voice).";
+    container.appendChild(warn);
+  }
+
   if (!col.verseIds.length) {
     const p = document.createElement("p");
     p.className = "media-empty";
@@ -3869,6 +4068,9 @@ function renderCollectionDetailInto(container, id, col) {
         <div class="result-ref">${escapeHtml(ref)}</div>
         <div class="result-text"></div>
         <div class="collection-verse-actions">
+          ${ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Putar</button>' : ""}
+          <button type="button" class="chip-btn small col-move-up-btn" title="Naikkan urutan">⬆️</button>
+          <button type="button" class="chip-btn small col-move-down-btn" title="Turunkan urutan">⬇️</button>
           ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
           <button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>
           <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
@@ -3889,6 +4091,7 @@ function renderCollectionDetailInto(container, id, col) {
     }
     item.querySelector(".col-open-btn").addEventListener("click", () => {
       if (!v) return;
+      stopCollectionVersePlayback();
       currentLang = v.lang;
       if (el("langSelect")) el("langSelect").value = v.lang;
       renderChapter(v.bookNumber, v.chapter, v.verse);
@@ -3897,6 +4100,20 @@ function renderCollectionDetailInto(container, id, col) {
       removeVerseFromCollection(currentUser, id, verseId);
       renderCollectionsPanel(id);
     });
+    const moveUpBtn = item.querySelector(".col-move-up-btn");
+    const moveDownBtn = item.querySelector(".col-move-down-btn");
+    if (i === 0) moveUpBtn.disabled = true;
+    if (i === col.verseIds.length - 1) moveDownBtn.disabled = true;
+    moveUpBtn.addEventListener("click", () => {
+      if (moveVerseInCollection(currentUser, id, verseId, -1)) renderCollectionsPanel(id);
+    });
+    moveDownBtn.addEventListener("click", () => {
+      if (moveVerseInCollection(currentUser, id, verseId, 1)) renderCollectionsPanel(id);
+    });
+    const playBtn = item.querySelector(".col-play-btn");
+    if (playBtn && v) {
+      playBtn.addEventListener("click", () => toggleCollectionVersePlayback(v, playBtn));
+    }
 
     // Tombol BULAT 🎵MP3/🎬MP4/▶️YouTube (kalau kitab+pasal ayat ini ada di
     // salah satu sheet Bacaan Bersuara) -- dicari di latar belakang supaya
@@ -4049,6 +4266,15 @@ function openCollectionFullscreen(col, startIndex) {
     refEl.textContent = `${ref}  ·  ${idx + 1} / ${total}`;
     box.appendChild(refEl);
 
+    if (v && ttsSupported) {
+      const fsPlayBtn = document.createElement("button");
+      fsPlayBtn.type = "button";
+      fsPlayBtn.className = "chip-btn small col-play-btn";
+      fsPlayBtn.textContent = "▶️ Putar";
+      fsPlayBtn.addEventListener("click", () => toggleCollectionVersePlayback(v, fsPlayBtn));
+      box.appendChild(fsPlayBtn);
+    }
+
     const textEl = document.createElement("div");
     textEl.className = "collection-fs-text";
     textEl.style.fontSize = currentFontSize() + "px";
@@ -4086,22 +4312,36 @@ function openCollectionFullscreen(col, startIndex) {
 
     const hint = document.createElement("div");
     hint.className = "collection-fs-hint";
-    hint.textContent = "Gunakan tombol panah kiri/kanan di papan ketik untuk pindah ayat.";
+    hint.textContent = "Gunakan tombol panah kiri/kanan (atau Page Up/Down, atas/bawah, spasi) di papan ketik / alat pointer presentasi untuk pindah ayat.";
     overlay.appendChild(hint);
   }
 
   function goPrev() {
-    if (idx > 0) { idx -= 1; render(); }
+    if (idx > 0) { stopCollectionVersePlayback(); idx -= 1; render(); }
   }
   function goNext() {
-    if (idx < total - 1) { idx += 1; render(); }
+    if (idx < total - 1) { stopCollectionVersePlayback(); idx += 1; render(); }
   }
   function onKeyDown(e) {
-    if (e.key === "ArrowLeft") goPrev();
-    else if (e.key === "ArrowRight") goNext();
-    else if (e.key === "Escape") closeOverlay();
+    // Tombol panah kiri/kanan SELALU aktif -- ini juga yang dipakai oleh
+    // kebanyakan "clicker"/pointer presentasi nirkabel (mis. Logitech dkk),
+    // karena alat itu meniru tombol panah kiri/kanan di papan ketik.
+    if (e.key === "ArrowLeft") { goPrev(); return; }
+    if (e.key === "ArrowRight") { goNext(); return; }
+    if (e.key === "Escape") { closeOverlay(); return; }
+
+    // Sebagian clicker/pointer lain meniru Page Up/Page Down, atau panah
+    // atas/bawah, atau tombol spasi, alih-alih panah kiri/kanan -- jadi
+    // semuanya didukung juga di sini supaya cocok dengan berbagai merek.
+    // Dikecualikan kalau fokus sedang di kotak pilih/input (mis. jenis
+    // huruf) supaya tidak mengganggu penggunaan normal kotak itu.
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (e.key === "PageDown" || e.key === "ArrowDown" || e.key === " ") { e.preventDefault(); goNext(); }
+    else if (e.key === "PageUp" || e.key === "ArrowUp") { e.preventDefault(); goPrev(); }
   }
   function closeOverlay() {
+    stopCollectionVersePlayback();
     overlay.hidden = true;
     overlay.innerHTML = "";
     document.removeEventListener("keydown", onKeyDown);
@@ -5345,6 +5585,57 @@ function stopTTS() {
 function toggleTTS() {
   if (ttsPlaying) pauseTTS();
   else playTTS();
+}
+
+// ------------------------------------------------------------
+// 13a-2) PUTAR SUARA 1 AYAT (dipakai di panel Kumpulan Ayat / "SPR ...")
+//   Beda dari playTTS() di atas (yang membacakan SATU PASAL PENUH dari
+//   currentChapterVerses): fungsi ini membacakan SATU AYAT SAJA lewat
+//   tombol "▶️ Putar" di tiap kartu ayat kumpulan, sesuai suara Google
+//   (id-ID/en-US/zh-CN) yang dipilih di kotak "🔊 Bahasa suara" panel itu.
+//   Memakai ttsSettings & pickVoice() yang sama supaya pilihan bahasa/
+//   jenis suara/kecepatan tetap konsisten dengan menu Pembaca biasa.
+// ------------------------------------------------------------
+let collectionVersePlayingBtn = null; // tombol yang sedang aktif memutar (kalau ada)
+
+function stopCollectionVersePlayback() {
+  if (!ttsSupported) return;
+  window.speechSynthesis.cancel();
+  if (collectionVersePlayingBtn) {
+    collectionVersePlayingBtn.textContent = "▶️ Putar";
+    collectionVersePlayingBtn.classList.remove("playing");
+    collectionVersePlayingBtn = null;
+  }
+  releaseWakeLock();
+}
+
+function toggleCollectionVersePlayback(v, btn) {
+  if (!ttsSupported || !v) return;
+
+  // Kalau tombol yang diklik sedang jalan -> hentikan (berfungsi sebagai jeda).
+  if (collectionVersePlayingBtn === btn) {
+    stopCollectionVersePlayback();
+    return;
+  }
+
+  // Hentikan dulu: pembacaan pasal penuh (kalau ada) & ayat lain yang
+  // sedang diputar, supaya suaranya tidak bertumpuk.
+  stopTTS();
+  stopCollectionVersePlayback();
+
+  const voice = pickVoice();
+  const utter = new SpeechSynthesisUtterance(`Ayat ${v.verse}. ${v.text}`);
+  if (voice) utter.voice = voice;
+  utter.lang = ttsSettings.lang;
+  utter.rate = ttsSettings.rate;
+  utter.onend = () => stopCollectionVersePlayback();
+  utter.onerror = () => stopCollectionVersePlayback();
+
+  btn.textContent = "⏸ Jeda";
+  btn.classList.add("playing");
+  collectionVersePlayingBtn = btn;
+  requestWakeLock();
+  window.speechSynthesis.speak(utter);
 }
 
 // ------------------------------------------------------------
