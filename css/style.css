@@ -254,6 +254,7 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 }
 .kidung-search-input { max-width: 320px; margin-bottom: 14px; display: block; }
 .kidung-icons-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.kidung-search-count { font-size: 0.85em; color: var(--muted, #667); margin: -6px 0 10px; }
 .kidung-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-width: 520px; }
 .kidung-list-item {
   text-align: left; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--rule);
