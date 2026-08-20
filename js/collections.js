@@ -79,11 +79,45 @@ function removeVerseFromCollection(username, collectionId, verseId) {
   pushCollectionToRemote(username, collectionId, collections[collectionId]);
 }
 
+// Menggeser urutan satu ayat di dalam kumpulan (dipakai tombol ⬆️/⬇️ di
+// panel Kumpulan Ayat) -- `direction` -1 = naik/lebih awal, +1 = turun/
+// lebih akhir. Kalau sudah di ujung (paling atas/bawah), tidak ngapa-apain.
+function moveVerseInCollection(username, collectionId, verseId, direction) {
+  const collections = loadCollections(username);
+  const col = collections[collectionId];
+  if (!col) return false;
+  const idx = col.verseIds.indexOf(verseId);
+  if (idx === -1) return false;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= col.verseIds.length) return false;
+  const tmp = col.verseIds[idx];
+  col.verseIds[idx] = col.verseIds[newIdx];
+  col.verseIds[newIdx] = tmp;
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  pushCollectionToRemote(username, collectionId, col);
+  return true;
+}
+
 function deleteCollection(username, collectionId) {
   const collections = loadCollections(username);
   delete collections[collectionId];
   saveCollections(username, collections);
   if (typeof Sync !== "undefined") Sync.deleteCollectionRemote(username, collectionId);
+}
+
+// Daftar NAMA kumpulan yang sudah ada, diurutkan dari yang PALING BARU
+// dipakai/diubah (updatedAt) ke yang paling lama -- dipakai untuk kasih
+// rekomendasi/autocomplete saat menyimpan sesuatu ke Kumpulan Ayat, supaya
+// operator tidak perlu ingat-ingat & ketik ulang nama persis sama tiap kali
+// (mis. "SPR 17 Agustus 2026") -- lihat promptCollectionName() di
+// js/presentation-studio.js.
+function getRecentCollectionNames(username, limit) {
+  const collections = loadCollections(username);
+  return Object.values(collections)
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+    .slice(0, limit || 8)
+    .map((c) => c.name);
 }
 
 function pushCollectionToRemote(username, id, col) {
@@ -127,33 +161,81 @@ async function refreshCollectionsFromRemote(username) {
 //  MEDIA TERSIMPAN (File/PPTX/PDF/Gambar yang di-"+ Daftar"-kan dari
 //  tab File Studio Presentasi) — sengaja terpisah dari Kumpulan Ayat
 //  di atas: item di sini berisi gambar (data-URL) yang bisa besar,
-//  jadi HANYA disimpan lokal di perangkat ini (localStorage), TIDAK
-//  disinkronkan ke Google Sheet (beda dari Kumpulan Ayat/verseIds).
+//  jadi HANYA disimpan lokal di perangkat ini, TIDAK disinkronkan ke
+//  Google Sheet (beda dari Kumpulan Ayat/verseIds -- lihat catatan di
+//  bawah soal kenapa keduanya TIDAK digabung jadi satu tempat).
 //  Tampil sebagai tab "🖼️ Media Tersimpan" di kolom kiri Studio,
 //  bisa dibuka & ditayangkan lagi di mode 1 monitor maupun dual
 //  monitor (sama seperti item ayat di Kumpulan Ayat).
+//
+//  RIWAYAT PENYIMPANAN (20 Agu 2026): sebelumnya semua item di sini
+//  ditulis sebagai SATU blob JSON raksasa ke localStorage
+//  ("bible_app_studio_media_v1_<user>"). localStorage per origin di
+//  browser cuma punya jatah TOTAL sekitar 5-10MB (SEMUA key gabung,
+//  bukan per-file) -- padahal 1 PDF hasil di-render jadi gambar
+//  (skala 2x + base64) gampang lebih besar dari itu walau file PDF
+//  aslinya cuma beberapa MB. Itu sebab error "Gagal menyimpan
+//  (penyimpanan perangkat penuh?)" muncul meski file di bawah batas
+//  25MB yang ditulis di UI -- batas 25MB itu cuma mengecek ukuran
+//  file ASLI yang diunggah (lihat handleFiles() di
+//  js/presentation-studio.js), bukan ukuran hasil render+encode yang
+//  sebenarnya disimpan.
+//  SEKARANG dipindah ke IndexedDB (lewat LocalDB di js/db.js, store
+//  "studioMedia") -- kuotanya jauh lebih besar (umumnya ratusan MB
+//  sampai beberapa GB, tergantung sisa disk), dan tiap item disimpan
+//  sebagai RECORD TERPISAH (bukan 1 blob gabungan), jadi 1 file besar
+//  tidak lagi mengancam menghabiskan jatah semua item lain.
+//  Semua fungsi di bawah sekarang ASYNC (kembalikan Promise) --
+//  pemanggilnya (js/presentation-studio.js) sudah disesuaikan pakai
+//  `await`.
 // ============================================================
-function mediaStorageKey(username) {
-  return "bible_app_studio_media_v1_" + (username || "guest");
+const LEGACY_MEDIA_KEY_PREFIX = "bible_app_studio_media_v1_";
+function legacyMediaStorageKey(username) {
+  return LEGACY_MEDIA_KEY_PREFIX + (username || "guest");
 }
 
-function loadMediaItems(username) {
+// Migrasi SEKALI SAJA per akun: kalau masih ada data lama di
+// localStorage (dari sebelum 20 Agu 2026), pindahkan tiap itemnya ke
+// IndexedDB lalu hapus key localStorage-nya. Aman dipanggil berkali-
+// kali (setelah migrasi pertama, key lama sudah tidak ada lagi jadi
+// langsung skip).
+async function migrateLegacyMediaItemsIfNeeded(username) {
+  let raw;
   try {
-    const raw = localStorage.getItem(mediaStorageKey(username));
-    return raw ? JSON.parse(raw) : [];
+    raw = localStorage.getItem(legacyMediaStorageKey(username));
   } catch (e) {
-    return [];
+    return;
+  }
+  if (!raw) return;
+  try {
+    const items = JSON.parse(raw) || [];
+    for (const item of items) {
+      item.username = username || "guest";
+      try {
+        await LocalDB.putMediaItem(item);
+      } catch (e) {
+        // 1 item gagal (jarang terjadi) -- lanjut item lain, jangan
+        // sampai seluruh migrasi batal gara-gara 1 item bermasalah.
+      }
+    }
+  } catch (e) {
+    /* JSON rusak -- lewati saja, tidak bisa diselamatkan */
+  } finally {
+    try { localStorage.removeItem(legacyMediaStorageKey(username)); } catch (e) {}
   }
 }
 
-function saveMediaItems(username, items) {
+// Mengembalikan Promise<array> semua item Media Tersimpan milik
+// `username`, diurutkan dari yang paling LAMA ke paling BARU (sama
+// seperti urutan lama, supaya tampilan daftar tidak tiba-tiba
+// berubah urutan).
+async function loadMediaItems(username) {
+  await migrateLegacyMediaItemsIfNeeded(username);
   try {
-    localStorage.setItem(mediaStorageKey(username), JSON.stringify(items));
-    return true;
+    const items = await LocalDB.getMediaItemsByUsername(username || "guest");
+    return items.sort((a, b) => new Date(a.addedAt || 0) - new Date(b.addedAt || 0));
   } catch (e) {
-    // Kemungkinan besar localStorage penuh (banyak gambar besar) --
-    // beri tahu lewat return false, biar pemanggil bisa kasih alert.
-    return false;
+    return [];
   }
 }
 
@@ -167,13 +249,15 @@ function saveMediaItems(username, items) {
 // Tersimpan" bisa menampilkan judul & durasi tiap video di dalam daftar,
 // bukan cuma nama gabungan + hitungan slide. Diisi dari queue di
 // wireYoutubeTab(); untuk gambar/PDF cukup dibiarkan undefined.
-// Mengembalikan id item baru, atau null kalau gagal.
-function addMediaItem(username, name, images, fileName, type, labels) {
+// Mengembalikan Promise<id> item baru, atau Promise<null> kalau gagal
+// (mis. disk benar-benar penuh -- jauh lebih jarang terjadi sekarang
+// karena kuota IndexedDB jauh lebih besar dari localStorage).
+async function addMediaItem(username, name, images, fileName, type, labels) {
   const trimmedName = (name || fileName || "Media").trim();
   if (!images || !images.length) return null;
-  const items = loadMediaItems(username);
   const item = {
     id: "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    username: username || "guest",
     name: trimmedName,
     fileName: fileName || trimmedName,
     images,
@@ -181,12 +265,39 @@ function addMediaItem(username, name, images, fileName, type, labels) {
     addedAt: new Date().toISOString(),
   };
   if (labels && labels.length) item.videoLabels = labels;
-  items.push(item);
-  if (!saveMediaItems(username, items)) return null;
-  return item.id;
+  try {
+    await LocalDB.putMediaItem(item);
+    return item.id;
+  } catch (e) {
+    return null;
+  }
 }
 
-function removeMediaItem(username, id) {
-  const items = loadMediaItems(username).filter((it) => it.id !== id);
-  saveMediaItems(username, items);
+async function removeMediaItem(username, id) {
+  try {
+    await LocalDB.deleteMediaItem(id);
+  } catch (e) {
+    /* item mungkin sudah tidak ada -- abaikan */
+  }
+}
+
+// Nama-nama Media Tersimpan yang PALING BARU dipakai, untuk rekomendasi
+// klik-langsung saat menyimpan item baru (dropzone File & daftar
+// YouTube) -- pola sama seperti getRecentCollectionNames() di atas,
+// dipakai oleh promptSaveName() (js/presentation-studio.js). Nama bisa
+// berulang antar item (tidak digabung jadi 1 seperti Kumpulan Ayat),
+// jadi di sini di-dedup dulu sebelum dipotong ke `limit`.
+async function getRecentMediaNames(username, limit) {
+  const items = await loadMediaItems(username);
+  const sorted = items.slice().sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0));
+  const seen = new Set();
+  const names = [];
+  for (const it of sorted) {
+    const n = (it.name || "").trim();
+    if (!n || seen.has(n.toLowerCase())) continue;
+    seen.add(n.toLowerCase());
+    names.push(n);
+    if (names.length >= (limit || 8)) break;
+  }
+  return names;
 }
