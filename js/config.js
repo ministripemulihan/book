@@ -168,7 +168,15 @@ const CONFIG = {
   // diunggah, bukan batas hasil render/penyimpanannya). IndexedDB tidak
   // punya batas sekecil itu (umumnya ratusan MB - beberapa GB tergantung
   // browser/disk kosong), jadi masalah ini hilang dengan pindah ke sini.
-  DB_VERSION: 5,
+  // v6 (20 Agu 2026): menaikkan versi supaya migrasi index "byBukuNo" pada
+  // store kidung (lihat js/db.js) BENAR-BENAR jalan di perangkat yang sudah
+  // pernah sinkron sebelum index ini ditambahkan ke kode. onupgradeneeded
+  // cuma terpicu kalau DB_VERSION naik -- tanpa ini, perangkat lama tetap
+  // memakai skema versi 5 selamanya (index byBukuNo tidak pernah terbentuk),
+  // sehingga getKidungRowsByBukuNo() gagal untuk SEMUA nomor kidung (bukan
+  // cuma satu nomor tertentu) -- persis gejala "judul kidung muncul di
+  // daftar, tapi isi bait selalu 'tidak ditemukan' saat dibuka).
+  DB_VERSION: 6,
   STORE_NAME: "verses",
   USERS_STORE_NAME: "users",
   MEDIA_STORE_NAME: "studioMedia",
