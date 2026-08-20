@@ -537,7 +537,12 @@ function detectConnectionType() {
 // saat WiFi tidak/tidak-bisa dipastikan (opts.isFirstTime false).
 async function showBibleSyncPrompt(opts) {
   const { isFirstTime, connType } = opts || {};
-  const sizeMB = await getEffectiveBibleSizeMb();
+  // Dipakai untuk teks (Alkitab saja untuk tamu, Alkitab+Kidung untuk yang
+  // sudah login) -- SAMA seperti yang dipakai syncFromServer(), supaya
+  // angka MB yang tampil DI SINI (sebelum sinkron dimulai) konsisten
+  // dengan yang tampil nanti selama proses unduh berjalan.
+  const dlInfo = await getInitialDownloadInfo();
+  const sizeMB = dlInfo.bibleMb;
   let overlay = el("wifiPromptOverlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -565,9 +570,13 @@ async function showBibleSyncPrompt(opts) {
       `Prosesnya bisa memakan waktu beberapa menit tergantung kecepatan internet.` +
       (connType === "cellular" ? " Perangkat ini sepertinya sedang memakai DATA SELULER — unduhan sebesar ini bisa memakai banyak kuota." : "");
   } else {
+    // Sinkron ulang, WiFi/kabel tidak/tidak-bisa dipastikan -- SEKARANG
+    // ikut menyebutkan perkiraan ukurannya (dlInfo.label, mis. "~62 MB
+    // (Alkitab ~58 MB + Kidung ~4 MB)"), sebelumnya cuma peringatan
+    // polos tanpa angka MB sama sekali.
     msg.textContent = connType === "cellular"
-      ? "Perangkat ini sepertinya sedang memakai data seluler. Data Alkitab (semua bahasa) cukup besar — melanjutkan sekarang bisa memakai banyak kuota."
-      : "Aplikasi tidak bisa memastikan Anda sedang tersambung WiFi atau data seluler. Data Alkitab (semua bahasa) cukup besar — kalau sedang memakai data seluler, melanjutkan sekarang bisa memakai banyak kuota.";
+      ? `Perangkat ini sepertinya sedang memakai data seluler. Data yang akan diunduh ulang sekitar ${dlInfo.label} — melanjutkan sekarang bisa memakai banyak kuota.`
+      : `Aplikasi tidak bisa memastikan Anda sedang tersambung WiFi atau data seluler. Data yang akan diunduh ulang sekitar ${dlInfo.label} — kalau sedang memakai data seluler, melanjutkan sekarang bisa memakai banyak kuota.`;
   }
   box.appendChild(msg);
 
@@ -605,7 +614,7 @@ async function showBibleSyncPrompt(opts) {
 
   const nowBtn = document.createElement("button");
   nowBtn.className = "chip-btn primary";
-  nowBtn.textContent = isFirstTime ? `📥 Mulai Unduh (~${sizeMB} MB)` : "📥 Lanjutkan Sekarang";
+  nowBtn.textContent = isFirstTime ? `📥 Mulai Unduh (~${sizeMB} MB)` : `📥 Lanjutkan Sekarang (~${dlInfo.totalMb} MB)`;
   nowBtn.addEventListener("click", () => {
     overlay.hidden = true;
     syncFromServer(!!isFirstTime);
