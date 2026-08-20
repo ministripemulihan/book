@@ -1329,46 +1329,27 @@ function openChapterPicker(bookNum) {
 
   hideAllPanels();
   el("chapterPickerTitle").textContent = book.name;
-  el("chapterGrid").innerHTML = ""; // grid dikosongkan dulu, BELUM diisi sama sekali
 
-  // PENTING (perbaikan bug salah pencet nomor pasal): baris info kitab
-  // ("📌 Pokok" dkk) HARUS SELALU muncul (atau sudah dipastikan memang
-  // tidak ada datanya) SEBELUM nomor pasal ditampilkan -- urutan ini
-  // TIDAK BOLEH DIBALIK, baik di komputer maupun di HP. Kalau nomor
-  // pasal sudah tampil duluan lalu baris info menyusul belakangan,
-  // nomor-nomor itu akan tergeser turun tepat saat jari sudah bersiap
-  // menekan salah satu nomor -- akibatnya nomor yang lebih kecil yang
-  // kena tekan (mis. mau pasal 10, kena pasal 2 karena sudah tergeser).
-  const extraDoneSync = renderChapterPickerExtra(bookNum);
-
-  if (extraDoneSync) {
-    // Cache sudah ada -> baris info & grid nomor pasal langsung tampil
-    // BERSAMAAN dalam satu kali cat layar, tidak ada yang menyusul.
-    fillChapterGrid(bookNum, sorted);
-    el("chapterPicker").hidden = false;
-    return;
-  }
-
-  // Cache belum ada (jarang -- lihat catatan panjang di bawah) -> jangan
-  // tampilkan grid nomor pasal SAMA SEKALI dulu. Tampilkan panel dengan
-  // baris info dalam keadaan "Memuat…", BARU setelah baris info itu
-  // selesai (berhasil ada isinya ATAU dipastikan memang kosong), grid
-  // nomor pasal baru diisi & ditampilkan menyusul SETELAHNYA -- supaya
-  // urutan kemunculan tetap benar: baris info duluan, nomor pasal
-  // kemudian, tidak pernah kebalik.
-  const box = el("chapterPickerExtra");
-  if (box) {
-    box.hidden = false;
-    box.innerHTML = '<p class="chapter-picker-loading">Memuat info kitab…</p>';
-  }
+  // PERUBAHAN: nomor pasal SEKARANG SELALU langsung ditampilkan di sini,
+  // seketika, TANPA menunggu apa pun -- termasuk tidak menunggu baris
+  // "📌 Pokok"/"📋 Garis Besar Kitab"/"🗺️ Peta+Gambar". Begitu nama
+  // kitab dipencet, nomor pasal langsung kelihatan (tidak ada jeda
+  // tunggu sama sekali, walau data pokok/garis besar/peta belum siap).
+  //
+  // Baris tombol "📌 Pokok" dkk BOLEH menyusul belakangan (baik dari
+  // cache -- praktis instan -- maupun dari fallback ambil ke server,
+  // yang jarang terjadi). Yang menjamin baris itu TIDAK ikut mendorong
+  // nomor pasal turun saat menyusul BUKAN LAGI urutan render (seperti
+  // sebelumnya), melainkan ruang tetap yang sudah dicadangkan lewat
+  // CSS -- lihat kelas "chapter-picker-extra--reserved" di
+  // style.css (.chapter-picker-extra--reserved) yang dipasang di bawah
+  // SEBELUM tahu baris itu akhirnya terisi tombol atau kosong. Jadi
+  // tinggi baris itu sudah pasti sejak awal, dan nomor pasal di
+  // bawahnya tidak pernah bergeser posisi.
+  fillChapterGrid(bookNum, sorted);
   el("chapterPicker").hidden = false;
-  renderChapterPickerExtraAsync(bookNum).then(() => {
-    // Kalau pengguna sudah keburu pindah ke kitab lain selama menunggu,
-    // jangan isi grid kitab yang lama ini lagi.
-    if (!el("chapterPicker") || el("chapterPicker").hidden) return;
-    if (el("chapterPickerTitle").textContent !== book.name) return;
-    fillChapterGrid(bookNum, sorted);
-  });
+
+  renderChapterPickerExtraReserved(bookNum, book);
 }
 
 function fillChapterGrid(bookNum, sorted) {
@@ -1440,56 +1421,64 @@ function buildMapsButtonIfAny(box, book, bookNum, maps) {
   box.appendChild(b);
 }
 
-// Versi SYNC (tanpa await): mengembalikan true kalau berhasil dirender
-// tuntas dari cache (termasuk kalau memang tidak ada datanya sama
-// sekali -- itu juga "tuntas"), atau false kalau cache belum tersedia
-// sama sekali sehingga pemanggil perlu jatuh balik ke versi async.
-function renderChapterPickerExtra(bookNum) {
+// Mengisi baris tombol "📌 Pokok" dkk TANPA membuat grid nomor pasal
+// (yang sudah tampil duluan, lihat openChapterPicker) ikut bergeser --
+// baik saat baris ini terisi cepat dari cache (kasus normal, praktis
+// instan) maupun saat harus ambil ke server dulu (fallback langka,
+// hanya kalau cache belum ada sama sekali, mis. pertama kali pakai
+// app). Triknya: box langsung diberi kelas "chapter-picker-extra--
+// reserved" (mencadangkan tinggi satu baris tombol lewat CSS) SEBELUM
+// tahu isinya nanti ada tombol atau kosong sama sekali -- jadi tinggi
+// box sudah pasti dari awal, grid pasal di bawahnya tidak pernah
+// tergeser walau baris tombol ini menyusul belakangan.
+function renderChapterPickerExtraReserved(bookNum, book) {
   const box = el("chapterPickerExtra");
-  if (!box) return true;
-  box.hidden = true;
+  if (!box) return;
   box.innerHTML = "";
-  if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) return true;
+  box.hidden = false;
+  box.classList.add("chapter-picker-extra--reserved");
+
+  if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) {
+    box.classList.remove("chapter-picker-extra--reserved");
+    box.hidden = true;
+    return;
+  }
+
+  const fillFrom = (outline, pokokHtml, maps) => {
+    // Kalau pengguna sudah keburu pindah ke kitab lain selama menunggu
+    // (hanya relevan untuk jalur ambil-ke-server di bawah), jangan isi
+    // baris tombol punya kitab yang lama ini lagi.
+    if (!el("chapterPicker") || el("chapterPicker").hidden) return;
+    if (el("chapterPickerTitle").textContent !== book.name) return;
+    box.innerHTML = "";
+    buildPokokButtonIfAny(box, book, bookNum, pokokHtml);
+    buildOutlineButtonIfAny(box, book, bookNum, outline);
+    buildMapsButtonIfAny(box, book, bookNum, maps);
+    box.classList.remove("chapter-picker-extra--reserved");
+    box.hidden = box.children.length === 0;
+  };
 
   const outlineRows = (typeof garisBesarRowsFromCacheOnly === "function") ? garisBesarRowsFromCacheOnly() : null;
   const pokokRows = (typeof pokokKitabRowsFromCacheOnly === "function") ? pokokKitabRowsFromCacheOnly() : null;
   const mapRows = (typeof petaGambarRowsFromCacheOnly === "function") ? petaGambarRowsFromCacheOnly() : null;
-  if (outlineRows === null || pokokRows === null || mapRows === null) return false;
 
-  const book = BOOKS.find((b) => b.num === bookNum);
-  const outline = pickOutlineRowsForBook(outlineRows, bookNum, currentLang);
-  const pokokHit = pickPokokRowFor(pokokRows, bookNum, currentLang);
-  const maps = mapRows.filter((r) => r.bookNum === bookNum);
+  if (outlineRows !== null && pokokRows !== null && mapRows !== null) {
+    // Cache sudah ada (kasus normal sehari-hari) -> isi sinkron, praktis instan.
+    const outline = pickOutlineRowsForBook(outlineRows, bookNum, currentLang);
+    const pokokHit = pickPokokRowFor(pokokRows, bookNum, currentLang);
+    const maps = mapRows.filter((r) => r.bookNum === bookNum);
+    fillFrom(outline, pokokHit ? pokokHit.pokok : null, maps);
+    return;
+  }
 
-  buildPokokButtonIfAny(box, book, bookNum, pokokHit ? pokokHit.pokok : null);
-  buildOutlineButtonIfAny(box, book, bookNum, outline);
-  buildMapsButtonIfAny(box, book, bookNum, maps);
-  box.hidden = box.children.length === 0;
-  return true;
-}
-
-// Versi ASYNC (fallback langka -- lihat catatan panjang di atas): sama
-// seperti versi lama, dipanggil hanya kalau cache belum ada sama sekali.
-async function renderChapterPickerExtraAsync(bookNum) {
-  const box = el("chapterPickerExtra");
-  if (!box) return;
-  if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) return;
-
-  const book = BOOKS.find((b) => b.num === bookNum);
-  const [outline, pokokHtml, maps] = await Promise.all([
+  // Cache belum ada sama sekali (jarang) -> ambil ke server; ruang baris
+  // tombol SUDAH dicadangkan dari awal (lihat kelas --reserved di atas)
+  // jadi grid pasal tidak ikut bergeser walau ini makan waktu.
+  Promise.all([
     getOutlineForBook(bookNum, currentLang).catch(() => []),
     getPokokKitabFor(bookNum, currentLang).catch(() => null),
     getMapImagesForBook(bookNum).catch(() => []),
-  ]);
-  // Kalau kitab yang dibuka sudah berpindah lagi selama menunggu, batalkan.
-  if (!el("chapterPicker") || el("chapterPicker").hidden) return;
-  if (el("chapterPickerTitle").textContent !== book.name) return;
-
-  box.innerHTML = "";
-  buildPokokButtonIfAny(box, book, bookNum, pokokHtml);
-  buildOutlineButtonIfAny(box, book, bookNum, outline);
-  buildMapsButtonIfAny(box, book, bookNum, maps);
-  box.hidden = box.children.length === 0;
+  ]).then(([outline, pokokHtml, maps]) => fillFrom(outline, pokokHtml, maps));
 }
 
 // ------------------------------------------------------------
