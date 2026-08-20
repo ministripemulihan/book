@@ -35,6 +35,23 @@
 
 let kidungCurrentBuku = "Kidung";
 
+// FIX (20 Agu 2026) — bug "Kidung No. 95 tidak ditemukan" di HP padahal
+// di komputer ketemu: data Kidung di IndexedDB tiap perangkat SEBELUMNYA
+// cuma disinkron 1x (saat unduh awal Alkitab pertama kali, lihat
+// resyncKidungSheet() di js/app.js syncFromServer()), lalu di sini di
+// renderKidungHome() HANYA disinkron ulang kalau datanya BENAR-BENAR
+// KOSONG sama sekali (`if (!count)`). Begitu kidung baru ditambah admin
+// di Google Sheet SETELAH sebuah HP sinkron pertama kalinya, HP itu
+// tidak akan pernah tahu ada kidung baru -- refresh browser/logout-login
+// TIDAK membantu karena IndexedDB memang persisten & tidak disentuh oleh
+// keduanya (beda perangkat = beda IndexedDB = beda "kapan terakhir
+// sinkron", makanya bisa beda antara komputer & 2 HP walau akun sama).
+// Timestamp (ms) sinkron LATAR BELAKANG terakhir dalam sesi ini -- dipakai
+// throttle di renderKidungHome() supaya tidak menyinkron ulang tiap kali
+// panel Kidung dibuka berturut-turut (datanya kecil ~800 KB jadi murah,
+// tapi tetap tidak perlu diulang tiap beberapa detik).
+let kidungLastBgSyncAt = 0;
+
 async function showKidungPanel() {
   hideAllPanels();
   const panel = el("kidungPanel");
@@ -131,6 +148,27 @@ async function renderKidungHome() {
       return;
     }
     loading.remove();
+  } else {
+    // FIX: data SUDAH ada (count > 0) -- tapi belum tentu TERBARU (lihat
+    // catatan kidungLastBgSyncAt di atas). Sinkron ulang diam-diam di
+    // LATAR BELAKANG (tidak menghalangi tampilan yang sudah ada) tiap kali
+    // panel ini dibuka, dibatasi maksimal 1x/10 menit per sesi supaya
+    // hemat kuota kalau panel dibuka-tutup berkali-kali. Render ulang
+    // panel HANYA kalau jumlah baris berubah (ada kidung baru/terhapus)
+    // supaya tidak mengganggu kalau pengguna sedang mengetik di kotak
+    // nomor/pencarian saat sinkron ini selesai.
+    const now = Date.now();
+    if (!kidungLastBgSyncAt || now - kidungLastBgSyncAt > 10 * 60 * 1000) {
+      kidungLastBgSyncAt = now;
+      resyncKidungSheet()
+        .then(async () => {
+          const newCount = await LocalDB.countKidungRows().catch(() => count);
+          if (newCount !== count && el("kidungPanel") && !el("kidungPanel").hidden) {
+            renderKidungHome();
+          }
+        })
+        .catch(() => {});
+    }
   }
 
   const books = (await getKidungBooks().catch(() => [])) || [];
@@ -188,7 +226,7 @@ async function renderKidungHome() {
   const searchBtn = document.createElement("button");
   searchBtn.type = "button";
   searchBtn.className = "chip-btn small";
-  searchBtn.textContent = "🔍 Cari Judul";
+  searchBtn.textContent = "🔍 Cari";
   searchBtn.addEventListener("click", () => renderKidungSearch());
   const listBtn = document.createElement("button");
   listBtn.type = "button";
@@ -243,30 +281,54 @@ async function renderKidungSearch() {
   title.textContent = "🔍 Cari Kidung";
   panel.appendChild(title);
 
+  // UPDATE (20 Agu 2026): sebelumnya pencarian ini HANYA mencocokkan
+  // field judul ("Cari Judul") -- kata yang ada di DALAM syair (mis.
+  // "kasih") tidak akan ketemu apa-apa walau kata itu muncul di puluhan
+  // kidung. Sekarang pakai searchKidungFull() (js/kidung.js) yang ikut
+  // mencocokkan ke pengarang & ke SETIAP baris teks bait/koor, plus
+  // menampilkan penghitung "ketemu X/Y kidung" (Y = total kidung buku
+  // yang sedang aktif) seperti diminta.
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "Ketik judul kidung…";
+  input.placeholder = "Ketik judul atau kata dalam syair (mis. \"kasih\")…";
   input.className = "kidung-search-input";
   panel.appendChild(input);
+
+  const countLabel = document.createElement("p");
+  countLabel.className = "kidung-search-count";
+  panel.appendChild(countLabel);
 
   const resultsBox = document.createElement("div");
   resultsBox.className = "kidung-list";
   panel.appendChild(resultsBox);
 
-  const allList = await getKidungList().catch(() => []); // semua buku sekaligus
+  // Batasi ke buku yang sedang aktif (kidungCurrentBuku) supaya angka
+  // "X/Y" konsisten dengan konteks yang sedang dilihat pengguna (sama
+  // seperti toggle buku di renderKidungHome()) -- bukan digabung semua
+  // buku sekaligus, yang bisa membingungkan artinya "Y".
+  const bukuFilter = kidungCurrentBuku;
+  let searchSeq = 0; // penanda supaya hasil pencarian LAMA yang telat selesai tidak menimpa hasil BARU (ketik cepat berturut-turut)
 
-  function runSearch() {
-    const q = input.value.trim().toLowerCase();
+  async function runSearch() {
+    const q = input.value.trim();
+    const mySeq = ++searchSeq;
+    if (!q) {
+      resultsBox.innerHTML = "";
+      countLabel.textContent = "";
+      return;
+    }
+    const { matches, total } = await searchKidungFull(q, bukuFilter).catch(() => ({ matches: [], total: 0 }));
+    if (mySeq !== searchSeq) return; // sudah ada pencarian lebih baru, buang hasil ini
+
+    countLabel.textContent = "Ketemu " + matches.length + "/" + total + " kidung";
     resultsBox.innerHTML = "";
-    if (!q) return;
-    const matches = allList.filter((k) => (k.judul || "").toLowerCase().includes(q)).slice(0, 50);
     if (!matches.length) {
       const p = document.createElement("p");
       p.textContent = "Tidak ditemukan.";
       resultsBox.appendChild(p);
       return;
     }
-    matches.forEach((k) => {
+    matches.slice(0, 100).forEach((k) => {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "kidung-list-item";
@@ -274,6 +336,11 @@ async function renderKidungSearch() {
       item.addEventListener("click", () => openKidungReader(k.buku, k.noKidung));
       resultsBox.appendChild(item);
     });
+    if (matches.length > 100) {
+      const more = document.createElement("p");
+      more.textContent = "(menampilkan 100 pertama dari " + matches.length + " yang ketemu -- ketik kata lebih spesifik untuk mempersempit)";
+      resultsBox.appendChild(more);
+    }
   }
   input.addEventListener("input", runSearch);
   input.focus();
@@ -285,10 +352,33 @@ async function openKidungReader(buku, no) {
   panel.hidden = false;
   panel.innerHTML = '<p class="chapter-picker-loading">Memuat kidung…</p>';
 
-  const result = await openKidungByKeypad(buku, no).catch((e) => {
+  let result = await openKidungByKeypad(buku, no).catch((e) => {
     console.error("openKidungReader gagal:", e);
     return null;
   });
+
+  // FIX (20 Agu 2026): dulu langsung nyerah & bilang "tidak ditemukan"
+  // begitu tidak ketemu di data LOKAL (IndexedDB) -- padahal kemungkinan
+  // besar kidung itu memang ADA di Sheet tapi HP ini belum sempat
+  // sinkron ulang sejak kidung itu ditambahkan (lihat catatan panjang di
+  // kidungLastBgSyncAt/renderKidungHome di atas soal kenapa ini bisa
+  // "macet" berbeda antar perangkat & tidak sembuh sendiri walau
+  // refresh/logout-login). Sebelum benar-benar bilang tidak ditemukan,
+  // coba SEKALI sinkron ulang LANGSUNG (data Kidung kecil, ~800 KB,
+  // lihat CONFIG.KIDUNG_DATA_APPROX_KB, jadi cepat & murah), lalu cari
+  // lagi -- baru kalau MASIH tidak ketemu setelah itu, tampilkan pesan
+  // tidak ditemukan (berarti sungguh belum ada / salah nomor).
+  if ((!result || !result.baits || !result.baits.length) && typeof resyncKidungSheet === "function") {
+    panel.innerHTML = '<p class="chapter-picker-loading">Belum ketemu di data tersimpan, menyinkronkan ulang data kidung…</p>';
+    try {
+      await resyncKidungSheet();
+      result = await openKidungByKeypad(buku, no).catch(() => null);
+    } catch (e) {
+      // Gagal sinkron (mis. tidak ada internet) -- biarkan, di bawah
+      // tetap akan tampil pesan "tidak ditemukan" seperti sebelumnya.
+    }
+  }
+
   if (!result || !result.baits || !result.baits.length) {
     panel.innerHTML = "";
     panel.appendChild(kidungTopRow(() => renderKidungHome()));
