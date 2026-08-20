@@ -269,6 +269,10 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 }
 .collection-verse-body { flex: 1; min-width: 0; }
 .collection-verse-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.collection-voice-row { display: flex; align-items: center; gap: 6px; margin: 0 0 14px; font-size: 0.95em; }
+.collection-voice-row select { margin-left: 6px; }
+.col-play-btn.playing { background: var(--brass, #b8860b); color: #1a1206; font-weight: 700; }
+.col-move-up-btn:disabled, .col-move-down-btn:disabled { opacity: 0.35; cursor: default; }
 .chip-btn.small { padding: 5px 10px; font-size: 12px; }
 .chip-btn.danger { color: var(--danger); border-color: var(--danger); }
 .chip-btn.danger:hover { background: var(--danger); color: #fff; }
@@ -618,6 +622,35 @@ input { font-family: inherit; }
 .guest-modal-btn.primary { background: var(--petrol); border-color: var(--petrol); color: #fff; }
 .guest-modal-btn.primary:hover { background: var(--petrol-dark); }
 .guest-modal-btn:not(.primary):hover { background: rgba(0,0,0,0.05); }
+
+/* Picker "Simpan ke Kumpulan Ayat" -- lihat #collectionNamePicker di index.html */
+.collection-name-picker-box { max-width: 420px; text-align: left; }
+.collection-name-picker-box h2, .collection-name-picker-box p { text-align: center; }
+.collection-name-picker-recent {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 12px;
+}
+.collection-name-picker-recent .cnp-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.collection-name-picker-recent .cnp-chip:hover { background: rgba(0,0,0,0.06); }
+.collection-name-picker-recent .cnp-chip.newest { border-color: var(--petrol); color: var(--petrol); font-weight: 600; }
+.collection-name-picker-recent .cnp-empty { font-size: 13px; color: var(--ink-soft); }
+.collection-name-picker-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  font-size: 14px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
 
 /* ============================================================
    PANEL "INFO KAMI" -- Versi, Amanat Kami, Misi Kami, Donasi, dst.
@@ -1655,12 +1688,19 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .pokok-box {
   padding: 16px 18px; background: var(--paper-raised);
   border: 1px solid var(--rule); border-left: 4px solid var(--petrol);
-  border-radius: 10px; line-height: 1.6; white-space: pre-wrap;
+  border-radius: 10px; line-height: 1.6;
 }
 .pokok-box-inline { margin: 4px 0 14px; }
 .pokok-box-label { font-weight: 700; color: var(--petrol); margin-bottom: 6px; }
 .pokok-box-list-item { margin-bottom: 14px; }
 .pokok-box-list-item .chip-btn { margin-top: 10px; }
+
+/* Isi "Pokok Kitab" dirender sebagai HTML asli (bukan lagi teks mentah
+   yang tag-nya kelihatan apa adanya) -- lihat cleanPokokKitabHtml() di
+   js/outlines.js. Rapikan jarak antar-paragraf & tebal-nya di sini. */
+.pokok-box-html p { margin: 0 0 10px; }
+.pokok-box-html p:last-child { margin-bottom: 0; }
+.pokok-box-html strong, .pokok-box-html b { color: inherit; }
 
 /* Panel global "Pokok Alkitab" / "Peta+Gambar" (sidebar, semua kitab
    sekaligus) -- judul pengelompokan per Perjanjian/per kitab. */
@@ -2261,6 +2301,27 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-file-actions { display: flex; gap: 4px; flex: 0 0 auto; align-items: center; }
 .ps-file-status { font-style: normal; font-size: 11px; color: var(--ps-muted); margin-left: 6px; }
 .ps-file-slide-count { font-size: 11px; color: var(--ps-ink-soft); min-width: 34px; text-align: center; }
+
+/* Pembungkus 1 item File/Media Tersimpan -- baris utama + (opsional)
+   grid mini-preview halaman di bawahnya. Lihat wireThumbGrid() &
+   buildRow()/renderMediaList() di js/presentation-studio.js. */
+.ps-file-item { display: flex; flex-direction: column; gap: 6px; }
+.chip-btn.small[data-act="grid"].active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+.ps-thumbgrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 6px;
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px; padding: 8px;
+}
+.ps-thumb {
+  position: relative; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden;
+  cursor: pointer; background: #fff; aspect-ratio: 4 / 3; display: block;
+}
+.ps-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ps-thumb:hover { border-color: var(--ps-ink-soft); }
+.ps-thumb.active { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass); }
+.ps-thumb-num {
+  position: absolute; left: 3px; bottom: 3px; font-size: 10px; line-height: 1; font-weight: 600;
+  background: rgba(0,0,0,0.65); color: #fff; padding: 2px 4px; border-radius: 4px;
+}
 
 /* Sub-daftar judul + durasi tiap video di dalam 1 item YouTube tersimpan
    (lihat renderMediaList() di js/presentation-studio.js) -- ditaruh
