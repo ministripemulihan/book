@@ -1,7 +1,7 @@
 // ============================================================
-//  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari 
+//  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari
 //  menu ☰ / "Lainnya" seperti "📚 Kumpulan Ayat" dkk, supaya bisa
-//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron,
+//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron, 
 //  parsing, ambil bait+koor, teks bagikan) SUDAH ada semua di
 //  js/kidung.js -- file ini KHUSUS tampilan & alur klik saja, pola
 //  penulisannya sama seperti js/collections.js (renderCollectionsPanel
@@ -672,12 +672,17 @@ function buildKidungToolbar(meta, baits) {
   const noInt = parseInt(meta.noKidung, 10);
   const sessionTitle = (meta.judul && meta.judul.trim()) || ("Kidung No. " + formatKidungNo(meta.buku, meta.noKidung));
 
-  // ---- SATU baris, semua kotak SERAGAM (permintaan 21 Agu 2026: tombol
-  // ◀/▶ TANPA kotak/lebih ringkas, & tombol MP3(1)/YouTube digabung jadi
-  // 1 baris yang sama dengan tombol video, gaya sama semua) ----
-  //   ◀  🎼midi  ▶️mp3(1)  🎧mp3v2  🎬video  📺youtube  ♡favorit  📋salin  🔗bagikan  ▶
+  // ---- ◀ [kelompok tengah, boleh melipat ke baris berikut] ▶ ----
+  // ◀/▶ SENGAJA elemen TERPISAH dari kelompok tengah (bukan ikut
+  // di-flex-wrap bareng) -- supaya kalau ikon tengah kepanjangan dan
+  // melipat ke baris ke-2 di HP, ◀ tetap nempel di kiri & ▶ tetap
+  // nempel di KANAN toolbar (bukan ikut lompat ke pojok kiri baris ke-2
+  // seperti sebelumnya, permintaan 21 Agu 2026).
   const grid = document.createElement("div");
   grid.className = "kidung-toolbar-grid";
+
+  const middle = document.createElement("div");
+  middle.className = "kidung-toolbar-middle";
 
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
@@ -710,47 +715,48 @@ function buildKidungToolbar(meta, baits) {
     const a = roundMediaLinkButton("🎼", "Unduh MIDI", meta.linkMidi);
     a.classList.add("square-media-btn");
     a.classList.remove("round-media-btn");
-    grid.appendChild(a);
+    middle.appendChild(a);
   } else {
-    grid.appendChild(kidungDisabledSquare("🎼", "Belum ada MIDI"));
+    middle.appendChild(kidungDisabledSquare("🎼", "Belum ada MIDI"));
   }
 
   if (meta.linkMp3_1) {
-    grid.appendChild(kidungSquareLoopToggle(meta.linkMp3_1, sessionTitle, "MP3"));
+    middle.appendChild(kidungSquareLoopToggle(meta.linkMp3_1, sessionTitle, "MP3"));
   } else {
-    grid.appendChild(kidungDisabledSquare("🎵", "Belum ada MP3"));
+    middle.appendChild(kidungDisabledSquare("🎵", "Belum ada MP3"));
   }
 
   if (meta.linkMp3_2) {
-    grid.appendChild(kidungSquareLoopToggle(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2"));
+    middle.appendChild(kidungSquareLoopToggle(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2"));
   } else {
-    grid.appendChild(kidungDisabledSquare("🎧", "Belum ada MP3 versi 2"));
+    middle.appendChild(kidungDisabledSquare("🎧", "Belum ada MP3 versi 2"));
   }
 
   if (meta.linkVideo && typeof buildStandaloneMediaPlayer === "function") {
-    grid.appendChild(kidungInlineMediaSquareButton("🎬", "Tonton video", () => buildStandaloneMediaPlayer("mp4", meta.linkVideo, sessionTitle), body));
+    middle.appendChild(kidungInlineMediaSquareButton("🎬", "Tonton video", () => buildStandaloneMediaPlayer("mp4", meta.linkVideo, sessionTitle), body));
   } else {
-    grid.appendChild(kidungDisabledSquare("🎬", "Belum ada video"));
+    middle.appendChild(kidungDisabledSquare("🎬", "Belum ada video"));
   }
 
   if (meta.linkYoutube && typeof buildStandaloneMediaPlayer === "function") {
-    grid.appendChild(kidungInlineMediaSquareButton("📺", "Tonton YouTube", () => buildStandaloneMediaPlayer("youtube", meta.linkYoutube, sessionTitle), body));
+    middle.appendChild(kidungInlineMediaSquareButton("📺", "Tonton YouTube", () => buildStandaloneMediaPlayer("youtube", meta.linkYoutube, sessionTitle), body));
   } else {
-    grid.appendChild(kidungDisabledSquare("📺", "Belum ada YouTube"));
+    middle.appendChild(kidungDisabledSquare("📺", "Belum ada YouTube"));
   }
 
-  grid.appendChild(kidungFavoriteButton(meta));
+  middle.appendChild(kidungFavoriteButton(meta));
 
   const copyBtn = buildKidungCopyButton(meta, baits);
   copyBtn.classList.add("square-media-btn");
   copyBtn.classList.remove("round-media-btn");
-  grid.appendChild(copyBtn);
+  middle.appendChild(copyBtn);
 
   const shareBtn = buildKidungShareButton(meta, baits);
   shareBtn.classList.add("square-media-btn");
   shareBtn.classList.remove("round-media-btn");
-  grid.appendChild(shareBtn);
+  middle.appendChild(shareBtn);
 
+  grid.appendChild(middle);
   grid.appendChild(nextBtn);
   body.appendChild(grid);
 
