@@ -5061,6 +5061,7 @@ function hideAllPanels() {
   // berkali-kali, atau buka menu lain langsung).
   document.body.classList.remove("kidung-active");
   if (typeof syncKidungHeaderToggle === "function") syncKidungHeaderToggle();
+  if (typeof teardownKidungReaderKeyNav === "function") teardownKidungReaderKeyNav();
   el("chapterPicker").hidden = true;
   el("searchResults").hidden = true;
   el("reader").hidden = true;
