@@ -1,5 +1,5 @@
 /* ============================================================
-   TOKEN DESAIN 
+   TOKEN DESAIN
    Tema: "manuskrip & kuningan" — kertas hangat, tinta cokelat gelap,
    aksen hijau petrol (sampul kitab berjilid kain) dan kuningan pudar
    untuk nomor ayat. Serif "Literata" untuk teks bacaan (dirancang
@@ -287,19 +287,47 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
    tidak terus menutupi syair saat sedang dibaca/dinyanyikan, terutama
    di layar HP yang sempit. */
 .kidung-toolbar { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 12px; }
+/* Tombol sembunyikan/tampilkan -- sekarang HANYA garis tipis selebar
+   toolbar (::before, flex:1) + segitiga kecil bulat (▾/▸) menempel di
+   ujung kanan (dulu ada tulisan "Tombol" di sampingnya, sudah dihapus
+   supaya hemat tempat). Tombolnya sendiri (elemen <button>) tetap
+   dibuat SELEBAR PENUH baris + padding atas/bawah yang cukup, supaya
+   walau yang KELIHATAN cuma garis+segitiga, area yang bisa disentuh
+   jari tetap lega, tidak cuma sekitar segitiganya saja. */
 .kidung-toolbar-toggle {
-  display: flex; align-items: center; gap: 6px;
-  margin: 0 0 10px; padding: 6px 14px;
-  border-radius: 999px; border: 1px solid var(--rule);
-  background: var(--paper-raised); color: var(--ink-soft);
-  font-family: var(--font-ui); font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; margin: 0 0 10px; padding: 10px 2px;
+  border: none; background: transparent; cursor: pointer;
 }
-.kidung-toolbar-toggle:hover { border-color: var(--petrol); color: var(--petrol); }
+.kidung-toolbar-toggle::before {
+  content: ""; flex: 1; height: 1px; background: var(--rule);
+}
+.kidung-toolbar-toggle-arrow {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 999px;
+  border: 1px solid var(--rule); background: var(--paper-raised);
+  color: var(--ink-soft); font-size: 12px;
+}
+.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow,
+.kidung-toolbar-toggle:hover::before { border-color: var(--petrol); }
+.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow { color: var(--petrol); }
 .kidung-toolbar-body { display: flex; flex-direction: column; gap: 12px; }
 .kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
 .kidung-toolbar-nav { display: flex; align-items: center; gap: 14px; }
 .kidung-nav-btn { font-size: 19px; }
-.kidung-toolbar-midi { display: flex; }
+.kidung-toolbar-media-row { margin-top: -2px; }
+
+/* Pemutar MP3 toggle bulat + progress bar (lihat buildLoopingMp3Player()
+   di js/media.js) -- 1 tombol bulat ▶️/⏸️ (loop terus sampai ditekan
+   lagi) + garis progres yang bisa digeser + penanda waktu berjalan. */
+.kidung-mp3-player { display: flex; align-items: center; gap: 10px; }
+.kidung-mp3-toggle.playing { background: var(--brass); }
+.kidung-mp3-progress-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.kidung-mp3-progress { flex: 1; min-width: 0; accent-color: var(--petrol); }
+.kidung-mp3-time {
+  flex-shrink: 0; min-width: 32px; text-align: right;
+  font-family: var(--font-ui); font-size: 11px; color: var(--ink-soft);
+}
 
 @media (max-width: 640px) {
   /* Di HP, toolbar menempel di bawah layar (bukan ikut men-scroll
@@ -315,7 +343,6 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
     border-radius: 14px 14px 0 0;
     z-index: 5;
   }
-  .kidung-toolbar-toggle { width: 100%; justify-content: center; margin-bottom: 8px; }
 }
 .notes-menu-list { display: flex; flex-direction: column; gap: 10px; }
 .notes-menu-item .result-item { width: 100%; text-align: left; }
@@ -888,7 +915,12 @@ input { font-family: inherit; }
 }
 
 .font-size-control {
-  display: none;
+  /* Dulu display:none di bawah 600px (A+/A- ikut hilang di HP, hanya
+     kelihatan di komputer). Sekarang SELALU flex -- di HP, ikon ini
+     tetap kelihatan lewat baris .header-actions yang sudah bisa
+     digulir ke samping (lihat @media max-width:640px di bawah), jadi
+     tidak makan tempat ekstra, hanya ikut digeser bersama ikon lain. */
+  display: flex;
   align-items: center; gap: 2px;
   background: var(--paper);
   border: 1px solid var(--rule);
@@ -897,9 +929,6 @@ input { font-family: inherit; }
 }
 .font-btn { width: 30px; height: 30px; font-size: 12px; font-weight: 700; border-radius: 999px; }
 .font-btn:hover { background: var(--brass-soft); }
-@media (min-width: 600px) {
-  .font-size-control { display: flex; }
-}
 
 #fullscreenToggle.active { background: var(--petrol); color: #fff; }
 
@@ -1739,6 +1768,14 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
     width: 100%;
   }
   .search-form input { font-size: 15px; padding: 10px 4px; }
+
+  /* Sedang di panel 🎵 Kidung, di HP -- kotak "Cari Alkitab" disembunyikan
+     (kotak carinya untuk Alkitab, tidak dipakai selagi baca/nyanyi kidung,
+     lihat body.kidung-active di showKidungPanel()/hideAllPanels()) supaya
+     lebih hemat tempat & tidak menutupi syair. Kembali muncul otomatis
+     begitu keluar dari Kidung. Di komputer (lebar > 640px) kotak cari ini
+     TETAP kelihatan seperti biasa, karena di sana memang tidak sesempit itu. */
+  body.kidung-active .search-form { display: none; }
 }
 
 /* ============================================================
