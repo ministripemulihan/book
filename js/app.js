@@ -5044,6 +5044,12 @@ async function renderMonitorPanel(selectedUsername, showPinEditor) {
 // 9) TAMPILAN / PANEL
 // ------------------------------------------------------------
 function hideAllPanels() {
+  // Lepas penanda "lagi di Kidung" (lihat showKidungPanel() di
+  // js/kidung-ui.js) setiap kali pindah ke panel LAIN -- supaya kotak
+  // "Cari Alkitab" di header balik muncul lagi di HP begitu keluar dari
+  // Kidung, apa pun jalan keluarnya (tombol "📖 Alkitab", "← Kembali"
+  // berkali-kali, atau buka menu lain langsung).
+  document.body.classList.remove("kidung-active");
   el("chapterPicker").hidden = true;
   el("searchResults").hidden = true;
   el("reader").hidden = true;
