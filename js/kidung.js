@@ -496,9 +496,10 @@ function buildKidungShareButton(meta, baits) {
   const text = buildKidungShareText(meta, baits);
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "chip-btn small kidung-share-btn";
-  btn.textContent = "🔗 Bagikan";
+  btn.className = "round-media-btn kidung-share-btn";
+  btn.textContent = "🔗";
   btn.title = "Bagikan teks lengkap kidung ini (semua bait + koor ditulis ulang)";
+  btn.setAttribute("aria-label", "Bagikan teks kidung ini");
   if (!text) { btn.disabled = true; return btn; }
   btn.addEventListener("click", async () => {
     if (navigator.share) {
@@ -540,9 +541,10 @@ function buildKidungCopyButton(meta, baits) {
   const text = buildKidungShareText(meta, baits);
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "chip-btn small kidung-copy-btn";
-  btn.textContent = "📋 Salin Teks";
+  btn.className = "round-media-btn kidung-copy-btn";
+  btn.textContent = "📋";
   btn.title = "Salin teks lengkap kidung ini ke clipboard (semua bait + koor)";
+  btn.setAttribute("aria-label", "Salin teks kidung ini");
   if (!text) { btn.disabled = true; return btn; }
   btn.addEventListener("click", () => {
     if (typeof copyTextWithFeedback === "function") {
