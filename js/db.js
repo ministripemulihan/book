@@ -293,7 +293,14 @@ const LocalDB = {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
-      const idx = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).index("byNoKidung");
+      const store = tx.objectStore(CONFIG.KIDUNG_STORE_NAME);
+      if (!store.indexNames.contains("byNoKidung")) {
+        const req = store.getAll();
+        req.onsuccess = () => resolve((req.result || []).filter((r) => String(r.noKidung) === String(noKidung)));
+        req.onerror = (e) => reject(e.target.error);
+        return;
+      }
+      const idx = store.index("byNoKidung");
       const req = idx.getAll(IDBKeyRange.only(noKidung));
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = (e) => reject(e.target.error);
@@ -303,11 +310,38 @@ const LocalDB = {
   // Sama seperti di atas, tapi dipersempit per BUKU juga (Kidung vs
   // Suplemen) -- dipakai supaya nomor yang sama di 2 buku berbeda tidak
   // ikut tercampur (lihat catatan index "byBukuNo" di open() di atas).
+  //
+  // FIX (21 Agu 2026) — PENGAMAN TAMBAHAN: laporan lapangan menunjukkan
+  // sebagian HP MASIH gagal ("... tidak ditemukan") walau perbaikan index
+  // di open() di atas SUDAH dipasang & DB_VERSION sudah dinaikkan --
+  // dugaan kuat: onupgradeneeded butuh SEMUA koneksi/tab lain ke
+  // IndexedDB yang sama tertutup dulu baru benar-benar jalan (event
+  // "blocked" kalau ada tab lama situs ini masih terbuka di latar
+  // belakang saat versi baru dimuat), jadi index bisa tetap belum
+  // terbentuk di kunjungan itu walau kodenya sudah benar. Daripada
+  // bergantung 100% pada migrasi skema berhasil, fungsi ini sekarang
+  // MENGECEK dulu index "byBukuNo" benar-benar ada; kalau BELUM ada,
+  // fallback ke scan manual (getAll() lalu difilter di JS) supaya kidung
+  // TETAP bisa dibuka & dibaca (sedikit lebih lambat, tapi data Kidung
+  // kecil jadi tidak terasa) alih-alih gagal total. Ini juga sekaligus
+  // jaring pengaman kalau suatu saat ada bug index lain yang belum
+  // ketahuan -- fitur baca Kidung tidak akan pernah "mati total" lagi
+  // hanya gara-gara index hilang.
   async getKidungRowsByBukuNo(buku, noKidung) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
-      const idx = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).index("byBukuNo");
+      const store = tx.objectStore(CONFIG.KIDUNG_STORE_NAME);
+      if (!store.indexNames.contains("byBukuNo")) {
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const all = req.result || [];
+          resolve(all.filter((r) => r.buku === buku && String(r.noKidung) === String(noKidung)));
+        };
+        req.onerror = (e) => reject(e.target.error);
+        return;
+      }
+      const idx = store.index("byBukuNo");
       const req = idx.getAll(IDBKeyRange.only([buku, noKidung]));
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = (e) => reject(e.target.error);
