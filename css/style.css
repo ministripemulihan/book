@@ -276,10 +276,27 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .kidung-reader-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; max-width: 400px; }
 
 /* Baris atas standar di semua layar Kidung: "← Kembali" (kalau ada) +
-   "📖 Alkitab" (selalu ada -- lihat kidungTopRow() di js/kidung-ui.js). */
+   "🎨" ganti tema (selalu ada -- lihat kidungTopRow() di js/kidung-ui.js).
+   Tombol "📖 Alkitab" yang dulu di sini sudah pindah jadi toggle di
+   #kidungHeaderBtn (header, lihat .kidung-header-btn-active di bawah). */
 .kidung-top-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-.kidung-alkitab-btn { border-color: var(--petrol); color: var(--petrol); }
-.kidung-alkitab-btn:hover { background: var(--petrol); color: #fff; }
+
+/* #kidungHeaderBtn (index.html, baris ikon header) saat sedang di dalam
+   Kidung -- disorot supaya jelas tombolnya SEKARANG berfungsi balik ke
+   Alkitab (icon-nya sendiri sudah berubah jadi 📖 lewat JS). */
+#kidungHeaderBtn.kidung-header-btn-active { background: var(--petrol); color: #fff; border-radius: 8px; }
+
+/* Tombol "🎨" ganti tema + pop-up kecil berisi swatch (dipakai daftar
+   THEMES yang sama dengan #themePicker utama, lihat kidungThemeButton()
+   di js/kidung-ui.js). */
+.kidung-theme-btn-wrap { position: relative; }
+.chip-btn.round { border-radius: 999px; padding: 6px 10px; }
+.kidung-theme-popover {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+  width: 220px; padding: 10px; border-radius: 12px;
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
 
 /* Toolbar bawah layar baca Kidung: panah sebelumnya/sesudahnya + bagikan
    + pemutar MP3/MP4/YouTube, bisa disembunyikan/ditampilkan lewat tombol
@@ -287,35 +304,62 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
    tidak terus menutupi syair saat sedang dibaca/dinyanyikan, terutama
    di layar HP yang sempit. */
 .kidung-toolbar { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 12px; }
-/* Tombol sembunyikan/tampilkan -- sekarang HANYA garis tipis selebar
-   toolbar (::before, flex:1) + segitiga kecil bulat (▾/▸) menempel di
-   ujung kanan (dulu ada tulisan "Tombol" di sampingnya, sudah dihapus
-   supaya hemat tempat). Tombolnya sendiri (elemen <button>) tetap
-   dibuat SELEBAR PENUH baris + padding atas/bawah yang cukup, supaya
-   walau yang KELIHATAN cuma garis+segitiga, area yang bisa disentuh
-   jari tetap lega, tidak cuma sekitar segitiganya saja. */
+.kidung-toolbar-body { display: flex; flex-direction: column; gap: 10px; }
+.kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
+
+/* ---- Baris utama: 8 kotak rapi (bukan bulat) ----
+   ◀ midi mp3v2 video favorit salin bagikan ▶ -- selalu 8 kolom sama
+   lebar (grid-template-columns: repeat(8,1fr)), jadi RAPI & sejajar
+   walau sebagian kotak "kosong/nonaktif" (lihat kidungDisabledSquare()
+   di js/kidung-ui.js), tidak lompat-lompat antar nomor kidung. */
+.kidung-toolbar-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+}
+.square-media-btn {
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1; width: 100%; min-height: 42px;
+  border-radius: 12px; border: 1px solid var(--rule);
+  background: var(--paper-raised); color: var(--ink);
+  font-size: 18px; line-height: 1; text-decoration: none;
+  cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.square-media-btn:hover { box-shadow: 0 3px 10px rgba(0,0,0,.14); border-color: var(--petrol); }
+.square-media-btn:active { transform: scale(.94); }
+.square-media-btn.active { background: var(--petrol); border-color: var(--petrol); color: #fff; }
+.kidung-square-disabled { opacity: .35; cursor: default; box-shadow: none; }
+.kidung-square-disabled:hover { box-shadow: none; border-color: var(--rule); }
+.kidung-nav-edge { font-weight: 700; color: var(--petrol); }
+
+/* ---- Baris kedua, lebih kecil: MP3 utama (loop) + YouTube ---- */
+.kidung-toolbar-secondary {
+  display: flex; align-items: center; gap: 8px; padding-top: 2px;
+}
+.square-media-btn-sm { min-height: 34px; font-size: 15px; border-radius: 10px; }
+.kidung-inline-media-slot { margin-top: 8px; grid-column: 1 / -1; }
+
+/* Tombol sembunyikan/tampilkan -- HANYA garis tipis selebar toolbar
+   (::before, flex:1) + tanda kecil TRANSPARAN "v"/"^" menempel di ujung
+   kanan (diperkecil & dibuat transparan sesuai permintaan 21 Agu 2026,
+   dulu pakai lingkaran ▾/▸ yang lebih besar/tebal). Tombolnya sendiri
+   (elemen <button>) tetap SELEBAR PENUH baris + padding tipis, supaya
+   area yang bisa disentuh jari tetap lega walau yang KELIHATAN kecil. */
 .kidung-toolbar-toggle {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; margin: 0 0 10px; padding: 10px 2px;
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; margin: 8px 0 0; padding: 6px 2px;
   border: none; background: transparent; cursor: pointer;
 }
 .kidung-toolbar-toggle::before {
-  content: ""; flex: 1; height: 1px; background: var(--rule);
+  content: ""; flex: 1; height: 1px; background: var(--rule); opacity: .5;
 }
 .kidung-toolbar-toggle-arrow {
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 999px;
-  border: 1px solid var(--rule); background: var(--paper-raised);
-  color: var(--ink-soft); font-size: 12px;
+  width: 18px; height: 18px;
+  background: transparent; border: none;
+  color: var(--ink-soft); opacity: .45; font-size: 11px; font-weight: 700;
 }
-.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow,
-.kidung-toolbar-toggle:hover::before { border-color: var(--petrol); }
-.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow { color: var(--petrol); }
-.kidung-toolbar-body { display: flex; flex-direction: column; gap: 12px; }
-.kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
-.kidung-toolbar-nav { display: flex; align-items: center; gap: 14px; }
-.kidung-nav-btn { font-size: 19px; }
-.kidung-toolbar-media-row { margin-top: -2px; }
+.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow { color: var(--petrol); opacity: .9; }
+.kidung-toolbar-toggle:hover::before { opacity: .9; border-color: var(--petrol); }
 
 /* Pemutar MP3 toggle bulat + progress bar (lihat buildLoopingMp3Player()
    di js/media.js) -- 1 tombol bulat ▶️/⏸️ (loop terus sampai ditekan
