@@ -345,22 +345,54 @@ async function getKidungSummaryByCategory(bukuFilter) {
 //  Balikan: { matches: [...meta kidung yang cocok, bentuk sama seperti
 //  getKidungList()...], total: jumlah SEMUA kidung buku ini (buat
 //  tampilan "ketemu X/Y kidung") }.
+// Cari 1 BARIS (di dalam sel `teks`, sel itu sendiri bisa berisi banyak
+// baris syair dipisah Alt+Enter/\n) yang memuat `q`, lalu potong jadi
+// cuplikan pendek dengan "…" di kiri/kanan kalau dipotong -- dipakai
+// supaya hasil pencarian bisa menampilkan POTONGAN SYAIR yang cocok
+// (mis. "…Kau wahyukan kasih mesra-Mu, biar…"), bukan cuma judulnya,
+// sesuai contoh tampilan yang diminta (lihat renderKidungSearch()).
+// `label` = "Bait N" / "Koor" (+ nama grup koor kalau kidung itu punya
+// >1 koor berbeda, mis. "Koor B") supaya jelas cuplikan itu ada di
+// bagian mana kidung itu.
+function findKidungMatchingLine(rows, q) {
+  for (const r of rows) {
+    const teks = r.teks || "";
+    if (!teks.toLowerCase().includes(q)) continue;
+    const lines = teks.split("\n");
+    const line = lines.find((l) => l.toLowerCase().includes(q)) || teks;
+    const li = line.toLowerCase().indexOf(q);
+    const CTX = 40;
+    const start = Math.max(0, li - CTX);
+    const end = Math.min(line.length, li + q.length + CTX);
+    const snippet = (start > 0 ? "…" : "") + line.slice(start, end).trim() + (end < line.length ? "…" : "");
+    const label = r.jenis === "koor" ? ("Koor" + (r.koorGroup ? " " + r.koorGroup : "")) : ("Bait " + (r.noBait || ""));
+    return { label, snippet };
+  }
+  return null;
+}
+
+// Balikan: { matches: [...meta kidung yang cocok, bentuk sama seperti
+//  getKidungList()..., PLUS `matchExcerpt: {label, snippet}|null` --
+//  potongan syair yang cocok (null kalau yang cocok cuma judul/pengarang,
+//  bukan isi syairnya)...], total: jumlah SEMUA kidung dalam cakupan ini
+//  (buat tampilan "ketemu X/Y kidung") }.
 //
-//  UPDATE (20 Agu 2026, permintaan lanjutan #2): tiap hasil pencarian
-//  sekarang membawa POTONGAN TEKS (snippet) dari baris syair/koor yang
-//  cocok -- bukan cuma judul lagi -- lewat buildKidungSnippet() di
-//  bawah: 2 kata SEBELUM + kata yang dicari + 2 kata SESUDAH (kalau
-//  ketemu di kata paling awal baris, 5 kata SESUDAHNYA saja, sesuai
-//  diminta). Field baru per match: `matchedIn` ("judul"/"pengarang"/
-//  "syair"), `snippet` (string potongan teks, atau null kalau yang
-//  cocok cuma judul/pengarang), `snippetBaitLabel` ("Bait 2"/"Koor").
-//  Kalau ada BEBERAPA baris yang cocok dalam 1 kidung yang sama, hanya
-//  baris PERTAMA yang dipakai untuk snippet (cukup buat pratinjau).
+// UPDATE (21 Agu 2026) -- 2 perubahan atas permintaan:
+//  1) `bukuFilter` sekarang BENAR-BENAR opsional & sengaja DIKOSONGKAN
+//     oleh pemanggil di kidung-ui.js (renderKidungSearch()) -- pencarian
+//     jadi 1 KOTAK SAJA lintas SEMUA buku (Kidung/Suplemen/Tambahan/dst,
+//     apa pun isi kolom `buku` di Sheet), bukan per-buku yang mengharuskan
+//     gonta-ganti toggle dulu (1 sheet, 1 sumber data -> 1 pencarian).
+//     Parameter ini TETAP dipertahankan (bukan dihapus) supaya pemanggil
+//     lain yang memang butuh cari dalam 1 buku saja tidak perlu diubah.
+//  2) Tiap match sekarang menyertakan matchExcerpt (lihat
+//     findKidungMatchingLine() di atas) supaya UI bisa menampilkan
+//     CUPLIKAN SYAIR yang cocok, bukan cuma judul kidungnya.
 async function searchKidungFull(query, bukuFilter) {
   const q = String(query || "").trim().toLowerCase();
   const list = await getKidungList(bukuFilter);
   const total = list.length;
-  if (!q) return { matches: list, total };
+  if (!q) return { matches: [], total };
 
   const allRows = await LocalDB.getAllKidungRows();
   // Kelompokkan baris per kidung (kunci buku+noKidung) supaya gampang
@@ -376,73 +408,15 @@ async function searchKidungFull(query, bukuFilter) {
 
   const matches = [];
   list.forEach((k) => {
-    const judulHit = (k.judul || "").toLowerCase().includes(q);
-    const pengarangHit = (k.pengarang || "").toLowerCase().includes(q);
     const rows = rowsByKey.get(k.buku + "_" + k.noKidung) || [];
-    const lyricRow = rows.find((r) => (r.teks || "").toLowerCase().includes(q)) || null;
-    if (!judulHit && !pengarangHit && !lyricRow) return; // tidak cocok sama sekali -- lewati
-
-    const entry = Object.assign({}, k);
-    if (lyricRow) {
-      entry.matchedIn = "syair";
-      entry.snippet = buildKidungSnippet(lyricRow.teks, q);
-      entry.snippetBaitLabel = lyricRow.jenis === "koor" ? "Koor" : ("Bait " + (lyricRow.noBait || ""));
-    } else {
-      entry.matchedIn = judulHit ? "judul" : "pengarang";
-      entry.snippet = null;
-      entry.snippetBaitLabel = null;
-    }
-    matches.push(entry);
+    const titleHit = (k.judul || "").toLowerCase().includes(q);
+    const authorHit = (k.pengarang || "").toLowerCase().includes(q);
+    const matchExcerpt = findKidungMatchingLine(rows, q);
+    if (!titleHit && !authorHit && !matchExcerpt) return;
+    matches.push(Object.assign({}, k, { matchExcerpt }));
   });
 
   return { matches, total };
-}
-
-// Ambil potongan teks di sekitar kata yang ditemukan dalam 1 baris
-// syair/koor: 2 kata SEBELUM + kata yang dicari + 2 kata SESUDAH (jadi
-// sekitar 5 kata total tampil di sekitar titik ketemu) -- KECUALI kalau
-// kata yang ketemu berada di kata PALING AWAL baris (tidak ada kata
-// sebelumnya sama sekali), yang ditampilkan malah 5 kata SESUDAHNYA
-// saja, persis seperti diminta. "…" ditambah di ujung yang terpotong
-// supaya jelas itu bukan awal/akhir baris yang sesungguhnya.
-// Dipakai searchKidungFull() di atas.
-function buildKidungSnippet(text, q) {
-  if (!text || !q) return null;
-  const lower = text.toLowerCase();
-  const idx = lower.indexOf(q);
-  if (idx === -1) return null;
-
-  const words = text.split(/\s+/).filter(Boolean);
-  if (!words.length) return null;
-
-  // Cari index KATA yang memuat posisi karakter `idx` di atas (dicocokkan
-  // per kata, jadi longgar terhadap variasi spasi/baris baru di data asli).
-  let cum = 0;
-  let startWordIdx = words.length - 1;
-  for (let i = 0; i < words.length; i++) {
-    const wStart = lower.indexOf(words[i].toLowerCase(), cum);
-    const wEnd = (wStart === -1 ? cum : wStart) + words[i].length;
-    if (idx < wEnd) { startWordIdx = i; break; }
-    cum = wEnd;
-  }
-
-  const qWordSpan = q.split(/\s+/).filter(Boolean).length; // query bisa >1 kata
-  const endWordIdx = Math.min(words.length - 1, startWordIdx + qWordSpan - 1);
-  const isFirstWord = startWordIdx === 0;
-
-  let sliceStart, sliceEnd;
-  if (isFirstWord) {
-    sliceStart = startWordIdx;
-    sliceEnd = Math.min(words.length - 1, endWordIdx + 5);
-  } else {
-    sliceStart = Math.max(0, startWordIdx - 2);
-    sliceEnd = Math.min(words.length - 1, endWordIdx + 2);
-  }
-
-  let snippet = words.slice(sliceStart, sliceEnd + 1).join(" ");
-  if (sliceStart > 0) snippet = "…" + snippet;
-  if (sliceEnd < words.length - 1) snippet = snippet + "…";
-  return snippet;
 }
 
 // ============================================================
