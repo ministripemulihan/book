@@ -177,6 +177,23 @@ function mediaLinkButton(label, url) {
   return a;
 }
 
+// Versi BULAT (ikon saja, tanpa tulisan) dari mediaLinkButton() di atas --
+// dipakai di tempat yang butuh baris tombol padat berisi ikon-ikon saja
+// (mis. toolbar bawah layar baca Kidung), sama gayanya dengan
+// roundMediaButton() tapi ini <a> (buka/unduh link apa adanya), bukan
+// <button> (buka pemutar sebaris).
+function roundMediaLinkButton(icon, title, url) {
+  const a = document.createElement("a");
+  a.href = driveOpenUrl(url);
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.className = "round-media-btn";
+  a.textContent = icon;
+  a.title = title;
+  a.setAttribute("aria-label", title);
+  return a;
+}
+
 // ------------------------------------------------------------
 //  PEMUTAR MEDIA "SEBARIS" (inline) -- dulu tombol MP3/MP4/YouTube
 //  membuka TAB BARU (target="_blank"), yang di HP suka tertutup sendiri
@@ -309,6 +326,179 @@ function youTubeEmbedUrl(url) {
   if (!id) { m = url.match(/youtube\.com\/embed\/([^?&]+)/); if (m) id = m[1]; }
   if (!id) { m = url.match(/youtube\.com\/shorts\/([^?&]+)/); if (m) id = m[1]; }
   return id ? "https://www.youtube.com/embed/" + id : null;
+}
+
+// ------------------------------------------------------------
+//  PEMUTAR MP3 "TOGGLE BULAT" -- khusus dipakai toolbar Kidung, gayanya
+//  mengikuti contoh app "Kidung" yang dikirim (1 tombol bulat ▶️/⏸️ +
+//  progress bar tipis di sampingnya, BUKAN elemen <audio controls> biasa
+//  seperti buildInlineMediaBlock() di atas). Beda perilaku dari MP3 di
+//  buildInlineMediaBlock():
+//    - SATU tombol bulat saja: sekali tekan main, tekan lagi jeda (murni
+//      toggle play/pause, bukan buka pemutar baru tiap kali).
+//    - loop = true -- begitu selesai, otomatis mengulang dari awal terus
+//      menerus, BERHENTI hanya kalau tombolnya ditekan lagi (sesuai
+//      permintaan "terus berulang mainnya sampai ditekan kembali").
+//    - Progress bar tipis di sebelah tombol menunjukan posisi lagu
+//      berjalan (bisa disentuh/digeser untuk lompat ke bagian tertentu).
+// ------------------------------------------------------------
+function formatMediaTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
+
+function buildLoopingMp3Player(url, titleForSession, label) {
+  const wrap = document.createElement("div");
+  wrap.className = "kidung-mp3-player";
+
+  const audio = document.createElement("audio");
+  audio.loop = true; // "terus berulang mainnya sampai ditekan kembali"
+  audio.preload = "none";
+  audio.setAttribute("playsinline", "");
+  audio.src = url;
+  wrap.appendChild(audio);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "round-media-btn kidung-mp3-toggle";
+  toggleBtn.textContent = "▶️";
+  toggleBtn.title = "Putar " + (label || "MP3") + " (berulang, tekan lagi untuk jeda)";
+  toggleBtn.setAttribute("aria-label", toggleBtn.title);
+  wrap.appendChild(toggleBtn);
+
+  const progressWrap = document.createElement("div");
+  progressWrap.className = "kidung-mp3-progress-wrap";
+
+  const progress = document.createElement("input");
+  progress.type = "range";
+  progress.className = "kidung-mp3-progress";
+  progress.min = "0";
+  progress.max = "100";
+  progress.value = "0";
+  progress.setAttribute("aria-label", "Posisi " + (label || "MP3"));
+  progressWrap.appendChild(progress);
+
+  const timeLabel = document.createElement("span");
+  timeLabel.className = "kidung-mp3-time";
+  timeLabel.textContent = "0:00";
+  progressWrap.appendChild(timeLabel);
+
+  wrap.appendChild(progressWrap);
+
+  let seeking = false;
+
+  toggleBtn.addEventListener("click", () => {
+    if (audio.paused) {
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  });
+  audio.addEventListener("play", () => {
+    toggleBtn.textContent = "⏸️";
+    toggleBtn.classList.add("playing");
+    if (typeof requestWakeLock === "function") requestWakeLock();
+    if (typeof wireMediaSession === "function") wireMediaSession(audio, titleForSession);
+  });
+  audio.addEventListener("pause", () => {
+    toggleBtn.textContent = "▶️";
+    toggleBtn.classList.remove("playing");
+    if (typeof releaseWakeLock === "function") releaseWakeLock();
+  });
+  audio.addEventListener("timeupdate", () => {
+    if (seeking || !audio.duration) return;
+    progress.value = String((audio.currentTime / audio.duration) * 100);
+    timeLabel.textContent = formatMediaTime(audio.currentTime);
+  });
+  progress.addEventListener("input", () => {
+    seeking = true;
+    if (audio.duration) timeLabel.textContent = formatMediaTime((progress.value / 100) * audio.duration);
+  });
+  progress.addEventListener("change", () => {
+    if (audio.duration) audio.currentTime = (progress.value / 100) * audio.duration;
+    seeking = false;
+  });
+
+  return wrap;
+}
+
+// Versi "TELANJANG" dari pemutar sebaris di atas -- HANYA elemen
+// pemutarnya saja (iframe/video/audio + catatan Drive kalau perlu),
+// TANPA baris tombol bulat + tombol bagikan bawaan buildInlineMediaBlock().
+// Dipakai di toolbar layar baca Kidung (js/kidung-ui.js) yang sudah
+// punya tombol kotak sendiri (🎬/📺) -- supaya tidak dobel tombol
+// (dulu: tombol kotak DITEKAN, lalu buildInlineMediaBlock() menaruh LAGI
+// 1 baris tombol bulat + bagikan sendiri di bawahnya, jadi kelihatan
+// berantakan/dobel). Wake lock diurus sendiri lewat elemen medianya.
+// `kind`: "mp3" | "mp4" | "youtube". `rawUrl`: link mentahnya.
+function buildStandaloneMediaPlayer(kind, rawUrl, titleForSession) {
+  const wrap = document.createElement("div");
+  wrap.className = "standalone-media-player";
+
+  function wireWakeLockToMediaEl(mediaEl) {
+    if (typeof requestWakeLock !== "function") return;
+    mediaEl.addEventListener("play", () => requestWakeLock());
+    mediaEl.addEventListener("pause", () => { if (typeof releaseWakeLock === "function") releaseWakeLock(); });
+    mediaEl.addEventListener("ended", () => { if (typeof releaseWakeLock === "function") releaseWakeLock(); });
+  }
+
+  if (kind === "mp3" || kind === "mp4") {
+    if (isDriveUrl(rawUrl)) {
+      const embedUrl = driveEmbedPreviewUrl(rawUrl);
+      if (embedUrl) {
+        const iframe = document.createElement("iframe");
+        iframe.className = "inline-media-player " + (kind === "mp4" ? "inline-media-drive-video" : "inline-media-drive-audio");
+        iframe.src = embedUrl;
+        iframe.allow = "autoplay";
+        iframe.allowFullscreen = true;
+        wrap.appendChild(iframe);
+        const hint = document.createElement("div");
+        hint.className = "inline-media-drive-hint";
+        hint.innerHTML = 'Tidak muncul / minta izin? Pastikan file di Google Drive dibagikan sebagai "Siapa saja yang memiliki link" (Anyone with the link), lalu <a href="' + driveOpenUrl(rawUrl) + '" target="_blank" rel="noopener noreferrer">buka langsung di sini</a>.';
+        wrap.appendChild(hint);
+        if (typeof requestWakeLock === "function") requestWakeLock();
+      } else {
+        window.open(driveOpenUrl(rawUrl), "_blank", "noopener,noreferrer");
+        return null;
+      }
+    } else if (kind === "mp3") {
+      const audio = document.createElement("audio");
+      audio.controls = true;
+      audio.autoplay = true;
+      audio.setAttribute("playsinline", "");
+      audio.className = "inline-media-player";
+      audio.src = rawUrl;
+      wrap.appendChild(audio);
+      if (typeof wireMediaSession === "function") wireMediaSession(audio, titleForSession);
+      wireWakeLockToMediaEl(audio);
+    } else {
+      const video = document.createElement("video");
+      video.controls = true;
+      video.autoplay = true;
+      video.setAttribute("playsinline", "");
+      video.className = "inline-media-player";
+      video.src = rawUrl;
+      wrap.appendChild(video);
+      if (typeof wireMediaSession === "function") wireMediaSession(video, titleForSession);
+      wireWakeLockToMediaEl(video);
+    }
+  } else if (kind === "youtube") {
+    const embedUrl = youTubeEmbedUrl(rawUrl);
+    if (embedUrl) {
+      const iframe = document.createElement("iframe");
+      iframe.className = "inline-media-player inline-media-youtube";
+      iframe.src = embedUrl + (embedUrl.indexOf("?") === -1 ? "?" : "&") + "autoplay=1&playsinline=1";
+      iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+      iframe.allowFullscreen = true;
+      wrap.appendChild(iframe);
+    } else {
+      window.open(rawUrl, "_blank", "noopener,noreferrer");
+      return null;
+    }
+  }
+  return wrap;
 }
 
 // Membangun blok tombol BULAT + pemutar sebaris untuk satu `media`
