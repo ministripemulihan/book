@@ -307,20 +307,20 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .kidung-toolbar-body { display: flex; flex-direction: column; gap: 10px; }
 .kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
 
-/* ---- Baris utama: 8 kotak rapi (bukan bulat) ----
-   ◀ midi mp3v2 video favorit salin bagikan ▶ -- selalu 8 kolom sama
-   lebar (grid-template-columns: repeat(8,1fr)), jadi RAPI & sejajar
-   walau sebagian kotak "kosong/nonaktif" (lihat kidungDisabledSquare()
-   di js/kidung-ui.js), tidak lompat-lompat antar nomor kidung. */
+/* ---- Satu baris, semua kotak SERAGAM ----
+   ◀ midi mp3(1) mp3v2 video youtube favorit salin bagikan ▶ -- flex-wrap
+   (bukan grid kolom tetap) supaya jumlah kotak bisa berubah tanpa
+   kolong kosong, tapi ukuran tiap kotak tetap SAMA & rapi. Di layar
+   sempit otomatis lanjut ke baris berikutnya (wrap). */
 .kidung-toolbar-grid {
-  display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
 }
 .square-media-btn {
   display: flex; align-items: center; justify-content: center;
-  aspect-ratio: 1; width: 100%; min-height: 42px;
-  border-radius: 12px; border: 1px solid var(--rule);
+  flex: 0 0 auto; width: 38px; height: 38px;
+  border-radius: 11px; border: 1px solid var(--rule);
   background: var(--paper-raised); color: var(--ink);
-  font-size: 18px; line-height: 1; text-decoration: none;
+  font-size: 16px; line-height: 1; text-decoration: none;
   cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
   box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
@@ -329,14 +329,22 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .square-media-btn.active { background: var(--petrol); border-color: var(--petrol); color: #fff; }
 .kidung-square-disabled { opacity: .35; cursor: default; box-shadow: none; }
 .kidung-square-disabled:hover { box-shadow: none; border-color: var(--rule); }
-.kidung-nav-edge { font-weight: 700; color: var(--petrol); }
 
-/* ---- Baris kedua, lebih kecil: MP3 utama (loop) + YouTube ---- */
-.kidung-toolbar-secondary {
-  display: flex; align-items: center; gap: 8px; padding-top: 2px;
+/* Tombol ◀/▶ (nomor sebelumnya/selanjutnya) -- SENGAJA TANPA kotak/latar
+   (permintaan 21 Agu 2026: "tombol paling kiri dan kanan dibuat tidak
+   pakai kotak, supaya bisa lebih rapi"), cuma panah polos berwarna. */
+.kidung-nav-plain {
+  flex: 0 0 auto; width: 30px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; color: var(--petrol);
+  font-size: 18px; font-weight: 700; cursor: pointer;
+  transition: opacity .12s ease, transform .12s ease;
 }
-.square-media-btn-sm { min-height: 34px; font-size: 15px; border-radius: 10px; }
-.kidung-inline-media-slot { margin-top: 8px; grid-column: 1 / -1; }
+.kidung-nav-plain:hover { opacity: .75; }
+.kidung-nav-plain:active { transform: scale(.9); }
+.kidung-nav-plain:disabled { opacity: .3; cursor: default; }
+
+.kidung-inline-media-slot { margin-top: 8px; width: 100%; }
 
 /* Tombol sembunyikan/tampilkan -- HANYA garis tipis selebar toolbar
    (::before, flex:1) + tanda kecil TRANSPARAN "v"/"^" menempel di ujung
