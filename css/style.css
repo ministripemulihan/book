@@ -1,5 +1,5 @@
 /* ============================================================
-   TOKEN DESAIN 
+   TOKEN DESAIN
    Tema: "manuskrip & kuningan" — kertas hangat, tinta cokelat gelap,
    aksen hijau petrol (sampul kitab berjilid kain) dan kuningan pudar
    untuk nomor ayat. Serif "Literata" untuk teks bacaan (dirancang
@@ -307,13 +307,20 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .kidung-toolbar-body { display: flex; flex-direction: column; gap: 10px; }
 .kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
 
-/* ---- Satu baris, semua kotak SERAGAM ----
-   ◀ midi mp3(1) mp3v2 video youtube favorit salin bagikan ▶ -- flex-wrap
-   (bukan grid kolom tetap) supaya jumlah kotak bisa berubah tanpa
-   kolong kosong, tapi ukuran tiap kotak tetap SAMA & rapi. Di layar
-   sempit otomatis lanjut ke baris berikutnya (wrap). */
+/* ---- ◀ [kelompok tengah, boleh melipat] ▶ ----
+   .kidung-toolbar-grid = baris LUAR, TIDAK melipat (nowrap) -- isinya
+   cuma 3 anak: ◀, .kidung-toolbar-middle, ▶ -- supaya ◀ tetap di
+   ujung KIRI & ▶ tetap di ujung KANAN toolbar apa pun yang terjadi di
+   dalamnya. .kidung-toolbar-middle = baris DALAM yang boleh melipat ke
+   baris ke-2/3 di layar sempit (flex-wrap), berisi semua ikon media +
+   favorit + salin + bagikan. align-items:flex-start supaya ◀/▶ nempel
+   di baris PALING ATAS walau kelompok tengah melipat jadi 2 baris. */
 .kidung-toolbar-grid {
+  display: flex; align-items: flex-start; gap: 4px;
+}
+.kidung-toolbar-middle {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  flex: 1; min-width: 0;
 }
 .square-media-btn {
   display: flex; align-items: center; justify-content: center;
