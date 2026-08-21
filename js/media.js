@@ -6,7 +6,7 @@
 //  ayat + link dengar/tonton untuk tiap rentang itu.
 //
 //  Data di-cache di localStorage (bukan IndexedDB, karena ukurannya kecil)
-//  supaya kunjungan berikutnya instan; ada tombol sinkron ulang per sheet.
+//  supaya kunjungan berikutnya instan; ada tombol sinkron ulang per sheet. 
 // ============================================================
 const MEDIA_CACHE_PREFIX = "bible_app_media_v1_";
 
