@@ -39,11 +39,14 @@ const AiChatSync = {
   enabled() {
     return !!(CONFIG.AI_CHAT_APPS_SCRIPT_URL && CONFIG.AI_CHAT_APPS_SCRIPT_URL.indexOf("http") === 0);
   },
-  async ask({ username, question, context, allowExternal, history }) {
+  async ask({ username, displayName, saudara, question, context, allowExternal, history }) {
     const res = await fetch(CONFIG.AI_CHAT_APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ type: "ai_chat", username, question, context, allowExternal, history }),
+      // displayName/saudara -- BARU, dipakai backend supaya AI Chat
+      // menyapa pengguna dengan nama aslinya ("Saudara"/"Saudari {Nama}")
+      // alih-alih selalu "Gembala", lihat AiChatCode.gs.
+      body: JSON.stringify({ type: "ai_chat", username, displayName, saudara, question, context, allowExternal, history }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
@@ -467,10 +470,33 @@ async function gatherAiChatContext(question) {
     }
   } catch (e) { /* opsional -- AI tetap jalan tanpanya kalau gagal (mis. Sheet belum diisi) */ }
 
+  // 🎵 Kidung/Nyanyian Pujian -- BARU, dicari lewat searchKidungFull()
+  // yang SUDAH ADA di js/kidung.js (kotak cari kidung biasa memakainya
+  // juga), supaya AI Chat bisa ikut menjawab pertanyaan seputar syair
+  // kidung/pujian & MENYEBUT nomornya (mis. "Kidung No. 095" atau
+  // "Suplemen No. 12"), bukan cuma ayat Alkitab. Query dipakai UTUH
+  // (bukan per-kata seperti runKeywordSearch ayat) karena judul/potongan
+  // syair biasanya berupa frasa, bukan 1 kata kunci lepas.
+  let kidung = [];
+  let kidungSources = [];
+  try {
+    if (typeof searchKidungFull === "function") {
+      const { matches } = await searchKidungFull(question);
+      matches.slice(0, 5).forEach((m) => {
+        const noText = (typeof formatKidungNo === "function") ? formatKidungNo(m.buku, m.noKidung) : m.noKidung;
+        const ref = `${m.buku} No. ${noText}${m.judul ? " - " + m.judul : ""}`;
+        const cuplikan = m.matchExcerpt ? `${m.matchExcerpt.label}: "${m.matchExcerpt.snippet}"` : (m.judul || "");
+        kidung.push({ kind: "kidung", ref, text: cuplikan });
+        kidungSources.push({ kind: "kidung", ref, text: cuplikan });
+      });
+    }
+  } catch (e) { /* opsional -- AI tetap jalan tanpanya kalau data Kidung belum disinkron */ }
+
   return {
     verses, notes,
     bookPokok: outline.bookPokok, allPokok: outline.allPokok,
     knowledgeContext, knowledgeSources,
+    kidung, kidungSources,
   };
 }
 
@@ -896,6 +922,8 @@ async function handleAiChatAsk(question) {
     const context = await gatherAiChatContext(question);
     const data = await AiChatSync.ask({
       username: currentUser,
+      displayName: currentUserDisplay,
+      saudara: currentUserSaudara,
       question,
       context,
       allowExternal: _aiChatState.allowExternal,
@@ -907,7 +935,7 @@ async function handleAiChatAsk(question) {
     const aiTurn = {
       role: "ai",
       text: data.answer,
-      sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context), context.knowledgeSources || []),
+      sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context), context.knowledgeSources || [], context.kidungSources || []),
     };
     _aiChatState.history.push(aiTurn);
     maybeSaveAiChatTurn(question, aiTurn);
