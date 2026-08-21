@@ -57,6 +57,14 @@ async function showKidungPanel() {
   const panel = el("kidungPanel");
   if (!panel) return;
   panel.hidden = false;
+  // Tandai <body> "lagi di Kidung" -- dipakai css/style.css untuk
+  // menyembunyikan kotak "Cari Alkitab" di header KHUSUS di lebar HP
+  // (lihat body.kidung-active .search-form), supaya di layar sempit
+  // tidak berebut tempat dengan syair yang sedang dibaca. Ditaruh di
+  // <body> (bukan panel Kidung sendiri) karena kotak carinya ada di
+  // <header>, di LUAR panel-panel konten. Dilepas lagi otomatis begitu
+  // panel LAIN dibuka, lewat hideAllPanels() di js/app.js.
+  document.body.classList.add("kidung-active");
   logActivity && typeof logActivity === "function" && logActivity("Kidung");
   await renderKidungHome();
 }
@@ -518,10 +526,15 @@ function buildKidungToolbar(meta, baits) {
   const wrap = document.createElement("div");
   wrap.className = "kidung-toolbar";
 
+  // Baris pemicu sembunyikan/tampilkan: HANYA garis tipis + segitiga kecil
+  // di ujung kanan (▾/▸) -- dulu ada tulisan "Tombol" di sampingnya, sudah
+  // dihapus supaya hemat tempat, tapi area yang bisa disentuh (tombolnya)
+  // tetap dibuat penuh 1 baris (bukan cuma sekitar segitiganya saja) supaya
+  // tetap gampang ditekan jari walau yang KELIHATAN cuma garis + segitiga.
   const toggleBtn = document.createElement("button");
   toggleBtn.type = "button";
   toggleBtn.className = "kidung-toolbar-toggle";
-  toggleBtn.textContent = "▾ Tombol";
+  toggleBtn.innerHTML = '<span class="kidung-toolbar-toggle-arrow">▾</span>';
   toggleBtn.title = "Sembunyikan/tampilkan tombol navigasi, bagikan, & pemutar";
   toggleBtn.setAttribute("aria-label", "Sembunyikan/tampilkan tombol kidung");
   wrap.appendChild(toggleBtn);
@@ -562,26 +575,37 @@ function buildKidungToolbar(meta, baits) {
   navRow.appendChild(nextBtn);
   body.appendChild(navRow);
 
-  // Pemutar MP3 (bisa 2 rekaman)/MP4/YouTube/unduh MIDI -- link-nya
-  // ambil apa adanya dari data kidung (kosong = tombolnya otomatis
-  // tidak dipasang, lewat cek if() masing-masing di bawah).
+  // Baris ikon media -- gaya "mirip mockup" (semua BULAT, ikon saja tanpa
+  // tulisan): 🎼 unduh MIDI, lalu 🎧/🎧2 MP3 (pemutar toggle+progress bar
+  // sendiri, lihat buildLoopingMp3Player() di js/media.js -- BEDA dari MP4/
+  // YouTube di bawahnya yang masih pakai buildInlineMediaBlock() biasa,
+  // karena MP3 di sini memang mau berperilaku loop+toggle 1 tombol, bukan
+  // buka pemutar <audio controls>). Link-nya ambil apa adanya dari data
+  // kidung -- kosong = tombolnya otomatis tidak dipasang.
+  const sessionTitle = (meta.judul && meta.judul.trim()) || ("Kidung No. " + formatKidungNo(meta.buku, meta.noKidung));
+
+  // 🎼 Unduh MIDI -- ikon bulat saja, ditaruh baris sendiri tepat di bawah
+  // baris navigasi supaya urutannya: navigasi -> MIDI -> MP3(x2) -> MP4 -> YouTube.
+  if (meta.linkMidi && typeof roundMediaLinkButton === "function") {
+    const midiRow = document.createElement("div");
+    midiRow.className = "round-media-row kidung-toolbar-media-row";
+    midiRow.appendChild(roundMediaLinkButton("🎼", "Unduh MIDI", meta.linkMidi));
+    body.appendChild(midiRow);
+  }
+  if (meta.linkMp3_1 && typeof buildLoopingMp3Player === "function") {
+    body.appendChild(buildLoopingMp3Player(meta.linkMp3_1, sessionTitle, "MP3"));
+  }
+  if (meta.linkMp3_2 && typeof buildLoopingMp3Player === "function") {
+    body.appendChild(buildLoopingMp3Player(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2"));
+  }
   if (typeof buildInlineMediaBlock === "function") {
-    const sessionTitle = (meta.judul && meta.judul.trim()) || ("Kidung No. " + formatKidungNo(meta.buku, meta.noKidung));
-    if (meta.linkMp3_1) body.appendChild(buildInlineMediaBlock({ mp3: meta.linkMp3_1 }, sessionTitle));
-    if (meta.linkMp3_2) body.appendChild(buildInlineMediaBlock({ mp3: meta.linkMp3_2 }, sessionTitle + " (versi 2)"));
     if (meta.linkVideo) body.appendChild(buildInlineMediaBlock({ mp4: meta.linkVideo }, sessionTitle));
     if (meta.linkYoutube) body.appendChild(buildInlineMediaBlock({ youtube: meta.linkYoutube }, sessionTitle));
-  }
-  if (meta.linkMidi && typeof mediaLinkButton === "function") {
-    const midiRow = document.createElement("div");
-    midiRow.className = "kidung-toolbar-midi";
-    midiRow.appendChild(mediaLinkButton("⬇️ Unduh MIDI", meta.linkMidi));
-    body.appendChild(midiRow);
   }
 
   toggleBtn.addEventListener("click", () => {
     const collapsed = wrap.classList.toggle("collapsed");
-    toggleBtn.textContent = collapsed ? "▸ Tombol" : "▾ Tombol";
+    toggleBtn.querySelector(".kidung-toolbar-toggle-arrow").textContent = collapsed ? "▸" : "▾";
   });
 
   return wrap;
