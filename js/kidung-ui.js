@@ -1,7 +1,7 @@
 // ============================================================
 //  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari
 //  menu ☰ / "Lainnya" seperti "📚 Kumpulan Ayat" dkk, supaya bisa
-//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron, 
+//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron,
 //  parsing, ambil bait+koor, teks bagikan) SUDAH ada semua di
 //  js/kidung.js -- file ini KHUSUS tampilan & alur klik saja, pola
 //  penulisannya sama seperti js/collections.js (renderCollectionsPanel
@@ -313,6 +313,23 @@ async function renderKidungHome() {
   numInput.focus();
 }
 
+// 🎛️ Filter media -- BARU. Tiap filter mengecek 1 (atau beberapa) kolom
+// link yang sudah ada di getKidungList() (lihat js/kidung.js): "mp3"
+// mencakup link_mp3_1 ATAU link_mp3_2 (dianggap "punya MP3" kalau salah
+// satunya terisi), "video" = link_video (mp4/rekaman video), "youtube" =
+// link_youtube, "midi" = link_midi. Ini FILTER TAMPILAN saja (mempersempit
+// baris mana yang MUNCUL di daftar) -- begitu ditekan, tetap membuka
+// pembaca/tampilan kidung yang SAMA PERSIS seperti biasa (openKidungReader),
+// isi syairnya tetap ditampilkan lengkap seperti biasa, bukan cuma linknya.
+const KIDUNG_MEDIA_FILTERS = [
+  { key: "__all__", label: "Semua" },
+  { key: "mp3", label: "🎵 MP3", test: (k) => !!(k.linkMp3_1 || k.linkMp3_2) },
+  { key: "video", label: "🎬 Video/MP4", test: (k) => !!k.linkVideo },
+  { key: "youtube", label: "▶️ YouTube", test: (k) => !!k.linkYoutube },
+  { key: "midi", label: "🎹 MIDI", test: (k) => !!k.linkMidi },
+];
+let kidungListMediaFilter = "__all__";
+
 async function renderKidungList(bukuFilter) {
   const panel = el("kidungPanel");
   if (!panel) return;
@@ -323,25 +340,74 @@ async function renderKidungList(bukuFilter) {
   title.textContent = "📋 Daftar " + bukuFilter;
   panel.appendChild(title);
 
-  const list = await getKidungList(bukuFilter).catch(() => []);
-  if (!list.length) {
+  const fullList = await getKidungList(bukuFilter).catch(() => []);
+  if (!fullList.length) {
     const p = document.createElement("p");
     p.textContent = "Belum ada data untuk buku ini.";
     panel.appendChild(p);
     return;
   }
 
+  // Baris chip filter media -- hanya tampil kalau memang ada kidung yang
+  // punya minimal 1 link media di buku ini (kalau tidak ada satupun, chip
+  // ini cuma bikin bingung karena semua akan kosong).
+  const anyHasMedia = fullList.some((k) => k.linkMp3_1 || k.linkMp3_2 || k.linkVideo || k.linkYoutube || k.linkMidi);
+  const countLabel = document.createElement("p");
+  countLabel.className = "kidung-search-count";
   const box = document.createElement("div");
   box.className = "kidung-list";
-  list.forEach((k) => {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "kidung-list-item";
-    item.textContent = formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
-    item.addEventListener("click", () => openKidungReader(k.buku, k.noKidung));
-    box.appendChild(item);
-  });
+
+  function renderFilteredList() {
+    const active = KIDUNG_MEDIA_FILTERS.find((f) => f.key === kidungListMediaFilter) || KIDUNG_MEDIA_FILTERS[0];
+    const filtered = active.test ? fullList.filter(active.test) : fullList;
+    countLabel.textContent =
+      kidungListMediaFilter === "__all__"
+        ? fullList.length.toLocaleString("id-ID") + " kidung"
+        : filtered.length.toLocaleString("id-ID") + " dari " + fullList.length.toLocaleString("id-ID") + " kidung yang punya " + active.label;
+    box.innerHTML = "";
+    if (!filtered.length) {
+      const p = document.createElement("p");
+      p.className = "media-empty";
+      p.textContent = "Tidak ada kidung dengan jenis media ini.";
+      box.appendChild(p);
+      return;
+    }
+    // Tetap SAMA PERSIS seperti tampilan daftar biasa (nomor + judul),
+    // isi syair lengkapnya baru muncul di openKidungReader seperti biasa.
+    filtered.forEach((k) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "kidung-list-item";
+      item.textContent = formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
+      item.addEventListener("click", () => openKidungReader(k.buku, k.noKidung));
+      box.appendChild(item);
+    });
+  }
+
+  if (anyHasMedia) {
+    const filterRow = document.createElement("div");
+    filterRow.className = "kidung-book-toggle";
+    KIDUNG_MEDIA_FILTERS.forEach((f) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = f.label;
+      btn.className = "chip-btn small" + (f.key === kidungListMediaFilter ? " active" : "");
+      btn.addEventListener("click", () => {
+        kidungListMediaFilter = f.key;
+        filterRow.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderFilteredList();
+      });
+      filterRow.appendChild(btn);
+    });
+    panel.appendChild(filterRow);
+  } else {
+    kidungListMediaFilter = "__all__";
+  }
+
+  panel.appendChild(countLabel);
   panel.appendChild(box);
+  renderFilteredList();
 }
 
 // Berapa hasil ditampilkan per "halaman" -- dulu di-hardcode 100 lalu
