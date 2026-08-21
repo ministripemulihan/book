@@ -1,5 +1,5 @@
 // ============================================================
-//  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari
+//  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari 
 //  menu ☰ / "Lainnya" seperti "📚 Kumpulan Ayat" dkk, supaya bisa
 //  langsung dipakai di HP maupun komputer. Lapisan data (sinkron,
 //  parsing, ambil bait+koor, teks bagikan) SUDAH ada semua di
