@@ -5,7 +5,7 @@
 //  Alkitab utama seperti biasa) — sheet ini hanya berisi rentang referensi
 //  ayat + link dengar/tonton untuk tiap rentang itu.
 //
-//  Data di-cache di localStorage (bukan IndexedDB, karena ukurannya kecil) 
+//  Data di-cache di localStorage (bukan IndexedDB, karena ukurannya kecil)
 //  supaya kunjungan berikutnya instan; ada tombol sinkron ulang per sheet.
 // ============================================================
 const MEDIA_CACHE_PREFIX = "bible_app_media_v1_";
