@@ -252,6 +252,22 @@ function renderLangCheckPanel() {
   `;
   container.appendChild(controls);
 
+  // 🎵 Sub-menu BARU, khusus administrator (lihat js/kidungversecheck.js
+  // & CONFIG.KIDUNG_VERSE_REF_LEVELS) -- beda dari pemindaian di atas
+  // (yang mengecek bahasa AYAT ALKITAB), sub-menu ini mengecek syair
+  // KIDUNG untuk mencari referensi ayat Alkitab yang paling mendekati.
+  if (typeof isKidungVerseRefAllowed === "function" && isKidungVerseRefAllowed()) {
+    const kidungVerseRow = document.createElement("div");
+    kidungVerseRow.className = "log-controls";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip-btn";
+    btn.textContent = "🎵 Cek Referensi Ayat Kidung (khusus Admin)";
+    btn.addEventListener("click", () => showKidungVerseRefPanel());
+    kidungVerseRow.appendChild(btn);
+    container.appendChild(kidungVerseRow);
+  }
+
   const langFilterSel = controls.querySelector("#langCheckLangFilter");
   (CONFIG.LANGUAGES || []).forEach((l) => {
     const opt = document.createElement("option");
