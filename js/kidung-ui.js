@@ -65,8 +65,25 @@ async function showKidungPanel() {
   // <header>, di LUAR panel-panel konten. Dilepas lagi otomatis begitu
   // panel LAIN dibuka, lewat hideAllPanels() di js/app.js.
   document.body.classList.add("kidung-active");
+  syncKidungHeaderToggle();
   logActivity && typeof logActivity === "function" && logActivity("Kidung");
   await renderKidungHome();
+}
+
+// Menyamakan tampilan #kidungHeaderBtn (index.html, di baris ikon header)
+// dengan mode saat ini -- lihat catatan panjang di js/app.js dekat
+// pemasangan event click-nya. Dipanggil setiap kali body.kidung-active
+// berubah (showKidungPanel() di atas + hideAllPanels() di js/app.js),
+// jadi TIDAK PERNAH keliru walau berpindah panel lewat jalan lain
+// (mis. "← Kembali" berkali-kali, atau klik menu lain langsung).
+function syncKidungHeaderToggle() {
+  const btn = el("kidungHeaderBtn");
+  if (!btn) return;
+  const inKidung = document.body.classList.contains("kidung-active");
+  btn.textContent = inKidung ? "📖" : "🎵";
+  btn.title = inKidung ? "Kembali ke Alkitab (pasal terakhir dibaca)" : "Buka Kidung";
+  btn.setAttribute("aria-label", btn.title);
+  btn.classList.toggle("kidung-header-btn-active", inKidung);
 }
 
 function kidungBackButton(onClick) {
@@ -78,32 +95,80 @@ function kidungBackButton(onClick) {
   return backBtn;
 }
 
-// Tombol "📖 Alkitab" -- pasangan dari #kidungHeaderBtn di index.html
-// (yang membawa dari Alkitab MASUK ke Kidung). Tombol ini yang membawa
-// KELUAR dari Kidung, dari layar Kidung MANA PUN (depan/daftar/cari/
-// baca), balik ke bacaan Alkitab tanpa perlu mundur langkah demi
-// langkah lewat "← Kembali" dulu. Dipasang lewat kidungTopRow() di
-// bawah supaya konsisten muncul di semua layar Kidung.
-function kidungAlkitabButton() {
+// CATATAN (21 Agu 2026): tombol pill "📖 Alkitab" yang dulu ada di sini
+// SUDAH DIHAPUS -- fungsinya sekarang diambil alih #kidungHeaderBtn di
+// header (jadi tombol toggle 🎵⇄📖, lihat syncKidungHeaderToggle() di
+// atas + wiring click-nya di js/app.js), supaya tidak ada 2 tombol
+// berbeda untuk 1 fungsi yang sama. goToAlkitabFromKidung() di bawah
+// tetap dipertahankan, dipanggil dari #kidungHeaderBtn.
+
+// Tombol "🎨" -- pemilih tema tampilan, jalan pintas dari DALAM Kidung
+// supaya tidak perlu buka menu "⋮" -> gulung ke bagian "Tema tampilan"
+// dulu. Memakai DAFTAR TEMA & applyTheme() yang SAMA PERSIS dengan
+// #themePicker di menu "⋮" (lihat THEMES/applyTheme() di js/app.js) --
+// tema itu dipasang di <html> jadi otomatis berlaku juga untuk panel
+// Kidung, cukup tombol ini membuka pop-up kecil berisi swatch yang sama.
+function kidungThemeButton() {
+  const wrap = document.createElement("div");
+  wrap.className = "kidung-theme-btn-wrap";
+
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "chip-btn small kidung-alkitab-btn";
-  btn.textContent = "📖 Alkitab";
-  btn.title = "Kembali ke bacaan Alkitab (pasal terakhir dibaca)";
-  btn.addEventListener("click", () => {
-    if (typeof goToAlkitabFromKidung === "function") goToAlkitabFromKidung();
+  btn.className = "chip-btn small round kidung-theme-btn";
+  btn.textContent = "🎨";
+  btn.title = "Ganti tema tampilan";
+  btn.setAttribute("aria-label", "Ganti tema tampilan");
+
+  const popover = document.createElement("div");
+  popover.className = "kidung-theme-popover theme-picker";
+  popover.hidden = true;
+
+  function renderSwatches() {
+    popover.innerHTML = "";
+    if (typeof THEMES === "undefined") return;
+    const saved = parseInt(localStorage.getItem(THEME_STORAGE_KEY), 10) || 1;
+    THEMES.forEach((t) => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "theme-swatch";
+      if (t.id === saved) swatch.classList.add("active");
+      swatch.title = t.name;
+      swatch.setAttribute("aria-label", "Tema " + t.name);
+      swatch.style.background = t.swatch;
+      swatch.style.color = t.ink;
+      swatch.addEventListener("click", () => {
+        if (typeof applyTheme === "function") applyTheme(t.id);
+        renderSwatches();
+      });
+      popover.appendChild(swatch);
+    });
+  }
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willShow = popover.hidden;
+    document.querySelectorAll(".kidung-theme-popover").forEach((p) => (p.hidden = true));
+    if (willShow) { renderSwatches(); popover.hidden = false; }
   });
-  return btn;
+  document.addEventListener("click", (e) => {
+    if (!wrap.contains(e.target)) popover.hidden = true;
+  });
+
+  wrap.appendChild(btn);
+  wrap.appendChild(popover);
+  return wrap;
 }
 
 // Baris atas standar tiap layar Kidung: "← Kembali" (opsional, kosongkan
 // `onBack` untuk layar paling depan yang tidak punya "atas"-nya lagi di
-// dalam Kidung) + "📖 Alkitab" (selalu ada, di SEMUA layar Kidung).
+// dalam Kidung) + "🎨" ganti tema (selalu ada, di SEMUA layar Kidung).
+// (Tombol "📖 Alkitab" yang dulu ada di sini sudah pindah jadi toggle di
+// #kidungHeaderBtn -- lihat catatan di atas.)
 function kidungTopRow(onBack) {
   const row = document.createElement("div");
   row.className = "kidung-top-row";
   if (onBack) row.appendChild(kidungBackButton(onBack));
-  row.appendChild(kidungAlkitabButton());
+  row.appendChild(kidungThemeButton());
   return row;
 }
 
@@ -522,91 +587,189 @@ function renderKidungReader(meta, baits) {
 // syair saat sedang dibaca/dinyanyikan (lihat .kidung-toolbar di
 // css/style.css, jadi sticky di bagian bawah layar khusus di lebar HP).
 // ------------------------------------------------------------
+//  FAVORIT (❤️) -- MVP per PERANGKAT lewat localStorage (BELUM per akun/
+//  sinkron server, itu perlu tempat penyimpanan baru pola highlights.js,
+//  lihat catatan di kepala file). Cukup untuk "tandai kidung favorit di
+//  HP/komputer ini" dulu; gampang ditingkatkan jadi per akun nanti tanpa
+//  mengubah cara tombolnya dipakai.
+// ------------------------------------------------------------
+const KIDUNG_FAVORITES_KEY = "kidung_favorites_v1";
+function kidungFavoriteKey(meta) { return (meta.buku || "Kidung") + "|" + meta.noKidung; }
+function loadKidungFavorites() {
+  try { return JSON.parse(localStorage.getItem(KIDUNG_FAVORITES_KEY) || "[]"); }
+  catch (e) { return []; }
+}
+function isKidungFavorite(meta) { return loadKidungFavorites().includes(kidungFavoriteKey(meta)); }
+function toggleKidungFavorite(meta) {
+  const list = loadKidungFavorites();
+  const key = kidungFavoriteKey(meta);
+  const idx = list.indexOf(key);
+  if (idx === -1) list.push(key); else list.splice(idx, 1);
+  localStorage.setItem(KIDUNG_FAVORITES_KEY, JSON.stringify(list));
+  return idx === -1; // true = baru ditambahkan
+}
+function kidungFavoriteButton(meta) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "square-media-btn kidung-fav-btn";
+  const paint = () => {
+    const fav = isKidungFavorite(meta);
+    btn.textContent = fav ? "❤️" : "🤍";
+    btn.title = fav ? "Hapus dari favorit" : "Tandai favorit";
+    btn.setAttribute("aria-label", btn.title);
+    btn.classList.toggle("active", fav);
+  };
+  paint();
+  btn.addEventListener("click", () => { toggleKidungFavorite(meta); paint(); });
+  return btn;
+}
+
 function buildKidungToolbar(meta, baits) {
   const wrap = document.createElement("div");
   wrap.className = "kidung-toolbar";
-
-  // Baris pemicu sembunyikan/tampilkan: HANYA garis tipis + segitiga kecil
-  // di ujung kanan (▾/▸) -- dulu ada tulisan "Tombol" di sampingnya, sudah
-  // dihapus supaya hemat tempat, tapi area yang bisa disentuh (tombolnya)
-  // tetap dibuat penuh 1 baris (bukan cuma sekitar segitiganya saja) supaya
-  // tetap gampang ditekan jari walau yang KELIHATAN cuma garis + segitiga.
-  const toggleBtn = document.createElement("button");
-  toggleBtn.type = "button";
-  toggleBtn.className = "kidung-toolbar-toggle";
-  toggleBtn.innerHTML = '<span class="kidung-toolbar-toggle-arrow">▾</span>';
-  toggleBtn.title = "Sembunyikan/tampilkan tombol navigasi, bagikan, & pemutar";
-  toggleBtn.setAttribute("aria-label", "Sembunyikan/tampilkan tombol kidung");
-  wrap.appendChild(toggleBtn);
 
   const body = document.createElement("div");
   body.className = "kidung-toolbar-body";
   wrap.appendChild(body);
 
-  // Baris navigasi: ⬅️ [🔗 Bagikan] ➡️ -- tidak wajib nomornya
-  // berurutan tanpa celah, tinggal dicoba buka; kalau kosong akan
-  // tampil pesan "tidak ditemukan" seperti di openKidungReader() di
-  // atas, operator tinggal geser lagi ke arah yang sama.
-  const navRow = document.createElement("div");
-  navRow.className = "kidung-toolbar-nav";
   const noInt = parseInt(meta.noKidung, 10);
+  const sessionTitle = (meta.judul && meta.judul.trim()) || ("Kidung No. " + formatKidungNo(meta.buku, meta.noKidung));
+
+  // ---- Baris utama: 8 kotak rapi (bukan bulat, gaya "app modern") ----
+  //   [◀ sebelumnya] [🎼 midi] [🎧2 mp3 v2] [🎬 video] [♡ favorit]
+  //   [📋 salin] [🔗 bagikan] [selanjutnya ▶]
+  //   Nomor sebelumnya/selanjutnya SENGAJA lewat findAdjacentKidungNo()
+  //   (bukan noInt-1/noInt+1 mentah) -- lihat komentar di fungsi itu,
+  //   karena nomor kidung bisa loncat (mis. tidak ada No. 96, jadi dari
+  //   No. 95 "selanjutnya" mestinya ke nomor asli berikutnya di data,
+  //   bukan otomatis ke 96 yang belum tentu ada).
+  const grid = document.createElement("div");
+  grid.className = "kidung-toolbar-grid";
 
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
-  prevBtn.className = "round-media-btn kidung-nav-btn";
-  prevBtn.textContent = "⬅️";
+  prevBtn.className = "square-media-btn kidung-nav-btn kidung-nav-edge";
+  prevBtn.textContent = "◀";
   prevBtn.title = "Kidung nomor sebelumnya";
   prevBtn.setAttribute("aria-label", "Kidung nomor sebelumnya");
-  prevBtn.disabled = isNaN(noInt) || noInt <= 1;
-  prevBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt - 1)));
+  prevBtn.disabled = true;
 
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
-  nextBtn.className = "round-media-btn kidung-nav-btn";
-  nextBtn.textContent = "➡️";
+  nextBtn.className = "square-media-btn kidung-nav-btn kidung-nav-edge";
+  nextBtn.textContent = "▶";
   nextBtn.title = "Kidung nomor selanjutnya";
   nextBtn.setAttribute("aria-label", "Kidung nomor selanjutnya");
-  nextBtn.disabled = isNaN(noInt);
-  nextBtn.addEventListener("click", () => openKidungReader(meta.buku, String(noInt + 1)));
+  nextBtn.disabled = true;
 
-  navRow.appendChild(prevBtn);
-  navRow.appendChild(buildKidungCopyButton(meta, baits));
-  navRow.appendChild(buildKidungShareButton(meta, baits));
-  navRow.appendChild(nextBtn);
-  body.appendChild(navRow);
+  if (typeof findAdjacentKidungNo === "function" && !isNaN(noInt)) {
+    findAdjacentKidungNo(meta.buku, noInt, -1).then((prevNo) => {
+      if (prevNo != null) { prevBtn.disabled = false; prevBtn.addEventListener("click", () => openKidungReader(meta.buku, String(prevNo))); }
+    });
+    findAdjacentKidungNo(meta.buku, noInt, 1).then((nextNo) => {
+      if (nextNo != null) { nextBtn.disabled = false; nextBtn.addEventListener("click", () => openKidungReader(meta.buku, String(nextNo))); }
+    });
+  }
 
-  // Baris ikon media -- gaya "mirip mockup" (semua BULAT, ikon saja tanpa
-  // tulisan): 🎼 unduh MIDI, lalu 🎧/🎧2 MP3 (pemutar toggle+progress bar
-  // sendiri, lihat buildLoopingMp3Player() di js/media.js -- BEDA dari MP4/
-  // YouTube di bawahnya yang masih pakai buildInlineMediaBlock() biasa,
-  // karena MP3 di sini memang mau berperilaku loop+toggle 1 tombol, bukan
-  // buka pemutar <audio controls>). Link-nya ambil apa adanya dari data
-  // kidung -- kosong = tombolnya otomatis tidak dipasang.
-  const sessionTitle = (meta.judul && meta.judul.trim()) || ("Kidung No. " + formatKidungNo(meta.buku, meta.noKidung));
+  grid.appendChild(prevBtn);
 
-  // 🎼 Unduh MIDI -- ikon bulat saja, ditaruh baris sendiri tepat di bawah
-  // baris navigasi supaya urutannya: navigasi -> MIDI -> MP3(x2) -> MP4 -> YouTube.
   if (meta.linkMidi && typeof roundMediaLinkButton === "function") {
-    const midiRow = document.createElement("div");
-    midiRow.className = "round-media-row kidung-toolbar-media-row";
-    midiRow.appendChild(roundMediaLinkButton("🎼", "Unduh MIDI", meta.linkMidi));
-    body.appendChild(midiRow);
-  }
-  if (meta.linkMp3_1 && typeof buildLoopingMp3Player === "function") {
-    body.appendChild(buildLoopingMp3Player(meta.linkMp3_1, sessionTitle, "MP3"));
-  }
-  if (meta.linkMp3_2 && typeof buildLoopingMp3Player === "function") {
-    body.appendChild(buildLoopingMp3Player(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2"));
-  }
-  if (typeof buildInlineMediaBlock === "function") {
-    if (meta.linkVideo) body.appendChild(buildInlineMediaBlock({ mp4: meta.linkVideo }, sessionTitle));
-    if (meta.linkYoutube) body.appendChild(buildInlineMediaBlock({ youtube: meta.linkYoutube }, sessionTitle));
+    const a = roundMediaLinkButton("🎼", "Unduh MIDI", meta.linkMidi);
+    a.classList.add("square-media-btn");
+    a.classList.remove("round-media-btn");
+    grid.appendChild(a);
+  } else {
+    grid.appendChild(kidungDisabledSquare("🎼", "Belum ada MIDI"));
   }
 
+  if (meta.linkMp3_2 && typeof roundMediaLinkButton === "function") {
+    const a = roundMediaLinkButton("🎧", "Putar MP3 versi 2 (tab pemutar)", meta.linkMp3_2);
+    a.classList.add("square-media-btn");
+    a.classList.remove("round-media-btn");
+    grid.appendChild(a);
+  } else {
+    grid.appendChild(kidungDisabledSquare("🎧", "Belum ada MP3 versi 2"));
+  }
+
+  if (meta.linkVideo && typeof buildInlineMediaBlock === "function") {
+    grid.appendChild(kidungInlineMediaSquareButton("🎬", "Tonton video", () => buildInlineMediaBlock({ mp4: meta.linkVideo }, sessionTitle), body));
+  } else {
+    grid.appendChild(kidungDisabledSquare("🎬", "Belum ada video"));
+  }
+
+  grid.appendChild(kidungFavoriteButton(meta));
+
+  const copyBtn = buildKidungCopyButton(meta, baits);
+  copyBtn.classList.add("square-media-btn");
+  copyBtn.classList.remove("round-media-btn");
+  grid.appendChild(copyBtn);
+
+  const shareBtn = buildKidungShareButton(meta, baits);
+  shareBtn.classList.add("square-media-btn");
+  shareBtn.classList.remove("round-media-btn");
+  grid.appendChild(shareBtn);
+
+  grid.appendChild(nextBtn);
+  body.appendChild(grid);
+
+  // ---- Baris kedua, LEBIH KECIL: pemutar MP3 utama (loop) + YouTube ----
+  const secondary = document.createElement("div");
+  secondary.className = "kidung-toolbar-secondary";
+  if (meta.linkMp3_1 && typeof buildLoopingMp3Player === "function") {
+    secondary.appendChild(buildLoopingMp3Player(meta.linkMp3_1, sessionTitle, "MP3"));
+  }
+  if (meta.linkYoutube && typeof buildInlineMediaBlock === "function") {
+    secondary.appendChild(kidungInlineMediaSquareButton("▶️", "Tonton YouTube", () => buildInlineMediaBlock({ youtube: meta.linkYoutube }, sessionTitle), body, true));
+  }
+  if (secondary.children.length) body.appendChild(secondary);
+
+  // ---- Pemicu sembunyikan/tampilkan: garis tipis + ^ / v kecil & transparan ----
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "kidung-toolbar-toggle";
+  toggleBtn.innerHTML = '<span class="kidung-toolbar-toggle-arrow">v</span>';
+  toggleBtn.title = "Sembunyikan/tampilkan tombol navigasi, bagikan, & pemutar";
+  toggleBtn.setAttribute("aria-label", "Sembunyikan/tampilkan tombol kidung");
   toggleBtn.addEventListener("click", () => {
     const collapsed = wrap.classList.toggle("collapsed");
-    toggleBtn.querySelector(".kidung-toolbar-toggle-arrow").textContent = collapsed ? "▸" : "▾";
+    toggleBtn.querySelector(".kidung-toolbar-toggle-arrow").textContent = collapsed ? "^" : "v";
   });
+  wrap.appendChild(toggleBtn);
+  wrap.insertBefore(body, toggleBtn); // body di ATAS, tombol toggle di bawahnya
 
   return wrap;
+}
+
+// Kotak abu-abu redup, tidak bisa ditekan -- dipakai supaya grid 8-kotak
+// tetap RAPI (jumlah & posisi kotak selalu sama) walau sebagian link
+// media kidung ini kosong, daripada grid-nya "lompat-lompat" tiap nomor.
+function kidungDisabledSquare(icon, title) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "square-media-btn kidung-square-disabled";
+  btn.textContent = icon;
+  btn.title = title;
+  btn.disabled = true;
+  return btn;
+}
+
+// Kotak yang MEMBUKA pemutar sebaris (buildInlineMediaBlock) langsung di
+// `body` (bawah grid) begitu ditekan, tanpa perlu tombol bulat ganda
+// (ikon+share) seperti bawaan buildInlineMediaBlock() -- di sini cukup
+// SATU kotak per media supaya pas dengan grid 8-kotak yang rapi.
+function kidungInlineMediaSquareButton(icon, title, buildBlockFn, body, small) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "square-media-btn" + (small ? " square-media-btn-sm" : "");
+  btn.textContent = icon;
+  btn.title = title;
+  btn.setAttribute("aria-label", title);
+  let slot = null;
+  btn.addEventListener("click", () => {
+    if (slot) { slot.remove(); slot = null; return; }
+    slot = buildBlockFn();
+    slot.classList.add("kidung-inline-media-slot");
+    body.appendChild(slot);
+  });
+  return btn;
 }
