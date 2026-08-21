@@ -1,5 +1,5 @@
 // ============================================================
-//  APLIKASI UTAMA 
+//  APLIKASI UTAMA
 // ============================================================
 let bibleData = [];       // seluruh ayat (semua bahasa), dimuat sekali ke memori dari IndexedDB
 let verseIndex = {};      // lang -> bookNumber -> chapter -> [ayat...] (terurut), untuk akses instan
@@ -20,6 +20,7 @@ let highlightVerseOpenNote = false;
 let currentSingleVerse = null;
 let currentUser = null;        // username (huruf kecil) yang sedang login
 let currentUserDisplay = null; // nama tampilan
+let currentUserSaudara = null; // "Saudara"/"Saudari" dari kolom "Saudara/i" di Sheet Pengguna (dipakai AI Chat Gembala menyapa pengguna, lihat js/aichat.js)
 let currentChapterVerses = []; // ayat-ayat pasal yang sedang ditampilkan (dipakai TTS & modal catatan)
 let verseById = {};            // id ayat ("lang_verseId") -> objek ayat, dipakai menu "Catatan Saya"
 
@@ -332,6 +333,7 @@ function initAuth() {
   if (savedUser) {
     currentUser = savedUser;
     currentUserDisplay = localStorage.getItem(CONFIG.AUTH_DISPLAY_KEY) || savedUser;
+    currentUserSaudara = localStorage.getItem(CONFIG.AUTH_SAUDARA_KEY) || "";
     if (typeof Guest !== "undefined") Guest.exit(); // akun asli menang atas sisa status tamu lama
     startApp();
     return;
@@ -343,6 +345,7 @@ function initAuth() {
   if (CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest()) {
     currentUser = null;
     currentUserDisplay = null;
+    currentUserSaudara = null;
     startApp();
     return;
   }
@@ -354,6 +357,7 @@ function initAuth() {
       Guest.enter();
       currentUser = null;
       currentUserDisplay = null;
+      currentUserSaudara = null;
       el("loginScreen").hidden = true;
       startApp();
     });
@@ -381,8 +385,13 @@ function initAuth() {
     } else if (match) {
       currentUser = match.username;
       currentUserDisplay = match.displayName || match.username;
+      // "Saudara"/"Saudari" dari kolom "Saudara/i" Sheet Pengguna (kosong
+      // kalau belum diisi admin -> AI Chat jatuh balik ke sapaan netral,
+      // lihat buildAiChatSapaan() di js/aichat.js).
+      currentUserSaudara = match.saudara || "";
       localStorage.setItem(CONFIG.AUTH_STORAGE_KEY, currentUser);
       localStorage.setItem(CONFIG.AUTH_DISPLAY_KEY, currentUserDisplay);
+      localStorage.setItem(CONFIG.AUTH_SAUDARA_KEY, currentUserSaudara);
       if (typeof Guest !== "undefined") Guest.exit();
       el("loginScreen").hidden = true;
       startApp();
@@ -403,6 +412,7 @@ function logout() {
   // (catatan ayat sekarang sebaris, tidak ada lagi modal terpisah untuk ditutup)
   localStorage.removeItem(CONFIG.AUTH_STORAGE_KEY);
   localStorage.removeItem(CONFIG.AUTH_DISPLAY_KEY);
+  localStorage.removeItem(CONFIG.AUTH_SAUDARA_KEY);
   if (typeof Guest !== "undefined") Guest.exit();
   location.reload();
 }
@@ -5065,6 +5075,7 @@ function hideAllPanels() {
   if (el("curhatPanel")) el("curhatPanel").hidden = true;
   if (el("aiChatPanel")) el("aiChatPanel").hidden = true;
   if (el("langCheckPanel")) el("langCheckPanel").hidden = true;
+  if (el("kidungVerseRefPanel")) el("kidungVerseRefPanel").hidden = true;
   if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
   if (el("allPokokPanel")) el("allPokokPanel").hidden = true;
   if (el("allMapsPanel")) el("allMapsPanel").hidden = true;
