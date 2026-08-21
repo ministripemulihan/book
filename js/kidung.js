@@ -1,5 +1,5 @@
 // ============================================================
-//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG. 
+//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG.
 //  KIDUNG_SHEET_CSV_URL di js/config.js), disimpan lokal di IndexedDB
 //  (store "kidung", lihat js/db.js), lalu dibaca ulang dari sini
 //  tanpa perlu internet lagi -- pola SAMA PERSIS seperti Alkitab
