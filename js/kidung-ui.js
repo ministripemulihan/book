@@ -52,6 +52,40 @@ let kidungCurrentBuku = "Kidung";
 // tapi tetap tidak perlu diulang tiap beberapa detik).
 let kidungLastBgSyncAt = 0;
 
+// ⌨️ Navigasi kidung sebelumnya/selanjutnya PAKAI KEYBOARD (BARU, 21 Agu
+// 2026) -- tombol ◀/▶ di buildKidungToolbar() sekarang juga bisa ditekan
+// lewat tombol panah kiri/kanan papan ketik, tidak cuma diklik/disentuh.
+// Listener-nya dipasang cuma SAAT pembaca kidung (openKidungReader) lagi
+// tampil, dan WAJIB dicopot lagi begitu pindah ke tampilan Kidung LAIN
+// (Beranda/Cari/Daftar -- semuanya berbagi elemen <div id="kidungPanel">
+// yang sama, cuma innerHTML-nya diganti-ganti) supaya tidak menumpuk
+// beberapa listener sekaligus atau tetap aktif padahal pembaca sudah
+// tidak kelihatan lagi.
+let _kidungReaderKeyHandler = null;
+function teardownKidungReaderKeyNav() {
+  if (_kidungReaderKeyHandler) {
+    document.removeEventListener("keydown", _kidungReaderKeyHandler);
+    _kidungReaderKeyHandler = null;
+  }
+}
+function setupKidungReaderKeyNav(prevBtn, nextBtn) {
+  teardownKidungReaderKeyNav();
+  _kidungReaderKeyHandler = (e) => {
+    // Dikecualikan kalau fokus sedang di kotak isian (mis. sedang
+    // mengetik di kotak nomor/pencarian) supaya panah kiri/kanan di
+    // situ tetap berfungsi normal (pindah kursor teks), bukan malah
+    // pindah kidung.
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (e.key === "ArrowLeft") {
+      if (!prevBtn.disabled) { e.preventDefault(); prevBtn.click(); }
+    } else if (e.key === "ArrowRight") {
+      if (!nextBtn.disabled) { e.preventDefault(); nextBtn.click(); }
+    }
+  };
+  document.addEventListener("keydown", _kidungReaderKeyHandler);
+}
+
 async function showKidungPanel() {
   hideAllPanels();
   const panel = el("kidungPanel");
@@ -189,6 +223,7 @@ function goToAlkitabFromKidung() {
 async function renderKidungHome() {
   const panel = el("kidungPanel");
   if (!panel) return;
+  teardownKidungReaderKeyNav(); // keluar dari pembaca (kalau lagi aktif) -- lihat catatan di atas
   panel.innerHTML = "";
 
   panel.appendChild(kidungTopRow(null)); // layar paling depan Kidung -- tanpa "← Kembali"
@@ -333,6 +368,7 @@ let kidungListMediaFilter = "__all__";
 async function renderKidungList(bukuFilter) {
   const panel = el("kidungPanel");
   if (!panel) return;
+  teardownKidungReaderKeyNav(); // keluar dari pembaca (kalau lagi aktif) -- lihat catatan di atas
   panel.innerHTML = "";
   panel.appendChild(kidungTopRow(() => renderKidungHome()));
 
@@ -423,6 +459,7 @@ const KIDUNG_SEARCH_PAGE_SIZE = 40;
 async function renderKidungSearch() {
   const panel = el("kidungPanel");
   if (!panel) return;
+  teardownKidungReaderKeyNav(); // keluar dari pembaca (kalau lagi aktif) -- lihat catatan di atas
   panel.innerHTML = "";
   panel.appendChild(kidungTopRow(() => renderKidungHome()));
 
@@ -775,6 +812,12 @@ function buildKidungToolbar(meta, baits) {
     });
   }
 
+  // Pasang navigasi keyboard panah kiri/kanan untuk pembaca ini (lihat
+  // setupKidungReaderKeyNav() di atas) -- prevBtn/nextBtn dicek LIVE
+  // setiap tombol ditekan, jadi tidak masalah kalaupun status disabled-nya
+  // baru berubah belakangan (setelah findAdjacentKidungNo() di atas selesai).
+  setupKidungReaderKeyNav(prevBtn, nextBtn);
+
   grid.appendChild(prevBtn);
 
   if (meta.linkMidi && typeof roundMediaLinkButton === "function") {
@@ -786,14 +829,41 @@ function buildKidungToolbar(meta, baits) {
     middle.appendChild(kidungDisabledSquare("🎼", "Belum ada MIDI"));
   }
 
+  // MP3 -- BARU (21 Agu 2026): kalau link-nya dari Google Drive (mis.
+  // ".../file/d/FILE_ID/view?usp=drive_link"), tombol loop-toggle
+  // `<audio src="...">` yang dipakai untuk MP3 biasa TIDAK akan bunyi
+  // sama sekali. Sebabnya: link "/view" itu halaman HTML Drive (yang
+  // menampilkan tombol putar SENDIRI), bukan berkas .mp3 mentah -- tag
+  // <audio> hanya bisa memutar berkas mentah, jadi ia gagal DIAM-DIAM
+  // (tidak ada pesan error yang kelihatan, cuma tidak bersuara). Untuk
+  // link Drive, dipakai jalur yang SAMA seperti tombol Video/YouTube di
+  // bawah (kidungInlineMediaSquareButton + buildStandaloneMediaPlayer,
+  // js/media.js) yang SUDAH BENAR menangani Drive lewat <iframe src=
+  // ".../preview">) -- lihat isDriveUrl()/driveEmbedPreviewUrl() di
+  // js/media.js. Bedanya: pemutar Drive punya kontrol/loop BAWAAN Drive
+  // sendiri (bukan lagi tombol ▶️/⏸️ kotak yang otomatis mengulang).
+  // Link MP3 di luar Drive (mis. hymnal.net, link .mp3 langsung) TETAP
+  // pakai kidungSquareLoopToggle seperti sebelumnya, tidak berubah.
+  function kidungMp3Square(url, sessionTitleForThis, label, icon) {
+    if (typeof isDriveUrl === "function" && isDriveUrl(url)) {
+      return kidungInlineMediaSquareButton(
+        icon,
+        "Putar " + label + " (Google Drive)",
+        () => buildStandaloneMediaPlayer("mp3", url, sessionTitleForThis),
+        body
+      );
+    }
+    return kidungSquareLoopToggle(url, sessionTitleForThis, label);
+  }
+
   if (meta.linkMp3_1) {
-    middle.appendChild(kidungSquareLoopToggle(meta.linkMp3_1, sessionTitle, "MP3"));
+    middle.appendChild(kidungMp3Square(meta.linkMp3_1, sessionTitle, "MP3", "🎵"));
   } else {
     middle.appendChild(kidungDisabledSquare("🎵", "Belum ada MP3"));
   }
 
   if (meta.linkMp3_2) {
-    middle.appendChild(kidungSquareLoopToggle(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2"));
+    middle.appendChild(kidungMp3Square(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2", "🎧"));
   } else {
     middle.appendChild(kidungDisabledSquare("🎧", "Belum ada MP3 versi 2"));
   }
