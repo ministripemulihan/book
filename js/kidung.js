@@ -138,6 +138,30 @@ async function getKidungList(bukuFilter) {
   });
 }
 
+// Nomor kidung SEBENARNYA sebelum/sesudah `noInt` di buku yang sama,
+// dari daftar yang BENAR-BENAR ADA di data (BUKAN noInt-1/noInt+1
+// mentah -- bisa saja nomor sebelumnya lompat jauh, mis. dari No. 95
+// lompat ke No. 1955 kalau nomor di antaranya memang tidak ada di
+// Sheet). Dipakai tombol ◀/▶ di buildKidungToolbar() (js/kidung-ui.js).
+// `direction`: -1 = cari sebelumnya, 1 = cari selanjutnya.
+// Balikan: nomor (string dari noKidung asli) atau null kalau tidak ada.
+async function findAdjacentKidungNo(buku, noInt, direction) {
+  const list = await getKidungList(buku);
+  const nums = list
+    .map((k) => parseInt(k.noKidung, 10))
+    .filter((n) => !isNaN(n))
+    .sort((a, b) => a - b);
+  if (!nums.length) return null;
+  if (direction < 0) {
+    let best = null;
+    for (const n of nums) { if (n < noInt) best = n; else break; }
+    return best;
+  } else {
+    for (const n of nums) { if (n > noInt) return n; }
+    return null;
+  }
+}
+
 // Semua daftar BUKU yang sungguh dipakai di Sheet (mis. ["Kidung"] saja
 // selama Suplemen belum ditambahkan, otomatis jadi ["Kidung","Suplemen"]
 // begitu kolom `buku` diisi "Suplemen" di baris manapun) -- dipakai
