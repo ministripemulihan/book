@@ -5050,6 +5050,7 @@ function hideAllPanels() {
   // Kidung, apa pun jalan keluarnya (tombol "📖 Alkitab", "← Kembali"
   // berkali-kali, atau buka menu lain langsung).
   document.body.classList.remove("kidung-active");
+  if (typeof syncKidungHeaderToggle === "function") syncKidungHeaderToggle();
   el("chapterPicker").hidden = true;
   el("searchResults").hidden = true;
   el("reader").hidden = true;
@@ -6150,13 +6151,24 @@ function initUIEvents() {
       closeSidebarOnMobile();
     });
   }
-  // Jalan pintas header (☝️ lihat index.html #kidungHeaderBtn) -- perilaku
-  // sama persis dengan kidungMenuBtn di atas, cuma 1 sentuh lebih dekat
-  // (tidak perlu buka menu "⋮" dulu), sama untuk HP maupun komputer.
+  // Jalan pintas header (☝️ lihat index.html #kidungHeaderBtn) -- SEKARANG
+  // jadi tombol TOGGLE 2 arah (permintaan 21 Agu 2026): saat sedang di
+  // Alkitab tombolnya "🎵 Buka Kidung" (masuk ke Kidung), begitu sudah di
+  // dalam Kidung tombol YANG SAMA berubah jadi "📖 Alkitab" (balik keluar
+  // ke bacaan Alkitab terakhir) -- jadi tombol pill "📖 Alkitab" yang
+  // dulu terpisah di setiap layar Kidung (kidungAlkitabButton(), dulu di
+  // kidungTopRow()) sudah TIDAK dipasang lagi, cukup 1 tombol ini saja.
+  // Tampilan tombolnya disinkronkan lewat syncKidungHeaderToggle() di
+  // js/kidung-ui.js, dipanggil dari sini + showKidungPanel() + tiap kali
+  // hideAllPanels() dipanggil (lihat di bawah).
   if (el("kidungHeaderBtn")) {
     el("kidungHeaderBtn").addEventListener("click", () => {
       if (el("moreMenu")) el("moreMenu").hidden = true;
-      showKidungPanel();
+      if (document.body.classList.contains("kidung-active")) {
+        if (typeof goToAlkitabFromKidung === "function") goToAlkitabFromKidung();
+      } else {
+        showKidungPanel();
+      }
       closeSidebarOnMobile();
     });
   }
