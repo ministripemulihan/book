@@ -56,15 +56,42 @@ const LocalDB = {
         // tombol Kidung/Suplemen"). Index lama "byNoKidung" TETAP
         // dipertahankan (tidak menghalangi apa pun, berguna kalau nanti
         // perlu cari lintas-buku berdasar nomor saja).
+        // FIX (21 Agu 2026) — bug INTI penyebab "Kidung No. X tidak
+        // ditemukan" yang HANYA muncul di sebagian HP (bukan di komputer):
+        // dulu index "byBukuNo" cuma dibuat di cabang UPGRADE (kalau store
+        // "kidung" SUDAH ada dari versi lama), TIDAK PERNAH dibuat di
+        // cabang CREATE (kalau store ini baru pertama kali dibuat, mis. di
+        // perangkat yang baru pertama kali membuka app / IndexedDB-nya
+        // baru). Komputer yang sudah lama dipakai biasanya sudah melewati
+        // riwayat versi 3->4->5->6 secara bertahap sehingga lolos cabang
+        // upgrade & dapat index-nya; sebagian HP (baru instal / cache
+        // pernah dibersihkan / dibuka pertama kali setelah versi ini
+        // dirilis) membuat store "kidung" LANGSUNG di versi terbaru lewat
+        // cabang CREATE, jadi index "byBukuNo" tidak pernah tercipta.
+        // Akibatnya getKidungRowsByBukuNo() (dipakai membuka 1 kidung utk
+        // dibaca) SELALU gagal (index tidak ditemukan) di HP itu -- daftar
+        // judul tetap muncul (tidak butuh index ini) tapi begitu 1 kidung
+        // dibuka, syairnya tidak pernah ketemu, walau sinkron ulang
+        // berkali-kali (sinkron cuma mengisi ULANG DATA baris, bukan
+        // membuat index yang memang belum pernah ada). Perbaikan: KEDUA
+        // cabang sekarang SELALU memastikan index "byBukuNo" (dan
+        // index lain) ada, dan CONFIG.DB_VERSION dinaikkan (lihat
+        // js/config.js) supaya onupgradeneeded ini SUNGGUH terpicu lagi
+        // di HP yang sudah kadung punya store versi lama tanpa index ini.
+        let kidungStore;
         if (!db.objectStoreNames.contains(CONFIG.KIDUNG_STORE_NAME)) {
-          const kidungStore = db.createObjectStore(CONFIG.KIDUNG_STORE_NAME, { keyPath: "id" });
+          kidungStore = db.createObjectStore(CONFIG.KIDUNG_STORE_NAME, { keyPath: "id" });
+        } else {
+          kidungStore = e.target.transaction.objectStore(CONFIG.KIDUNG_STORE_NAME);
+        }
+        if (!kidungStore.indexNames.contains("byNoKidung")) {
           kidungStore.createIndex("byNoKidung", "noKidung", { unique: false });
+        }
+        if (!kidungStore.indexNames.contains("byKategori")) {
           kidungStore.createIndex("byKategori", "kategori", { unique: false });
-        } else if (db.objectStoreNames.contains(CONFIG.KIDUNG_STORE_NAME)) {
-          const kidungStore = e.target.transaction.objectStore(CONFIG.KIDUNG_STORE_NAME);
-          if (!kidungStore.indexNames.contains("byBukuNo")) {
-            kidungStore.createIndex("byBukuNo", ["buku", "noKidung"], { unique: false });
-          }
+        }
+        if (!kidungStore.indexNames.contains("byBukuNo")) {
+          kidungStore.createIndex("byBukuNo", ["buku", "noKidung"], { unique: false });
         }
       };
       req.onsuccess = (e) => {
