@@ -624,6 +624,43 @@ function kidungFavoriteButton(meta) {
   return btn;
 }
 
+// Kotak toggle SEDERHANA (SERAGAM gaya dengan kotak lain di baris ini,
+// BUKAN pemutar dengan progress bar seperti buildLoopingMp3Player() --
+// itu dipakai di tempat lain, mis. Rencana Baca. Di toolbar Kidung ini
+// sengaja disederhanakan jadi 1 kotak ▶️/⏸️ saja supaya rapi 1 baris
+// sama seperti kotak MIDI/video/dst, sesuai permintaan 21 Agu 2026).
+function kidungSquareLoopToggle(url, titleForSession, label) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "square-media-btn kidung-loop-toggle";
+  btn.textContent = "▶️";
+  btn.title = "Putar " + (label || "MP3") + " (berulang, tekan lagi untuk jeda)";
+  btn.setAttribute("aria-label", btn.title);
+
+  const audio = document.createElement("audio");
+  audio.loop = true;
+  audio.preload = "none";
+  audio.setAttribute("playsinline", "");
+  audio.src = url;
+  btn.appendChild(audio);
+
+  btn.addEventListener("click", () => {
+    if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+  });
+  audio.addEventListener("play", () => {
+    btn.textContent = "⏸️";
+    btn.classList.add("active");
+    if (typeof requestWakeLock === "function") requestWakeLock();
+    if (typeof wireMediaSession === "function") wireMediaSession(audio, titleForSession);
+  });
+  audio.addEventListener("pause", () => {
+    btn.textContent = "▶️";
+    btn.classList.remove("active");
+    if (typeof releaseWakeLock === "function") releaseWakeLock();
+  });
+  return btn;
+}
+
 function buildKidungToolbar(meta, baits) {
   const wrap = document.createElement("div");
   wrap.className = "kidung-toolbar";
@@ -635,20 +672,16 @@ function buildKidungToolbar(meta, baits) {
   const noInt = parseInt(meta.noKidung, 10);
   const sessionTitle = (meta.judul && meta.judul.trim()) || ("Kidung No. " + formatKidungNo(meta.buku, meta.noKidung));
 
-  // ---- Baris utama: 8 kotak rapi (bukan bulat, gaya "app modern") ----
-  //   [◀ sebelumnya] [🎼 midi] [🎧2 mp3 v2] [🎬 video] [♡ favorit]
-  //   [📋 salin] [🔗 bagikan] [selanjutnya ▶]
-  //   Nomor sebelumnya/selanjutnya SENGAJA lewat findAdjacentKidungNo()
-  //   (bukan noInt-1/noInt+1 mentah) -- lihat komentar di fungsi itu,
-  //   karena nomor kidung bisa loncat (mis. tidak ada No. 96, jadi dari
-  //   No. 95 "selanjutnya" mestinya ke nomor asli berikutnya di data,
-  //   bukan otomatis ke 96 yang belum tentu ada).
+  // ---- SATU baris, semua kotak SERAGAM (permintaan 21 Agu 2026: tombol
+  // ◀/▶ TANPA kotak/lebih ringkas, & tombol MP3(1)/YouTube digabung jadi
+  // 1 baris yang sama dengan tombol video, gaya sama semua) ----
+  //   ◀  🎼midi  ▶️mp3(1)  🎧mp3v2  🎬video  📺youtube  ♡favorit  📋salin  🔗bagikan  ▶
   const grid = document.createElement("div");
   grid.className = "kidung-toolbar-grid";
 
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
-  prevBtn.className = "square-media-btn kidung-nav-btn kidung-nav-edge";
+  prevBtn.className = "kidung-nav-plain kidung-nav-btn";
   prevBtn.textContent = "◀";
   prevBtn.title = "Kidung nomor sebelumnya";
   prevBtn.setAttribute("aria-label", "Kidung nomor sebelumnya");
@@ -656,7 +689,7 @@ function buildKidungToolbar(meta, baits) {
 
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
-  nextBtn.className = "square-media-btn kidung-nav-btn kidung-nav-edge";
+  nextBtn.className = "kidung-nav-plain kidung-nav-btn";
   nextBtn.textContent = "▶";
   nextBtn.title = "Kidung nomor selanjutnya";
   nextBtn.setAttribute("aria-label", "Kidung nomor selanjutnya");
@@ -682,19 +715,28 @@ function buildKidungToolbar(meta, baits) {
     grid.appendChild(kidungDisabledSquare("🎼", "Belum ada MIDI"));
   }
 
-  if (meta.linkMp3_2 && typeof roundMediaLinkButton === "function") {
-    const a = roundMediaLinkButton("🎧", "Putar MP3 versi 2 (tab pemutar)", meta.linkMp3_2);
-    a.classList.add("square-media-btn");
-    a.classList.remove("round-media-btn");
-    grid.appendChild(a);
+  if (meta.linkMp3_1) {
+    grid.appendChild(kidungSquareLoopToggle(meta.linkMp3_1, sessionTitle, "MP3"));
+  } else {
+    grid.appendChild(kidungDisabledSquare("🎵", "Belum ada MP3"));
+  }
+
+  if (meta.linkMp3_2) {
+    grid.appendChild(kidungSquareLoopToggle(meta.linkMp3_2, sessionTitle + " (versi 2)", "MP3 versi 2"));
   } else {
     grid.appendChild(kidungDisabledSquare("🎧", "Belum ada MP3 versi 2"));
   }
 
-  if (meta.linkVideo && typeof buildInlineMediaBlock === "function") {
-    grid.appendChild(kidungInlineMediaSquareButton("🎬", "Tonton video", () => buildInlineMediaBlock({ mp4: meta.linkVideo }, sessionTitle), body));
+  if (meta.linkVideo && typeof buildStandaloneMediaPlayer === "function") {
+    grid.appendChild(kidungInlineMediaSquareButton("🎬", "Tonton video", () => buildStandaloneMediaPlayer("mp4", meta.linkVideo, sessionTitle), body));
   } else {
     grid.appendChild(kidungDisabledSquare("🎬", "Belum ada video"));
+  }
+
+  if (meta.linkYoutube && typeof buildStandaloneMediaPlayer === "function") {
+    grid.appendChild(kidungInlineMediaSquareButton("📺", "Tonton YouTube", () => buildStandaloneMediaPlayer("youtube", meta.linkYoutube, sessionTitle), body));
+  } else {
+    grid.appendChild(kidungDisabledSquare("📺", "Belum ada YouTube"));
   }
 
   grid.appendChild(kidungFavoriteButton(meta));
@@ -711,17 +753,6 @@ function buildKidungToolbar(meta, baits) {
 
   grid.appendChild(nextBtn);
   body.appendChild(grid);
-
-  // ---- Baris kedua, LEBIH KECIL: pemutar MP3 utama (loop) + YouTube ----
-  const secondary = document.createElement("div");
-  secondary.className = "kidung-toolbar-secondary";
-  if (meta.linkMp3_1 && typeof buildLoopingMp3Player === "function") {
-    secondary.appendChild(buildLoopingMp3Player(meta.linkMp3_1, sessionTitle, "MP3"));
-  }
-  if (meta.linkYoutube && typeof buildInlineMediaBlock === "function") {
-    secondary.appendChild(kidungInlineMediaSquareButton("▶️", "Tonton YouTube", () => buildInlineMediaBlock({ youtube: meta.linkYoutube }, sessionTitle), body, true));
-  }
-  if (secondary.children.length) body.appendChild(secondary);
 
   // ---- Pemicu sembunyikan/tampilkan: garis tipis + ^ / v kecil & transparan ----
   const toggleBtn = document.createElement("button");
@@ -740,9 +771,9 @@ function buildKidungToolbar(meta, baits) {
   return wrap;
 }
 
-// Kotak abu-abu redup, tidak bisa ditekan -- dipakai supaya grid 8-kotak
-// tetap RAPI (jumlah & posisi kotak selalu sama) walau sebagian link
-// media kidung ini kosong, daripada grid-nya "lompat-lompat" tiap nomor.
+// Kotak abu-abu redup, tidak bisa ditekan -- dipakai supaya grid tetap
+// RAPI (jumlah & posisi kotak selalu sama) walau sebagian link media
+// kidung ini kosong, daripada baris-nya "lompat-lompat" tiap nomor.
 function kidungDisabledSquare(icon, title) {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -753,23 +784,26 @@ function kidungDisabledSquare(icon, title) {
   return btn;
 }
 
-// Kotak yang MEMBUKA pemutar sebaris (buildInlineMediaBlock) langsung di
-// `body` (bawah grid) begitu ditekan, tanpa perlu tombol bulat ganda
-// (ikon+share) seperti bawaan buildInlineMediaBlock() -- di sini cukup
-// SATU kotak per media supaya pas dengan grid 8-kotak yang rapi.
-function kidungInlineMediaSquareButton(icon, title, buildBlockFn, body, small) {
+// Kotak yang MEMBUKA pemutar sebaris (buildStandaloneMediaPlayer, HANYA
+// elemen pemutarnya -- tanpa baris tombol bulat + bagikan bawaan, itu
+// sudah ada sendiri di baris ini) langsung di `body` (bawah grid) begitu
+// ditekan; ditekan lagi -> tertutup lagi (hide), sesuai permintaan
+// 21 Agu 2026 ("kalau tidak ditekan tombol, maka hide saja").
+function kidungInlineMediaSquareButton(icon, title, buildPlayerFn, body) {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "square-media-btn" + (small ? " square-media-btn-sm" : "");
+  btn.className = "square-media-btn";
   btn.textContent = icon;
   btn.title = title;
   btn.setAttribute("aria-label", title);
   let slot = null;
   btn.addEventListener("click", () => {
-    if (slot) { slot.remove(); slot = null; return; }
-    slot = buildBlockFn();
+    if (slot) { slot.remove(); slot = null; btn.classList.remove("active"); return; }
+    slot = buildPlayerFn();
+    if (!slot) return; // fallback (mis. buka tab baru) sudah terjadi di dalam buildPlayerFn
     slot.classList.add("kidung-inline-media-slot");
     body.appendChild(slot);
+    btn.classList.add("active");
   });
   return btn;
 }
