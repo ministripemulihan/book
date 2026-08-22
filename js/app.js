@@ -1,5 +1,5 @@
 // ============================================================
-//  APLIKASI UTAMA 
+//  APLIKASI UTAMA
 // ============================================================
 let bibleData = [];       // seluruh ayat (semua bahasa), dimuat sekali ke memori dari IndexedDB
 let verseIndex = {};      // lang -> bookNumber -> chapter -> [ayat...] (terurut), untuk akses instan
@@ -4025,6 +4025,29 @@ function renderCollectionDetailInto(container, id, col) {
   renameBtn.textContent = "✏️ Ganti Nama";
   renameBtn.addEventListener("click", () => handleRenameCollection(id, col));
   titleBtns.appendChild(renameBtn);
+  // Tombol "Salin Semua" -- 22 Agu 2026, atas permintaan: bentuk kotak
+  // (bukan bulat) disamakan dengan tombol 📋 di layar Kidung, yang
+  // sengaja diganti dari .round-media-btn ke .square-media-btn (lihat
+  // buildKidungCopyButton() di js/kidung.js, dipakai di js/kidung-ui.js)
+  // -- itulah "gambar kotak yang cantik" yang dimaksud (kotak bersudut
+  // tumpul, border tipis, bayangan halus). Teksnya sendiri dibangun oleh
+  // buildCollectionShareText() di js/collections.js (urut ayat 1..N
+  // sesuai urutan kumpulan, bukan format kidung). Disembunyikan kalau
+  // kumpulannya masih kosong.
+  if (col.verseIds.length) {
+    const copyAllBtn = document.createElement("button");
+    copyAllBtn.type = "button";
+    copyAllBtn.className = "square-media-btn collection-copy-btn";
+    copyAllBtn.textContent = "📋";
+    copyAllBtn.title = "Salin semua ayat di kumpulan ini ke clipboard (urut 1 sampai terakhir)";
+    copyAllBtn.setAttribute("aria-label", "Salin semua ayat di kumpulan ini");
+    copyAllBtn.addEventListener("click", () => {
+      const text = buildCollectionShareText(col);
+      if (!text) { alert("Tidak ada ayat yang bisa disalin (mungkin belum ada ayat yang cocok di bahasa saat ini)."); return; }
+      copyTextWithFeedback(text, copyAllBtn);
+    });
+    titleBtns.appendChild(copyAllBtn);
+  }
   if (col.verseIds.length) {
     const fsBtn = document.createElement("button");
     fsBtn.className = "chip-btn primary";
