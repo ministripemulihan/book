@@ -120,6 +120,43 @@ function getRecentCollectionNames(username, limit) {
     .map((c) => c.name);
 }
 
+// ============================================================
+//  SALIN SEMUA (Kumpulan Ayat) — 22 Agu 2026, atas permintaan: tombol
+//  📋 di panel detail kumpulan (lihat renderCollectionDetailInto() di
+//  js/app.js) yang menyalin SEMUA ayat di kumpulan itu sekaligus ke
+//  clipboard, urut dari yang PERTAMA sampai yang TERAKHIR persis
+//  seperti urutan tampil di layar (col.verseIds -- urutan yang sama
+//  yang bisa diatur pakai ⬆️/⬇️ di tiap butir), BUKAN diurutkan ulang
+//  alfabetis/per-kitab. Tiap ayat ditulis "{kitab} {pasal}:{ayat}"
+//  lalu isi ayatnya di baris berikutnya, dipisah 1 baris kosong antar
+//  ayat (beda dari format Kidung -- buildKidungShareText() di
+//  js/kidung.js -- yang rapat tanpa baris kosong, karena di sana
+//  semua bait memang 1 kidung yang sama; di sini tiap butir ayat
+//  berdiri sendiri-sendiri, bisa dari kitab/pasal manapun).
+//  `verseById` = variabel global dari js/app.js (id ayat -> objek
+//  ayat {bookName, chapter, verse, text, ...}), diisi saat Alkitab
+//  sudah disinkron -- kalau suatu ayat kebetulan belum ada di situ
+//  (mis. beda bahasa dari yang sedang aktif saat ini), butir itu
+//  dilewati saja (tidak bikin baris kosong/error), sama seperti
+//  tampilan panel Kumpulan sendiri sudah menangani ("ayat tidak
+//  ditemukan di bahasa saat ini").
+// ============================================================
+function buildCollectionShareText(col) {
+  if (!col || !col.verseIds || !col.verseIds.length) return "";
+  const lines = [];
+  let n = 0;
+  col.verseIds.forEach((verseId) => {
+    const v = typeof verseById !== "undefined" ? verseById[verseId] : null;
+    if (!v) return;
+    n += 1;
+    lines.push(n + ". " + v.bookName + " " + v.chapter + ":" + v.verse);
+    lines.push(v.text);
+    lines.push("");
+  });
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  return lines.join("\n");
+}
+
 function pushCollectionToRemote(username, id, col) {
   if (typeof Sync !== "undefined") Sync.pushCollection(username, id, col);
 }
