@@ -1,5 +1,5 @@
 // ============================================================
-//  KONFIGURASI  —  ubah bagian ini sesuai kebutuhan Anda 
+//  KONFIGURASI  —  ubah bagian ini sesuai kebutuhan Anda
 // ============================================================
 const CONFIG = {
   // Judul yang muncul di header aplikasi
@@ -109,6 +109,22 @@ const CONFIG = {
   // isLangCheckAllowed()); level lain di sini boleh ditambah/dikurangi.
   LANG_CHECK_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
 
+  // Sub-menu "🎵 Cek Referensi Ayat Kidung" DI DALAM panel Verifikasi
+  // Bahasa Ayat (lihat js/kidungversecheck.js) -- mencocokkan syair
+  // kidung ke ayat Alkitab yang paling mendekati lewat AI. SENGAJA
+  // khusus "administrator" saja (tidak ikut LANG_CHECK_LEVELS di atas)
+  // karena ini memakai kuota AI per baris/bait & hasilnya baru berupa
+  // PERKIRAAN yang harus diverifikasi manual sebelum dipakai resmi.
+  KIDUNG_VERSE_REF_LEVELS: ["administrator"],
+
+  // Batas MAKS berapa kidung boleh dicek sekaligus dalam 1 rentang
+  // ("dari No. ... sampai No. ...") -- tiap kidung bisa berisi banyak
+  // bait, dan tiap bait = 1 panggilan AI, jadi rentang terlalu lebar
+  // bisa sangat lambat/boros kuota Gemini. Naikkan angka ini sendiri
+  // kalau kuota Anda longgar; admin akan diberi tahu di layar kalau
+  // rentang yang diketik melebihi batas ini.
+  KIDUNG_VERSE_REF_MAX_RANGE: 10,
+
   // Daftar bahasa yang ada di kolom "Bahasa" pada sheet Alkitab, dengan label yang
   // tampil di tombol pemilih bahasa. Sesuaikan "label" jika kurang tepat — kode
   // ("code") HARUS SAMA PERSIS dengan nilai di kolom Bahasa pada Google Sheet Anda.
@@ -153,6 +169,12 @@ const CONFIG = {
   // besok-besoknya langsung masuk tanpa mengetik ulang, sampai tekan Keluar.
   AUTH_STORAGE_KEY: "bible_app_auth_user_v1",
   AUTH_DISPLAY_KEY: "bible_app_auth_display_v1",
+  // BARU -- sebutan "Saudara"/"Saudari" dari kolom "Saudara/i" di Sheet
+  // Pengguna (lihat js/csv.js normalizeUserRecord() -> field `saudara`),
+  // disimpan lokal SAMA POLA seperti AUTH_DISPLAY_KEY, supaya AI Chat
+  // Gembala bisa menyapa pengguna dengan namanya sendiri (BUKAN "Gembala")
+  // begitu login, tanpa perlu tanya ulang tiap sesi. Lihat js/aichat.js.
+  AUTH_SAUDARA_KEY: "bible_app_auth_saudara_v1",
 
   // Nama database IndexedDB & object store tempat menyimpan data secara lokal.
   // DB_VERSION dinaikkan (dari versi sebelumnya) supaya store "users" baru
@@ -176,7 +198,20 @@ const CONFIG = {
   // sehingga getKidungRowsByBukuNo() gagal untuk SEMUA nomor kidung (bukan
   // cuma satu nomor tertentu) -- persis gejala "judul kidung muncul di
   // daftar, tapi isi bait selalu 'tidak ditemukan' saat dibuka).
-  DB_VERSION: 6,
+  // v7 (21 Agu 2026): v6 di atas TERNYATA belum benar-benar menutup
+  // celahnya -- js/db.js masih hanya membuat index "byBukuNo" di cabang
+  // UPGRADE (store "kidung" sudah ada dari versi lama), bukan di cabang
+  // CREATE (store baru dibuat langsung di versi terbaru, mis. di HP yang
+  // baru pertama kali buka app SETELAH v6 dirilis, atau yang cache/data
+  // situsnya pernah dibersihkan). HP seperti itu tetap kehilangan index
+  // ini walau sudah di DB_VERSION 6, persis gejala yang dilaporkan (daftar
+  // kidung muncul, tapi buka 1 kidung -> "tidak ditemukan" terus walau
+  // sudah "sinkronkan ulang" berkali-kali, khusus di sebagian HP, TIDAK di
+  // komputer). js/db.js sekarang membuat index ini (dicek dulu belum ada)
+  // di KEDUA cabang, dan versi dinaikkan lagi ke 7 di sini supaya
+  // onupgradeneeded benar-benar terpicu ulang & menambal HP yang sudah
+  // kadung rusak skemanya di versi 6.
+  DB_VERSION: 7,
   STORE_NAME: "verses",
   USERS_STORE_NAME: "users",
   MEDIA_STORE_NAME: "studioMedia",
@@ -303,6 +338,26 @@ const CONFIG = {
   // yang punya mekanisme ukur-otomatis; data Kidung jauh lebih kecil
   // jadi tidak perlu progress bar rumit).
   KIDUNG_DATA_APPROX_KB: 800,
+
+  // Urutan buku Kidung untuk navigasi ◀/▶ LINTAS BUKU (22 Agu 2026) --
+  // dipakai findAdjacentKidungCrossBook() di js/kidung.js supaya waktu
+  // pengguna tekan ▶ di nomor TERAKHIR sebuah buku, otomatis lompat ke
+  // nomor PERTAMA buku berikutnya dalam daftar ini (begitu juga ◀ di
+  // nomor pertama -> lompat ke nomor TERAKHIR buku sebelumnya), lalu di
+  // ujung daftar berputar balik ke awal (Tambahan habis -> balik ke
+  // Kidung No.1, bukan berhenti).
+  // - Buku yang namanya TIDAK ada di daftar ini (mis. baru ditambah di
+  //   Sheet tapi belum sempat didaftarkan di sini, misalnya nanti
+  //   "Remaja"/"Pemuda") TETAP otomatis ikut ketambahan sebagai buku
+  //   baru (list buku sendiri masih 100% otomatis dari data, lihat
+  //   getKidungBooks()) -- hanya URUTANNYA yang default taruh di
+  //   PALING BELAKANG (urut abjad), supaya navigasi tidak pernah
+  //   "kehilangan" buku baru itu sama sekali walau lupa didaftarkan di
+  //   sini. Begitu mau posisinya dipastikan (mis. "Remaja" maunya
+  //   sebelum "Tambahan"), tinggal masukkan namanya ke array ini di
+  //   posisi yang diinginkan -- ejaannya HARUS SAMA PERSIS dengan isi
+  //   kolom "Buku" di Sheet Kidung (termasuk besar/kecil huruf).
+  KIDUNG_BOOK_ORDER: ["Kidung", "Supplemen", "Tambahan"],
 
   // ----------------------------------------------------------
   // 8) PENGETAHUAN TAMBAHAN AI CHAT (istilah/kategori & topik) -- OPSIONAL
