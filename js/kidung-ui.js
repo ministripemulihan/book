@@ -1,7 +1,7 @@
 // ============================================================
 //  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari
 //  menu ☰ / "Lainnya" seperti "📚 Kumpulan Ayat" dkk, supaya bisa
-//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron, 
+//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron,
 //  parsing, ambil bait+koor, teks bagikan) SUDAH ada semua di
 //  js/kidung.js -- file ini KHUSUS tampilan & alur klik saja, pola
 //  penulisannya sama seperti js/collections.js (renderCollectionsPanel
@@ -279,7 +279,7 @@ async function renderKidungHome() {
     }
   }
 
-  const books = (await getKidungBooks().catch(() => [])) || [];
+  const books = (await getKidungBooksOrdered().catch(() => [])) || [];
   if (!books.length) books.push("Kidung");
   if (!books.includes(kidungCurrentBuku)) kidungCurrentBuku = books[0];
 
@@ -364,6 +364,10 @@ const KIDUNG_MEDIA_FILTERS = [
   { key: "midi", label: "🎹 MIDI", test: (k) => !!k.linkMidi },
 ];
 let kidungListMediaFilter = "__all__";
+// Filter cepat berdasarkan nomor di layar "📋 Daftar" (lihat renderKidungList()
+// di bawah) -- string angka saja (sudah dibuang non-digitnya), kosong berarti
+// tidak ada filter nomor aktif.
+let kidungListNumberFilter = "";
 
 async function renderKidungList(bukuFilter) {
   const panel = el("kidungPanel");
@@ -384,6 +388,27 @@ async function renderKidungList(bukuFilter) {
     return;
   }
 
+  // Kotak filter cepat berdasarkan NOMOR (22 Agu 2026, atas permintaan) --
+  // ketik nomor di sini langsung menyaring daftar di bawah secara LIVE
+  // (tiap ketukan tombol, tanpa perlu tombol "Cari"/submit terpisah),
+  // supaya gampang loncat ke nomor tertentu tanpa scroll manual walau
+  // judulnya lupa. Beda dari kotak "🔍 Cari" di layar depan (yang
+  // mencari lintas SEMUA buku sekaligus & ikut mencocokkan ke isi
+  // syair/judul/pengarang) -- ini KHUSUS nomor & scoped ke buku yang
+  // sedang dibuka (bukuFilter) saja, direset kosong tiap kali layar
+  // Daftar ini dibuka ulang.
+  kidungListNumberFilter = "";
+  const numberFilterRow = document.createElement("div");
+  numberFilterRow.className = "kidung-number-filter-row";
+  const numberFilterInput = document.createElement("input");
+  numberFilterInput.type = "text";
+  numberFilterInput.inputMode = "numeric";
+  numberFilterInput.autocomplete = "off";
+  numberFilterInput.placeholder = "Cari nomor " + bukuFilter + "…";
+  numberFilterInput.className = "kidung-search-input";
+  numberFilterRow.appendChild(numberFilterInput);
+  panel.appendChild(numberFilterRow);
+
   // Baris chip filter media -- hanya tampil kalau memang ada kidung yang
   // punya minimal 1 link media di buku ini (kalau tidak ada satupun, chip
   // ini cuma bikin bingung karena semua akan kosong).
@@ -395,11 +420,16 @@ async function renderKidungList(bukuFilter) {
 
   function renderFilteredList() {
     const active = KIDUNG_MEDIA_FILTERS.find((f) => f.key === kidungListMediaFilter) || KIDUNG_MEDIA_FILTERS[0];
-    const filtered = active.test ? fullList.filter(active.test) : fullList;
-    countLabel.textContent =
-      kidungListMediaFilter === "__all__"
-        ? fullList.length.toLocaleString("id-ID") + " kidung"
-        : filtered.length.toLocaleString("id-ID") + " dari " + fullList.length.toLocaleString("id-ID") + " kidung yang punya " + active.label;
+    let filtered = active.test ? fullList.filter(active.test) : fullList;
+    if (kidungListNumberFilter) {
+      filtered = filtered.filter((k) => String(k.noKidung).startsWith(kidungListNumberFilter));
+    }
+    const noFilterActive = kidungListMediaFilter === "__all__" && !kidungListNumberFilter;
+    countLabel.textContent = noFilterActive
+      ? fullList.length.toLocaleString("id-ID") + " kidung"
+      : filtered.length.toLocaleString("id-ID") + " dari " + fullList.length.toLocaleString("id-ID") + " kidung" +
+        (kidungListMediaFilter !== "__all__" ? " yang punya " + active.label : "") +
+        (kidungListNumberFilter ? " (nomor diawali \"" + kidungListNumberFilter + "\")" : "");
     box.innerHTML = "";
     if (!filtered.length) {
       const p = document.createElement("p");
@@ -419,6 +449,11 @@ async function renderKidungList(bukuFilter) {
       box.appendChild(item);
     });
   }
+
+  numberFilterInput.addEventListener("input", () => {
+    kidungListNumberFilter = (numberFilterInput.value || "").replace(/\D/g, "");
+    renderFilteredList();
+  });
 
   if (anyHasMedia) {
     const filterRow = document.createElement("div");
@@ -803,12 +838,30 @@ function buildKidungToolbar(meta, baits) {
   nextBtn.setAttribute("aria-label", "Kidung nomor selanjutnya");
   nextBtn.disabled = true;
 
-  if (typeof findAdjacentKidungNo === "function" && !isNaN(noInt)) {
-    findAdjacentKidungNo(meta.buku, noInt, -1).then((prevNo) => {
-      if (prevNo != null) { prevBtn.disabled = false; prevBtn.addEventListener("click", () => openKidungReader(meta.buku, String(prevNo))); }
+  // UPDATE (22 Agu 2026): dulu pakai findAdjacentKidungNo() langsung --
+  // tombol jadi disabled & mentok begitu sampai nomor pertama/terakhir
+  // SATU buku (mis. ▶ mati di Supplemen nomor terakhir walau "Tambahan"
+  // sudah ada). Sekarang pakai findAdjacentKidungCrossBook() (js/kidung.js)
+  // yang otomatis lompat ke buku berikutnya/sebelumnya (berputar balik ke
+  // awal di ujung daftar buku) -- lihat komentar panjang di sana. Target
+  // {buku, no} hasil lompatan dipakai LANGSUNG di openKidungReader(),
+  // jadi ◀/▶ (baik diklik/tap maupun panah keyboard lewat
+  // setupKidungReaderKeyNav() di bawah) selalu berpindah ke kidung yang
+  // benar-benar ada, tidak pernah "buntu" selama total kidung > 1.
+  if (typeof findAdjacentKidungCrossBook === "function" && !isNaN(noInt)) {
+    findAdjacentKidungCrossBook(meta.buku, noInt, -1).then((prev) => {
+      if (prev) {
+        prevBtn.disabled = false;
+        prevBtn.title = prev.buku === meta.buku ? "Kidung nomor sebelumnya" : "Pindah ke " + prev.buku + " No. " + prev.no;
+        prevBtn.addEventListener("click", () => openKidungReader(prev.buku, String(prev.no)));
+      }
     });
-    findAdjacentKidungNo(meta.buku, noInt, 1).then((nextNo) => {
-      if (nextNo != null) { nextBtn.disabled = false; nextBtn.addEventListener("click", () => openKidungReader(meta.buku, String(nextNo))); }
+    findAdjacentKidungCrossBook(meta.buku, noInt, 1).then((next) => {
+      if (next) {
+        nextBtn.disabled = false;
+        nextBtn.title = next.buku === meta.buku ? "Kidung nomor selanjutnya" : "Pindah ke " + next.buku + " No. " + next.no;
+        nextBtn.addEventListener("click", () => openKidungReader(next.buku, String(next.no)));
+      }
     });
   }
 
