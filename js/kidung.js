@@ -1,5 +1,5 @@
 // ============================================================
-//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG. 
+//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG.
 //  KIDUNG_SHEET_CSV_URL di js/config.js), disimpan lokal di IndexedDB
 //  (store "kidung", lihat js/db.js), lalu dibaca ulang dari sini
 //  tanpa perlu internet lagi -- pola SAMA PERSIS seperti Alkitab
@@ -172,6 +172,66 @@ async function getKidungBooks() {
   const set = new Set();
   list.forEach((k) => set.add(k.buku || "Kidung"));
   return Array.from(set).sort();
+}
+
+// Sama seperti getKidungBooks(), tapi urutannya mengikuti
+// CONFIG.KIDUNG_BOOK_ORDER (kalau ada) -- dipakai navigasi ◀/▶ LINTAS
+// BUKU (findAdjacentKidungCrossBook() di bawah) & toggle buku di UI,
+// supaya urutannya Kidung -> Supplemen -> Tambahan -> ... sesuai
+// keputusan admin, bukan abjad murni. Buku yang ada di DATA tapi tidak
+// disebut di KIDUNG_BOOK_ORDER tetap ikut (ditaruh di belakang, urut
+// abjad) -- lihat catatan panjang di js/config.js.
+async function getKidungBooksOrdered() {
+  const books = await getKidungBooks();
+  const order = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.KIDUNG_BOOK_ORDER)) ? CONFIG.KIDUNG_BOOK_ORDER : [];
+  const known = order.filter((b) => books.includes(b));
+  const rest = books.filter((b) => !known.includes(b)).sort();
+  return known.concat(rest);
+}
+
+// Navigasi ◀/▶ yang MELINTASI batas buku (22 Agu 2026, atas permintaan):
+// sebelumnya findAdjacentKidungNo() di atas berhenti total begitu sampai
+// nomor pertama/terakhir SATU buku (mis. tombol ▶ jadi disabled di
+// Supplemen nomor terakhir, walau buku "Tambahan" sudah ada & punya
+// nomor 1). Fungsi ini MENCOBA findAdjacentKidungNo() dulu seperti biasa
+// di buku yang sama; kalau sudah mentok (null, artinya memang di ujung
+// buku ini), lanjut LOMPAT ke buku BERIKUTNYA/SEBELUMNYA sesuai
+// getKidungBooksOrdered() -- mengambil nomor PERTAMA buku berikutnya
+// (untuk ▶) atau nomor TERAKHIR buku sebelumnya (untuk ◀). Buku yang
+// kebetulan kosong (belum ada datanya) dilewati begitu saja. Di ujung
+// daftar buku, urutannya BERPUTAR (buku terakhir -> buku pertama lagi),
+// supaya ▶ di kidung TERAKHIR buku TERAKHIR (mis. Tambahan No.21)
+// otomatis lompat balik ke kidung PERTAMA buku PERTAMA (Kidung No.1),
+// begitu juga sebaliknya -- jadi navigasi ◀/▶ TIDAK PERNAH mentok/
+// disabled selama total kidungnya lebih dari 1, baik di komputer
+// maupun di HP (klik/tap tombol maupun panah kiri-kanan keyboard, lihat
+// setupKidungReaderKeyNav() di js/kidung-ui.js -- keduanya sama-sama
+// lewat fungsi ini, jadi otomatis konsisten di kedua perangkat).
+// Balikan: { buku, no } kalau ketemu, atau null kalau memang cuma ada
+// 1 buku dengan 1 kidung saja (tidak ada ke mana-mana lagi).
+async function findAdjacentKidungCrossBook(buku, noInt, direction) {
+  const sameBookNo = await findAdjacentKidungNo(buku, noInt, direction);
+  if (sameBookNo != null) return { buku, no: sameBookNo };
+
+  const books = await getKidungBooksOrdered();
+  if (books.length < 1) return null;
+  const idx = books.indexOf(buku);
+  if (idx === -1) return null;
+
+  for (let step = 1; step <= books.length; step++) {
+    const nextIdx = ((idx + step * direction) % books.length + books.length) % books.length;
+    const nextBuku = books[nextIdx];
+    if (nextIdx === idx) break; // sudah 1 putaran penuh & tidak ketemu buku lain berisi data
+    const list = await getKidungList(nextBuku);
+    const nums = list
+      .map((k) => parseInt(k.noKidung, 10))
+      .filter((n) => !isNaN(n))
+      .sort((a, b) => a - b);
+    if (!nums.length) continue; // buku ini kosong, coba buku berikutnya/sebelumnya
+    const targetNo = direction > 0 ? nums[0] : nums[nums.length - 1];
+    return { buku: nextBuku, no: targetNo };
+  }
+  return null;
 }
 
 // Semua tag pemakaian yang sungguh dipakai (SPR/Pemuda/Remaja/Anak/
@@ -444,6 +504,17 @@ async function searchKidungFull(query, bukuFilter) {
   const total = list.length;
   if (!q) return { matches: [], total };
 
+  // UPDATE (22 Agu 2026) atas permintaan: pencarian ini sekarang JUGA
+  // mencocokkan ke NOMOR kidung, bukan cuma judul/pengarang/isi syair --
+  // ketik "42" sekarang ikut menemukan Kidung No. 42 (dicocokkan pakai
+  // "dimulai dengan", jadi "4" juga ikut menampilkan No. 4, 40-49,
+  // 400-409, dst -- berguna sebagai pencarian cepat walau nomornya
+  // belum diketik lengkap). Supaya kotak pencarian ini langsung bisa
+  // dipakai "cari berdasarkan nomor" tanpa perlu kotak terpisah, hasil
+  // yang cocok karena NOMOR ditaruh PALING ATAS (urut angka menaik),
+  // baru diikuti hasil yang cocok karena judul/pengarang/isi syair.
+  const isNumericQuery = /^\d+$/.test(q);
+
   const allRows = await LocalDB.getAllKidungRows();
   // Kelompokkan baris per kidung (kunci buku+noKidung) supaya gampang
   // dicek "ada baris yang cocok" tanpa query IndexedDB terpisah per
@@ -456,17 +527,21 @@ async function searchKidungFull(query, bukuFilter) {
     rowsByKey.get(key).push(r);
   });
 
-  const matches = [];
+  const numberMatches = [];
+  const otherMatches = [];
   list.forEach((k) => {
     const rows = rowsByKey.get(k.buku + "_" + k.noKidung) || [];
+    const numberHit = isNumericQuery && String(k.noKidung).startsWith(q);
     const titleHit = (k.judul || "").toLowerCase().includes(q);
     const authorHit = (k.pengarang || "").toLowerCase().includes(q);
     const matchExcerpt = findKidungMatchingLine(rows, q);
-    if (!titleHit && !authorHit && !matchExcerpt) return;
-    matches.push(Object.assign({}, k, { matchExcerpt }));
+    if (!numberHit && !titleHit && !authorHit && !matchExcerpt) return;
+    const entry = Object.assign({}, k, { matchExcerpt });
+    if (numberHit) numberMatches.push(entry); else otherMatches.push(entry);
   });
+  numberMatches.sort((a, b) => (parseInt(a.noKidung, 10) || 0) - (parseInt(b.noKidung, 10) || 0));
 
-  return { matches, total };
+  return { matches: numberMatches.concat(otherMatches), total };
 }
 
 // ============================================================
