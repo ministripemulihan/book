@@ -1,7 +1,7 @@
 // ============================================================
 //  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari
 //  menu ☰ / "Lainnya" seperti "📚 Kumpulan Ayat" dkk, supaya bisa
-//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron,
+//  langsung dipakai di HP maupun komputer. Lapisan data (sinkron, 
 //  parsing, ambil bait+koor, teks bagikan) SUDAH ada semua di
 //  js/kidung.js -- file ini KHUSUS tampilan & alur klik saja, pola
 //  penulisannya sama seperti js/collections.js (renderCollectionsPanel
