@@ -206,8 +206,34 @@ async function getKidungBaitsWithKoor(buku, noKidung) {
   const rows = await getKidungRows(buku, noKidung);
   const koorByGroup = {};
   rows.forEach((r) => { if (r.jenis === "koor" && r.koorGroup) koorByGroup[r.koorGroup] = r.teks; });
-  return rows
-    .filter((r) => r.jenis === "bait")
+
+  const baitRows = rows.filter((r) => r.jenis === "bait");
+
+  // FIX (22 Agu 2026): sejumlah kidung -- terutama di buku "Tambahan"
+  // (mis. No.1 "Betapa dalam kasihmu", No.2 "Come Lord Jesus", dst) --
+  // HANYA berisi baris koor/refrain, TANPA baris "bait" sama sekali.
+  // Sebelum fix ini, kalau tidak ada baris "bait", fungsi ini pulang
+  // dengan array KOSONG -> openKidungByKeypad() (js/kidung.js) mengira
+  // kidung itu TIDAK ADA sama sekali, sehingga openKidungReader()
+  // (js/kidung-ui.js) selalu menampilkan "... tidak ditemukan", BERAPA
+  // KALI PUN disinkronkan ulang -- karena memang bug logika di sini,
+  // bukan soal data belum sinkron. Sekarang, kalau memang tidak ada
+  // baris "bait" untuk kidung ini, baris-baris "koor"-nya sendiri
+  // dipakai sebagai isi (urut sesuai `urutan` di Sheet), supaya kidung
+  // jenis "koor-saja" ini tetap bisa dibuka & dibaca seperti biasa.
+  if (!baitRows.length) {
+    return rows
+      .filter((r) => r.jenis === "koor")
+      .sort((a, b) => (a.urutan || 0) - (b.urutan || 0))
+      .map((r) => ({
+        noBait: null,
+        teks: r.teks,
+        koorGroup: r.koorGroup || null,
+        koorTeks: null,
+      }));
+  }
+
+  return baitRows
     .sort((a, b) => (a.noBait || 0) - (b.noBait || 0))
     .map((r) => ({
       noBait: r.noBait,
