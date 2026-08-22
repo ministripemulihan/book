@@ -1,5 +1,5 @@
 // ============================================================
-//  🔎 VERIFIKASI BAHASA AYAT — alat bantu untuk memindai SELURUH data
+//  🔎 VERIFIKASI BAHASA AYAT — alat bantu untuk memindai SELURUH data 
 //  Alkitab yang sudah tersimpan lokal di perangkat (semua 8 kode bahasa
 //  di CONFIG.LANGUAGES: ind, rvind, kjv, eng, rveng, chs, chssmp, jawa),
 //  lalu mengecek apakah teks pada kolom "Text" tiap baris memang cocok
