@@ -1,5 +1,5 @@
 // ============================================================
-//  LAPISAN PENYIMPANAN LOKAL (IndexedDB)
+//  LAPISAN PENYIMPANAN LOKAL (IndexedDB) 
 //  Menyimpan secara lokal:
 //   1) Seluruh teks Alkitab (store "verses") — dari Google Sheet #1
 //   2) Daftar akun pengguna (store "users") — dari Google Sheet #2
