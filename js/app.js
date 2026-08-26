@@ -759,7 +759,7 @@ function loadMeasuredBibleSizeMbLocal_() {
   }
 }
 
-// Dipanggil OTOMATIS setiap kali unduhan/sinkron PENUH selesai (lihat 
+// Dipanggil OTOMATIS setiap kali unduhan/sinkron PENUH selesai (lihat
 // syncFromServer() di bawah) dengan ukuran byte SUNGGUHAN yang baru saja
 // diterima -- BUKAN pernah diketik siapa pun. Menyimpan ke perangkat ini
 // (instan, langsung dipakai lagi kalau perlu di perangkat yang sama), dan
