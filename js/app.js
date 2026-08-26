@@ -459,6 +459,7 @@ async function startApp() {
     refreshPlanFromRemote(currentUser);
     refreshSettingsFromRemote(currentUser).then(() => {
       if (el("readingAnimToggle")) el("readingAnimToggle").checked = isReadingProgressEnabled();
+      initFootnoteAccentControl();
     });
     refreshCollectionsFromRemote(currentUser).then((changed) => {
       // Kalau panel Kumpulan Ayat sedang terbuka & ada perubahan dari
@@ -758,7 +759,7 @@ function loadMeasuredBibleSizeMbLocal_() {
   }
 }
 
-// Dipanggil OTOMATIS setiap kali unduhan/sinkron PENUH selesai (lihat
+// Dipanggil OTOMATIS setiap kali unduhan/sinkron PENUH selesai (lihat 
 // syncFromServer() di bawah) dengan ukuran byte SUNGGUHAN yang baru saja
 // diterima -- BUKAN pernah diketik siapa pun. Menyimpan ke perangkat ini
 // (instan, langsung dipakai lagi kalau perlu di perangkat yang sama), dan
@@ -993,6 +994,7 @@ function afterDataReady() {
   initFullscreenControl();
   initTTS();
   initReadingProgressControl();
+  initFootnoteAccentControl();
   initColumnsControl();
   initVerseModeControl();
   updateStatusPanel();
@@ -1899,7 +1901,13 @@ function buildInlineNoteCardEl(v, block) {
     adminWrap.appendChild(label);
     const adminText = document.createElement("div");
     adminText.className = "note-modal-admin-text";
-    adminText.innerHTML = linkifyOsisReferences(sanitizeNoteHtml(v.note), v.bookNumber, v.chapter);
+    // buildFootnoteEntriesHtml() (js/footnotes.js) membungkus tiap entri
+    // nomor/huruf dalam <div class="footnote-entry" data-fn-num/letter>
+    // supaya tanda "1a" dkk. di teks ayat bisa MELOMPAT & MENYOROT bagian
+    // ini langsung, tanpa perlu kotak ringkasan terpisah yang isinya dobel.
+    adminText.innerHTML = typeof buildFootnoteEntriesHtml === "function"
+      ? buildFootnoteEntriesHtml(v.note, v.bookNumber, v.chapter)
+      : linkifyOsisReferences(sanitizeNoteHtml(v.note), v.bookNumber, v.chapter);
     adminText.addEventListener("click", (e) => {
       const btn = e.target.closest(".note-verse-ref");
       if (!btn) return;
@@ -2139,7 +2147,15 @@ function buildVerseBlock(v, idx, fallbackBookName) {
 
   const textWrap = document.createElement("div");
   textWrap.className = "verse-text-wrap";
-  textWrap.textContent = v.text;
+  // v.markedText (kalau ada -- lihat js/footnotes.js) menyimpan tanda
+  // catatan kaki ("1a", "2", "3b" dst) sebagai elemen <sup> yang bisa
+  // ditekan. Bahasa yang tidak punya tanda ini (markedText kosong/tanpa
+  // penanda) tampil PERSIS seperti sebelumnya (teks polos v.text).
+  if (typeof renderVerseTextWithFootnotes === "function" && v.markedText) {
+    renderVerseTextWithFootnotes(textWrap, v.markedText);
+  } else {
+    textWrap.textContent = v.text;
+  }
 
   const hasAdminNote = !!(v.note && v.note.trim());
   const hasPersonalNote = !!getPersonalNote(currentUser, v.id);
@@ -2186,6 +2202,9 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   block.appendChild(presentBtn);
   const notePanel = buildInlineNoteCardEl(v, block);
   block.appendChild(notePanel);
+  if (typeof setupFootnoteMarkerHandlers === "function") {
+    setupFootnoteMarkerHandlers(textWrap, v, block, notePanel);
+  }
 
   // Kalau ayat ini sedang di-highlight (mis. datang dari menu "Catatan
   // Saya" atau hasil pencarian CATATAN) DAN memang punya catatan, langsung
@@ -6038,6 +6057,23 @@ function initReadingProgressControl() {
   window.addEventListener("scroll", handleScrollForReadingProgress, { passive: true });
 }
 
+// Warna biru pada tanda catatan kaki ("1a", "2", dst di dalam teks ayat --
+// lihat js/footnotes.js & .footnote-marker di css/style.css). Disimpan
+// PER PENGGUNA seperti pengaturan lain di file ini (lihat js/settings.js).
+function isFootnoteAccentBlueEnabled() {
+  return getSetting(currentUser, "footnoteAccentBlue") !== false;
+}
+
+function applyFootnoteAccentSetting(enabled) {
+  document.body.classList.toggle("footnote-accent-off", !enabled);
+}
+
+function initFootnoteAccentControl() {
+  const enabled = isFootnoteAccentBlueEnabled();
+  if (el("footnoteAccentToggle")) el("footnoteAccentToggle").checked = enabled;
+  applyFootnoteAccentSetting(enabled);
+}
+
 // Header di HP bisa melipat jadi 2-3 baris (lihat @media 640px di CSS)
 // tergantung lebar layar/besar huruf antarmuka, jadi tingginya TIDAK selalu
 // sama. Sidebar (laci daftar kitab) dulunya diset mulai dari paling atas
@@ -6304,6 +6340,12 @@ function initUIEvents() {
     setSetting(currentUser, "readingProgressAnimation", e.target.checked);
     resetReadingProgressFlags(); // supaya tidak langsung "nembak" toast kalau baru dinyalakan lagi
   });
+  if (el("footnoteAccentToggle")) {
+    el("footnoteAccentToggle").addEventListener("change", (e) => {
+      setSetting(currentUser, "footnoteAccentBlue", e.target.checked);
+      applyFootnoteAccentSetting(e.target.checked);
+    });
+  }
   initChangePasswordUI();
   el("logoutBtn").addEventListener("click", () => {
     const guestNow = typeof Guest !== "undefined" && Guest.isGuest();
