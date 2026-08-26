@@ -21,6 +21,12 @@ let currentSingleVerse = null;
 let currentUser = null;        // username (huruf kecil) yang sedang login
 let currentUserDisplay = null; // nama tampilan
 let currentUserSaudara = null; // "Saudara"/"Saudari" dari kolom "Saudara/i" di Sheet Pengguna (dipakai AI Chat Gembala menyapa pengguna, lihat js/aichat.js)
+// Bahasa DEFAULT milik pengguna yang sedang login, dari kolom "Language"
+// (atau "Bahasa" kalau "Language" kosong) di Sheet Pengguna -- lihat
+// normalizeUserRecord() di js/csv.js (extra.language / extra.bahasa) dan
+// initLanguageSelector() di bawah. Kosong ("") = tidak diatur admin, jadi
+// pemilihan bahasa jatuh balik ke default aplikasi (Indonesia).
+let currentUserExtraLanguage = "";
 let currentChapterVerses = []; // ayat-ayat pasal yang sedang ditampilkan (dipakai TTS & modal catatan)
 let verseById = {};            // id ayat ("lang_verseId") -> objek ayat, dipakai menu "Catatan Saya"
 
@@ -335,7 +341,19 @@ function initAuth() {
     currentUserDisplay = localStorage.getItem(CONFIG.AUTH_DISPLAY_KEY) || savedUser;
     currentUserSaudara = localStorage.getItem(CONFIG.AUTH_SAUDARA_KEY) || "";
     if (typeof Guest !== "undefined") Guest.exit(); // akun asli menang atas sisa status tamu lama
-    startApp();
+    // BARU -- pengguna yang SUDAH login dari kunjungan sebelumnya (bukan baru
+    // mengisi form login) tidak punya objek `match` di sini, jadi kolom
+    // "Language"/"Bahasa"-nya perlu dicari ulang dari data pengguna lokal
+    // sebelum startApp() memilih bahasa awal (lihat initLanguageSelector()).
+    // Kalau pencarian gagal (mis. offline & belum pernah sinkron pengguna),
+    // tetap lanjut masuk apa adanya (currentUserExtraLanguage tetap "").
+    LocalDB.getAllUsers()
+      .then((users) => {
+        const rec = users.find((u) => u.username === savedUser);
+        currentUserExtraLanguage = (rec && rec.extra && (rec.extra.language || rec.extra.bahasa)) || "";
+      })
+      .catch(() => {})
+      .then(() => startApp());
     return;
   }
 
@@ -358,6 +376,7 @@ function initAuth() {
       currentUser = null;
       currentUserDisplay = null;
       currentUserSaudara = null;
+      currentUserExtraLanguage = ""; // tamu tidak punya kolom Language -- default Indonesia
       el("loginScreen").hidden = true;
       startApp();
     });
@@ -389,6 +408,10 @@ function initAuth() {
       // kalau belum diisi admin -> AI Chat jatuh balik ke sapaan netral,
       // lihat buildAiChatSapaan() di js/aichat.js).
       currentUserSaudara = match.saudara || "";
+      // BARU -- kolom "Language" (atau "Bahasa" kalau "Language" kosong) di
+      // Sheet Pengguna dipakai sebagai bahasa AWAL Alkitab untuk pengguna ini
+      // (lihat initLanguageSelector()). Kosong = tetap default Indonesia.
+      currentUserExtraLanguage = (match.extra && (match.extra.language || match.extra.bahasa)) || "";
       localStorage.setItem(CONFIG.AUTH_STORAGE_KEY, currentUser);
       localStorage.setItem(CONFIG.AUTH_DISPLAY_KEY, currentUserDisplay);
       localStorage.setItem(CONFIG.AUTH_SAUDARA_KEY, currentUserSaudara);
@@ -1157,11 +1180,42 @@ function buildScheduleForScope(scope) {
 // ------------------------------------------------------------
 // 4) PEMILIH BAHASA
 // ------------------------------------------------------------
+// Kunci localStorage bahasa PILIHAN MANUAL sekarang per-pengguna (BARU --
+// sebelumnya satu kunci global "bible_app_lang" dipakai bersama oleh semua
+// akun di perangkat yang sama). Tamu (currentUser kosong) tetap memakai
+// kunci global lama supaya tidak kehilangan preferensi yang sudah ada.
+function languageStorageKey_() {
+  return currentUser ? "bible_app_lang:" + currentUser : "bible_app_lang";
+}
+
+// Mencocokkan isi kolom "Language"/"Bahasa" Sheet Pengguna (bebas huruf
+// besar/kecil & spasi di sekitarnya, mis. "RVIND", " rvind ") ke salah satu
+// kode di CONFIG.LANGUAGES -- "" kalau kosong atau kodenya tidak dikenal
+// (supaya tidak salah ketik admin membuat aplikasi macet, cukup diabaikan).
+function resolveSheetDefaultLanguage_(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  if (!v) return "";
+  const found = CONFIG.LANGUAGES.find((l) => l.code.toLowerCase() === v);
+  return found ? found.code : "";
+}
+
 function initLanguageSelector() {
-  const saved = localStorage.getItem("bible_app_lang");
+  const langKey = languageStorageKey_();
+  // Sudah pernah pilih bahasa SECARA MANUAL di perangkat ini (dropdown
+  // bahasa) -> preferensi manual itu SELALU menang, tidak pernah ditimpa
+  // ulang oleh kolom Language di Sheet supaya pengguna bebas ganti-ganti
+  // bahasa kapan saja tanpa "ditarik paksa" balik ke default tiap masuk.
+  const saved = localStorage.getItem(langKey);
+  // BARU -- kalau BELUM PERNAH pilih manual di perangkat ini, bahasa AWAL
+  // Alkitab dituntun oleh kolom "Language" (atau "Bahasa" kalau "Language"
+  // kosong) di Sheet Pengguna, lihat currentUserExtraLanguage (diisi saat
+  // login, lihat initAuth() & submit form login di atas). Kosong / kode
+  // tidak dikenal = tetap jatuh balik ke CONFIG.DEFAULT_LANGUAGE (Indonesia).
+  const sheetDefault = resolveSheetDefaultLanguage_(currentUserExtraLanguage);
   const available = CONFIG.LANGUAGES.filter((l) => verseIndex[l.code]);
   currentLang =
     (saved && verseIndex[saved] && saved) ||
+    (sheetDefault && verseIndex[sheetDefault] && sheetDefault) ||
     (verseIndex[CONFIG.DEFAULT_LANGUAGE] && CONFIG.DEFAULT_LANGUAGE) ||
     (available[0] && available[0].code);
 
@@ -1177,7 +1231,7 @@ function initLanguageSelector() {
 
   sel.addEventListener("change", () => {
     currentLang = sel.value;
-    localStorage.setItem("bible_app_lang", currentLang);
+    localStorage.setItem(langKey, currentLang);
     if (el("columnLang1")) el("columnLang1").value = currentLang;
     buildSidebar();
     if (currentBookNum && currentChapter) {
