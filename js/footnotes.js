@@ -1,5 +1,5 @@
 // ============================================================
-//  CATATAN KAKI PER-KATA (Alkitab Recovery Version) 
+//  CATATAN KAKI PER-KATA (Alkitab Recovery Version)
 // ------------------------------------------------------------
 //  Beberapa bahasa (mis. rvind/rveng) menyimpan tanda catatan kaki
 //  DI DALAM teks ayat itu sendiri, menempel ke kata tertentu, mis.:
@@ -46,6 +46,7 @@ function renderVerseTextWithFootnotes(wrap, markedText) {
   }
   const parts = raw.split("\u0001");
   let lastMarkerKey = null;
+  let lastMarkerHasLetter = false;
   parts.forEach((part, i) => {
     if (i % 2 === 0) {
       // Bagian teks biasa. Kalau bagian SEBELUMNYA barusan sebuah tanda
@@ -58,7 +59,12 @@ function renderVerseTextWithFootnotes(wrap, markedText) {
         const m = part.match(/^(\S+)([\s\S]*)$/);
         if (m) {
           const wordSpan = document.createElement("span");
-          wordSpan.className = "footnote-marker-word";
+          // Kata setelah tanda ANGKA-SAJA (mis. "2" pada "2Yesus", tanpa huruf
+          // rujukan silang) TIDAK ikut biru -- persis app Recovery Version
+          // resmi: hanya tanda yang punya huruf (mis. "1a","3b") yang birunya
+          // menular ke kata setelahnya. Lihat footnote-marker-word vs
+          // footnote-marker-word-plain di css/style.css.
+          wordSpan.className = lastMarkerHasLetter ? "footnote-marker-word" : "footnote-marker-word-plain";
           wordSpan.textContent = m[1];
           wordSpan.dataset.fnKey = lastMarkerKey;
           wordSpan.setAttribute("role", "button");
@@ -73,11 +79,16 @@ function renderVerseTextWithFootnotes(wrap, markedText) {
         wrap.appendChild(document.createTextNode(part));
       }
       lastMarkerKey = null;
+      lastMarkerHasLetter = false;
     } else {
       const marker = part.trim();
-      if (!marker) { lastMarkerKey = null; return; }
+      if (!marker) { lastMarkerKey = null; lastMarkerHasLetter = false; return; }
+      // Tanda BERHURUF (mis. "1a","3b") = rujukan silang -> biru.
+      // Tanda ANGKA-SAJA (mis. "2") = catatan penjelasan tanpa rujukan
+      // silang -> warna teks biasa (bukan biru), tapi tetap bisa ditekan.
+      const hasLetter = /[A-Za-z]/.test(marker);
       const sup = document.createElement("sup");
-      sup.className = "footnote-marker";
+      sup.className = hasLetter ? "footnote-marker" : "footnote-marker-plain";
       sup.textContent = marker;
       sup.dataset.fnKey = marker;
       sup.setAttribute("role", "button");
@@ -85,6 +96,7 @@ function renderVerseTextWithFootnotes(wrap, markedText) {
       sup.title = "Tekan untuk membaca catatan " + marker + " — tekan lagi untuk menutup";
       wrap.appendChild(sup);
       lastMarkerKey = marker;
+      lastMarkerHasLetter = hasLetter;
     }
   });
 }
@@ -199,7 +211,9 @@ function buildFootnoteEntriesHtml(noteHtml, bookNumber, chapter) {
 //      baru (bukan menutup lalu membuka lagi dari awal).
 // ------------------------------------------------------------
 function setupFootnoteMarkerHandlers(textWrap, v, block, notePanel) {
-  const markers = textWrap.querySelectorAll(".footnote-marker, .footnote-marker-word");
+  const markers = textWrap.querySelectorAll(
+    ".footnote-marker, .footnote-marker-word, .footnote-marker-plain, .footnote-marker-word-plain"
+  );
   if (!markers.length) return;
   let activeKey = null;
 
