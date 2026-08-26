@@ -1,5 +1,5 @@
 // ============================================================
-//  PARSER CSV  — mendeteksi otomatis pemisah kolom (koma/titik koma/tab)
+//  PARSER CSV  — mendeteksi otomatis pemisah kolom (koma/titik koma/tab) 
 //  dan menangani nilai yang dibungkus tanda kutip (bisa berisi koma/baris baru)
 // ============================================================
 function detectDelimiter(sampleLine) {
