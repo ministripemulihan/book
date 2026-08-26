@@ -939,7 +939,6 @@ input { font-family: inherit; }
 .icon-btn:hover { background: var(--rule); }
 
 .brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.brand-mark { color: var(--petrol); font-size: 20px; }
 .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
 
 .search-form {
