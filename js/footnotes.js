@@ -1,5 +1,5 @@
 // ============================================================
-//  CATATAN KAKI PER-KATA (Alkitab Recovery Version)
+//  CATATAN KAKI PER-KATA (Alkitab Recovery Version) 
 // ------------------------------------------------------------
 //  Beberapa bahasa (mis. rvind/rveng) menyimpan tanda catatan kaki
 //  DI DALAM teks ayat itu sendiri, menempel ke kata tertentu, mis.:
