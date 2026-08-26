@@ -3941,7 +3941,8 @@ function handleAddToCollection(verse) {
     ids.forEach((id) => {
       const opt = document.createElement("option");
       opt.value = id;
-      opt.textContent = `${collections[id].name} (${collections[id].verseIds.length} ayat)`;
+      const n = (collections[id].items || collections[id].verseIds || []).length;
+      opt.textContent = `${collections[id].name} (${n} item)`;
       select.appendChild(opt);
     });
     const newOpt = document.createElement("option");
@@ -4051,7 +4052,13 @@ function renderCollectionsPanel(openId) {
 
       const openBtn = document.createElement("button");
       openBtn.className = "collection-card-open";
-      openBtn.innerHTML = `<div class="plan-option-title">${escapeHtml(col.name)}</div><div class="plan-option-sub">${col.verseIds.length} ayat</div>`;
+      // PERBAIKAN (Kumpulan Ayat generik): kumpulan sekarang bisa berisi
+      // campuran ayat/kidung/pengumuman/teks bebas (col.items), bukan cuma
+      // ayat (col.verseIds) -- lihat js/collections.js. Label jumlah item
+      // disesuaikan supaya tidak menyesatkan (mis. "3 ayat" padahal isinya
+      // 1 ayat + 2 pengumuman).
+      const itemCount = (col.items || col.verseIds || []).length;
+      openBtn.innerHTML = `<div class="plan-option-title">${escapeHtml(col.name)}</div><div class="plan-option-sub">${itemCount} item</div>`;
       openBtn.addEventListener("click", () => renderCollectionsPanel(id));
 
       const renameBtn = document.createElement("button");
@@ -4098,30 +4105,52 @@ function renderCollectionDetailInto(container, id, col) {
   renameBtn.textContent = "✏️ Ganti Nama";
   renameBtn.addEventListener("click", () => handleRenameCollection(id, col));
   titleBtns.appendChild(renameBtn);
+  // PERBAIKAN (Kumpulan Ayat generik, lihat js/collections.js): kumpulan
+  // sekarang bisa berisi campuran ayat/kidung/pengumuman/teks bebas
+  // (col.items), bukan cuma ayat (col.verseIds) -- semua pengecekan
+  // "kumpulan kosong?" di bawah ini dipindah dari col.verseIds.length ke
+  // col.items.length supaya tombol Salin/Layar Penuh & Mode Layar Penuh
+  // tetap muncul walau isinya BUKAN ayat sama sekali (mis. cuma
+  // pengumuman + teks bebas).
+  const items = col.items || [];
+  // Tombol "Simpan teks/pengumuman bebas" -- pelengkap "📚 Simpan ke
+  // Kumpulan Ayat" yang sudah ada (dipicu dari klik ayat) -- supaya isi
+  // campuran ini benar-benar bisa diisi dari panel ini sendiri, bukan
+  // cuma kerangka data yang tidak kepakai. Kidung & pengumuman ASLI
+  // (bukan teks bebas) akan disambungkan lewat tombol khusus di tab-nya
+  // masing-masing pada tahap berikutnya (lihat rencana kerja poin 3 & 4);
+  // untuk sekarang jenis "pengumuman" & "teks bebas" bisa diisi manual
+  // lewat dialog ini (mis. salin-tempel isi pengumuman yang sedang aktif).
+  const addTextBtn = document.createElement("button");
+  addTextBtn.className = "chip-btn small";
+  addTextBtn.textContent = "➕ Teks / Pengumuman";
+  addTextBtn.title = "Tambahkan baris teks bebas atau pengumuman ke kumpulan ini";
+  addTextBtn.addEventListener("click", () => handleAddFreeItemToCollection(id, col));
+  titleBtns.appendChild(addTextBtn);
   // Tombol "Salin Semua" -- 22 Agu 2026, atas permintaan: bentuk kotak
   // (bukan bulat) disamakan dengan tombol 📋 di layar Kidung, yang
   // sengaja diganti dari .round-media-btn ke .square-media-btn (lihat
   // buildKidungCopyButton() di js/kidung.js, dipakai di js/kidung-ui.js)
   // -- itulah "gambar kotak yang cantik" yang dimaksud (kotak bersudut
   // tumpul, border tipis, bayangan halus). Teksnya sendiri dibangun oleh
-  // buildCollectionShareText() di js/collections.js (urut ayat 1..N
-  // sesuai urutan kumpulan, bukan format kidung). Disembunyikan kalau
-  // kumpulannya masih kosong.
-  if (col.verseIds.length) {
+  // buildCollectionShareText() di js/collections.js (urut item 1..N
+  // sesuai urutan kumpulan, semua jenis -- bukan cuma ayat). Disembunyikan
+  // kalau kumpulannya masih kosong.
+  if (items.length) {
     const copyAllBtn = document.createElement("button");
     copyAllBtn.type = "button";
     copyAllBtn.className = "square-media-btn collection-copy-btn";
     copyAllBtn.textContent = "📋";
-    copyAllBtn.title = "Salin semua ayat di kumpulan ini ke clipboard (urut 1 sampai terakhir)";
-    copyAllBtn.setAttribute("aria-label", "Salin semua ayat di kumpulan ini");
+    copyAllBtn.title = "Salin semua item di kumpulan ini ke clipboard (urut 1 sampai terakhir)";
+    copyAllBtn.setAttribute("aria-label", "Salin semua item di kumpulan ini");
     copyAllBtn.addEventListener("click", () => {
       const text = buildCollectionShareText(col);
-      if (!text) { alert("Tidak ada ayat yang bisa disalin (mungkin belum ada ayat yang cocok di bahasa saat ini)."); return; }
+      if (!text) { alert("Tidak ada item yang bisa disalin (mungkin belum ada ayat yang cocok di bahasa saat ini)."); return; }
       copyTextWithFeedback(text, copyAllBtn);
     });
     titleBtns.appendChild(copyAllBtn);
   }
-  if (col.verseIds.length) {
+  if (items.length) {
     const fsBtn = document.createElement("button");
     fsBtn.className = "chip-btn primary";
     fsBtn.textContent = "⛶ Mode Layar Penuh";
@@ -4137,7 +4166,11 @@ function renderCollectionDetailInto(container, id, col) {
   // di atas) supaya pilihan suara konsisten dengan menu Pembaca biasa --
   // hanya saja di sini kotak pilihnya ditaruh langsung di panel ini supaya
   // tidak perlu pindah ke menu Pembaca dulu hanya untuk ganti bahasa suara.
-  if (col.verseIds.length && ttsSupported) {
+  // Bahasa suara hanya relevan kalau ada item AYAT di kumpulan ini (item
+  // teks/pengumuman/kidung tidak dibacakan lewat suara ayat) -- lihat
+  // hasVerseItems di bawah, dipakai juga di Mode Layar Penuh.
+  const hasVerseItems = items.some((it) => it.type === "verse");
+  if (hasVerseItems && ttsSupported) {
     const voiceRow = document.createElement("div");
     voiceRow.className = "collection-voice-row";
     const voiceLabel = document.createElement("label");
@@ -4167,100 +4200,202 @@ function renderCollectionDetailInto(container, id, col) {
     voiceLabel.appendChild(voiceSel);
     voiceRow.appendChild(voiceLabel);
     container.appendChild(voiceRow);
-  } else if (col.verseIds.length && !ttsSupported) {
+  } else if (hasVerseItems && !ttsSupported) {
     const warn = document.createElement("p");
     warn.className = "media-empty";
     warn.textContent = "Perangkat/browser ini tidak mendukung pembacaan suara (Google Voice).";
     container.appendChild(warn);
   }
 
-  if (!col.verseIds.length) {
+  if (!items.length) {
     const p = document.createElement("p");
     p.className = "media-empty";
-    p.textContent = "Kumpulan ini masih kosong.";
+    p.textContent = 'Kumpulan ini masih kosong. Tambahkan ayat lewat "📚 Simpan ke Kumpulan Ayat" saat membaca, atau tekan "➕ Teks / Pengumuman" di atas.';
     container.appendChild(p);
     return;
   }
 
+  // Render 1 baris per item, jenisnya menentukan isi & tombol aksinya --
+  // lihat buildCollectionItemRow() di bawah untuk detail per jenis
+  // (ayat/teks/pengumuman/kidung).
   const list = document.createElement("div");
   list.className = "collection-verse-list";
-  col.verseIds.forEach((verseId, i) => {
-    const v = verseById[verseId];
-    const noteText = v ? getPersonalNote(currentUser, verseId) : "";
-    const ref = v ? `${v.bookName} ${v.chapter}:${v.verse}` : verseId;
+  items.forEach((it, i) => {
+    const row = buildCollectionItemRow(id, col, it, i, {
+      onChanged: () => renderCollectionsPanel(id),
+    });
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+}
 
-    const item = document.createElement("div");
-    item.className = "collection-verse-item";
-    item.innerHTML = `
-      <div class="collection-verse-num">${i + 1}</div>
-      <div class="collection-verse-body">
-        <div class="result-ref">${escapeHtml(ref)}</div>
-        <div class="result-text"></div>
-        <div class="collection-verse-actions">
-          ${ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Putar</button>' : ""}
-          <button type="button" class="chip-btn small col-move-up-btn" title="Naikkan urutan">⬆️</button>
-          <button type="button" class="chip-btn small col-move-down-btn" title="Turunkan urutan">⬇️</button>
-          ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
-          <button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>
-          <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
-        </div>
-        ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
+// ------------------------------------------------------------
+// Membangun 1 baris item di panel Kumpulan Ayat -- dipakai baik oleh
+// renderCollectionDetailInto() di atas MAUPUN openCollectionFullscreen()
+// di bawah (Mode Layar Penuh memakai versi ringkasnya sendiri, tapi
+// jenis kontennya sama persis, lihat collectionItemDisplayText()).
+// Dipisah per `it.type` ("verse" / "text" / "announcement" / "kidung")
+// -- kerangka navigasi panah/clicker yang sudah ada dari fitur Mode Layar
+// Penuh ayat SEBELUMNYA cukup diperluas render-nya di sini, tidak perlu
+// diubah strukturnya.
+// ------------------------------------------------------------
+function collectionItemRef(it) {
+  if (it.type === "verse") {
+    const v = verseById[it.verseId];
+    return v ? `${v.bookName} ${v.chapter}:${v.verse}` : it.verseId;
+  }
+  if (it.type === "text") return "📝 Teks Bebas";
+  if (it.type === "announcement") return it.title ? `📢 ${it.title}` : "📢 Pengumuman";
+  if (it.type === "kidung") return `🎵 Kidung No. ${it.kidungNo}${it.title ? " — " + it.title : ""}`;
+  return "(jenis tidak dikenal)";
+}
+
+function collectionItemBodyText(it) {
+  if (it.type === "verse") {
+    const v = verseById[it.verseId];
+    return v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
+  }
+  if (it.type === "text") return it.text;
+  if (it.type === "announcement") return it.text;
+  if (it.type === "kidung") {
+    // Tab Kidung di Studio Presentasi belum tersambung ke sumber data
+    // kidung (lihat STATUS poin 7 di js/presentation-studio.js) -- jadi
+    // untuk sementara hanya nomor/judulnya yang tersimpan & ditampilkan
+    // di sini. Begitu sumber datanya tersambung, baris ini tinggal diganti
+    // memanggil getKidungRows()/sejenisnya dari js/kidung.js pakai
+    // it.kidungNo, tanpa perlu mengubah struktur data kumpulan.
+    return "(syair kidung akan tampil di sini setelah tab Kidung di Studio Presentasi tersambung ke sumber datanya)";
+  }
+  return "";
+}
+
+function buildCollectionItemRow(id, col, it, i, opts) {
+  const v = it.type === "verse" ? verseById[it.verseId] : null;
+  const noteText = v ? getPersonalNote(currentUser, it.verseId) : "";
+  const ref = collectionItemRef(it);
+  const bodyText = collectionItemBodyText(it);
+
+  const item = document.createElement("div");
+  item.className = "collection-verse-item";
+  item.innerHTML = `
+    <div class="collection-verse-num">${i + 1}</div>
+    <div class="collection-verse-body">
+      <div class="result-ref">${escapeHtml(ref)}</div>
+      <div class="result-text"></div>
+      <div class="collection-verse-actions">
+        ${v && ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Putar</button>' : ""}
+        <button type="button" class="chip-btn small col-move-up-btn" title="Naikkan urutan">⬆️</button>
+        <button type="button" class="chip-btn small col-move-down-btn" title="Turunkan urutan">⬇️</button>
+        ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
+        ${v ? '<button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>' : ""}
+        <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
       </div>
-    `;
-    item.querySelector(".result-text").textContent = v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
-    if (noteText) item.querySelector(".collection-verse-note").textContent = noteText;
+      ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
+    </div>
+  `;
+  item.querySelector(".result-text").textContent = bodyText;
+  if (noteText) item.querySelector(".collection-verse-note").textContent = noteText;
 
-    const toggleBtn = item.querySelector(".col-note-toggle");
-    if (toggleBtn) {
-      toggleBtn.addEventListener("click", () => {
-        const noteEl = item.querySelector(".collection-verse-note");
-        noteEl.hidden = !noteEl.hidden;
-        toggleBtn.textContent = noteEl.hidden ? "📝 Lihat Catatan" : "📝 Sembunyikan Catatan";
-      });
-    }
-    item.querySelector(".col-open-btn").addEventListener("click", () => {
+  const toggleBtn = item.querySelector(".col-note-toggle");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      const noteEl = item.querySelector(".collection-verse-note");
+      noteEl.hidden = !noteEl.hidden;
+      toggleBtn.textContent = noteEl.hidden ? "📝 Lihat Catatan" : "📝 Sembunyikan Catatan";
+    });
+  }
+  const openBtn = item.querySelector(".col-open-btn");
+  if (openBtn) {
+    openBtn.addEventListener("click", () => {
       if (!v) return;
       stopCollectionVersePlayback();
       currentLang = v.lang;
       if (el("langSelect")) el("langSelect").value = v.lang;
       renderChapter(v.bookNumber, v.chapter, v.verse);
     });
-    item.querySelector(".col-remove-btn").addEventListener("click", () => {
-      removeVerseFromCollection(currentUser, id, verseId);
-      renderCollectionsPanel(id);
-    });
-    const moveUpBtn = item.querySelector(".col-move-up-btn");
-    const moveDownBtn = item.querySelector(".col-move-down-btn");
-    if (i === 0) moveUpBtn.disabled = true;
-    if (i === col.verseIds.length - 1) moveDownBtn.disabled = true;
-    moveUpBtn.addEventListener("click", () => {
-      if (moveVerseInCollection(currentUser, id, verseId, -1)) renderCollectionsPanel(id);
-    });
-    moveDownBtn.addEventListener("click", () => {
-      if (moveVerseInCollection(currentUser, id, verseId, 1)) renderCollectionsPanel(id);
-    });
-    const playBtn = item.querySelector(".col-play-btn");
-    if (playBtn && v) {
-      playBtn.addEventListener("click", () => toggleCollectionVersePlayback(v, playBtn));
-    }
-
-    // Tombol BULAT 🎵MP3/🎬MP4/▶️YouTube (kalau kitab+pasal ayat ini ada di
-    // salah satu sheet Bacaan Bersuara) -- dicari di latar belakang supaya
-    // daftar kumpulan tetap tampil instan, tombolnya menyusul begitu
-    // ketemu. Lihat findMediaLinkForReference()/buildInlineMediaBlock() di
-    // js/media.js -- pemutarnya muncul LANGSUNG di sini, bukan tab baru.
-    if (v && typeof findMediaLinkForReference === "function") {
-      findMediaLinkForReference(v.bookNumber, v.chapter, v.lang).then((media) => {
-        if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
-        const actions = item.querySelector(".collection-verse-actions");
-        if (!actions) return;
-        actions.appendChild(buildInlineMediaBlock(media, `${v.bookName} ${v.chapter}:${v.verse}`));
-      }).catch(() => {});
-    }
-
-    list.appendChild(item);
+  }
+  item.querySelector(".col-remove-btn").addEventListener("click", () => {
+    if (removeItemFromCollection(currentUser, id, i)) opts.onChanged();
   });
-  container.appendChild(list);
+  const moveUpBtn = item.querySelector(".col-move-up-btn");
+  const moveDownBtn = item.querySelector(".col-move-down-btn");
+  if (i === 0) moveUpBtn.disabled = true;
+  if (i === col.items.length - 1) moveDownBtn.disabled = true;
+  moveUpBtn.addEventListener("click", () => {
+    if (moveItemInCollection(currentUser, id, i, -1)) opts.onChanged();
+  });
+  moveDownBtn.addEventListener("click", () => {
+    if (moveItemInCollection(currentUser, id, i, 1)) opts.onChanged();
+  });
+  const playBtn = item.querySelector(".col-play-btn");
+  if (playBtn && v) {
+    playBtn.addEventListener("click", () => toggleCollectionVersePlayback(v, playBtn));
+  }
+
+  // Tombol BULAT 🎵MP3/🎬MP4/▶️YouTube (kalau kitab+pasal ayat ini ada di
+  // salah satu sheet Bacaan Bersuara) -- HANYA untuk item bertipe "verse".
+  // dicari di latar belakang supaya daftar kumpulan tetap tampil instan,
+  // tombolnya menyusul begitu ketemu. Lihat findMediaLinkForReference()/
+  // buildInlineMediaBlock() di js/media.js -- pemutarnya muncul LANGSUNG
+  // di sini, bukan tab baru.
+  if (v && typeof findMediaLinkForReference === "function") {
+    findMediaLinkForReference(v.bookNumber, v.chapter, v.lang).then((media) => {
+      if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
+      const actions = item.querySelector(".collection-verse-actions");
+      if (!actions) return;
+      actions.appendChild(buildInlineMediaBlock(media, `${v.bookName} ${v.chapter}:${v.verse}`));
+    }).catch(() => {});
+  }
+
+  return item;
+}
+
+// Dialog kecil "➕ Teks / Pengumuman" -- pelengkap alur yang sudah ada
+// (klik ayat -> "📚 Simpan ke Kumpulan Ayat") supaya item NON-ayat
+// (teks bebas / pengumuman) benar-benar bisa diisi dari panel Kumpulan
+// Ayat itu sendiri, bukan cuma kerangka data yang tidak terpakai.
+function handleAddFreeItemToCollection(id, col) {
+  showSimpleDialog("➕ Tambah ke Kumpulan", (box) => {
+    const field1 = document.createElement("div");
+    field1.className = "simple-dialog-field";
+    const label1 = document.createElement("label");
+    label1.textContent = "Jenis:";
+    field1.appendChild(label1);
+    const typeSel = document.createElement("select");
+    [
+      { value: "text", label: "📝 Teks Bebas" },
+      { value: "announcement", label: "📢 Pengumuman" },
+    ].forEach((o) => {
+      const opt = document.createElement("option");
+      opt.value = o.value;
+      opt.textContent = o.label;
+      typeSel.appendChild(opt);
+    });
+    field1.appendChild(typeSel);
+    box.appendChild(field1);
+
+    const field2 = document.createElement("div");
+    field2.className = "simple-dialog-field";
+    const label2 = document.createElement("label");
+    label2.textContent = "Isi:";
+    field2.appendChild(label2);
+    const textarea = document.createElement("textarea");
+    textarea.rows = 4;
+    textarea.placeholder = "Ketik isinya di sini…";
+    field2.appendChild(textarea);
+    box.appendChild(field2);
+    setTimeout(() => textarea.focus(), 0);
+
+    return () => {
+      const val = textarea.value.trim();
+      return val ? { type: typeSel.value, text: val } : null;
+    };
+  }, (val) => {
+    const ok = val.type === "announcement"
+      ? addAnnouncementToCollection(currentUser, col.name, val.text)
+      : addTextToCollection(currentUser, col.name, val.text);
+    if (ok) renderCollectionsPanel(id);
+  }, "Tambahkan");
 }
 
 // ------------------------------------------------------------
@@ -4297,7 +4432,7 @@ function openCollectionFullscreen(col, startIndex) {
   }
 
   let idx = startIndex || 0;
-  const total = col.verseIds.length;
+  const total = (col.items || []).length;
 
   function currentFontSize() {
     return parseInt(localStorage.getItem(COLLECTION_FS_FONT_KEY), 10) || COLLECTION_FS_FONT_DEFAULT;
@@ -4337,10 +4472,15 @@ function openCollectionFullscreen(col, startIndex) {
   function render() {
     overlay.innerHTML = "";
     overlay.classList.toggle("fs-wide", currentWidthMode() === "wide");
-    const verseId = col.verseIds[idx];
-    const v = verseById[verseId];
-    const noteText = v ? getPersonalNote(currentUser, verseId) : "";
-    const ref = v ? `${v.bookName} ${v.chapter}:${v.verse}` : verseId;
+    // PERBAIKAN (Kumpulan Ayat generik): dulu hanya col.verseIds[idx] (item
+    // ayat). Sekarang col.items[idx] bisa berjenis ayat/teks/pengumuman/
+    // kidung -- `v` hanya terisi untuk jenis "verse" (dipakai TTS/catatan/
+    // tombol "Buka di Pembaca" di bawah, semuanya sudah menjaga v ? ... : ...
+    // seperti sebelumnya, jadi jenis lain otomatis melewati bagian itu).
+    const it = col.items[idx];
+    const v = it && it.type === "verse" ? verseById[it.verseId] : null;
+    const noteText = v ? getPersonalNote(currentUser, it.verseId) : "";
+    const ref = it ? collectionItemRef(it) : "";
 
     const closeBtn = document.createElement("button");
     closeBtn.className = "collection-fs-close";
@@ -4409,7 +4549,7 @@ function openCollectionFullscreen(col, startIndex) {
     textEl.style.fontSize = currentFontSize() + "px";
     textEl.style.fontFamily = currentFontFamily().body;
     textEl.style.fontWeight = currentFontFamily().weight;
-    textEl.textContent = v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
+    textEl.textContent = it ? collectionItemBodyText(it) : "";
     box.appendChild(textEl);
 
     if (noteText) {
