@@ -1,6 +1,6 @@
 // ============================================================
-//  APLIKASI UTAMA 
-// ============================================================
+//  APLIKASI UTAMA
+// ============================================================ 
 let bibleData = [];       // seluruh ayat (semua bahasa), dimuat sekali ke memori dari IndexedDB
 let verseIndex = {};      // lang -> bookNumber -> chapter -> [ayat...] (terurut), untuk akses instan
 let chaptersByBook = {};  // lang -> bookNumber -> [nomor pasal...] (terurut)
