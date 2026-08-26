@@ -1467,10 +1467,14 @@ input { font-family: inherit; }
   touch-action: manipulation;
 }
 .footnote-marker-word:hover { text-decoration: underline; }
-/* Tanda ANGKA-SAJA (catatan penjelasan, tanpa huruf rujukan silang) --
-   tetap bisa ditekan tapi warnanya TIDAK biru, sesuai app Recovery
-   Version resmi (mis. "2Yesus" di Mat 1:1 tetap warna teks biasa,
-   beda dari "1adaftar"/"3bKristus" yang berhuruf & biru). */
+/* CATATAN (Agustus 2026): dua class di bawah ini ("-plain") SUDAH TIDAK
+   DIPAKAI LAGI oleh js/footnotes.js -- sebelumnya dipakai untuk tanda
+   angka-saja (mis. "2") supaya warnanya BEDA (tidak biru) dari tanda
+   berhuruf. Ternyata itu keliru: di app Recovery Version resmi, "2Yesus"
+   di Mat 1:1 tetap BIRU sama seperti "1adaftar"/"3bKristus". Sekarang
+   SEMUA tanda dibangun dengan class .footnote-marker/.footnote-marker-word
+   biasa (biru semua). Aturan di bawah dibiarkan (tidak dihapus) hanya
+   untuk jaga-jaga kalau ada data lama yang masih memakainya. */
 .footnote-marker-plain {
   cursor: pointer;
   font-size: 0.68em;
