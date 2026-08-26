@@ -956,6 +956,56 @@ sempat ditanyakan ulang:
   "Update lanjutan tahap 4", poin 2) — sebelumnya salah tercatat belum
   dikerjakan di versi README ini, sudah diperbaiki.
 
+## Update lanjutan (Agustus 2026, tahap 16) — perbaikan tanda catatan kaki per-kata
+
+Perbaikan atas fitur "catatan kaki per-kata" (`js/footnotes.js`) yang sudah
+ada sebelumnya, sesuai contoh tampilan aplikasi Recovery Version resmi yang
+dikirim untuk dibandingkan:
+
+1. **Warna biru + area tekan sekarang ikut 1 kata SETELAH tanda**, bukan
+   cuma superskrip kecilnya sendiri. Misalnya pada `¹ᵃdaftar`, sebelumnya
+   hanya "1a" yang biru & bisa ditekan; sekarang kata "daftar" (sampai
+   spasi berikutnya) ikut biru & bisa ditekan juga, tanda maupun katanya
+   sama-sama membuka catatan yang sama. Ukuran teks kata itu **tetap
+   normal** (bukan ikut mengecil seperti superskrip) supaya gampang
+   disentuh di HP. Berlaku otomatis untuk **semua bahasa** yang memakai
+   markup `<FR><sup>..</sup><Fr>` di kolom Text — termasuk `rvind` DAN
+   `rveng` sekaligus (kode ini tidak dibedakan per bahasa).
+   - Berkas: `js/footnotes.js` (`renderVerseTextWithFootnotes()` dirombak），
+     `css/style.css` (`.footnote-marker-word` baru).
+2. **Catatan yang keluar saat tanda ditekan TIDAK DOBEL lagi.** Sebelumnya,
+   menekan satu tanda (mis. "3b") membuka kotak ringkasan kecil TERPISAH
+   berisi catatan untuk tanda itu SAJA, padahal di bawahnya sudah ada
+   catatan LENGKAP ayat itu (semua nomor & huruf sekaligus) — jadi isinya
+   terasa dobel/berulang. Sekarang: catatan LENGKAP ayat langsung tampil
+   semua (seperti sebelumnya, tidak dipotong-potong), dan menekan salah
+   satu tanda hanya **menggulir & menyorot sebentar** bagian yang cocok
+   di dalam catatan lengkap itu — tidak ada kotak isi dobel lagi. Tekan
+   tanda yang sama lagi untuk menghapus sorotannya (panel & catatan
+   lengkapnya tetap terbuka).
+   - Berkas: `js/footnotes.js` (`buildFootnoteEntriesHtml()` baru — tiap
+     entri nomor/huruf dibungkus `<div class="footnote-entry"
+     data-fn-num=".." data-fn-letter="..">` supaya bisa dituju;
+     `setupFootnoteMarkerHandlers()` dirombak total, kotak
+     `.inline-note-footnote-focus` yang lama **dihapus**), `js/app.js`
+     (`buildInlineNoteCardEl()` — bagian `adminText.innerHTML` sekarang
+     memanggil `buildFootnoteEntriesHtml()`), `css/style.css`
+     (`.footnote-entry`, `.footnote-entry-highlight` baru, aturan
+     `.inline-note-footnote-focus` lama dihapus).
+3. **Soal pembacaan suara (Google Voice/TTS) tidak ikut membaca tanda
+   ini** — ini **memang disengaja**, bukan bug: TTS selalu membaca
+   `v.text` (versi ayat yang SUDAH dibersihkan total dari tanda
+   `<FR>...<Fr>`), sedangkan tanda + kata biru yang bisa ditekan itu
+   hanya ada di jalur tampilan KEDUA (`v.markedText`) yang terpisah —
+   lihat komentar di bagian atas `js/footnotes.js`. Jadi kalau
+   dibacakan, "1a" dkk. TIDAK akan terdengar dieja aneh ("satu a") —
+   ini sudah berjalan seperti itu sejak `markedText` pertama dibuat,
+   tidak ada yang perlu diubah untuk ini.
+4. Perlu unggah ulang `js/footnotes.js`, `js/app.js`, `css/style.css`,
+   `index.html` (nomor versi `?v=` pada tag `<script>`/`<link>` di
+   `index.html` sudah dinaikkan supaya HP/browser tidak memakai
+   berkas lama dari cache).
+
 ## Struktur berkas
 
 ```
@@ -1288,3 +1338,94 @@ bible-app/
    mungkin perlu **coba masuk lagi sesaat kemudian**, atau administrator
    bisa memintanya menekan menu ⋮ → "👥 Sinkronkan ulang daftar
    pengguna" di HP-nya supaya langsung ketemu tanpa menunggu.
+
+## Update lanjutan (Agustus 2026, tahap 15) — AI Chat: sapaan nama pengguna (bukan "Gembala") + kutip data Kidung
+
+1. **AI Chat Gembala sekarang menyapa pengguna dengan NAMANYA SENDIRI**,
+   bukan selalu "Gembala". Dipakai kolom **"Nama"** (displayName) +
+   kolom **"Saudara/i"** yang SUDAH ADA di Sheet Pengguna (isi persis
+   `Saudara` atau `Saudari` per akun) — kalau kolom itu masih kosong
+   untuk akun tertentu, AI jatuh balik ke sapaan netral "Saudara/i
+   {Nama}" (tetap pakai nama, tidak menebak jenis kelamin sembarangan).
+   Nama fitur tetap "AI Chat Gembala" (karena memang ditujukan untuk
+   membantu gembala/pemimpin jemaat menyiapkan jawaban), tapi sapaan ke
+   pengguna yang sedang login sekarang pribadi.
+   - **Supaya sapaan ini muncul**: isi kolom **Saudara/i** di Sheet
+     Pengguna untuk tiap akun (`Saudara` untuk pengguna pria, `Saudari`
+     untuk pengguna wanita). Kolom ini TIDAK wajib diisi — akun yang
+     belum diisi tetap jalan, hanya sapaannya netral "Saudara/i".
+   - Berkas: `js/config.js` (`AUTH_SAUDARA_KEY` — BARU), `js/app.js`
+     (`currentUserSaudara` — variabel BARU, diisi dari `match.saudara`
+     saat login/kunjungan berikutnya, dihapus saat logout — pola sama
+     persis seperti `currentUserDisplay`), `js/aichat.js`
+     (`AiChatSync.ask()` & `handleAiChatAsk()` sekarang mengirim
+     `displayName`+`saudara` ke backend), `apps-script/AiChatCode.gs`
+     (`sapaanInstruction` — BARU, disisipkan ke `systemInstruction`
+     yang dikirim ke Gemini; label `PERTANYAAN GEMBALA:` diganti jadi
+     `PERTANYAAN:` supaya tidak ikut "menyugesti" model memanggil
+     penanya "Gembala").
+
+2. **AI Chat sekarang IKUT membaca data Kidung/Nyanyian Pujian**
+   (Sheet yang sama dipakai fitur "🎵 Kidung", lihat `js/kidung.js`),
+   bukan cuma Alkitab. Pertanyaan yang menyinggung judul/isi syair
+   kidung akan otomatis mencari kidung yang cocok (pakai
+   `searchKidungFull()` yang sudah ada — SAMA fungsi yang dipakai
+   kotak cari kidung biasa) dan menyertakan **nomor kidung/suplemen
+   ASLI-nya persis apa adanya** (mis. "Kidung No. 095" / "Suplemen No.
+   12") sebagai bagian konteks yang dikirim ke AI, dengan instruksi
+   tegas supaya AI **menyebut nomor itu APA ADANYA** (tidak boleh
+   mengarang nomor sendiri) ketika kidung itu relevan dengan jawaban.
+   Maksimal 5 kidung paling relevan per pertanyaan disertakan, sama
+   seperti pembatasan jumlah ayat/catatan yang sudah ada, supaya
+   konteks yang dikirim ke Gemini tidak membengkak.
+   - Kidung yang disertakan juga otomatis ikut muncul di daftar
+     "sumber" di bawah jawaban AI (sama seperti sumber ayat/catatan
+     lain), jadi pengguna bisa lihat kidung mana saja yang dipakai AI.
+   - Berkas: `js/aichat.js` (`gatherAiChatContext()` — blok BARU
+     memanggil `searchKidungFull()`, menghasilkan `context.kidung` &
+     `context.kidungSources`), `apps-script/AiChatCode.gs` (destructure
+     `context.kidung`, ditambahkan ke `contextText` sebagai blok
+     "KIDUNG/NYANYIAN PUJIAN YANG DITEMUKAN", `systemInstruction`
+     diperbarui menyebut sumber ini juga).
+   - **Prasyarat**: `CONFIG.KIDUNG_SHEET_CSV_URL` di `js/config.js`
+     harus sudah diisi & data Kidung sudah pernah disinkron ke
+     perangkat (menu 🎵 Kidung) — kalau belum, blok ini otomatis kosong
+     dan AI Chat tetap jalan seperti biasa (Alkitab saja), TIDAK error.
+
+3. **Kalau AiChatCode.gs sudah pernah di-deploy sebelumnya**: tempel
+   ulang SELURUH isi file terbaru ke editor Apps Script, lalu "Deploy"
+   → "Manage deployments" → ikon pensil → Version: "New version" →
+   Deploy (JANGAN buat deployment baru). Tidak ada kolom Sheet baru
+   yang WAJIB ditambahkan untuk update ini — kolom "Saudara/i" memang
+   sudah ada di rancangan Sheet Pengguna dari awal.
+
+### Belum dikerjakan (di luar cakupan update ini) — usul submenu baru "Cek Referensi Ayat Kidung"
+
+Menu **"🔎 Verifikasi Bahasa Ayat"** yang SUDAH ADA (khusus
+administrator, lihat `js/langcheck.js`) tujuannya BEDA dari yang
+diminta: menu itu mengecek apakah teks ayat Alkitab sudah sesuai
+kode bahasanya (mis. baris berkode "ind" ternyata isinya Inggris) —
+bukan mencari ayat Alkitab yang paling mendekati isi syair kidung.
+
+Permintaan "cek isi kidung ini paling mendekati ayat Alkitab mana"
+(mis. potongan syair yang sudah dibersihkan dari tanda pemisah suku
+kata, seperti `Mu-lia ba-gi Al-lah` → `Mulia bagi Allah`, lalu dicari
+ayat Alkitab yang paling relevan) BELUM dikerjakan di update ini —
+ini pekerjaan terpisah & lebih besar karena:
+- Pembersihan tanda hubung suku kata di kolom `teks` (mis.
+  `Mu-lia ba-gi Al-lah` → `Mulia bagi Allah`) — bagian termudah,
+  tinggal fungsi teks biasa.
+- Pencarian ayat "paling mendekati" makna (bukan sekadar kata yang
+  sama persis) baru bisa akurat kalau dibantu AI (Gemini), karena
+  syair kidung jarang mengutip ayat kata-per-kata — jadi perlu
+  endpoint Apps Script baru yang memanggil Gemini per potongan syair
+  (maks. 1 bait dibagi 2, sesuai permintaan), lalu hasilnya
+  ditampilkan ke administrator untuk DIKONFIRMASI manual (bukan
+  otomatis ditulis ke Sheet), supaya tidak ada referensi ayat yang
+  salah tersimpan tanpa dicek.
+- Perlu panel/submenu BARU di dalam "🔎 Verifikasi Bahasa Ayat" (atau
+  panel admin terpisah) untuk memilih kidung → tampilkan tiap
+  potongan syair → tombol "🤖 Cari Ayat Terdekat" → tampil usulan ayat
+  dari AI + tingkat keyakinan, mengikuti pola tombol "🤖 Tanya AI"
+  yang sudah ada di `js/langcheck.js` untuk kasus serupa (konfirmasi
+  AI per baris, bukan otomatis).
