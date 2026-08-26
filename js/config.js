@@ -2,7 +2,7 @@
 //  KONFIGURASI  —  ubah bagian ini sesuai kebutuhan Anda
 // ============================================================
 const CONFIG = {
-  // Judul yang muncul di header aplikasi
+  // Judul yang muncul di header aplikasi 
   APP_TITLE: "Alkitab",
 
   // ----------------------------------------------------------
