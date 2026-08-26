@@ -1,5 +1,5 @@
 // ============================================================
-//  PARSER CSV  — mendeteksi otomatis pemisah kolom (koma/titik koma/tab)
+//  PARSER CSV  — mendeteksi otomatis pemisah kolom (koma/titik koma/tab) 
 //  dan menangani nilai yang dibungkus tanda kutip (bisa berisi koma/baris baru)
 // ============================================================
 function detectDelimiter(sampleLine) {
@@ -232,6 +232,15 @@ function normalizeVerseRecord(rec) {
     chapter: parseInt(get("chapter", "pasal"), 10) || 0,
     verse: parseInt(get("verse", "ayat"), 10) || 0,
     text: cleanVerseText(get("text", "teks", "isi")),
+    // markedText: sama seperti "text" di atas, tapi tanda catatan kaki
+    // (<FR><sup>1a</sup><Fr>) DISIMPAN (bukan dibuang) sebagai penanda
+    // tersembunyi -- dipakai untuk menampilkan tanda "1a", "2", "3b" dst
+    // yang bisa ditekan di dalam teks ayat (lihat js/footnotes.js).
+    // "text" (di atas) TETAP bersih total -- dipakai apa adanya untuk
+    // salin ayat, pencarian, dan TTS supaya tidak ada perubahan perilaku.
+    markedText: typeof extractFootnoteMarkedText === "function"
+      ? extractFootnoteMarkedText(get("text", "teks", "isi"))
+      : undefined,
     note: cleanVerseText(get("note", "catatan")),
   };
 }
