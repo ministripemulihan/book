@@ -187,14 +187,16 @@ function buildFootnoteEntriesHtml(noteHtml, bookNumber, chapter) {
 //  blok ayat dengan panel catatan sebarisnya (notePanel, dibangun oleh
 //  buildInlineNoteCardEl() di js/app.js, isinya SUDAH berupa catatan
 //  LENGKAP ayat itu -- lihat buildFootnoteEntriesHtml() di atas):
-//    - SEKALI TEKAN pada tanda/kata -> buka panel (kalau tertutup),
-//      lalu GULIR & SOROT bagian catatan yang cocok dengan tanda itu
-//      di dalam catatan lengkap yang sudah tampil (TIDAK membuat kotak
-//      isi dobel lagi seperti versi sebelumnya).
-//    - TEKAN LAGI pada tanda YANG SAMA -> hilangkan sorotannya (panel
-//      tetap terbuka, catatan lengkap tetap kelihatan).
-//    - Tekan tanda LAIN selagi ada sorotan -> sorotan lama hilang,
-//      langsung gulir & sorot ke entri tanda yang baru.
+//    - SEKALI TEKAN pada tanda/kata -> BUKA panel catatan (kalau masih
+//      tertutup), lalu GULIR & SOROT bagian catatan yang cocok dengan
+//      tanda itu di dalam catatan lengkap yang sudah tampil (TIDAK
+//      membuat kotak isi dobel lagi seperti versi sebelumnya).
+//    - TEKAN LAGI pada tanda YANG SAMA -> TUTUP panel catatan itu
+//      sepenuhnya (bukan cuma hilangkan sorotannya) -- sesuai
+//      permintaan: "tekan sekali buka, tekan sekali lagi tutup".
+//    - Tekan tanda LAIN selagi panel terbuka -> panel TETAP terbuka,
+//      sorotan lama hilang, langsung gulir & sorot ke entri tanda yang
+//      baru (bukan menutup lalu membuka lagi dari awal).
 // ------------------------------------------------------------
 function setupFootnoteMarkerHandlers(textWrap, v, block, notePanel) {
   const markers = textWrap.querySelectorAll(".footnote-marker, .footnote-marker-word");
@@ -211,10 +213,15 @@ function setupFootnoteMarkerHandlers(textWrap, v, block, notePanel) {
       el.classList.remove("footnote-entry-highlight");
     });
   };
-  const closeJump = () => {
+  // Menutup panel SEPENUHNYA (dipanggil saat tanda yang SAMA ditekan lagi) --
+  // beda dari sekadar clearEntryHighlight() yang cuma menghapus sorotan tapi
+  // membiarkan panel tetap terbuka.
+  const closePanel = () => {
     clearEntryHighlight();
     setActiveVisual(null);
     activeKey = null;
+    notePanel.hidden = true;
+    block.classList.remove("note-open");
   };
 
   markers.forEach((sup) => {
@@ -222,8 +229,10 @@ function setupFootnoteMarkerHandlers(textWrap, v, block, notePanel) {
       e.stopPropagation();
       const key = sup.dataset.fnKey;
       if (!key) return;
-      if (activeKey === key) {
-        closeJump();
+      // Tanda yang SAMA ditekan lagi (dan panel memang masih terbuka
+      // karenanya) -> tutup panel sepenuhnya, bukan cuma lepas sorotan.
+      if (activeKey === key && !notePanel.hidden) {
+        closePanel();
         return;
       }
       if (notePanel.hidden) {
@@ -248,4 +257,16 @@ function setupFootnoteMarkerHandlers(textWrap, v, block, notePanel) {
       activeKey = key;
     });
   });
+
+  // Kalau panel ditutup dari JALUR LAIN (mis. tekan-dua-kali nomor ayat lagi
+  // lewat toggleInlineNote() di js/app.js), lepas juga status "aktif" tanda
+  // catatan kaki supaya tekan tanda yang sama sesudahnya membuka lagi dari
+  // awal (bukan dianggap "tekan kedua kali" yang malah langsung menutup).
+  const syncWithPanelVisibility = () => {
+    if (notePanel.hidden && activeKey) {
+      setActiveVisual(null);
+      activeKey = null;
+    }
+  };
+  new MutationObserver(syncWithPanelVisibility).observe(notePanel, { attributes: true, attributeFilter: ["hidden"] });
 }
