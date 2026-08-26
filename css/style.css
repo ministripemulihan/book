@@ -1439,6 +1439,55 @@ input { font-family: inherit; }
 .verse-block.note-open .verse-num-btn { background: var(--brass); }
 .verse-block.speaking .verse-num { background: var(--brass); }
 .verse-text-wrap { flex: 1; }
+/* ------------------------------------------------------------
+   TANDA CATATAN KAKI DI DALAM TEKS AYAT (mis. "1a", "2", "3b") --
+   lihat js/footnotes.js. Warna aksen birunya bisa dimatikan lewat
+   menu ⋮ -> "🔵 Warna biru pada tanda catatan kaki" (lihat
+   applyFootnoteAccentSetting() di js/app.js), yang memasang class
+   "footnote-accent-off" di <body>.
+   ------------------------------------------------------------ */
+.footnote-marker {
+  cursor: pointer;
+  font-size: 0.68em;
+  vertical-align: super;
+  line-height: 0;
+  margin: 0 1px;
+  color: #2b6fce;
+  user-select: none;
+  touch-action: manipulation;
+}
+.footnote-marker:hover { text-decoration: underline; }
+/* Kata SETELAH tanda catatan kaki (mis. "daftar" pada "¹ᵃdaftar") --
+   sekarang ikut biru & bisa ditekan juga, ukuran teks TETAP NORMAL
+   (bukan superskrip kecil seperti tandanya sendiri) supaya gampang
+   disentuh di HP, sesuai contoh aplikasi Recovery Version resminya. */
+.footnote-marker-word {
+  cursor: pointer;
+  color: #2b6fce;
+  touch-action: manipulation;
+}
+.footnote-marker-word:hover { text-decoration: underline; }
+.footnote-marker-active { text-decoration: underline; font-weight: 700; color: #1c4c96; }
+body.footnote-accent-off .footnote-marker { color: var(--ink-soft); }
+body.footnote-accent-off .footnote-marker-word { color: inherit; }
+body.footnote-accent-off .footnote-marker-active { color: var(--ink); }
+/* Entri catatan (per nomor/huruf) di dalam catatan LENGKAP ayat --
+   disorot sesaat saat tandanya di teks ayat ditekan, supaya pengguna
+   lompat langsung ke bagian yang dimaksud TANPA perlu kotak ringkasan
+   terpisah yang isinya dobel (lihat setupFootnoteMarkerHandlers() di
+   js/footnotes.js). */
+.footnote-entry {
+  margin-bottom: 10px;
+  scroll-margin-top: 90px;
+}
+.footnote-entry:last-child { margin-bottom: 0; }
+.footnote-entry-highlight {
+  background: rgba(43, 111, 206, 0.12);
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 0 -6px 10px -6px;
+}
+body.footnote-accent-off .footnote-entry-highlight { background: rgba(184, 134, 11, 0.15); }
 .verse-note-badge {
   display: inline-flex; align-items: center; justify-content: center;
   margin-left: 6px; font-size: 12px; vertical-align: middle;
