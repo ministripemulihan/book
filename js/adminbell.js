@@ -67,13 +67,57 @@ const AdminBell = (() => {
     }
   }
 
+  // PERBAIKAN (laporan: notifikasi tidak kelihatan di HP): panel ini
+  // sebelumnya position:absolute relatif ke .admin-bell-wrap, yang ada
+  // DI DALAM .header-actions -- di layar sempit (<=640px) .header-actions
+  // punya overflow-x:auto (baris ikon header yang bisa digeser ke
+  // samping), dan CSS overflow pada 1 sumbu otomatis ikut meng-clip
+  // sumbu yang lain juga. Akibatnya panel yang muncul ke BAWAH tombol
+  // lonceng ikut "terpotong tak terlihat" oleh area geser itu, padahal
+  // tombolnya sendiri tetap kelihatan & bisa ditekan -- jadi terkesan
+  // "notifikasi tidak keluar" padahal sebenarnya kepotong.
+  // Sekarang posisi panel dihitung ULANG tiap dibuka lewat
+  // getBoundingClientRect() lalu dipasang position:fixed (relatif ke
+  // viewport, BUKAN ke .header-actions) -- otomatis lolos dari overflow
+  // apa pun ancestor-nya, di HP maupun komputer.
+  function positionPanel(panel, btn) {
+    if (!panel || !btn) return;
+    const r = btn.getBoundingClientRect();
+    const margin = 8;
+    panel.style.position = "fixed";
+    panel.style.top = Math.round(r.bottom + margin) + "px";
+    // Rapatkan ke tepi kanan tombol, tapi jangan sampai keluar layar (HP sempit).
+    const panelWidth = panel.offsetWidth || 260;
+    let left = Math.round(r.right - panelWidth);
+    left = Math.max(margin, Math.min(left, window.innerWidth - panelWidth - margin));
+    panel.style.left = left + "px";
+    panel.style.right = "auto";
+  }
+
   function togglePanel() {
     const panel = el("adminBellPanel");
+    const btn = el("adminBellBtn");
     if (!panel) return;
     const willOpen = panel.hidden;
     panel.hidden = !willOpen;
-    if (willOpen) refresh();
+    if (willOpen) {
+      // Dihitung 2x: sebelum & sesudah refresh() -- lebar panel bisa
+      // sedikit berubah begitu isinya (rincian login/tamu) selesai
+      // dimuat, jadi posisinya disegarkan lagi supaya tetap presisi
+      // (bukan cuma nebak lebar dari saat masih "Memuat…").
+      positionPanel(panel, btn);
+      refresh().then(() => positionPanel(panel, btn));
+    }
   }
+
+  // Posisi ikut disegarkan kalau jendela di-resize / diputar (rotasi
+  // HP) SELAGI panelnya sedang terbuka, supaya tidak "nyangkut" di
+  // posisi lama.
+  window.addEventListener("resize", () => {
+    const panel = el("adminBellPanel");
+    const btn = el("adminBellBtn");
+    if (panel && !panel.hidden) positionPanel(panel, btn);
+  });
 
   function init() {
     if (el("adminBellBtn")) el("adminBellBtn").addEventListener("click", (e) => { e.stopPropagation(); togglePanel(); });
