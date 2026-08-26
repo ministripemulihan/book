@@ -27,6 +27,10 @@ const DEFAULT_SETTINGS = {
   // "verse" = cuma 1 ayat yang ditampilkan (lihat menu ⋮ → 👁️ Tampilan
   // Ayat, dan renderChapter()/renderVerseJumpBar() di js/app.js).
   verseDisplayMode: "chapter",
+  // Warna biru pada tanda catatan kaki di dalam teks ayat (mis. "1a",
+  // "2", "3b" -- lihat js/footnotes.js). Defaultnya AKTIF (biru);
+  // dimatikan lewat menu ⋮ -> "🔵 Warna biru pada tanda catatan kaki".
+  footnoteAccentBlue: true,
 };
 
 function settingsStorageKey(username) {
