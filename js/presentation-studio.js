@@ -266,7 +266,13 @@ const PresentationStudio = (() => {
     document.documentElement.classList.add("ps-open"); // jaring tambahan untuk <html>, lihat CSS body.ps-open
     refreshStatusUi();
     renderCollectionSelect();
-    renderMediaList();
+    // PERBAIKAN: js/collections.js sebelumnya hilang total dari proyek,
+    // jadi migrateLegacyMediaItemsIfNeeded() tidak pernah ada/terpanggil.
+    // Sekarang dipanggil sekali tiap Studio dibuka (aman dipanggil
+    // berkali-kali -- lihat komentarnya di js/collections.js), BARU
+    // renderMediaList() supaya Media Tersimpan lama (kalau ada, dari versi
+    // sebelum pindah ke IndexedDB) ikut tampil, bukan cuma disimpan diam-diam.
+    migrateLegacyMediaItemsIfNeeded().then(() => renderMediaList());
     applyStoredTheme();
     watchDualLayout();
   }
