@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260826e" />
+<link rel="stylesheet" href="css/style.css?v=20260827b" />
 </head>
 <body>
 
@@ -158,6 +158,7 @@
     <header class="app-header">
       <button id="sidebarToggle" class="icon-btn" aria-label="Buka daftar kitab">☰</button>
       <div class="brand">
+        <span class="brand-mark">☩</span>
         <span class="brand-name" id="appTitle">Alkitab</span>
       </div>
 
@@ -202,22 +203,39 @@
              (paling atas, di baris ikon header) supaya operator bisa
              langsung buka Studio tanpa masuk menu "⋮" dulu. -->
         <button type="button" id="headerStudioBtn" class="icon-btn" title="Buka Studio Presentasi (Layar 2)" aria-label="Buka Studio Presentasi (Layar 2)" hidden>🎛️</button>
-        <!-- BARU -- lonceng notifikasi khusus administrator: jumlah
-             pencarian ayat HARI INI (gabungan pengguna login + tamu),
-             lihat js/adminbell.js. Disembunyikan untuk selain
-             administrator (lihat updateLevelGatedMenus() di js/app.js). -->
+        <!-- BARU -- lonceng notifikasi: untuk administrator isinya jumlah
+             pencarian ayat HARI INI, untuk pengguna lain isinya waktu
+             login TERAKHIR mereka sendiri (lihat js/adminbell.js). Hanya
+             disembunyikan untuk Mode Tamu (belum login sama sekali) --
+             lihat updateLevelGatedMenus() di js/app.js.
+             PERBAIKAN (panel tidak tampil di HP): panelnya (#adminBellPanel)
+             DIPINDAH ke luar .header-actions (jadi sejajar dengan #moreMenu
+             di bawah) -- sebelumnya ada DI DALAM .header-actions yang di
+             HP diberi "overflow-x:auto" supaya ikon-ikon bisa digeser
+             (lihat media query 640px), dan overflow-x:auto itu diam-diam
+             IKUT MEMOTONG arah vertikal juga (aturan CSS overflow bawaan
+             browser: kalau salah satu sumbu "auto" dan sumbu lain
+             "visible", yang "visible" otomatis ikut jadi "auto"/terpotong)
+             -- jadi panelnya SEBENARNYA terbuka, hanya saja langsung
+             terpotong tak terlihat di dalam kotak ikon yang bisa digeser
+             itu. Posisinya sekarang position:fixed, dihitung & diikuti
+             lewat JS (positionPanel() di js/adminbell.js) supaya tetap
+             tepat di bawah tombol lonceng di ukuran layar mana pun. -->
         <div class="admin-bell-wrap">
-          <button id="adminBellBtn" class="icon-btn admin-bell-btn" title="Notifikasi pencarian hari ini" aria-label="Notifikasi administrator" hidden>
+          <button id="adminBellBtn" class="icon-btn admin-bell-btn" title="Notifikasi" aria-label="Notifikasi" hidden>
             🔔<span id="adminBellBadge" class="admin-bell-badge" hidden>0</span>
           </button>
-          <div id="adminBellPanel" class="admin-bell-panel" hidden>
-            <div class="admin-bell-panel-title">🔔 Notifikasi Administrator</div>
-            <div id="adminBellPanelBody">Memuat…</div>
-          </div>
         </div>
         <button id="menuToggle" class="icon-btn" aria-label="Menu lainnya">⋮</button>
       </div>
     </header>
+
+    <!-- Lihat catatan panjang di atas (#adminBellBtn) soal kenapa panel ini
+         SENGAJA ditaruh di luar header/.header-actions. -->
+    <div id="adminBellPanel" class="admin-bell-panel" hidden>
+      <div class="admin-bell-panel-title" id="adminBellPanelTitle">🔔 Notifikasi</div>
+      <div id="adminBellPanelBody">Memuat…</div>
+    </div>
 
     <div id="currentReadingIndicator" class="current-reading-indicator" hidden></div>
 
@@ -658,7 +676,20 @@
         </div>
 
         <div class="ps-tab-panel" data-ps-left-panel="kumpulan">
-          <select id="psCollectionSelect" class="columns-lang-select"></select>
+          <div class="ps-collection-select-row">
+            <select id="psCollectionSelect" class="columns-lang-select"></select>
+            <!-- BARU -- kalau aktif, tiap baris di bawah dapat 4 tombol
+                 mini ⏮️⬆️⬇️⏭️ untuk memindah urutan item (awal/naik/
+                 turun/akhir) TANPA berpindah dari Studio dulu, lihat
+                 renderCollectionList() di js/presentation-studio.js.
+                 Sumber datanya SAMA dengan panel "📚 Kumpulan Ayat" biasa
+                 (js/collections.js) -- jadi urutan yang diatur di sini
+                 otomatis ikut dipakai juga di Mode Layar Penuh 1 monitor
+                 (openCollectionFullscreen, js/app.js), begitu juga
+                 sebaliknya. -->
+            <button type="button" id="psCollectionReorderToggle" class="chip-btn small" title="Tampilkan tombol atur urutan di tiap item">✎ Atur Urutan</button>
+            <button type="button" id="psCollectionShareBtn" class="chip-btn small" title="Bagikan salinan kumpulan yang sedang dipilih ke pengguna lain">🔗 Bagikan</button>
+          </div>
           <div id="psCollectionList" class="ps-verse-list"></div>
         </div>
 
@@ -759,13 +790,47 @@
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="kidung" hidden>
-          <p class="announcement-compose-hint">Kidung/Hymn diambil dari daftar kidung yang sudah ada di menu utama. Buka lewat menu ⋮ untuk mencari &amp; kirim ke Layar 2 — integrasi langsung di tab ini menyusul.</p>
+          <p class="announcement-compose-hint">Cari kidung dari data yang sama dengan menu 🎵 Kidung biasa. Pilih mode tampilan slide, lalu "▶️ Tayangkan" langsung ke Layar 2, atau "➕ Daftar" untuk menyimpannya ke Kumpulan Ayat (kolom kiri) supaya bisa dipindah pakai panah kiri/kanan atau clicker/stylus presentasi saat acara berlangsung.</p>
+          <div class="kidung-book-toggle" id="psKidungBookToggle"></div>
+          <div class="kidung-number-form">
+            <input type="text" id="psKidungNoInput" class="kidung-number-input" placeholder="No. kidung, mis. 169" />
+            <button type="button" id="psKidungGoBtn" class="chip-btn small">Buka</button>
+          </div>
+          <input type="text" id="psKidungSearchInput" class="kidung-search-input" placeholder="🔍 Cari judul kidung…" />
+          <div id="psKidungSearchResults" class="kidung-list"></div>
+
+          <div id="psKidungDetail" class="ps-kidung-detail" hidden>
+            <div class="ps-kidung-detail-head">
+              <div id="psKidungDetailTitle" class="ps-kidung-detail-title"></div>
+              <button type="button" id="psKidungBackBtn" class="chip-btn small">✖️ Tutup</button>
+            </div>
+            <div class="ps-field-label">Mode tampilan slide</div>
+            <select id="psKidungModeSelect" class="columns-lang-select">
+              <option value="1+koor">1 bait / layar + koor</option>
+              <option value="1">1 bait / layar (tanpa koor)</option>
+              <option value="2+koor">2 bait / layar + koor</option>
+              <option value="3+koor">3 bait / layar + koor</option>
+              <option value="koor">Koor saja</option>
+            </select>
+            <div id="psKidungSlideList" class="ps-verse-list"></div>
+            <div class="ps-btn-row">
+              <button type="button" id="psKidungAddAllBtn" class="chip-btn small">➕ Semua Slide ke Kumpulan Ayat</button>
+            </div>
+          </div>
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="file" hidden>
-          <div class="ps-dropzone" id="psFileDropzone">Seret file ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">pptx, pdf, jpg, png, webp, gif — maksimal 25MB per file</span></div>
-          <input type="file" id="psFileInput" accept=".pptx,.pdf,.jpg,.jpeg,.png,.webp,.gif" multiple hidden />
-          <p class="announcement-compose-hint">ℹ️ File .pptx diubah menjadi gambar per slide saat diunggah. Bila slide punya teks yang sangat penuh, hasilnya bisa sedikit berbeda dari PowerPoint — simpan sebagai PDF lalu unggah PDF-nya untuk hasil persis sama. File .ppt lama harus disimpan sebagai .pptx atau PDF dahulu.</p>
+          <div class="ps-dropzone" id="psFileDropzone">Seret file ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">pptx, pdf, docx, jpg, png, webp, gif — maksimal 25MB per file</span></div>
+          <input type="file" id="psFileInput" accept=".pptx,.pdf,.docx,.jpg,.jpeg,.png,.webp,.gif" multiple hidden />
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="psKeepOriginalPdf" style="margin:0;" />
+            Simpan juga file PDF asli (bisa diunduh utuh sebagai .pdf, bukan cuma gambar per halaman — memakai lebih banyak ruang penyimpanan HP/komputer ini)
+          </label>
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="psSyncToDrive" style="margin:0;" />
+            ☁️ Sinkron ke akun (berkas ikut diunggah ke Google Drive akun ini, supaya nanti bisa ditarik lagi dari HP/komputer lain — perlu koneksi internet saat menekan "➕ Daftar", tidak menggantikan penyimpanan di perangkat ini)
+          </label>
+          <p class="announcement-compose-hint">ℹ️ File .pptx diubah menjadi gambar per slide saat diunggah. Bila slide punya teks yang sangat penuh, hasilnya bisa sedikit berbeda dari PowerPoint — simpan sebagai PDF lalu unggah PDF-nya untuk hasil persis sama. File .ppt lama harus disimpan sebagai .pptx atau PDF dahulu. File .docx diubah jadi gambar per "halaman" berisi TEKS SAJA (gambar/tabel di dalam Word tidak ikut, dan pembagian halamannya perkiraan) — file .doc lama harus disimpan ulang sebagai .docx atau PDF dahulu.</p>
           <div id="psFileList" class="ps-file-list"></div>
         </div>
 
@@ -893,7 +958,7 @@
             <button type="button" class="ps-theme-swatch active" data-theme="gelap" style="background:#05070c; color:#f5f2e8;">Gelap</button>
             <button type="button" class="ps-theme-swatch" data-theme="terang" style="background:#fdfaf3; color:#1a1a1a;">Terang</button>
             <button type="button" class="ps-theme-swatch" data-theme="emas" style="background:#1a1206; color:#e9c977;">Emas</button>
-            <button type="button" class="ps-theme-swatch" data-theme="biru" style="background:#0b1730; color:#dce8ff;">Biru Malam</button>
+            <button type="button" class="ps-theme-swatch" data-theme="biru" style="background:#0b1730; color:#ffffff;">Biru Malam</button>
             <button type="button" class="ps-theme-swatch" data-theme="sepia" style="background:#f4e8d0; color:#3a2c17;">Sepia</button>
           </div>
         </div>
@@ -977,13 +1042,13 @@
   <script src="js/footnotes.js?v=20260826e"></script>
   <script src="js/csv.js?v=20260820b"></script>
   <script src="js/db.js?v=20260821b"></script>
-  <script src="js/sync.js?v=20260818b"></script>
+  <script src="js/sync.js?v=20260827a"></script>
   <!-- Sebelumnya HILANG dari index.html (filenya sendiri juga tidak ada di
        proyek) padahal disebut di banyak komentar -- lihat js/collections.js
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260826a"></script>
+  <script src="js/collections.js?v=20260827c"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -995,11 +1060,11 @@
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260822a"></script>
   <script src="js/kidung-ui.js?v=20260822a"></script>
-  <script src="js/presentation.js?v=20260819b"></script>
-  <script src="js/presentation-studio.js?v=20260820a"></script>
+  <script src="js/presentation.js?v=20260826a"></script>
+  <script src="js/presentation-studio.js?v=20260827c"></script>
   <script src="js/signup.js?v=20260818b"></script>
-  <script src="js/adminbell.js?v=20260818bc"></script>
-  <script src="js/app.js?v=20260826d"></script>
+  <script src="js/adminbell.js?v=20260827a"></script>
+  <script src="js/app.js?v=20260827c"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260818b"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
