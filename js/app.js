@@ -1069,8 +1069,11 @@ function updateLevelGatedMenus() {
     el("aiChatBtn").hidden = !allowedNow && !guestNow;
   }
   if (el("langCheckBtn")) el("langCheckBtn").hidden = typeof isLangCheckAllowed === "function" ? !isLangCheckAllowed() : true;
-  // BARU -- "🗂️ Kelola Pengguna" (persetujuan akun baru) & lonceng 🔔
-  // notifikasi jumlah pencarian hari ini, khusus administrator.
+  // BARU -- "🗂️ Kelola Pengguna" (persetujuan akun baru): khusus
+  // administrator. Lonceng 🔔 SEKARANG tampil untuk SEMUA yang sudah
+  // login (bukan cuma administrator) -- isinya beda menurut level
+  // (statistik pencarian utk administrator, waktu login terakhir utk
+  // yang lain), lihat js/adminbell.js.
   if (el("userManageBtn")) el("userManageBtn").hidden = !isAdministrator();
   if (typeof AdminBell !== "undefined") AdminBell.refreshVisibility(isAdministrator());
   applyGuestModeUi();
@@ -4011,11 +4014,97 @@ function handleRenameCollection(id, col) {
   }, "Ganti Nama");
 }
 
+function handleShareCollection(id, col) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    alert("Berbagi ke pengguna lain butuh sambungan ke server -- sinkronisasi belum aktif di aplikasi ini.");
+    return;
+  }
+  showSimpleDialog("🔗 Bagikan Kumpulan", (box) => {
+    const field = document.createElement("div");
+    field.className = "simple-dialog-field";
+    const label = document.createElement("label");
+    label.textContent = "Username tujuan:";
+    field.appendChild(label);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "mis. budi.santoso";
+    field.appendChild(input);
+    box.appendChild(field);
+    const hint = document.createElement("p");
+    hint.className = "simple-dialog-hint";
+    hint.textContent = 'Salinan kumpulan "' + col.name + '" (semua item + tema Layar Proyeksi yang sedang Anda pakai) akan dikirim ke akun itu SEBAGAI PERMINTAAN -- baru muncul di daftar Kumpulan Ayat mereka kalau mereka sendiri menekan "✅ Terima". Kumpulan Anda sendiri tidak berubah/hilang.';
+    box.appendChild(hint);
+    setTimeout(() => input.focus(), 0);
+    return () => {
+      const val = input.value.trim();
+      return val ? val : null;
+    };
+  }, async (targetUsername) => {
+    const res = await shareCollectionToUser(currentUser, id, targetUsername);
+    if (res && res.ok) alert(`Kumpulan "${col.name}" sudah dikirim ke "${targetUsername}" -- menunggu mereka menekan "✅ Terima" (lihat 🔔 di panel Kumpulan Ayat mereka).`);
+    else alert("Gagal membagikan: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+  }, "Bagikan");
+}
+
 function showCollectionsPanel() {
   hideAllPanels();
   el("collectionsPanel").hidden = false;
   logActivity("Kumpulan Ayat");
   renderCollectionsPanel();
+}
+
+// BARU -- isi kartu 🔔 "Kiriman Menunggu Persetujuan" di atas panel
+// Kumpulan Ayat (dipanggil dari renderCollectionsPanel() di atas).
+// `wrap` dikosongkan & diisi ulang tiap kali dipanggil (dipanggil lagi
+// sendiri setelah Terima/Tolak supaya kartu yang sudah direspons hilang
+// dari daftar tanpa perlu buka-tutup panel).
+async function renderPendingSharesInto(wrap) {
+  wrap.innerHTML = "";
+  if (typeof checkPendingCollectionShares !== "function") return;
+  const shares = await checkPendingCollectionShares(currentUser);
+  if (!shares || !shares.length) return;
+  const box = document.createElement("div");
+  box.className = "collection-pending-box";
+  const h = document.createElement("h3");
+  h.className = "collection-pending-title";
+  h.textContent = `🔔 ${shares.length} Kiriman Menunggu Persetujuan`;
+  box.appendChild(h);
+  shares.forEach((share) => {
+    const card = document.createElement("div");
+    card.className = "collection-pending-card";
+    const info = document.createElement("span");
+    info.className = "collection-pending-info";
+    info.innerHTML = `<b>${escapeHtml(share.name)}</b><br>dari <b>${escapeHtml(share.fromUsername)}</b>`;
+    card.appendChild(info);
+    const btnRow = document.createElement("span");
+    btnRow.className = "collection-pending-actions";
+    const acceptBtn = document.createElement("button");
+    acceptBtn.type = "button";
+    acceptBtn.className = "chip-btn small primary";
+    acceptBtn.textContent = "✅ Terima";
+    acceptBtn.addEventListener("click", async () => {
+      acceptBtn.disabled = true;
+      const res = await respondToCollectionShare(currentUser, share.id, "accept");
+      if (res && res.ok) { renderCollectionsPanel(); } // muat ulang seluruh panel -- kumpulan baru sudah harus ikut tampil
+      else { alert("Gagal menerima: " + ((res && res.error) || "Terjadi kesalahan.")); acceptBtn.disabled = false; }
+    });
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "chip-btn small danger";
+    rejectBtn.textContent = "❌ Tolak";
+    rejectBtn.addEventListener("click", async () => {
+      if (!confirm(`Tolak kiriman "${share.name}" dari ${share.fromUsername}?`)) return;
+      rejectBtn.disabled = true;
+      const res = await respondToCollectionShare(currentUser, share.id, "reject");
+      if (res && res.ok) { renderPendingSharesInto(wrap); }
+      else { alert("Gagal menolak: " + ((res && res.error) || "Terjadi kesalahan.")); rejectBtn.disabled = false; }
+    });
+    btnRow.appendChild(acceptBtn);
+    btnRow.appendChild(rejectBtn);
+    card.appendChild(btnRow);
+    box.appendChild(card);
+  });
+  wrap.appendChild(box);
 }
 
 function renderCollectionsPanel(openId) {
@@ -4032,6 +4121,16 @@ function renderCollectionsPanel(openId) {
   title.textContent = "📚 Kumpulan Ayat Saya";
   container.appendChild(title);
 
+  // BARU -- 🔔 kartu "Kiriman Menunggu Persetujuan" (kalau ada), lihat
+  // checkPendingCollectionShares()/respondToCollectionShare() di
+  // js/collections.js. Dimuat async (butuh 1x panggilan server) supaya
+  // panel utama tetap langsung tampil tanpa menunggu -- kartu ini
+  // "menyusul" begitu selesai diambil.
+  const pendingWrap = document.createElement("div");
+  pendingWrap.id = "collectionsPendingWrap";
+  container.appendChild(pendingWrap);
+  renderPendingSharesInto(pendingWrap);
+
   const ids = Object.keys(collections);
   if (!ids.length) {
     const p = document.createElement("p");
@@ -4043,8 +4142,17 @@ function renderCollectionsPanel(openId) {
 
   const list = document.createElement("div");
   list.className = "collections-list";
+  // PERBAIKAN -- dulu diurutkan pakai createdAt saja (kapan kumpulan itu
+  // PERTAMA dibuat), jadi kumpulan lama yang baru saja ditambah/diubah
+  // isinya tidak ikut naik ke atas. Sekarang pakai updatedAt (jatuh ke
+  // createdAt kalau belum pernah ada updatedAt) supaya kumpulan yang
+  // BARU SAJA disimpan/diubah -- oleh sebab apa pun (tambah item, atur
+  // ulang urutan, ganti nama, dst) -- selalu tampil PALING ATAS.
   ids
-    .sort((a, b) => new Date(collections[b].createdAt || 0) - new Date(collections[a].createdAt || 0))
+    .sort((a, b) =>
+      new Date(collections[b].updatedAt || collections[b].createdAt || 0)
+      - new Date(collections[a].updatedAt || collections[a].createdAt || 0)
+    )
     .forEach((id) => {
       const col = collections[id];
       const row = document.createElement("div");
@@ -4149,6 +4257,44 @@ function renderCollectionDetailInto(container, id, col) {
       copyTextWithFeedback(text, copyAllBtn);
     });
     titleBtns.appendChild(copyAllBtn);
+
+    // Tombol "🔗 Bagikan" -- BARU, kirim SALINAN kumpulan ini (semua
+    // item + tema Layar Proyeksi yang sedang dipakai) ke akun pengguna
+    // lain, lihat handleShareCollection() & shareCollectionToUser() di
+    // js/collections.js. Kumpulan milik Anda sendiri TIDAK berubah.
+    const shareBtn = document.createElement("button");
+    shareBtn.type = "button";
+    shareBtn.className = "chip-btn small";
+    shareBtn.textContent = "🔗 Bagikan";
+    shareBtn.title = "Bagikan salinan kumpulan ini ke akun pengguna lain";
+    shareBtn.addEventListener("click", () => handleShareCollection(id, col));
+    titleBtns.appendChild(shareBtn);
+  }
+  // Tombol "🎨 Terapkan Tema Kiriman" -- BARU, hanya muncul kalau
+  // kumpulan INI hasil terima dari 🔗 Bagikan akun lain YANG menyertakan
+  // tema Layar Proyeksi mereka (col.theme terisi, lihat
+  // shareCollectionToUser_() di apps-script/Code.gs & catatan di
+  // refreshCollectionsFromRemote() di js/collections.js). Sebelumnya
+  // tema itu cuma tersimpan sebagai data tanpa cara menerapkannya --
+  // sekarang klik tombol ini akan menimpa tema Layar Proyeksi MILIK
+  // AKUN INI (Studio & Layar 2 kalau sedang terbuka) dengan tema
+  // kiriman tadi. Tidak otomatis, harus ditekan sendiri oleh penerima.
+  if (col.theme) {
+    const applyThemeBtn = document.createElement("button");
+    applyThemeBtn.type = "button";
+    applyThemeBtn.className = "chip-btn small";
+    applyThemeBtn.textContent = "🎨 Terapkan Tema Kiriman";
+    applyThemeBtn.title = "Terapkan tema Layar Proyeksi yang disertakan pengirim kumpulan ini ke akun Anda";
+    applyThemeBtn.addEventListener("click", () => {
+      if (!confirm('Terapkan tema kiriman ini ke Layar Proyeksi Anda? Tema Layar Proyeksi yang sedang Anda pakai sekarang akan diganti.')) return;
+      const res = applyCollectionTheme(currentUser, id);
+      if (res.ok) {
+        alert("✅ Tema kiriman sudah diterapkan ke Layar Proyeksi Anda.");
+      } else {
+        alert("Gagal menerapkan tema: " + (res.error || "Buka dulu Studio Presentasi (🎛️), lalu coba lagi."));
+      }
+    });
+    titleBtns.appendChild(applyThemeBtn);
   }
   if (items.length) {
     const fsBtn = document.createElement("button");
@@ -4246,10 +4392,19 @@ function collectionItemRef(it) {
   }
   if (it.type === "text") return "📝 Teks Bebas";
   if (it.type === "announcement") return it.title ? `📢 ${it.title}` : "📢 Pengumuman";
-  if (it.type === "kidung") return `🎵 Kidung No. ${it.kidungNo}${it.title ? " — " + it.title : ""}`;
+  if (it.type === "kidung") {
+    const bukuLabel = it.buku && it.buku !== "Kidung" ? it.buku + " " : "";
+    const noLabel = typeof formatKidungNo === "function" ? formatKidungNo(it.buku || "Kidung", it.kidungNo) : it.kidungNo;
+    return `🎵 ${bukuLabel}No. ${noLabel}${it.title ? " — " + it.title : ""}`;
+  }
   return "(jenis tidak dikenal)";
 }
 
+// Dipakai dimana pun teks POLOS (bukan HTML) dibutuhkan -- baris daftar
+// kumpulan (buildCollectionItemRow di atas) & sebagai dasar untuk
+// collectionItemBodyHtml() di bawah (Mode Layar Penuh, yang menambahkan
+// highlight kuning khusus untuk koor kidung, meniru tampilan Layar 2 --
+// lihat js/presentation-studio.js untuk versi Studio 2 Layarnya).
 function collectionItemBodyText(it) {
   if (it.type === "verse") {
     const v = verseById[it.verseId];
@@ -4258,15 +4413,34 @@ function collectionItemBodyText(it) {
   if (it.type === "text") return it.text;
   if (it.type === "announcement") return it.text;
   if (it.type === "kidung") {
-    // Tab Kidung di Studio Presentasi belum tersambung ke sumber data
-    // kidung (lihat STATUS poin 7 di js/presentation-studio.js) -- jadi
-    // untuk sementara hanya nomor/judulnya yang tersimpan & ditampilkan
-    // di sini. Begitu sumber datanya tersambung, baris ini tinggal diganti
-    // memanggil getKidungRows()/sejenisnya dari js/kidung.js pakai
-    // it.kidungNo, tanpa perlu mengubah struktur data kumpulan.
-    return "(syair kidung akan tampil di sini setelah tab Kidung di Studio Presentasi tersambung ke sumber datanya)";
+    // Item kidung sekarang menyimpan SNAPSHOT 1 slide (bait + koorTeks
+    // milik slide itu) -- lihat catatan bentuk data di js/collections.js
+    // (addKidungToCollection) & tab Kidung Studio Presentasi
+    // (js/presentation-studio.js, wireKidungTab()) yang mengisinya.
+    const baitText = (it.bait || []).map((b) => (b.noBait ? b.noBait + ". " : "") + b.teks).join("\n\n");
+    if (!baitText && !it.koorTeks) return "(syair kidung tidak tersedia untuk slide ini)";
+    return it.koorTeks ? `${baitText}${baitText ? "\n\n" : ""}Koor:\n${it.koorTeks}` : baitText;
   }
   return "";
+}
+
+// Versi HTML dari collectionItemBodyText() -- SATU-SATUNYA perbedaan:
+// khusus item "kidung", baris koor ditandai kelas .collection-fs-koor
+// (kuning, lihat css/style.css) supaya Mode Layar Penuh 1-monitor ini
+// terasa SAMA seperti tampilan Layar 2 di Studio Presentasi walau
+// dipakai TANPA monitor kedua sama sekali. Item jenis lain apa adanya
+// (di-escape, baris baru -> <br>), tidak ada styling tambahan.
+function collectionItemBodyHtml(it) {
+  if (it.type === "kidung" && ((it.bait && it.bait.length) || it.koorTeks)) {
+    const baitHtml = (it.bait || [])
+      .map((b) => `<div>${escapeHtml((b.noBait ? b.noBait + ". " : "") + b.teks).replace(/\n/g, "<br>")}</div>`)
+      .join('<div class="collection-fs-gap">&nbsp;</div>');
+    const koorHtml = it.koorTeks
+      ? `<div class="collection-fs-gap">&nbsp;</div><div class="collection-fs-koor"><b>Koor:</b><br>${escapeHtml(it.koorTeks).replace(/\n/g, "<br>")}</div>`
+      : "";
+    return baitHtml + koorHtml;
+  }
+  return escapeHtml(collectionItemBodyText(it)).replace(/\n/g, "<br>");
 }
 
 function buildCollectionItemRow(id, col, it, i, opts) {
@@ -4284,8 +4458,10 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       <div class="result-text"></div>
       <div class="collection-verse-actions">
         ${v && ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Putar</button>' : ""}
+        <button type="button" class="chip-btn small col-move-top-btn" title="Pindahkan ke paling awal">⏮️ Awal</button>
         <button type="button" class="chip-btn small col-move-up-btn" title="Naikkan urutan">⬆️</button>
         <button type="button" class="chip-btn small col-move-down-btn" title="Turunkan urutan">⬇️</button>
+        <button type="button" class="chip-btn small col-move-bottom-btn" title="Pindahkan ke paling akhir">⏭️ Akhir</button>
         ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
         ${v ? '<button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>' : ""}
         <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
@@ -4293,6 +4469,18 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
     </div>
   `;
+  // Kontrol "Pindah ke urutan ke-#" (untuk kumpulan >2 item -- kalau cuma
+  // 1-2 item, ⏮️/⬆️/⬇️/⏭️ saja sudah cukup) ditambahkan terpisah di sini
+  // (bukan di dalam template literal di atas) supaya tidak perlu backtick
+  // bersarang.
+  if (col.items.length > 2) {
+    const moveToWrap = document.createElement("div");
+    moveToWrap.className = "collection-verse-moveto";
+    moveToWrap.innerHTML =
+      `<label>Pindah ke urutan ke- <input type="number" class="col-move-to-input" min="1" max="${col.items.length}" value="${i + 1}" /></label>` +
+      `<button type="button" class="chip-btn small col-move-to-btn">Pindah</button>`;
+    item.querySelector(".collection-verse-body").appendChild(moveToWrap);
+  }
   item.querySelector(".result-text").textContent = bodyText;
   if (noteText) item.querySelector(".collection-verse-note").textContent = noteText;
 
@@ -4317,16 +4505,33 @@ function buildCollectionItemRow(id, col, it, i, opts) {
   item.querySelector(".col-remove-btn").addEventListener("click", () => {
     if (removeItemFromCollection(currentUser, id, i)) opts.onChanged();
   });
+  const moveTopBtn = item.querySelector(".col-move-top-btn");
+  const moveBottomBtn = item.querySelector(".col-move-bottom-btn");
   const moveUpBtn = item.querySelector(".col-move-up-btn");
   const moveDownBtn = item.querySelector(".col-move-down-btn");
-  if (i === 0) moveUpBtn.disabled = true;
-  if (i === col.items.length - 1) moveDownBtn.disabled = true;
+  if (i === 0) { moveUpBtn.disabled = true; moveTopBtn.disabled = true; }
+  if (i === col.items.length - 1) { moveDownBtn.disabled = true; moveBottomBtn.disabled = true; }
+  moveTopBtn.addEventListener("click", () => {
+    if (moveItemToStart(currentUser, id, i)) opts.onChanged();
+  });
+  moveBottomBtn.addEventListener("click", () => {
+    if (moveItemToEnd(currentUser, id, i)) opts.onChanged();
+  });
   moveUpBtn.addEventListener("click", () => {
     if (moveItemInCollection(currentUser, id, i, -1)) opts.onChanged();
   });
   moveDownBtn.addEventListener("click", () => {
     if (moveItemInCollection(currentUser, id, i, 1)) opts.onChanged();
   });
+  const moveToInput = item.querySelector(".col-move-to-input");
+  const moveToBtn = item.querySelector(".col-move-to-btn");
+  if (moveToBtn && moveToInput) {
+    moveToBtn.addEventListener("click", () => {
+      const wanted = parseInt(moveToInput.value, 10);
+      if (!wanted || wanted < 1) { alert("Isi nomor urutan tujuan dulu (1 sampai " + col.items.length + ")."); return; }
+      if (moveItemToPosition(currentUser, id, i, wanted - 1)) opts.onChanged();
+    });
+  }
   const playBtn = item.querySelector(".col-play-btn");
   if (playBtn && v) {
     playBtn.addEventListener("click", () => toggleCollectionVersePlayback(v, playBtn));
@@ -4549,7 +4754,10 @@ function openCollectionFullscreen(col, startIndex) {
     textEl.style.fontSize = currentFontSize() + "px";
     textEl.style.fontFamily = currentFontFamily().body;
     textEl.style.fontWeight = currentFontFamily().weight;
-    textEl.textContent = it ? collectionItemBodyText(it) : "";
+    // innerHTML (bukan textContent) khusus supaya item "kidung" bisa
+    // menyorot barisnya koor warna kuning (lihat collectionItemBodyHtml()
+    // di atas) -- item jenis lain tetap sama persis (di-escape dulu).
+    textEl.innerHTML = it ? collectionItemBodyHtml(it) : "";
     box.appendChild(textEl);
 
     if (noteText) {
@@ -5414,6 +5622,15 @@ const THEMES = [
   { id: 15, name: "Merah Tua", swatch: "#6E1414", ink: "#FFFFFF" },
   { id: 16, name: "Hijau Tua Pastel", swatch: "#1F3A28", ink: "#FFE98A" },
   { id: 17, name: "Kuning - Oranye Pastel", swatch: "#FFF3B0", ink: "#C6712B" },
+  // BARU -- sesuai contoh tampilan Layar Proyeksi (slide K169 dsb):
+  // latar biru navy pekat, tulisan PUTIH murni (beda dari tema 7 "Biru
+  // Malam" yang inknya off-white #E7EEF7 -- ini sengaja #FFFFFF supaya
+  // persis meniru contoh). Warna sama dengan tema "biru" bawaan Studio
+  // Presentasi Layar 2 (lihat THEMES di js/presentation-studio.js) biar
+  // konsisten dipakai dengan/tanpa monitor kedua. Baris "Koor:" TIDAK
+  // perlu diatur di sini -- sudah otomatis kuning (#ffd84a) di tema
+  // apa pun, lihat .collection-fs-koor & .kidung-koor-line di css/style.css.
+  { id: 18, name: "Biru Navy - Putih (Layar Proyeksi)", swatch: "#0B1730", ink: "#FFFFFF" },
 ];
 
 function applyTheme(id) {
@@ -5425,7 +5642,7 @@ function applyTheme(id) {
   // di komputer/layar lebar. Dipasang di <html> supaya seluruh layar
   // (termasuk area di luar kotak <body>) ikut berubah.
   const root = document.documentElement;
-  for (let i = 2; i <= 17; i++) root.classList.remove("theme-" + i);
+  for (let i = 2; i <= 18; i++) root.classList.remove("theme-" + i);
   if (id && id !== 1) root.classList.add("theme-" + id);
   localStorage.setItem(THEME_STORAGE_KEY, id);
   document.querySelectorAll("#themePicker .theme-swatch").forEach((btn) => {
