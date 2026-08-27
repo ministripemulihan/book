@@ -258,12 +258,57 @@ const Sync = {
         id,
         name: col.name,
         verseIds: col.verseIds || [],
+        // BARU -- item generik (kidung/teks/pengumuman/ayat) ikut dikirim
+        // apa adanya, disimpan server di kolom terpisah "ItemsJson" (lihat
+        // saveCollection_() di apps-script/Code.gs) supaya benar-benar
+        // tersinkron lintas perangkat, bukan cuma verseIds seperti
+        // sebelumnya. Item PDF/gambar (Media Tersimpan) SENGAJA TIDAK ikut
+        // di sini -- itu penyimpanan terpisah, lihat catatan di
+        // js/collections.js. Kalau kumpulan besar (60+ slide) melewati
+        // 50.000 karakter/sel, server otomatis memecahnya jadi beberapa
+        // baris "Part 2/3/dst" -- klien di sini tidak perlu tahu soal itu.
+        items: col.items || [],
         createdAt: col.createdAt || new Date().toISOString(),
         updatedAt: col.updatedAt || new Date().toISOString(),
       });
       return true;
     } catch (e) {
       return false; // offline / belum dikonfigurasi -- tetap tersimpan lokal
+    }
+  },
+
+  // Bagikan 1 kumpulan (apa adanya, termasuk item & tema kalau disertakan)
+  // ke akun `targetUsername` -- lihat shareCollectionToUser_() di
+  // apps-script/Code.gs & shareCollectionToUser() di js/collections.js.
+  async shareCollection(username, id, targetUsername, theme) {
+    try {
+      const res = await this._post({ type: "collection_share", username, id, targetUsername, theme: theme || null });
+      return res || { ok: false, error: "Tidak ada balasan dari server." };
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server (periksa sambungan internet)." };
+    }
+  },
+
+  // BARU -- 🔔 kiriman 🔗Bagikan dari akun lain yang masih menunggu
+  // "Terima"/"Tolak" milik `username` ini. Lihat readPendingShares_()
+  // di apps-script/Code.gs.
+  async pullPendingShares(username) {
+    try {
+      const data = await this._get({ type: "collection_shares_pending", username });
+      return (data && data.ok && data.shares) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // action: "accept" atau "reject". Lihat respondToShare_() di
+  // apps-script/Code.gs.
+  async respondShare(username, id, action) {
+    try {
+      const res = await this._post({ type: "collection_share_respond", username, id, action });
+      return res || { ok: false, error: "Tidak ada balasan dari server." };
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server (periksa sambungan internet)." };
     }
   },
 
@@ -320,6 +365,46 @@ const Sync = {
       return (data && data.ok) || false;
     } catch (e) {
       return false; // offline -- diam-diam diabaikan, bukan fitur penting
+    }
+  },
+
+  // ---------------- Sinkron Media (PDF/gambar) ke Drive -- Tahap 2 & 3 ----------------
+  // Lihat uploadToDrive_()/getDriveFileForUser_() di apps-script/Code.gs
+  // & checkbox "☁️ Sinkron ke akun" di js/presentation-studio.js
+  // (wireFileTab() -> addBtn). `dataUrl` = 1 data-URL apa adanya (mis.
+  // dari originalFileDataUrl atau images[0]) -- prefix "data:mime;base64,"
+  // DIPOTONG di sini dulu sebelum dikirim, server cuma menerima base64
+  // murni. Mengembalikan `fileId` (string) kalau berhasil, atau `null`
+  // kalau gagal/offline -- SELALU best-effort, TIDAK PERNAH menggagalkan
+  // penyimpanan lokal yang sudah terjadi duluan (lihat pemanggilnya).
+  async uploadMedia(username, fileName, dataUrl) {
+    try {
+      const m = /^data:([^;]+);base64,(.*)$/.exec(String(dataUrl || ""));
+      if (!m) return null;
+      const data = await this._post({
+        type: "media_upload",
+        username,
+        fileName: fileName || "berkas",
+        mimeType: m[1],
+        dataBase64: m[2],
+      });
+      return (data && data.ok && data.fileId) || null;
+    } catch (e) {
+      return null; // offline / belum dikonfigurasi -- tetap tersimpan lokal
+    }
+  },
+
+  // Ambil 1 file media balik dari Drive sebagai data-URL (dipakai Tahap 4,
+  // saat menarik Media Tersimpan di perangkat lain -- belum dipanggil di
+  // mana pun sampai Tahap 4 dikerjakan, disiapkan sekalian di sini supaya
+  // Tahap 4 nanti tinggal pakai, tidak perlu balik lagi ke Code.gs).
+  async fetchMediaFile(username, fileId) {
+    try {
+      const data = await this._get({ type: "media_file", username, fileId });
+      if (!data || !data.ok) return null;
+      return "data:" + data.mimeType + ";base64," + data.dataBase64;
+    } catch (e) {
+      return null;
     }
   },
 };
