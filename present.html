@@ -88,6 +88,27 @@
     transform: translateY(-0.15em);
   }
   #stage.fade-in #text, #stage.fade-in #ref { animation: fadeUp .5s ease both; }
+  /* Slide Kidung (Presentation.sendKidung()) -- bait polos memakai warna
+     tulisan tema biasa (var(--p-ink)), koor DISOROT kuning tetap (TIDAK
+     ikut var(--p-ink)/tema) supaya selalu jelas kelihatan "ini bagian
+     koor" di tema apa pun (gelap/terang/sepia/dst -- lihat THEMES di
+     js/presentation-studio.js), meniru mockup layar biru-kuning yang
+     dicontohkan. */
+  .kidung-bait-line { margin: 0 auto clamp(10px, 1.6vh, 20px); }
+  .kidung-line-gap { display: block; height: clamp(6px, 1vh, 14px); }
+  .kidung-koor-line {
+    color: #ffd84a;
+    font-weight: 600;
+  }
+  .kidung-koor-label {
+    display: inline-block;
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.5em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.3em;
+  }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
 
   #logoView { max-width: 60vw; max-height: 60vh; object-fit: contain; }
@@ -417,6 +438,23 @@
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = "";
       if (data.embedUrl) { ytEl.src = data.embedUrl; ytEl.hidden = false; }
+    } else if (kind === "kidung") {
+      // Slide Kidung (bait + koor snapshot, lihat Presentation.sendKidung()
+      // di js/presentation.js & tab "🎵 Kidung / Hymn" di js/presentation-
+      // studio.js) -- ditampilkan seperti mockup: judul kidung sebagai
+      // referensi kecil di atas, tiap bait 1 baris/blok, lalu koor (kalau
+      // ada) DISOROT warna kuning terpisah dari warna teks bait biasa,
+      // supaya jemaat langsung tahu bagian mana yang koor.
+      refEl.hidden = !data.ref;
+      refEl.textContent = data.ref || "";
+      const escKidung = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const baitHtml = (data.bait || [])
+        .map((b) => `<div class="kidung-bait-line">${escKidung((b.noBait ? b.noBait + ". " : "") + (b.teks || "")).replace(/\n/g, "<br>")}</div>`)
+        .join('<div class="kidung-line-gap">&nbsp;</div>');
+      const koorHtml = data.koorTeks
+        ? `<div class="kidung-line-gap">&nbsp;</div><div class="kidung-koor-line"><span class="kidung-koor-label">Koor:</span><br>${escKidung(data.koorTeks).replace(/\n/g, "<br>")}</div>`
+        : "";
+      textEl.innerHTML = baitHtml + koorHtml;
     }
     stageEl.classList.add("fade-in");
   }
@@ -430,7 +468,7 @@
       stopTimer(true);
       return;
     }
-    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube") {
+    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung") {
       showMain(data.type, data);
       return;
     }
