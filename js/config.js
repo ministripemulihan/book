@@ -35,7 +35,7 @@ const CONFIG = {
   // yang perlu diketik manual oleh administrator. Lihat
   // saveMeasuredBibleSizeMb_() & getEffectiveBibleSizeMb() di js/app.js,
   // dan updateMeasuredBibleSizeMb_() di apps-script/Code.gs.
-  BIBLE_DATA_APPROX_SIZE_MB: 60,
+  BIBLE_DATA_APPROX_SIZE_MB: 57,
 
   // ----------------------------------------------------------
   // 2) SUMBER DATA PENGGUNA — Google Sheet #2 (BERBEDA dari sheet Alkitab)
@@ -337,7 +337,7 @@ const CONFIG = {
   // sinkron, tidak wajib akurat (beda dengan BIBLE_DATA_APPROX_SIZE_MB
   // yang punya mekanisme ukur-otomatis; data Kidung jauh lebih kecil
   // jadi tidak perlu progress bar rumit).
-  KIDUNG_DATA_APPROX_KB: 800,
+  KIDUNG_DATA_APPROX_KB: 1300,
 
   // Urutan buku Kidung untuk navigasi ◀/▶ LINTAS BUKU (22 Agu 2026) --
   // dipakai findAdjacentKidungCrossBook() di js/kidung.js supaya waktu
