@@ -32,7 +32,11 @@
 //        { type: "verse", verseId },                     // ayat asli
 //        { type: "text", text },                          // teks bebas
 //        { type: "announcement", text, title? },           // pengumuman (snapshot teks)
-//        { type: "kidung", kidungNo, title },               // kidung (lihat catatan di bawah)
+//        { type: "kidung", buku, kidungNo, title,            // kidung -- 1 item = 1 SLIDE
+//          bait: [{noBait,teks}], koorTeks },                // (bukan 1 lagu penuh), lihat
+//                                                              // catatan di bawah & tab Kidung
+//                                                              // Studio Presentasi (js/presentation-
+//                                                              // studio.js, wireKidungTab()).
 //      ],
 //      verseIds: [verseId, ...],   // TURUNAN otomatis dari items (hanya
 //                                  // yang type:"verse") -- disimpan JUGA
@@ -53,21 +57,34 @@
 //  di atas begitu dibaca (lihat _migrateCollection() di bawah) -- tidak
 //  ada tombol/migrasi manual, dan tidak menghapus data apa pun.
 //
-//  CATATAN PENTING soal sinkron item non-ayat: Sheet "Collections" di
-//  server (apps-script/Code.gs) baru punya kolom VerseIdsJson -- BELUM
-//  ada kolom untuk item kidung/pengumuman/teks bebas. Jadi untuk saat
-//  ini, item type "verse" ikut sinkron lintas perangkat seperti biasa,
-//  sedangkan item "text"/"announcement"/"kidung" HANYA tersimpan lokal
-//  per perangkat (belum ikut ke Sheet). Ini didokumentasikan supaya
-//  tidak mengejutkan -- langkah lanjutan (kolom "ItemsJson" baru di
-//  Sheet + Code.gs) dicatat sebagai pekerjaan susulan, bukan bug.
+//  SELESAI 27 Agu 2026 -- sinkron item non-ayat: Sheet "Collections" di
+//  server (apps-script/Code.gs) sekarang punya kolom "ItemsJson" (kolom
+//  G, ditambah BELAKANGAN dari kolom lain yang sudah ada -- lihat
+//  fixCollectionsItemsColumn_() -- supaya baris lama tidak bergeser),
+//  jadi SEMUA jenis item (ayat/kidung/pengumuman/teks bebas) sekarang
+//  ikut tersinkron lintas perangkat lewat 1 akun, sama seperti ayat.
+//  Item PDF/gambar (Media Tersimpan) TETAP tidak ikut -- itu penyimpanan
+//  terpisah (lihat Bagian B di bawah), ukurannya jauh lebih besar
+//  daripada muat di sel Google Sheets. VerseIdsJson & ItemsJson DIJAGA
+//  TERPISAH (bukan digabung 1 sel) supaya kalau salah satunya kepanjangan
+//  (lewat batas KERAS 50.000 karakter/sel Google Sheets), cuma yang itu
+//  saja yang dikosongkan server (lihat safeCellJson_() di Code.gs) --
+//  yang satunya tetap utuh.
 //
-//  Item type "kidung" sengaja hanya menyimpan { kidungNo, title } (bukan
-//  seluruh syairnya) -- karena tab Kidung di Studio Presentasi BELUM
-//  tersambung ke sumber data kidung (lihat catatan STATUS di
-//  js/presentation-studio.js, poin 7) -- begitu itu tersambung, syair
-//  lengkapnya tinggal diambil ulang lewat js/kidung.js pakai kidungNo
-//  ini, tidak perlu ubah struktur item.
+//  BARU (tab Kidung Studio Presentasi tersambung ke js/kidung.js):
+//  item type "kidung" sekarang menyimpan SNAPSHOT 1 slide (bukan cuma
+//  {kidungNo,title} seperti sebelumnya) -- `buku`, `bait` (1 atau
+//  beberapa bait, sesuai mode pemecah slide yang dipilih operator saat
+//  itu -- lihat splitKidungIntoSlides() di js/kidung.js), & `koorTeks`
+//  (teks koor yang menempel di slide itu, atau null kalau slide ini
+//  tidak pakai koor). Disimpan sebagai snapshot (bukan hanya nomor
+//  lalu diambil ulang tiap kali dibuka) supaya: (a) tetap tampil benar
+//  walau operator OFFLINE / belum sinkron ulang data Kidung, dan (b)
+//  urutan/pemecahan slide yang sudah dipilih operator untuk ACARA ini
+//  tidak berubah sendiri kalau suatu saat isi Sheet Kidung diedit.
+//  Kalau syairnya sendiri memang perlu diperbarui (typo dibetulkan di
+//  Sheet dsb), operator tinggal buka lagi lewat tab Kidung & timpa
+//  ulang item lama (belum ada tombol "segarkan" otomatis per item).
 // ============================================================
 
 function collectionsStorageKey(username) {
@@ -173,9 +190,23 @@ function addAnnouncementToCollection(username, name, text, title) {
   return addItemToCollection(username, name, { type: "announcement", text: trimmed, title: title || "" });
 }
 
-function addKidungToCollection(username, name, kidungNo, title) {
-  if (!kidungNo) return null;
-  return addItemToCollection(username, name, { type: "kidung", kidungNo: String(kidungNo), title: title || "" });
+// `kidungItem`: { buku, kidungNo, title, bait: [{noBait,teks}], koorTeks }
+// -- 1 panggilan = 1 SLIDE ditambahkan (lihat catatan bentuk item di
+// atas). Dipanggil per-slide dari tab Kidung Studio Presentasi
+// (js/presentation-studio.js, wireKidungTab()) -- untuk menambah 1 lagu
+// penuh sekaligus (semua slide hasil pemecahan), tab itu cukup
+// memanggil fungsi ini berkali-kali (1x per slide), tidak perlu bentuk
+// data baru.
+function addKidungToCollection(username, name, kidungItem) {
+  if (!kidungItem || !kidungItem.kidungNo) return null;
+  return addItemToCollection(username, name, {
+    type: "kidung",
+    buku: kidungItem.buku || "Kidung",
+    kidungNo: String(kidungItem.kidungNo),
+    title: kidungItem.title || "",
+    bait: Array.isArray(kidungItem.bait) ? kidungItem.bait.map((b) => ({ noBait: b.noBait, teks: b.teks })) : [],
+    koorTeks: kidungItem.koorTeks || null,
+  });
 }
 
 // Hapus/pindah item berdasarkan INDEX di array items (bukan verseId --
@@ -207,6 +238,38 @@ function moveItemInCollection(username, id, index, direction) {
   saveCollections(username, collections);
   _pushCollectionRemote(username, id, col);
   return true;
+}
+
+// BARU -- pindah LANGSUNG ke posisi mana pun (bukan cuma naik/turun 1
+// langkah lewat moveItemInCollection() di atas) -- dipakai tombol
+// "⏮️ Awal" / "⏭️ Akhir" & kotak "Pindah ke urutan #..." di panel
+// Kumpulan Ayat (js/app.js: buildCollectionItemRow()) MAUPUN kontrol
+// urutan ringkas di Studio Presentasi (js/presentation-studio.js) --
+// supaya menaruh 1 item ke awal/tengah/akhir daftar yang panjang tidak
+// perlu klik ⬆️/⬇️ berkali-kali satu per satu.
+function moveItemToPosition(username, id, index, newIndex) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !col.items[index]) return false;
+  const max = col.items.length - 1;
+  const clamped = Math.max(0, Math.min(Number(newIndex) || 0, max));
+  if (clamped === index) return false;
+  const [moved] = col.items.splice(index, 1);
+  col.items.splice(clamped, 0, moved);
+  _migrateCollection(col);
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+function moveItemToStart(username, id, index) {
+  return moveItemToPosition(username, id, index, 0);
+}
+function moveItemToEnd(username, id, index) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !col.items[index]) return false;
+  return moveItemToPosition(username, id, index, col.items.length - 1);
 }
 
 // ---- Kompatibilitas lama (dipakai js/app.js versi sebelumnya) --------
@@ -274,6 +337,85 @@ function buildCollectionShareText(col) {
   return lines.join("\n\n");
 }
 
+// ------------------------------------------------------------
+// 🔗 BAGIKAN KUMPULAN KE PENGGUNA LAIN -- operator mengetik username
+// tujuan, tekan "Bagikan" (js/app.js: handleShareCollection() / tab
+// Kumpulan Ayat Studio: js/presentation-studio.js), kirim ke
+// Sync.shareCollection() -> shareCollectionToUser_() di
+// apps-script/Code.gs, yang MENYALIN (bukan memindah) semua item
+// kumpulan itu jadi kumpulan baru milik akun tujuan. Ikut menyertakan
+// TEMA Layar Proyeksi yang sedang dipakai pengirim SAAT INI (dibaca
+// langsung dari localStorage, kuncinya harus SAMA PERSIS dengan
+// THEME_KEY di js/presentation-studio.js -- disalin literalnya di sini
+// supaya file ini tetap berdiri sendiri tanpa perlu presentation-
+// studio.js dimuat) -- penerima TIDAK otomatis memakainya, cuma
+// tersimpan sebagai info yang bisa mereka terapkan sendiri kalau mau.
+// ------------------------------------------------------------
+const STUDIO_THEME_KEY_FOR_SHARE_ = "bible_app_studio_theme_v1";
+
+async function shareCollectionToUser(username, id, targetUsername) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    return { ok: false, error: "Sinkronisasi ke server belum aktif." };
+  }
+  const target = String(targetUsername || "").trim().toLowerCase();
+  if (!target) return { ok: false, error: "Username tujuan kosong." };
+  let theme = null;
+  try {
+    const raw = localStorage.getItem(STUDIO_THEME_KEY_FOR_SHARE_);
+    if (raw) theme = JSON.parse(raw);
+  } catch (e) { /* diamkan -- berbagi tetap jalan tanpa tema */ }
+  return Sync.shareCollection(username, id, target, theme);
+}
+
+// ------------------------------------------------------------
+// BARU -- 🔔 KIRIMAN MENUNGGU PERSETUJUAN. Sebelumnya 🔗 Bagikan
+// langsung menyalin kumpulan ke akun tujuan tanpa persetujuan; sekarang
+// kumpulan itu disimpan server sebagai "pending" (lihat
+// shareCollectionToUser_() di apps-script/Code.gs) sampai penerima
+// menekan Terima/Tolak lewat 2 fungsi berikut.
+// ------------------------------------------------------------
+async function checkPendingCollectionShares(username) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) return [];
+  return Sync.pullPendingShares(username);
+}
+
+async function respondToCollectionShare(username, id, action) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    return { ok: false, error: "Sinkronisasi ke server belum aktif." };
+  }
+  const res = await Sync.respondShare(username, id, action);
+  // Kalau diterima, tarik ulang Kumpulan Ayat dari server supaya kumpulan
+  // yang baru saja "lolos" jadi normal itu langsung muncul di HP ini juga
+  // (tidak perlu tunggu sinkron berkala berikutnya).
+  if (res && res.ok && action === "accept") {
+    try { await refreshCollectionsFromRemote(username); } catch (e) { /* diamkan, sinkron berkala akan menyusul */ }
+  }
+  return res;
+}
+
+// BARU -- "🎨 Terapkan tema kiriman": dipanggil dari tombol di panel
+// Kumpulan Ayat (js/app.js) saat kumpulan yang sedang dilihat punya
+// col.theme terisi (artinya kumpulan ini hasil BAGIKAN dari akun lain
+// yang menyertakan tema Layar Proyeksi mereka, lihat
+// shareCollectionToUser() di atas & shareCollectionToUser_() di
+// apps-script/Code.gs). Sebelumnya tema itu cuma tersimpan sebagai
+// data (lihat catatan di readCollections_()/refreshCollectionsFromRemote()
+// di atas) tanpa ada cara menerapkannya -- sekarang tinggal delegasikan
+// ke PresentationStudio.applySharedTheme() (js/presentation-studio.js),
+// yang menimpa tema Layar Proyeksi milik PENERIMA dengan tema kiriman
+// ini (aktif untuk Studio & Layar 2 penerima, TIDAK mengubah apa pun
+// di akun pengirim).
+function applyCollectionTheme(username, id) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !col.theme) return { ok: false, error: "Kumpulan ini tidak membawa tema kiriman." };
+  if (typeof PresentationStudio === "undefined" || !PresentationStudio.applySharedTheme) {
+    return { ok: false, error: "Studio Presentasi belum siap." };
+  }
+  const applied = PresentationStudio.applySharedTheme(col.theme);
+  return applied ? { ok: true } : { ok: false, error: "Format tema tidak valid." };
+}
+
 // Nama kumpulan yang PALING BARU dipakai (updatedAt/createdAt terbaru
 // duluan) -- dipakai dialog "Simpan ke Kumpulan Ayat" (promptCollectionName()
 // di js/presentation-studio.js) supaya operator tinggal klik, tidak perlu
@@ -302,19 +444,44 @@ async function refreshCollectionsFromRemote(username) {
     const r = remote[id];
     const l = local[id];
     if (!l || new Date(r.updatedAt || 0) > new Date(l.updatedAt || 0)) {
-      // Hasil dari Sheet hanya berisi verseIds (lihat catatan sinkron di
-      // atas) -- item non-ayat milik kumpulan LOKAL yang sudah ada (kalau
-      // ada) TETAP dipertahankan supaya tidak hilang tertimpa versi Sheet
-      // yang belum tahu bentuk item generik.
-      const keepNonVerseItems = (l && Array.isArray(l.items)) ? l.items.filter((it) => it.type !== "verse") : [];
-      const verseItems = (r.verseIds || []).map((verseId) => ({ type: "verse", verseId }));
-      local[id] = {
-        name: r.name,
-        items: verseItems.concat(keepNonVerseItems),
-        verseIds: [],
-        createdAt: r.createdAt || r.updatedAt || new Date().toISOString(),
-        updatedAt: r.updatedAt || new Date().toISOString(),
-      };
+      // BARU -- Sheet sekarang JUGA menyimpan "items" generik (kolom
+      // ItemsJson, lihat readCollections_()/saveCollection_() di
+      // apps-script/Code.gs) -- kalau ada isinya, itu yang dipakai APA
+      // ADANYA (sudah lengkap, sudah termasuk ayat/kidung/teks/pengumuman
+      // dalam urutan yang benar). Kalau kosong (baris LAMA dari sebelum
+      // kolom ini ada, atau memang overflow lewat 50.000 karakter &
+      // sengaja dikosongkan server -- lihat safeCellJson_()), jatuh ke
+      // cara lama: rekonstruksi dari verseIds + pertahankan item non-ayat
+      // LOKAL yang sudah ada (kalau ada), supaya tidak ada yang hilang
+      // tertimpa versi Sheet yang kosong.
+      // BARU -- "theme" (metadata tema Layar Proyeksi pengirim, lihat
+      // shareCollectionToUser_() di apps-script/Code.gs) sekarang IKUT
+      // disimpan lokal juga -- sebelumnya field ini dibuang begitu saja
+      // di sini, jadi walau server sudah menyimpannya, penerima tidak
+      // pernah punya cara mengaksesnya sama sekali. TIDAK diterapkan
+      // otomatis (tetap perlu tombol "🎨 Terapkan tema kiriman" di
+      // panel, lihat renderCollectionsPanel() di js/app.js).
+      if (Array.isArray(r.items) && r.items.length) {
+        local[id] = {
+          name: r.name,
+          items: r.items,
+          verseIds: [],
+          theme: r.theme || null,
+          createdAt: r.createdAt || r.updatedAt || new Date().toISOString(),
+          updatedAt: r.updatedAt || new Date().toISOString(),
+        };
+      } else {
+        const keepNonVerseItems = (l && Array.isArray(l.items)) ? l.items.filter((it) => it.type !== "verse") : [];
+        const verseItems = (r.verseIds || []).map((verseId) => ({ type: "verse", verseId }));
+        local[id] = {
+          name: r.name,
+          items: verseItems.concat(keepNonVerseItems),
+          verseIds: [],
+          theme: r.theme || null,
+          createdAt: r.createdAt || r.updatedAt || new Date().toISOString(),
+          updatedAt: r.updatedAt || new Date().toISOString(),
+        };
+      }
       _migrateCollection(local[id]);
       changed = true;
     }
@@ -341,6 +508,20 @@ async function refreshCollectionsFromRemote(username) {
 //      type: "image" | "youtube",
 //      videoLabels: [{ title, durationLabel }, ...] | null,  // khusus type "youtube"
 //      createdAt, updatedAt: ISO string,
+//      driveFileId: string | null,   // BARU (Tahap 3 peta jalan Drive,
+//                                    // lihat ROADMAP-drive-sync.md) --
+//                                    // terisi kalau operator mencentang
+//                                    // "☁️ Sinkron ke akun" saat
+//                                    // mengunggah DAN unggahan ke Drive
+//                                    // berhasil (diisi belakangan, lihat
+//                                    // catatan di addMediaItem() di
+//                                    // bawah -- TIDAK memblokir
+//                                    // penyimpanan lokal yang sudah
+//                                    // terjadi duluan). null berarti
+//                                    // belum/tidak disinkron -- item
+//                                    // TETAP jalan seperti biasa (cuma
+//                                    // lokal), sama seperti sebelum
+//                                    // Tahap 3 ada.
 //    }
 // ============================================================
 
@@ -348,7 +529,7 @@ function _genMediaId() {
   return "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 }
 
-async function addMediaItem(username, name, images, sourceFileName, type, videoLabels) {
+async function addMediaItem(username, name, images, sourceFileName, type, videoLabels, originalFileDataUrl, syncToDrive) {
   const trimmedName = (name || "").trim();
   if (!trimmedName || !images || !images.length) return null;
   const now = new Date().toISOString();
@@ -362,14 +543,47 @@ async function addMediaItem(username, name, images, sourceFileName, type, videoL
     videoLabels: videoLabels || null,
     createdAt: now,
     updatedAt: now,
+    // BARU -- kalau ini PDF & operator mencentang "Simpan juga file PDF
+    // asli" saat mengunggah (lihat wireFileTab() di
+    // js/presentation-studio.js), berkas mentahnya (data-URL) disimpan di
+    // sini SELAIN gambar hasil render per halaman -- supaya bisa diunduh
+    // utuh sebagai .pdf, bukan cuma gambar. null kalau tidak dicentang
+    // (perilaku lama, tidak boros ruang IndexedDB). Ini SELALU lokal per
+    // perangkat (IndexedDB), tidak ikut tersinkron/dibagikan ke akun lain
+    // -- sama seperti "images" lainnya.
+    originalFile: originalFileDataUrl || null,
+    driveFileId: null, // diisi belakangan kalau syncToDrive -- lihat di bawah
   };
   try {
     if (typeof LocalDB === "undefined") return null;
     await LocalDB.putMediaItem(item);
-    return item.id;
   } catch (e) {
     return null; // penyimpanan perangkat penuh / IndexedDB tidak tersedia
   }
+  // BARU (Tahap 3) -- kalau dicentang "☁️ Sinkron ke akun", unggah SATU
+  // berkas (originalFile PDF asli kalau ada, kalau tidak gambar pertama)
+  // ke Drive di LATAR BELAKANG lewat Sync.uploadMedia() (js/sync.js) --
+  // SENGAJA tidak di-`await` di sini supaya "✅ Tersimpan" (yang sudah
+  // terjadi lewat penyimpanan lokal di atas) tidak menunggu upload besar
+  // selesai dulu. Kalau berhasil, item yang SUDAH tersimpan itu ditimpa
+  // ulang (put() dengan id sama = update) untuk menambahkan driveFileId.
+  // Kalau offline/gagal, dibiarkan begitu saja -- item tetap 100% jalan
+  // secara lokal, sama seperti sebelum Tahap 3 ada (lihat catatan
+  // keamanan/fallback yang sama di js/sync.js pushCollection dkk).
+  if (syncToDrive && typeof Sync !== "undefined" && typeof Sync.uploadMedia === "function") {
+    const uploadSource = originalFileDataUrl || images[0] || null;
+    if (uploadSource) {
+      Sync.uploadMedia(username, sourceFileName || trimmedName, uploadSource)
+        .then((fileId) => {
+          if (!fileId || typeof LocalDB === "undefined") return;
+          item.driveFileId = fileId;
+          item.updatedAt = new Date().toISOString();
+          LocalDB.putMediaItem(item).catch(() => {});
+        })
+        .catch(() => {});
+    }
+  }
+  return item.id;
 }
 
 async function loadMediaItems(username) {
