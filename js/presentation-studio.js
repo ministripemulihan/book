@@ -1568,7 +1568,33 @@ const PresentationStudio = (() => {
         // di js/collections.js akan mengunggah berkas ini ke Drive di
         // LATAR BELAKANG (tidak memblokir "✅ Tersimpan" di bawah).
         const syncToDriveBox = el("psSyncToDrive");
-        const id = await addMediaItem(username, name, images, file.name, null, null, originalFileDataUrl || null, !!(syncToDriveBox && syncToDriveBox.checked));
+        const wantsSync = !!(syncToDriveBox && syncToDriveBox.checked);
+        // BARU (27 Agu 2026) -- lihat catatan panjang di addMediaItem()
+        // (js/collections.js): status sinkron Drive dulu diam-diam
+        // (tidak dilaporkan ke UI sama sekali), sekarang ditampilkan di
+        // sebelah nama file lewat statusEl kecil ini -- MUNCUL BELAKANGAN
+        // (bukan langsung) karena memang menunggu unggahan Drive selesai
+        // di latar belakang, TIDAK memblokir "✅ Tersimpan" di bawah yang
+        // tetap instan seperti sebelumnya (penyimpanan lokal).
+        let statusEl = wrapper.querySelector(".ps-drive-sync-status");
+        if (wantsSync && !statusEl) {
+          statusEl = document.createElement("em");
+          statusEl.className = "ps-file-status ps-drive-sync-status";
+          statusEl.textContent = " ☁️ menyinkronkan…";
+          row.querySelector(".ps-file-name").appendChild(statusEl);
+        }
+        const id = await addMediaItem(username, name, images, file.name, null, null, originalFileDataUrl || null, wantsSync,
+          wantsSync ? (ok, errorMessage) => {
+            if (!statusEl) return;
+            if (ok) {
+              statusEl.textContent = " ☁️ tersinkron ke Drive";
+              statusEl.title = "";
+            } else {
+              statusEl.textContent = " ⚠️ gagal sinkron ke Drive";
+              statusEl.title = errorMessage || "Gagal, tidak diketahui sebabnya.";
+              statusEl.style.cursor = "help";
+            }
+          } : null);
         if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh? coba hapus item Media Tersimpan lama, atau kosongkan sedikit ruang penyimpanan perangkat -- kalau baru saja mencentang \"Simpan file PDF asli\", coba matikan centang itu, berkas PDF asli cukup boros ruang)."); return; }
         renderMediaList();
         addBtn.textContent = "✅ Tersimpan";
