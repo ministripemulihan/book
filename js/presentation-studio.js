@@ -42,12 +42,17 @@
 //      kolom kiri (lihat addMediaItem() dkk. di js/collections.js).
 //      Lokal per-perangkat saja (tidak disinkron ke Sheet -- data-URL
 //      gambar terlalu besar untuk itu).
-//   7) Tab Kidung/Hymn — MASIH PLACEHOLDER. Belum ada sumber data
-//      kidung/hymn sama sekali di proyek ini (bukan hanya belum
-//      tersambung) -- perlu diputuskan dulu sumbernya (mis. Google
-//      Sheet baru "Kidung" dgn kolom nomor/judul/syair, mirip pola
-//      Alkitab di js/db.js) sebelum tab ini bisa diisi sungguhan.
-//      Lihat rancangan sheet & mode tampil di jawaban chat 20 Agu 2026.
+//   7) BARU 26 Agu 2026: Tab Kidung/Hymn — SELESAI (tersambung ke
+//      sumber data Kidung yang SAMA dengan menu 🎵 Kidung biasa,
+//      js/kidung.js -- tidak butuh Sheet/sumber data baru, sumbernya
+//      sudah ada). Operator cari buku/nomor/judul, pilih mode pemecah
+//      slide (1 bait, 1+koor, 2+koor, 3+koor, koor saja -- lihat
+//      splitKidungIntoSlides() di js/kidung.js), lalu per-slide bisa
+//      "▶️ Tayangkan" (langsung live ke Layar 2) atau "➕ Daftar"
+//      (simpan ke Kumpulan Ayat sebagai snapshot -- lihat
+//      addKidungToCollection() di js/collections.js, item type
+//      "kidung" sekarang menyimpan bait+koor per slide, bukan cuma
+//      nomor). Lihat wireKidungTab() di bawah.
 //   8) BARU 20 Agu 2026: "Media Tersimpan" (PDF/gambar/daftar YouTube)
 //      dipindah dari localStorage ke IndexedDB (LocalDB di js/db.js,
 //      store "studioMedia") -- ini yang memperbaiki bug "Gagal
@@ -65,6 +70,19 @@
 //      Kumpulan Ayat & Media Tersimpan SENGAJA TETAP 2 penyimpanan
 //      terpisah (bukan digabung 1 nama) -- lihat penjelasan di
 //      jawaban chat kenapa ini pilihan yang lebih aman.
+//   9) BARU 26 Agu 2026: Kumpulan Ayat (kiri) & tab Kidung (tengah)
+//      SEKARANG SATU PLAYLIST -- klik item mana pun di salah satu
+//      daftar itu langsung tayang LIVE ke Layar 2 (bukan lagi 2 langkah
+//      "Berikutnya" -> "▶ Tayangkan" khusus untuk daftar ini) sekaligus
+//      menjadikannya "playlist aktif": tombol panah kiri/kanan papan
+//      ketik, ATAU clicker/stylus presentasi nirkabel yang meniru
+//      tombol itu, langsung menggerakkan Layar 2 dari slide pertama
+//      sampai terakhir & bisa kembali dengan sempurna -- persis seperti
+//      openCollectionFullscreen() (js/app.js) untuk mode 1 layar, tapi
+//      sekarang berlaku juga di mode 2 Layar/Studio. Kumpulan Ayat juga
+//      sudah mendaftar item GENERIK (ayat/teks/pengumuman/kidung),
+//      bukan cuma ayat lagi. Lihat activePlaylist, setActivePlaylist(),
+//      sendGenericItemLive(), wirePlaylistKeyNav().
 // ============================================================
 
 const PresentationStudio = (() => {
@@ -93,7 +111,7 @@ const PresentationStudio = (() => {
     gelap:  { bg: "#05070c", ink: "#f5f2e8" },
     terang: { bg: "#fdfaf3", ink: "#1a1a1a" },
     emas:   { bg: "#1a1206", ink: "#e9c977" },
-    biru:   { bg: "#0b1730", ink: "#dce8ff" },
+    biru:   { bg: "#0b1730", ink: "#ffffff" },
     sepia:  { bg: "#f4e8d0", ink: "#3a2c17" },
   };
 
@@ -183,6 +201,16 @@ const PresentationStudio = (() => {
         return;
       }
       box.innerHTML = `${refHtml}<div class="present-preview-text">${escapeHtml(payload.text || "")}</div>`;
+      return;
+    }
+    if (payload.type === "kidung") {
+      // Pratinjau mini kidung di kotak "Tayang" Studio -- meniru persis
+      // yang tampil di Layar 2 (lihat #kidungStage di present.html):
+      // bait apa adanya + baris koor disorot kuning kalau ada.
+      const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
+      const baitHtml = (payload.bait || []).map((b) => `<div class="present-preview-text">${escapeHtml((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`).join("");
+      const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:#ffd84a; font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtml(payload.koorTeks)}</div>` : "";
+      box.innerHTML = `${refHtml}${baitHtml}${koorHtml}`;
     }
   }
 
@@ -333,14 +361,53 @@ const PresentationStudio = (() => {
     if (!sel || typeof loadCollections !== "function") return;
     const username = typeof currentUser !== "undefined" ? currentUser : null;
     const collections = loadCollections(username);
-    const ids = Object.keys(collections);
+    // BARU -- diurutkan updatedAt (jatuh ke createdAt) TERBARU DULUAN,
+    // sama seperti panel Kumpulan Ayat biasa (js/app.js renderCollectionsPanel())
+    // -- supaya kumpulan yang baru saja disimpan/diubah operator selalu
+    // ada di paling atas dropdown ini, tidak perlu dicari-cari.
+    const prevValue = sel.value;
+    const ids = Object.keys(collections).sort((a, b) =>
+      new Date(collections[b].updatedAt || collections[b].createdAt || 0)
+      - new Date(collections[a].updatedAt || collections[a].createdAt || 0)
+    );
+    // PERBAIKAN (Kumpulan Ayat generik): jumlah item dulu selalu
+    // col.verseIds.length (cuma ayat) -- sekarang pakai col.items.length
+    // supaya kumpulan yang isinya campuran (teks/pengumuman/kidung) ikut
+    // terhitung, bukan cuma yang jenis "verse".
     sel.innerHTML = ids.length
-      ? ids.map((id) => `<option value="${id}">${escapeHtml(collections[id].name)} (${collections[id].verseIds.length} ayat)</option>`).join("")
+      ? ids.map((id) => `<option value="${id}">${escapeHtml(collections[id].name)} (${(collections[id].items || collections[id].verseIds || []).length} item)</option>`).join("")
       : `<option value="">Belum ada Kumpulan Ayat</option>`;
+    // Pertahankan kumpulan yang sedang dipilih operator (kalau masih ada)
+    // -- PENTING sekarang karena urutan bisa berubah tiap render (baru
+    // diurutkan terbaru-dulu di atas), jadi tanpa ini operator bisa
+    // "terlempar" balik ke kumpulan lain begitu urutan bergeser (mis.
+    // tepat setelah menambah 1 item, yang otomatis membuat kumpulan itu
+    // naik ke atas).
+    if (prevValue && ids.includes(prevValue)) sel.value = prevValue;
     sel.onchange = renderCollectionList;
     renderCollectionList();
   }
 
+  // PERBAIKAN (poin 4, Kumpulan Ayat <-> Layar 2): dulu hanya mendaftar
+  // col.verseIds (ayat saja) & klik-nya memakai stageOrSend() (2 langkah
+  // "Berikutnya" -> "▶ Tayangkan" di mode dual monitor). Sekarang
+  // mendaftar col.items GENERIK (ayat/teks/pengumuman/kidung, sama
+  // seperti panel Kumpulan Ayat biasa di js/app.js -- lihat
+  // collectionItemRef()/collectionItemBodyText()), dan klik LANGSUNG
+  // menayangkan LIVE ke Layar 2 sekaligus menjadikan kumpulan ini
+  // "playlist aktif" (lihat setActivePlaylist() & wirePlaylistKeyNav()
+  // di bawah) -- supaya panah kiri/kanan papan ketik / clicker & stylus
+  // presentasi bisa langsung menggerakkan Layar 2 dari item yang baru
+  // diklik ini sampai ke ujung kumpulan, dan bisa kembali dengan
+  // sempurna (persis seperti openCollectionFullscreen() di js/app.js
+  // untuk mode 1 layar).
+  //
+  // BARU -- tombol "✎ Atur Urutan" (di atas daftar, index.html) menyalakan
+  // 4 tombol mini ⏮️⬆️⬇️⏭️ per baris di sini supaya urutan bisa diatur
+  // TANPA meninggalkan Studio -- memanggil fungsi yang SAMA (moveItemIn
+  // Collection/moveItemToStart/moveItemToEnd di js/collections.js) yang
+  // dipakai panel Kumpulan Ayat biasa, jadi hasilnya juga otomatis
+  // berlaku di Mode Layar Penuh 1 monitor.
   function renderCollectionList() {
     const wrap = el("psCollectionList");
     const sel = el("psCollectionSelect");
@@ -348,36 +415,346 @@ const PresentationStudio = (() => {
     const username = typeof currentUser !== "undefined" ? currentUser : null;
     const collections = loadCollections(username);
     const col = collections[sel.value];
-    if (!col || !col.verseIds.length) {
-      wrap.innerHTML = '<p class="present-saved-empty">Belum ada ayat di kumpulan ini.</p>';
+    const items = col && Array.isArray(col.items) ? col.items : [];
+    if (!items.length) {
+      wrap.innerHTML = '<p class="present-saved-empty">Belum ada item di kumpulan ini.</p>';
       return;
     }
+    const reorderBtn = el("psCollectionReorderToggle");
+    const reorderOn = !!(reorderBtn && reorderBtn.classList.contains("active"));
     wrap.innerHTML = "";
-    col.verseIds.forEach((verseId) => {
-      const v = typeof verseById !== "undefined" ? verseById[verseId] : null;
-      const ref = v ? `${v.bookName} ${v.chapter}:${v.verse}` : verseId;
-      const row = document.createElement("button");
-      row.type = "button";
+    items.forEach((it, i) => {
+      const ref = genericItemRefText(it);
+      const snippet = genericItemBodyText(it).slice(0, 50);
+      const row = document.createElement("div");
       row.className = "ps-verse-row";
-      row.innerHTML = `<span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${v ? escapeHtml(v.text.slice(0, 50)) : ""}</span>`;
-      row.addEventListener("click", () => {
-        // PERBAIKAN: sebelumnya klik di sini TIDAK memperbarui kotak
-        // pratinjau "Tayang" (psPreviewBox) milik Studio sendiri --
-        // Presentation.sendVerse() hanya memperbarui pratinjau mini di
-        // panel ⋮ lama (presentPreviewBox), bukan punya Studio. Ayat
-        // TETAP tayang ke Layar 2 seperti biasa, tapi operator tidak
-        // melihat konfirmasinya di kotak "Tayang" -- jadi terasa
-        // seperti "tidak tampil". Sekarang renderStudioPreview()
-        // dipanggil juga di sini, sama seperti Ayat Cepat & Media.
-        const doSend = () => {
-          if (v && typeof Presentation !== "undefined") Presentation.sendVerse(v, v.bookName);
-          else post({ type: "text", text: ref });
-          renderStudioPreview({ type: "verse", ref, texts: [{ label: "", text: v ? v.text : ref }] });
-        };
-        stageOrSend(ref, v ? v.text : ref, doSend);
+      row.dataset.playlistIdx = String(i);
+      row.innerHTML =
+        `<div class="ps-verse-row-body"><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
+        (reorderOn
+          ? `<div class="ps-verse-row-reorder">
+              <button type="button" class="chip-btn small" data-mv="top" title="Ke paling awal"${i === 0 ? " disabled" : ""}>⏮️</button>
+              <button type="button" class="chip-btn small" data-mv="up" title="Naikkan"${i === 0 ? " disabled" : ""}>⬆️</button>
+              <button type="button" class="chip-btn small" data-mv="down" title="Turunkan"${i === items.length - 1 ? " disabled" : ""}>⬇️</button>
+              <button type="button" class="chip-btn small" data-mv="bottom" title="Ke paling akhir"${i === items.length - 1 ? " disabled" : ""}>⏭️</button>
+            </div>`
+          : "");
+      row.querySelector(".ps-verse-row-body").addEventListener("click", () => {
+        setActivePlaylist(items, i, col.name);
+        sendGenericItemLive(items[i]);
       });
+      if (reorderOn) {
+        row.querySelectorAll("[data-mv]").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            let changed = false;
+            if (btn.dataset.mv === "top") changed = moveItemToStart(username, sel.value, i);
+            else if (btn.dataset.mv === "up") changed = moveItemInCollection(username, sel.value, i, -1);
+            else if (btn.dataset.mv === "down") changed = moveItemInCollection(username, sel.value, i, 1);
+            else if (btn.dataset.mv === "bottom") changed = moveItemToEnd(username, sel.value, i);
+            if (changed) {
+              // Urutan berubah -> playlist aktif (kalau sedang menunjuk
+              // ke kumpulan ini) direset supaya tidak nyasar ke index
+              // lama yang sekarang menunjuk item berbeda -- operator
+              // tinggal klik salah satu baris lagi untuk melanjutkan
+              // dengan panah/clicker dari situ.
+              activePlaylist = null;
+              renderCollectionSelect();
+            }
+          });
+        });
+      }
       wrap.appendChild(row);
     });
+    highlightActivePlaylistRow();
+  }
+
+  // Tombol "✎ Atur Urutan" di atas daftar Kumpulan Ayat -- cuma
+  // menyalakan/mematikan tampilnya tombol mini ⏮️⬆️⬇️⏭️ (lihat
+  // renderCollectionList() di atas), TIDAK mengubah data apa pun sendiri.
+  function wireCollectionReorderToggle() {
+    const btn = el("psCollectionReorderToggle");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("active");
+      renderCollectionList();
+    });
+  }
+
+  // Tombol "🔗 Bagikan" -- membagikan SALINAN kumpulan yang sedang
+  // dipilih di dropdown ke akun pengguna lain (mengetik username lewat
+  // prompt() sederhana di sini -- panel Kumpulan Ayat biasa di js/app.js
+  // punya dialog yang lebih rapi kalau operator sempat pindah ke situ,
+  // tapi supaya tetap bisa langsung dari Studio tanpa pindah tab, di sini
+  // cukup prompt() saja). Lihat shareCollectionToUser() di js/collections.js.
+  function wireCollectionShareButton() {
+    const btn = el("psCollectionShareBtn");
+    const sel = el("psCollectionSelect");
+    if (!btn || !sel) return;
+    btn.addEventListener("click", async () => {
+      if (!sel.value) { alert("Pilih dulu Kumpulan Ayat yang mau dibagikan."); return; }
+      if (typeof Sync === "undefined" || !Sync.enabled()) {
+        alert("Berbagi ke pengguna lain butuh sambungan ke server -- sinkronisasi belum aktif.");
+        return;
+      }
+      const target = prompt("Username tujuan (kumpulan ini akan disalin + tema Layar Proyeksi yang sedang dipakai ikut disertakan):");
+      if (!target || !target.trim()) return;
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const collections = loadCollections(username);
+      const col = collections[sel.value];
+      const res = await shareCollectionToUser(username, sel.value, target.trim());
+      if (res && res.ok) alert(`Kumpulan "${col ? col.name : sel.value}" berhasil dibagikan ke "${target.trim()}".`);
+      else alert("Gagal membagikan: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+    });
+  }
+
+  // ------------------------------------------------------------
+  // "Playlist aktif" -- dipakai BERSAMA oleh daftar Kumpulan Ayat (di
+  // atas) & daftar slide Kidung (wireKidungTab() di bawah), supaya
+  // panah kiri/kanan papan ketik ATAU clicker/stylus presentasi nirkabel
+  // (yang meniru tombol panah, lihat catatan yang sama di
+  // openCollectionFullscreen() js/app.js) selalu menggerakkan APA SAJA
+  // yang TERAKHIR diklik operator -- dari item pertama yang ditampilkan
+  // sampai yang terakhir, dan bisa kembali (mundur) dengan sempurna.
+  // Item generik yang sama ({type, ...}) dipakai di kedua sumber ini,
+  // jadi 1 mesin kirim (sendGenericItemLive) cukup untuk keduanya.
+  // ------------------------------------------------------------
+  let activePlaylist = null; // { items: [...item generik...], index, label }
+
+  function setActivePlaylist(items, index, label) {
+    activePlaylist = { items: items || [], index: index || 0, label: label || "" };
+    highlightActivePlaylistRow();
+  }
+
+  function highlightActivePlaylistRow() {
+    document.querySelectorAll("#psCollectionList .ps-verse-row.active, #psKidungSlideList .ps-verse-row.active")
+      .forEach((r) => r.classList.remove("active"));
+    if (!activePlaylist) return;
+    const rowEl = document.querySelector(
+      `#psCollectionList [data-playlist-idx="${activePlaylist.index}"], #psKidungSlideList [data-playlist-idx="${activePlaylist.index}"]`
+    );
+    if (rowEl) rowEl.classList.add("active");
+  }
+
+  // Ambil ref/teks 1 item generik lewat fungsi yang SAMA dipakai panel
+  // Kumpulan Ayat biasa (js/app.js: collectionItemRef/collectionItemBodyText)
+  // -- supaya format tampilannya (termasuk kidung: nomor+judul, bait+koor)
+  // selalu konsisten di mana pun item itu muncul, tidak perlu logic ganda.
+  function genericItemRefText(it) {
+    return typeof collectionItemRef === "function" ? collectionItemRef(it) : (it && it.type) || "";
+  }
+  function genericItemBodyText(it) {
+    return typeof collectionItemBodyText === "function" ? collectionItemBodyText(it) : "";
+  }
+
+  // Kirim 1 item generik ke Layar 2 SEKARANG JUGA (live langsung, TIDAK
+  // lewat antrean "Berikutnya" -- lihat stageOrSend() di atas, yang
+  // TETAP dipakai apa adanya oleh Ayat Cepat/File/YouTube, tidak
+  // disentuh). Dipakai baik oleh klik daftar (mouse) maupun panah/
+  // clicker (wirePlaylistKeyNav()) supaya klik pertama & navigasi
+  // sesudahnya selalu terasa 1 alur yang sama, bukan 2 perilaku beda.
+  function sendGenericItemLive(it) {
+    if (!it || typeof Presentation === "undefined") return;
+    if (it.type === "verse") {
+      const v = typeof verseById !== "undefined" ? verseById[it.verseId] : null;
+      if (v) Presentation.sendVerse(v, v.bookName);
+      renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? v.text : "" }] });
+    } else if (it.type === "text") {
+      Presentation.sendFreeText(it.text || "");
+      renderStudioPreview({ type: "text", text: it.text || "" });
+    } else if (it.type === "announcement") {
+      const txt = (it.title ? it.title + "\n\n" : "") + (it.text || "");
+      Presentation.sendFreeText(txt);
+      renderStudioPreview({ type: "text", text: txt });
+    } else if (it.type === "kidung") {
+      sendKidungSlide(it);
+    }
+  }
+
+  function sendKidungSlide(it) {
+    if (typeof Presentation === "undefined" || !Presentation.sendKidung) return;
+    const payload = { ref: genericItemRefText(it), bait: it.bait || [], koorTeks: it.koorTeks || null };
+    Presentation.sendKidung(payload);
+    renderStudioPreview(Object.assign({ type: "kidung" }, payload));
+  }
+
+  function playlistGoTo(idx) {
+    if (!activePlaylist) return;
+    const items = activePlaylist.items;
+    if (idx < 0 || idx >= items.length) return;
+    activePlaylist.index = idx;
+    sendGenericItemLive(items[idx]);
+    highlightActivePlaylistRow();
+  }
+  function playlistNext() { if (activePlaylist) playlistGoTo(activePlaylist.index + 1); }
+  function playlistPrev() { if (activePlaylist) playlistGoTo(activePlaylist.index - 1); }
+
+  // Panah kiri/kanan papan ketik (dan Page Up/Down -- sebagian
+  // clicker/stylus presentasi meniru tombol ini alih-alih panah, sama
+  // seperti catatan di openCollectionFullscreen() js/app.js) HANYA aktif
+  // selagi Studio terbuka & sudah ada playlist aktif, dan TIDAK dipakai
+  // saat fokus sedang di kotak isian (select/input/textarea) supaya
+  // tidak mengganggu pemakaian normal kotak itu.
+  function wirePlaylistKeyNav() {
+    document.addEventListener("keydown", (e) => {
+      if (!activePlaylist) return;
+      const studio = el("presentStudio");
+      if (!studio || studio.hidden) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); playlistNext(); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); playlistPrev(); }
+    });
+  }
+
+  // ------------------------------------------------------------
+  // Tab "🎵 Kidung / Hymn" (tengah) -- tersambung ke sumber data Kidung
+  // yang SAMA dengan menu Kidung biasa (js/kidung.js: getKidungBooksOrdered/
+  // getKidungList/openKidungByKeypad/splitKidungIntoSlides). Operator
+  // cari nomor/judul, pilih mode pemecah slide, lalu per-slide bisa
+  // "▶️ Tayangkan" (langsung live + jadi playlist aktif utk panah/
+  // clicker) atau "➕ Daftar" (simpan ke Kumpulan Ayat lewat
+  // addKidungToCollection() di js/collections.js).
+  // ------------------------------------------------------------
+  function wireKidungTab() {
+    const bookToggleWrap = el("psKidungBookToggle");
+    const noInput = el("psKidungNoInput");
+    const goBtn = el("psKidungGoBtn");
+    const searchInput = el("psKidungSearchInput");
+    const resultsWrap = el("psKidungSearchResults");
+    const detailWrap = el("psKidungDetail");
+    const detailTitle = el("psKidungDetailTitle");
+    const backBtn = el("psKidungBackBtn");
+    const modeSelect = el("psKidungModeSelect");
+    const slideListWrap = el("psKidungSlideList");
+    const addAllBtn = el("psKidungAddAllBtn");
+    if (!bookToggleWrap || typeof getKidungBooksOrdered !== "function") return;
+
+    let currentBuku = "Kidung";
+    let currentMeta = null; // { buku, noKidung, judul, ... } dari getKidungList()
+    let currentBaits = [];  // getKidungBaitsWithKoor()
+    let currentSlides = []; // splitKidungIntoSlides()
+
+    async function renderBookToggle() {
+      const books = await getKidungBooksOrdered();
+      const list = books.length ? books : ["Kidung"];
+      bookToggleWrap.innerHTML = list.map((b) =>
+        `<button type="button" class="kidung-book-toggle-btn${b === currentBuku ? " active" : ""}" data-buku="${escapeHtml(b)}">${escapeHtml(b)}</button>`
+      ).join("");
+      bookToggleWrap.querySelectorAll(".kidung-book-toggle-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentBuku = btn.dataset.buku;
+          renderBookToggle();
+          renderSearchResults(searchInput ? searchInput.value : "");
+        });
+      });
+    }
+
+    async function renderSearchResults(query) {
+      if (!resultsWrap || typeof getKidungList !== "function") return;
+      const q = (query || "").trim().toLowerCase();
+      const list = await getKidungList(currentBuku);
+      const filtered = q ? list.filter((k) => String(k.noKidung).includes(q) || (k.judul || "").toLowerCase().includes(q)) : list;
+      resultsWrap.innerHTML = filtered.length
+        ? filtered.slice(0, 60).map((k) => `<button type="button" class="kidung-list-item" data-no="${escapeHtml(k.noKidung)}">${escapeHtml(typeof formatKidungNo === "function" ? formatKidungNo(k.buku, k.noKidung) : k.noKidung)} — ${escapeHtml(k.judul || "")}</button>`).join("")
+        : '<p class="present-saved-empty">Tidak ada kidung yang cocok.</p>';
+      resultsWrap.querySelectorAll(".kidung-list-item").forEach((btn) => {
+        btn.addEventListener("click", () => openKidung(currentBuku, btn.dataset.no));
+      });
+    }
+
+    async function openKidung(buku, no) {
+      const result = typeof openKidungByKeypad === "function" ? await openKidungByKeypad(buku, no) : null;
+      if (!result) { alert(`Kidung No. ${no} tidak ditemukan di buku ${buku}.`); return; }
+      currentMeta = Object.assign({ buku }, result.meta || { buku, noKidung: no, judul: "" });
+      currentBaits = result.baits || [];
+      if (detailWrap) detailWrap.hidden = false;
+      if (detailTitle) detailTitle.textContent = `${typeof formatKidungNo === "function" ? formatKidungNo(currentMeta.buku, currentMeta.noKidung) : currentMeta.noKidung} — ${currentMeta.judul || ""}`;
+      renderSlides();
+    }
+
+    function renderSlides() {
+      if (!slideListWrap) return;
+      if (!currentBaits.length) {
+        slideListWrap.innerHTML = '<p class="present-saved-empty">Kidung ini belum ada syairnya.</p>';
+        currentSlides = [];
+        return;
+      }
+      currentSlides = typeof splitKidungIntoSlides === "function" ? splitKidungIntoSlides(currentBaits, modeSelect ? modeSelect.value : "1+koor") : [];
+      if (!currentSlides.length) {
+        slideListWrap.innerHTML = '<p class="present-saved-empty">Tidak ada slide untuk mode ini.</p>';
+        return;
+      }
+      // Slide-slide hasil pemecahan ini SEKALIGUS jadi "item generik"
+      // (bentuk yang sama seperti item kumpulan) -- dipakai langsung
+      // sebagai playlist aktif saat salah satunya ditayangkan, TANPA
+      // perlu disimpan ke Kumpulan Ayat dulu.
+      const genericItems = currentSlides.map((s) => ({
+        type: "kidung",
+        buku: currentMeta.buku,
+        kidungNo: currentMeta.noKidung,
+        title: currentMeta.judul,
+        bait: s.baits,
+        koorTeks: s.koorTeks,
+      }));
+      slideListWrap.innerHTML = "";
+      currentSlides.forEach((slide, i) => {
+        const label = slide.onlyKoor ? "Koor" : slide.baits.map((b) => b.noBait || "?").join(",");
+        const snippet = (slide.baits.length ? slide.baits[0].teks : slide.koorTeks || "").slice(0, 60);
+        const row = document.createElement("div");
+        row.className = "ps-verse-row";
+        row.dataset.playlistIdx = String(i);
+        row.innerHTML = `<span class="ps-verse-ref">Bait ${escapeHtml(String(label))}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span>
+          <div class="ps-btn-row ps-kidung-slide-actions">
+            <button type="button" class="chip-btn small" data-act="show">▶️ Tayangkan</button>
+            <button type="button" class="chip-btn small" data-act="add">➕ Daftar</button>
+          </div>`;
+        row.querySelector('[data-act="show"]').addEventListener("click", () => {
+          setActivePlaylist(genericItems, i, detailTitle ? detailTitle.textContent : "");
+          sendGenericItemLive(genericItems[i]);
+        });
+        row.querySelector('[data-act="add"]').addEventListener("click", async () => {
+          await addSlideToCollection(genericItems[i]);
+        });
+        slideListWrap.appendChild(row);
+      });
+      highlightActivePlaylistRow();
+    }
+
+    async function addSlideToCollection(genericItem) {
+      if (typeof addKidungToCollection !== "function") return;
+      const sel = el("psCollectionSelect");
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
+      if (!name) return;
+      addKidungToCollection(username, name, genericItem);
+      renderCollectionSelect();
+    }
+
+    if (backBtn) backBtn.addEventListener("click", () => { if (detailWrap) detailWrap.hidden = true; });
+    if (goBtn) goBtn.addEventListener("click", () => { if (noInput && noInput.value.trim()) openKidung(currentBuku, noInput.value.trim()); });
+    if (noInput) noInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goBtn.click(); } });
+    if (searchInput) searchInput.addEventListener("input", () => renderSearchResults(searchInput.value));
+    if (modeSelect) modeSelect.addEventListener("change", renderSlides);
+    if (addAllBtn) {
+      addAllBtn.addEventListener("click", async () => {
+        if (!currentMeta || !currentSlides.length) return;
+        const sel = el("psCollectionSelect");
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
+        if (!name) return;
+        currentSlides.forEach((slide) => {
+          addKidungToCollection(username, name, {
+            buku: currentMeta.buku, kidungNo: currentMeta.noKidung, title: currentMeta.judul,
+            bait: slide.baits, koorTeks: slide.koorTeks,
+          });
+        });
+        renderCollectionSelect();
+      });
+    }
+
+    renderBookToggle();
+    renderSearchResults("");
   }
 
   // ------------------------------------------------------------
@@ -417,9 +794,21 @@ const PresentationStudio = (() => {
           ${showGrid ? `<button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
           ${isYt ? `<button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai audio latar (video disembunyikan)">🎧</button>` : ""}
+          ${!isYt ? `<button type="button" class="chip-btn small" data-act="copyname" title="Salin nama file ini">📋</button>` : ""}
+          ${!isYt ? `<button type="button" class="chip-btn small" data-act="download" title="Unduh halaman yang sedang ditampilkan sebagai gambar">⬇️</button>` : ""}
+          ${item.originalFile ? `<button type="button" class="chip-btn small" data-act="downloadOriginal" title="Unduh file PDF ASLI (utuh, bukan gambar per halaman)">⬇️ PDF Asli</button>` : ""}
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
       itemWrap.appendChild(row);
+      const downloadOriginalBtn = row.querySelector('[data-act="downloadOriginal"]');
+      if (downloadOriginalBtn) downloadOriginalBtn.addEventListener("click", () => {
+        const a = document.createElement("a");
+        a.href = item.originalFile;
+        a.download = (item.sourceFileName || item.name || "berkas").replace(/\.pdf$/i, "") + ".pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
       const countEl = row.querySelector('[data-role="count"]');
       function updateCount() { if (countEl) countEl.textContent = `${idx + 1}/${images.length}`; }
       function doSend() {
@@ -442,6 +831,35 @@ const PresentationStudio = (() => {
       // saat presentasi sedang berjalan, sama seperti slide gambar/PDF.
       if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
       if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
+      // "📋" Salin NAMA FILE saja (bukan isinya -- PDF/gambar/Word tidak
+      // punya bentuk teks yang masuk akal buat disalin, cuma namanya yang
+      // berguna, mis. buat ditempel ke rundown acara). Nama yang disalin =
+      // nama file ASLI saat diunggah (sourceFileName) kalau ada, jatuh ke
+      // nama simpanan (item.name) kalau tidak.
+      const copyNameBtn = row.querySelector('[data-act="copyname"]');
+      if (copyNameBtn) copyNameBtn.addEventListener("click", () => {
+        copyTextWithFeedback(item.sourceFileName || item.name, copyNameBtn);
+      });
+      // "⬇️" Unduh halaman/gambar yang SEDANG ditampilkan (idx saat ini).
+      // PENTING: untuk PDF yang diunggah, aplikasi ini menyimpan hasil
+      // RENDER tiap halaman sebagai gambar (lihat catatan "images" di
+      // js/collections.js) -- BUKAN berkas .pdf aslinya (tidak disimpan
+      // sama sekali, supaya tidak boros ruang IndexedDB). Jadi unduhan
+      // untuk item PDF akan berbentuk gambar per halaman (.png), bukan
+      // file .pdf utuh -- ini keterbatasan yang disengaja, bukan bug.
+      const downloadBtn = row.querySelector('[data-act="download"]');
+      if (downloadBtn) downloadBtn.addEventListener("click", () => {
+        const url = images[idx];
+        if (!url) return;
+        const a = document.createElement("a");
+        a.href = url;
+        const base = (item.sourceFileName || item.name || "berkas").replace(/\.(pdf|docx?|pptx?)$/i, "");
+        const ext = (url.match(/^data:image\/(\w+)/) || [, "png"])[1];
+        a.download = multi ? `${base} - hal ${idx + 1}.${ext}` : `${base}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
       const gridBtn = row.querySelector('[data-act="grid"]');
       if (gridBtn && showGrid) {
         const gridWrap = document.createElement("div");
@@ -952,6 +1370,92 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // BARU -- Word (.docx) diunggah & diubah jadi gambar per "halaman",
+  // sama pola dengan PDF di atas (pdf.js), memakai mammoth.js (dimuat
+  // lazy dari CDN, hanya saat ada .docx diunggah). mammoth hanya bisa
+  // membaca TEKS (extractRawText) -- gambar/tabel/format asli di dalam
+  // dokumen Word TIDAK ikut tersalin, hanya teksnya -- lalu teks itu
+  // kita bungkus (word-wrap) & pisah per "halaman" sendiri lewat
+  // <canvas>. PENTING: Word tidak punya jumlah baris/halaman yang tetap
+  // seperti PDF (mengalir bebas, tergantung ukuran kertas & font
+  // aslinya) -- jadi pembagian halaman di sini PERKIRAAN saja (dipotong
+  // ulang per sekitar 12 baris), bukan sama persis dengan tampilan di
+  // Microsoft Word. Format lama .doc (bukan .docx) TIDAK didukung
+  // mammoth -- pengguna diarahkan menyimpan ulang sebagai .docx atau PDF.
+  // ------------------------------------------------------------
+  const MAMMOTH_VERSION = "1.6.0";
+  let mammothLoadPromise = null;
+  function loadMammoth() {
+    if (window.mammoth) return Promise.resolve(window.mammoth);
+    if (mammothLoadPromise) return mammothLoadPromise;
+    mammothLoadPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = `https://cdnjs.cloudflare.com/ajax/libs/mammoth/${MAMMOTH_VERSION}/mammoth.browser.min.js`;
+      s.onload = () => resolve(window.mammoth);
+      s.onerror = () => reject(new Error("Gagal memuat pustaka pembaca Word (cek koneksi internet)."));
+      document.head.appendChild(s);
+    });
+    return mammothLoadPromise;
+  }
+
+  function wrapTextLines(ctx, text, maxWidth) {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (!words.length) return [""];
+    const lines = [];
+    let line = "";
+    words.forEach((w) => {
+      const test = line ? line + " " + w : w;
+      if (line && ctx.measureText(test).width > maxWidth) {
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  async function docxFileToImages(file) {
+    const mammoth = await loadMammoth();
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    const rawText = ((result && result.value) || "").trim();
+    if (!rawText) throw new Error("Berkas ini tidak berisi teks yang bisa dibaca (mungkin isinya cuma gambar/tabel).");
+
+    const W = 1280, H = 720, PAD_X = 90, PAD_Y = 80, LINE_H = 46, FONT = "30px 'Literata', Georgia, serif";
+    const LINES_PER_PAGE = Math.floor((H - PAD_Y * 2) / LINE_H);
+
+    const measureCanvas = document.createElement("canvas");
+    const mctx = measureCanvas.getContext("2d");
+    mctx.font = FONT;
+
+    const allLines = [];
+    rawText.split(/\n+/).map((p) => p.trim()).filter(Boolean).forEach((para) => {
+      wrapTextLines(mctx, para, W - PAD_X * 2).forEach((l) => allLines.push(l));
+      allLines.push(""); // baris kosong pemisah antar paragraf
+    });
+    while (allLines.length && allLines[allLines.length - 1] === "") allLines.pop();
+
+    const pages = [];
+    for (let i = 0; i < allLines.length; i += LINES_PER_PAGE) pages.push(allLines.slice(i, i + LINES_PER_PAGE));
+    if (!pages.length) pages.push([""]);
+
+    return pages.map((lines) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#1a1a1a";
+      ctx.font = FONT;
+      ctx.textBaseline = "top";
+      lines.forEach((line, i) => ctx.fillText(line, PAD_X, PAD_Y + i * LINE_H));
+      return canvas.toDataURL("image/jpeg", 0.92);
+    });
+  }
+
+  // ------------------------------------------------------------
   // Grid mini-preview (thumbnail) untuk file bertumpuk halaman (PDF/
   // pptx-jadi-gambar) -- dipakai di tab File (sebelum disimpan) MAUPUN
   // di "🖼️ Media Tersimpan" (sesudah disimpan), supaya operator bisa
@@ -1011,9 +1515,14 @@ const PresentationStudio = (() => {
       renderStudioPreview({ type: "slide", imageUrl: url });
     }
 
-    function buildRow(file, images, statusText) {
-      // `images`: array data-URL (1 gambar biasa = 1 elemen; PDF = 1 per
-      // halaman). `idx` = slide yang sedang aktif untuk file ini.
+    function buildRow(file, images, statusText, originalFileDataUrl) {
+      // `images`: array data-URL (1 gambar biasa = 1 elemen; PDF/Word = 1
+      // per halaman). `idx` = slide yang sedang aktif untuk file ini.
+      // `originalFileDataUrl` -- BARU, hanya terisi kalau file ini PDF DAN
+      // kotak centang "Simpan juga file PDF asli" (psKeepOriginalPdf)
+      // dicentang saat diunggah -- disimpan APA ADANYA (bukan hasil
+      // render) supaya nanti bisa diunduh utuh sebagai .pdf, bukan cuma
+      // gambar per halaman (lihat tombol "⬇️ PDF Asli" di renderMediaList()).
       const wrapper = document.createElement("div");
       wrapper.className = "ps-file-item";
       const row = document.createElement("div");
@@ -1053,8 +1562,14 @@ const PresentationStudio = (() => {
         const username = typeof currentUser !== "undefined" ? currentUser : null;
         const name = await promptSaveName("media", username, file.name.replace(/\.[^.]+$/, ""));
         if (name === null) return; // dibatalkan
-        const id = await addMediaItem(username, name, images, file.name);
-        if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh? coba hapus item Media Tersimpan lama, atau kosongkan sedikit ruang penyimpanan perangkat)."); return; }
+        // BARU (Tahap 3, lihat ROADMAP-drive-sync.md) -- kotak centang
+        // "☁️ Sinkron ke akun" (psSyncToDrive di index.html), pola sama
+        // seperti psKeepOriginalPdf di atas. Kalau dicentang, addMediaItem()
+        // di js/collections.js akan mengunggah berkas ini ke Drive di
+        // LATAR BELAKANG (tidak memblokir "✅ Tersimpan" di bawah).
+        const syncToDriveBox = el("psSyncToDrive");
+        const id = await addMediaItem(username, name, images, file.name, null, null, originalFileDataUrl || null, !!(syncToDriveBox && syncToDriveBox.checked));
+        if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh? coba hapus item Media Tersimpan lama, atau kosongkan sedikit ruang penyimpanan perangkat -- kalau baru saja mencentang \"Simpan file PDF asli\", coba matikan centang itu, berkas PDF asli cukup boros ruang)."); return; }
         renderMediaList();
         addBtn.textContent = "✅ Tersimpan";
         setTimeout(() => { addBtn.textContent = "➕ Daftar"; }, 1200);
@@ -1064,11 +1579,14 @@ const PresentationStudio = (() => {
     }
 
     function handleFiles(files) {
+      const keepOriginalPdfBox = el("psKeepOriginalPdf");
       Array.from(files || []).forEach((file) => {
         if (file.size > 25 * 1024 * 1024) { alert(`${file.name}: melebihi 25MB.`); return; }
         const isImage = /^image\//.test(file.type);
         const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
         const isPptx = /\.pptx?$/i.test(file.name);
+        const isDocx = /\.docx$/i.test(file.name);
+        const isOldDoc = /\.doc$/i.test(file.name) && !isDocx;
 
         if (isImage) {
           const reader = new FileReader();
@@ -1080,8 +1598,12 @@ const PresentationStudio = (() => {
         if (isPdf) {
           const row = buildRow(file, [], "mengonversi…");
           list.appendChild(row);
-          pdfFileToImages(file).then((images) => {
-            row.replaceWith(buildRow(file, images, `${images.length} halaman`));
+          const wantsOriginal = !!(keepOriginalPdfBox && keepOriginalPdfBox.checked);
+          const originalPromise = wantsOriginal
+            ? new Promise((resolve) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => resolve(null); r.readAsDataURL(file); })
+            : Promise.resolve(null);
+          Promise.all([pdfFileToImages(file), originalPromise]).then(([images, originalDataUrl]) => {
+            row.replaceWith(buildRow(file, images, `${images.length} halaman` + (originalDataUrl ? " (+ file asli disimpan)" : ""), originalDataUrl));
           }).catch((err) => {
             row.querySelector(".ps-file-status").textContent = "gagal dikonversi";
             console.error(err);
@@ -1090,12 +1612,30 @@ const PresentationStudio = (() => {
           return;
         }
 
+        if (isDocx) {
+          const row = buildRow(file, [], "mengonversi…");
+          list.appendChild(row);
+          docxFileToImages(file).then((images) => {
+            row.replaceWith(buildRow(file, images, `${images.length} halaman (perkiraan, teks saja)`));
+          }).catch((err) => {
+            row.querySelector(".ps-file-status").textContent = "gagal dikonversi";
+            console.error(err);
+            alert(`Gagal mengonversi ${file.name}: ${err.message || err}`);
+          });
+          return;
+        }
+
+        if (isOldDoc) {
+          alert(`${file.name}: format .doc lama belum didukung. Buka di Word, lalu "Save As" -> pilih .docx (atau PDF), baru unggah lagi di sini.`);
+          return;
+        }
+
         if (isPptx) {
           alert(`${file.name}: konversi pptx langsung belum tersedia (perlu mesin render PowerPoint yang berat). Untuk hasil persis sama, simpan file ini sebagai PDF dari PowerPoint lalu unggah PDF-nya di sini -- akan otomatis dipecah per halaman.`);
           return;
         }
 
-        alert(`${file.name}: jenis file ini belum didukung. Gunakan pptx, pdf, jpg, png, webp, atau gif.`);
+        alert(`${file.name}: jenis file ini belum didukung. Gunakan pptx, pdf, docx, jpg, png, webp, atau gif.`);
       });
     }
   }
@@ -1624,6 +2164,23 @@ const PresentationStudio = (() => {
     rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
   }
 
+  // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
+  // (tombol di panel Kumpulan Ayat) saat kumpulan yang diterima dari
+  // akun lain membawa metadata tema (lihat shareCollectionToUser_() di
+  // apps-script/Code.gs -- tema TERSIMPAN sejak awal, cuma belum ada
+  // cara menerapkannya di sisi penerima sebelum fungsi ini ada).
+  // Bentuknya PERSIS sama dengan objek yang tersimpan di THEME_KEY
+  // ({ swatch, bgColor, ink, font, scale }), jadi tinggal ditimpakan
+  // lalu dipanggil ulang applyStoredTheme() supaya panel & Layar 2
+  // (kalau sedang terbuka) langsung ikut berubah.
+  function applySharedTheme(theme) {
+    if (!theme || typeof theme !== "object") return false;
+    const merged = { ...DEFAULT_STAGE_THEME, ...theme };
+    localStorage.setItem(THEME_KEY, JSON.stringify(merged));
+    applyStoredTheme();
+    return true;
+  }
+
 
   // ------------------------------------------------------------
   // Tema PANEL Studio (dark/light) -- terpisah total dari "Tema Layar
@@ -1809,6 +2366,10 @@ const PresentationStudio = (() => {
     wireClock();
     wireYoutubeTab();
     wireYtControls();
+    wireKidungTab();
+    wirePlaylistKeyNav();
+    wireCollectionReorderToggle();
+    wireCollectionShareButton();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
     // Jalan pintas di header utama (index.html, ikon 🎛️ -- khusus laptop/
@@ -1833,5 +2394,5 @@ const PresentationStudio = (() => {
     });
   }
 
-  return { init, openStudio, closeStudio, refreshGuestGate };
+  return { init, openStudio, closeStudio, refreshGuestGate, applySharedTheme };
 })();
