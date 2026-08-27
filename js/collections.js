@@ -529,7 +529,21 @@ function _genMediaId() {
   return "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 }
 
-async function addMediaItem(username, name, images, sourceFileName, type, videoLabels, originalFileDataUrl, syncToDrive) {
+// `onSyncResult(ok, errorMessage)` -- BARU (27 Agu 2026), OPSIONAL --
+// dipanggil belakangan (setelah addMediaItem() sendiri sudah selesai
+// & mengembalikan id-nya) begitu upload ke Drive di latar belakang
+// SELESAI, entah berhasil atau gagal. Sebelum ini, kalau "☁️ Sinkron
+// ke akun" dicentang tapi upload gagal (mis. deployment Apps Script
+// belum di-redeploy ulang setelah DriveApp ditambahkan, sehingga izin
+// akses Drive belum disetujui -- kesalahan paling umum), pemanggil
+// (presentation-studio.js) TIDAK PERNAH tahu -- "✅ Tersimpan" tetap
+// muncul (itu benar, penyimpanan LOKAL memang berhasil) tapi tidak ada
+// petunjuk sama sekali kenapa filenya tidak pernah muncul di folder
+// "BookApp Media" di Drive. Callback ini TIDAK mengubah alur/hasil
+// penyimpanan lokal sama sekali (tetap best-effort seperti sebelumnya,
+// lihat catatan di bawah) -- cuma tambahan jalur untuk MELAPORKAN hasil
+// akhirnya ke UI, supaya kegagalan tidak lagi diam-diam tak terlihat.
+async function addMediaItem(username, name, images, sourceFileName, type, videoLabels, originalFileDataUrl, syncToDrive, onSyncResult) {
   const trimmedName = (name || "").trim();
   if (!trimmedName || !images || !images.length) return null;
   const now = new Date().toISOString();
@@ -572,15 +586,33 @@ async function addMediaItem(username, name, images, sourceFileName, type, videoL
   // keamanan/fallback yang sama di js/sync.js pushCollection dkk).
   if (syncToDrive && typeof Sync !== "undefined" && typeof Sync.uploadMedia === "function") {
     const uploadSource = originalFileDataUrl || images[0] || null;
-    if (uploadSource) {
+    if (!uploadSource) {
+      if (typeof onSyncResult === "function") onSyncResult(false, "Tidak ada berkas untuk diunggah.");
+    } else if (!Sync.enabled()) {
+      // CONFIG.APPS_SCRIPT_URL belum diisi sama sekali -- beda dari
+      // "gagal karena offline", jadi dilaporkan beda pesannya supaya
+      // tidak membingungkan (pengguna tidak akan mengira internetnya
+      // yang bermasalah, padahal memang belum dikonfigurasi).
+      if (typeof onSyncResult === "function") onSyncResult(false, "Sinkron belum dikonfigurasi (CONFIG.APPS_SCRIPT_URL kosong).");
+    } else {
       Sync.uploadMedia(username, sourceFileName || trimmedName, uploadSource)
         .then((fileId) => {
-          if (!fileId || typeof LocalDB === "undefined") return;
-          item.driveFileId = fileId;
-          item.updatedAt = new Date().toISOString();
-          LocalDB.putMediaItem(item).catch(() => {});
+          if (!fileId) {
+            if (typeof onSyncResult === "function") {
+              onSyncResult(false, "Server menolak/tidak membalas fileId (cek deployment Apps Script sudah versi terbaru & izin akses Drive sudah disetujui).");
+            }
+            return;
+          }
+          if (typeof LocalDB !== "undefined") {
+            item.driveFileId = fileId;
+            item.updatedAt = new Date().toISOString();
+            LocalDB.putMediaItem(item).catch(() => {});
+          }
+          if (typeof onSyncResult === "function") onSyncResult(true, null);
         })
-        .catch(() => {});
+        .catch((e) => {
+          if (typeof onSyncResult === "function") onSyncResult(false, "Jaringan/permintaan gagal: " + String((e && e.message) || e));
+        });
     }
   }
   return item.id;
