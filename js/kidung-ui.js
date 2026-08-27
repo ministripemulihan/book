@@ -1,4 +1,4 @@
-// ============================================================ 
+// ============================================================
 //  UI "🎵 Kidung" — MENU UTAMA (bukan Studio Presentasi), dibuka dari
 //  menu ☰ / "Lainnya" seperti "📚 Kumpulan Ayat" dkk, supaya bisa
 //  langsung dipakai di HP maupun komputer. Lapisan data (sinkron,
@@ -746,6 +746,115 @@ function toggleKidungFavorite(meta) {
   localStorage.setItem(KIDUNG_FAVORITES_KEY, JSON.stringify(list));
   return idx === -1; // true = baru ditambahkan
 }
+// ------------------------------------------------------------
+// BARU (27 Agu 2026) -- "📚 Kumpulan" di layar baca Kidung biasa (menu
+// ☰, BUKAN Studio Presentasi). Sebelum ini, hanya ayat Alkitab yang
+// bisa ditambah ke Kumpulan Ayat dari layar baca (handleAddToCollection
+// di js/app.js) -- kidung sudah BISA ditambahkan (addKidungToCollection,
+// js/collections.js) tapi HANYA lewat tab Kidung di Studio Presentasi
+// (js/presentation-studio.js wireKidungTab). Tombol ini menutup celah
+// itu: dialog SAMA persis (pilih kumpulan yang sudah ada / buat baru,
+// lihat showSimpleDialog di js/app.js) tapi memanggil
+// splitKidungIntoSlides() (js/kidung.js, mode default "1+koor" -- SAMA
+// seperti default modeSelect di Studio) supaya lagunya masuk sebagai
+// beberapa slide (1 per bait + koor), bukan 1 blok teks raksasa --
+// konsisten dengan bentuk item yang sudah dipakai kalau ditambah dari
+// Studio. Fungsi loadCollections/showSimpleDialog/addKidungToCollection
+// didefinisikan di app.js/collections.js yang di-load SEBELUM tombol
+// ini sempat diklik pengguna, jadi aman dipanggil di sini walau file
+// kidung-ui.js sendiri di-load lebih dulu di index.html.
+// ------------------------------------------------------------
+function handleAddKidungToCollection(meta, baits) {
+  if (!meta || !baits || !baits.length) return;
+  if (typeof loadCollections !== "function" || typeof showSimpleDialog !== "function"
+    || typeof addKidungToCollection !== "function") return;
+
+  const slides = typeof splitKidungIntoSlides === "function"
+    ? splitKidungIntoSlides(baits, "1+koor")
+    : [{ baits: baits, koorTeks: null }];
+  if (!slides.length) { alert("Kidung ini belum ada syairnya untuk disimpan."); return; }
+
+  const username = (typeof currentUser !== "undefined" && currentUser) || "guest";
+  const collections = loadCollections(username);
+  const ids = Object.keys(collections).sort(
+    (a, b) => new Date(collections[b].updatedAt || collections[b].createdAt || 0)
+      - new Date(collections[a].updatedAt || collections[a].createdAt || 0)
+  );
+
+  showSimpleDialog("📚 Simpan ke Kumpulan Ayat", (box) => {
+    const field1 = document.createElement("div");
+    field1.className = "simple-dialog-field";
+    const label1 = document.createElement("label");
+    label1.textContent = "Kumpulan ayat:";
+    field1.appendChild(label1);
+    const select = document.createElement("select");
+    ids.forEach((id) => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      const n = (collections[id].items || collections[id].verseIds || []).length;
+      opt.textContent = `${collections[id].name} (${n} item)`;
+      select.appendChild(opt);
+    });
+    const newOpt = document.createElement("option");
+    newOpt.value = "__new__";
+    newOpt.textContent = "+ Buat kumpulan baru…";
+    select.appendChild(newOpt);
+    field1.appendChild(select);
+    box.appendChild(field1);
+
+    const field2 = document.createElement("div");
+    field2.className = "simple-dialog-field";
+    const label2 = document.createElement("label");
+    label2.textContent = "Nama kumpulan baru:";
+    field2.appendChild(label2);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = 'mis. "SPR 17 Agustus 2026"';
+    field2.appendChild(input);
+    box.appendChild(field2);
+
+    function syncFieldVisibility() {
+      field2.hidden = select.value !== "__new__";
+      if (!field2.hidden) input.focus();
+    }
+    if (!ids.length) select.value = "__new__";
+    select.addEventListener("change", syncFieldVisibility);
+    syncFieldVisibility();
+
+    return () => {
+      if (select.value === "__new__") {
+        const name = input.value.trim();
+        if (!name) { input.focus(); return null; }
+        return name;
+      }
+      return collections[select.value].name;
+    };
+  }, (name) => {
+    slides.forEach((s) => {
+      addKidungToCollection(username, name, {
+        buku: meta.buku,
+        kidungNo: meta.noKidung,
+        title: meta.judul || "",
+        bait: s.baits,
+        koorTeks: s.koorTeks,
+      });
+    });
+    if (typeof logActivity === "function") logActivity("Simpan Kidung ke Kumpulan Ayat");
+    alert(`Kidung disimpan ke kumpulan "${name}" (${slides.length} slide).`);
+  }, "Simpan");
+}
+
+function kidungCollectionButton(meta, baits) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "square-media-btn";
+  btn.textContent = "📚";
+  btn.title = "Simpan ke Kumpulan Ayat";
+  btn.setAttribute("aria-label", btn.title);
+  btn.addEventListener("click", () => handleAddKidungToCollection(meta, baits));
+  return btn;
+}
+
 function kidungFavoriteButton(meta) {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -934,6 +1043,7 @@ function buildKidungToolbar(meta, baits) {
   }
 
   middle.appendChild(kidungFavoriteButton(meta));
+  middle.appendChild(kidungCollectionButton(meta, baits));
 
   const copyBtn = buildKidungCopyButton(meta, baits);
   copyBtn.classList.add("square-media-btn");
