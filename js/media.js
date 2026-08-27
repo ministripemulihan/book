@@ -681,7 +681,7 @@ async function buildMediaPlan(sheet) {
 // Menarik ulang data TERBARU dari Google Sheet untuk rencana yang sedang
 // aktif (kalau rencana itu berbasis Bacaan Bersuara), lalu memasang
 // kembali link/labelnya -- progres centang yang sudah ada TETAP dijaga
-// (dicocokkan berdasar urutan/index hari, bukan dihapus dan mulai dari 0).
+// (dicocokkan berdasar urutan/index hari, bukan dihapus dan mulai dari 0). 
 async function resyncMediaPlan(plan) {
   const sheet = (CONFIG.READING_MEDIA_SHEETS || []).find((s) => s.key === plan.mediaSheetKey);
   if (!sheet || !sheet.csvUrl) throw new Error("Sheet Bacaan Bersuara ini sudah tidak ada di konfigurasi.");
