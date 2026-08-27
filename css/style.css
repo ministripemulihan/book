@@ -133,6 +133,11 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
   --rule: #F5E08A; --petrol: #C6712B; --petrol-dark: #9C551E; --brass: #D48F52;
   --brass-soft: #F5E08A; --danger: #C0392B;
 }
+html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: latar biru navy pekat, tulisan putih murni) */
+  --paper: #0B1730; --paper-raised: #132241; --ink: #FFFFFF; --ink-soft: #C7D3E8;
+  --rule: #1F3355; --petrol: #7FB4EE; --petrol-dark: #5A8FCB; --brass: #FFD84A;
+  --brass-soft: #4C4020; --danger: #FF8A7A; --shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
 .theme-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 4px 0; }
 
 /* Pemilih jenis huruf (Roboto / tebal ala Arial Black / Comic Sans anak-anak) */
@@ -438,7 +443,17 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .collection-voice-row { display: flex; align-items: center; gap: 6px; margin: 0 0 14px; font-size: 0.95em; }
 .collection-voice-row select { margin-left: 6px; }
 .col-play-btn.playing { background: var(--brass, #b8860b); color: #1a1206; font-weight: 700; }
-.col-move-up-btn:disabled, .col-move-down-btn:disabled { opacity: 0.35; cursor: default; }
+.col-move-up-btn:disabled, .col-move-down-btn:disabled, .col-move-top-btn:disabled, .col-move-bottom-btn:disabled { opacity: 0.35; cursor: default; }
+/* Kotak "Pindah ke urutan ke-#" -- pelengkap ⏮️/⬆️/⬇️/⏭️ di atas untuk
+   menaruh 1 item LANGSUNG ke urutan tengah manapun tanpa klik berkali-
+   kali (lihat moveItemToPosition() di js/collections.js), hanya
+   ditampilkan kalau kumpulannya sudah lebih dari 2 item. */
+.collection-verse-moveto {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 6px; font-size: 12px; color: var(--ink-soft);
+}
+.collection-verse-moveto label { display: flex; align-items: center; gap: 6px; }
+.col-move-to-input { width: 56px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font-size: 12px; }
 .chip-btn.small { padding: 5px 10px; font-size: 12px; }
 .chip-btn.danger { color: var(--danger); border-color: var(--danger); }
 .chip-btn.danger:hover { background: var(--danger); color: #fff; }
@@ -478,6 +493,9 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
   background: var(--paper-raised); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
 }
 .simple-dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+/* Keterangan kecil di dalam dialog (mis. penjelasan "🔗 Bagikan Kumpulan"
+   -- lihat handleShareCollection() di js/app.js). */
+.simple-dialog-hint { font-size: 12px; color: var(--ink-soft); margin: -6px 0 14px; line-height: 1.5; }
 
 /* ============================================================
    MODE LAYAR PENUH — KUMPULAN AYAT (satu ayat per layar, besar,
@@ -508,6 +526,12 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 #ttsRecordBtn.recording { background: var(--danger); color: #fff; border-color: var(--danger); }
 .collection-fs-ref { font-family: var(--font-ui); font-weight: 700; color: var(--brass); font-size: 16px; }
 .collection-fs-text { font-family: var(--font-body); font-weight: var(--font-body-weight, 400); line-height: 1.6; }
+/* Baris koor kidung di Mode Layar Penuh (js/app.js: collectionItemBodyHtml())
+   -- kuning, meniru tampilan koor di Layar 2 Studio Presentasi (lihat
+   #kidungKoor di present.html) supaya konsisten dipakai dengan/tanpa
+   monitor kedua. */
+.collection-fs-koor { color: #ffd84a; font-weight: 600; }
+.collection-fs-gap { display: block; height: 4px; }
 .collection-fs-note {
   max-width: 640px; padding: 14px 18px; background: var(--paper-raised);
   border-left: 3px solid var(--brass); border-radius: 8px; text-align: left;
@@ -516,6 +540,22 @@ html.theme-17 { /* Kuning - Oranye Pastel (sesuai permintaan: latar kuning, tuli
 .collection-fs-note-label { font-style: normal; font-weight: 700; margin-bottom: 6px; color: var(--ink); }
 .collection-fs-nav { display: flex; gap: 12px; margin-top: 20px; }
 .collection-fs-hint { font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
+/* BARU -- kartu 🔔 "Kiriman Menunggu Persetujuan" (lihat
+   renderPendingSharesInto() di js/app.js), tampil di atas panel Kumpulan
+   Ayat kalau ada kiriman 🔗Bagikan dari akun lain yang belum
+   diterima/ditolak. */
+.collection-pending-box {
+  background: var(--paper-raised); border: 1px solid var(--brass); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+}
+.collection-pending-title { margin: 0 0 10px; font-size: 15px; color: var(--brass); }
+.collection-pending-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--rule);
+}
+.collection-pending-card:first-of-type { border-top: none; }
+.collection-pending-info { font-size: 14px; line-height: 1.4; }
+.collection-pending-actions { display: flex; gap: 8px; flex-shrink: 0; }
 @media (max-width: 640px) {
   .collection-fs-nav { width: 100%; }
   .collection-fs-nav .chip-btn { flex: 1; }
@@ -939,6 +979,7 @@ input { font-family: inherit; }
 .icon-btn:hover { background: var(--rule); }
 
 .brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.brand-mark { color: var(--petrol); font-size: 20px; }
 .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
 
 .search-form {
@@ -2365,11 +2406,18 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   text-align: center;
 }
 .admin-bell-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  /* PERBAIKAN mobile: dulu position:absolute relatif ke .admin-bell-wrap
+     yang ada di dalam .header-actions (overflow-x:auto di HP -- lihat
+     catatan panjang di index.html) sehingga panel ini terpotong tak
+     kelihatan begitu dibuka di HP. Sekarang position:fixed (lepas dari
+     kotak mana pun) dengan top/left dihitung & diperbarui oleh
+     positionPanel() di js/adminbell.js setiap kali dibuka/di-resize/
+     di-scroll, supaya selalu pas di bawah tombol lonceng 🔔 di ukuran
+     layar apa pun, termasuk saat header ikonnya sedang digeser di HP. */
+  position: fixed;
   z-index: 400;
   width: 260px;
+  max-width: calc(100vw - 24px);
   background: var(--paper-raised);
   border: 1px solid var(--rule);
   border-radius: 12px;
@@ -2381,7 +2429,7 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .admin-bell-breakdown { margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; }
 
 @media (max-width: 640px) {
-  .admin-bell-panel { width: 220px; right: -8px; }
+  .admin-bell-panel { width: 220px; }
 }
 
 /* ============================================================
@@ -2509,12 +2557,54 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 
 .ps-verse-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .ps-verse-row {
-  text-align: left; background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px;
-  padding: 8px 10px; cursor: pointer; color: var(--ps-ink);
+  background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px;
+  padding: 8px 10px; color: var(--ps-ink);
 }
 .ps-verse-row:hover { border-color: var(--brass); }
 .ps-verse-ref { display: block; font-weight: 700; font-size: 12.5px; color: var(--brass-soft); }
 .ps-verse-snippet { display: block; font-size: 12px; color: var(--ps-ink-soft); margin-top: 2px; }
+/* Bagian yang bisa diklik untuk tayang (dulu seluruh baris <button>,
+   sekarang dipecah supaya tombol mini ⏮️⬆️⬇️⏭️ di sebelahnya -- lihat
+   .ps-verse-row-reorder di bawah -- tidak ikut ke-klik "tayang" tiap
+   ditekan). */
+.ps-verse-row-body { cursor: pointer; text-align: left; }
+/* Baris tombol mini urutan (⏮️⬆️⬇️⏭️), tampil hanya kalau "✎ Atur Urutan"
+   sedang aktif -- lihat renderCollectionList() di
+   js/presentation-studio.js & tombol #psCollectionReorderToggle. */
+.ps-verse-row-reorder { display: flex; gap: 4px; margin-top: 6px; }
+.ps-verse-row-reorder .chip-btn { padding: 3px 7px; font-size: 12px; }
+.ps-verse-row-reorder .chip-btn:disabled { opacity: 0.3; cursor: default; }
+.ps-collection-select-row { display: flex; align-items: center; gap: 6px; }
+.ps-collection-select-row select { flex: 1; min-width: 0; }
+#psCollectionReorderToggle.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+/* Item yang sedang "aktif" di playlist yang dikendalikan panah kiri/
+   kanan papan ketik atau clicker/stylus presentasi (lihat activePlaylist
+   & wirePlaylistKeyNav() di js/presentation-studio.js) -- baik daftar
+   Kumpulan Ayat MAUPUN daftar slide Kidung memakai kelas yang sama. */
+.ps-verse-row.active { border-color: var(--brass); background: rgba(216, 180, 92, .16); box-shadow: 0 0 0 1px var(--brass) inset; }
+
+/* Detail 1 kidung di tab "🎵 Kidung / Hymn" Studio Presentasi (kolom
+   tengah) -- daftar buku/nomor/pencarian di ATASnya memakai class
+   .kidung-* yang SAMA dengan panel Kidung biasa (js/kidung-ui.js),
+   jadi tidak perlu gaya baru untuk bagian itu. */
+.ps-kidung-detail { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ps-col-border); }
+.ps-kidung-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ps-kidung-detail-title { font-weight: 700; font-size: 14px; color: var(--ps-ink); }
+.ps-kidung-slide-actions { margin-top: 6px; }
+/* Tab Kidung Studio memakai class .kidung-book-toggle-btn/.kidung-list-item
+   dkk. YANG SAMA dengan panel Kidung biasa (js/kidung-ui.js) supaya tidak
+   perlu markup/JS baru untuk bagian ini -- tapi warnanya ditimpa di sini
+   supaya cocok dengan panel Studio yang SELALU gelap/terang sendiri
+   (var(--ps-*)), bukan ikut tema baca Alkitab utama (var(--paper-raised)
+   dkk, yang warnanya beda kalau tema utama sedang terang). */
+#presentStudio .kidung-book-toggle-btn,
+#presentStudio .kidung-number-input,
+#presentStudio .kidung-search-input,
+#presentStudio .kidung-list-item {
+  background: var(--ps-card-bg); color: var(--ps-ink); border-color: var(--ps-card-border);
+}
+#presentStudio .kidung-book-toggle-btn.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+#presentStudio .kidung-list-item:hover { border-color: var(--brass); color: var(--brass); }
 
 .ps-color-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .ps-color-chip {
