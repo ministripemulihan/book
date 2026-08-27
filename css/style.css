@@ -2606,6 +2606,38 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 #presentStudio .kidung-book-toggle-btn.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
 #presentStudio .kidung-list-item:hover { border-color: var(--brass); color: var(--brass); }
 
+/* BARU (27 Agu 2026) -- tab Kidung di Studio Presentasi: daftar hasil
+   pencarian (#psKidungSearchResults, bisa sampai 60 item) dulu TIDAK
+   dibatasi tingginya, jadi panel tengah harus digulir sangat jauh
+   sebelum sampai ke "Mode tampilan slide" & daftar slide di bawahnya.
+   Sekarang daftar itu dikunci ke tinggi tetap dengan SCROLL SENDIRI
+   (bukan ikut menggulir seluruh panel) -- scrollbar tipis yang selalu
+   kelihatan dipakai sebagai penanda visual "masih ada lagi di bawah"
+   (permintaan "progress vertikal bar"). Kotak cari & pilihan buku di
+   atasnya juga dirapikan sedikit lebih ringkas (padding lebih kecil)
+   supaya makin banyak baris kidung yang muat tanpa harus buka daftar
+   dulu. Hanya berlaku di dalam Studio (#presentStudio) -- daftar Kidung
+   di menu ☰ biasa (kidung-ui.js, layar penuh 1 kolom) TIDAK diubah,
+   karena di sana memang wajar mengikuti scroll halaman biasa.       */
+#presentStudio .kidung-search-input {
+  padding: 8px 12px; font-size: 0.9rem; margin-bottom: 8px;
+}
+#presentStudio .kidung-book-toggle { margin-bottom: 8px; }
+#presentStudio .kidung-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--brass) transparent;
+}
+#presentStudio .kidung-list::-webkit-scrollbar { width: 8px; }
+#presentStudio .kidung-list::-webkit-scrollbar-track { background: transparent; }
+#presentStudio .kidung-list::-webkit-scrollbar-thumb {
+  background: var(--brass); border-radius: 999px;
+}
+#presentStudio .kidung-list-item { padding: 8px 12px; font-size: 0.9rem; }
+
 .ps-color-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .ps-color-chip {
   width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
