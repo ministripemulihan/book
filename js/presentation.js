@@ -1,4 +1,4 @@
-// ============================================================ 
+// ============================================================
 //  MODE PRESENTASI 2 LAYAR (baru)
 // ============================================================
 // Fitur:
@@ -210,6 +210,23 @@ const Presentation = (() => {
     flashSendFeedback();
   }
 
+  // Kirim 1 slide Kidung (bait + koor milik slide itu) ke Layar 2 --
+  // dipakai js/presentation-studio.js (tab "🎵 Kidung / Hymn" & item
+  // kumpulan bertipe "kidung", lihat sendGenericItemLive()/sendKidungSlide()
+  // di sana). `data`: { ref, bait: [{noBait,teks}], koorTeks }. Dikirim
+  // sebagai payload BARU ("kidung", bukan "text" polos) supaya
+  // present.html bisa menyorot baris koornya warna kuning terpisah dari
+  // bait, meniru tampilan mockup (lihat #kidungKoor di present.html) --
+  // kalau cuma digabung jadi 1 blok teks polos, pembedaan warna itu
+  // tidak mungkin dilakukan.
+  function sendKidung(data) {
+    if (!data) return;
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) openWindow();
+    post({ type: "kidung", ref: data.ref || "", bait: data.bait || [], koorTeks: data.koorTeks || null });
+    flashSendFeedback();
+  }
+
   function clearScreen() {
     post({ type: "clear" });
   }
@@ -268,6 +285,16 @@ const Presentation = (() => {
     if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
       const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtmlLocal(t.label || "")}</span> ${escapeHtmlLocal(t.text || "")}</div>`).join("");
       box.innerHTML = `${refHtml}${versionsHtml}`;
+      return;
+    }
+    if (payload.type === "kidung") {
+      // Pratinjau mini di panel ⋮ biasa (bukan Studio -- Studio punya
+      // pratinjaunya sendiri, lihat renderStudioPreview() di
+      // js/presentation-studio.js, dengan penanganan "kidung" yang sama).
+      const kRefHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtmlLocal(payload.ref)}</div>` : "";
+      const baitHtml = (payload.bait || []).map((b) => `<div class="present-preview-text">${escapeHtmlLocal((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`).join("");
+      const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:#ffd84a; font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtmlLocal(payload.koorTeks)}</div>` : "";
+      box.innerHTML = `${kRefHtml}${baitHtml}${koorHtml}`;
       return;
     }
     box.innerHTML = `${refHtml}<div class="present-preview-text">${escapeHtmlLocal(payload.text || "")}</div>`;
@@ -532,5 +559,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow };
 })();
