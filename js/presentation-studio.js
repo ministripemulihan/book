@@ -1269,12 +1269,30 @@ const PresentationStudio = (() => {
         msgRunning = !msgRunning;
         const btn = el("psMsgToggleBtn");
         const text = (el("psMsgText") && el("psMsgText").value.trim()) || "";
+        // PERBAIKAN (laporan operator 28 Agu 2026, "pesan tidak bisa
+        // jalan marquee dari kanan ke kiri"): checkbox "#psMsgRunning"
+        // ("▶️ Berjalan") SEBELUMNYA TIDAK PERNAH dibaca sama sekali di
+        // sini -- present.html sendiri yang MEMUTUSKAN SENDIRI scroll
+        // atau tidak berdasarkan PANJANG teks (>40 karakter = geser,
+        // <=40 karakter = diam di tengah, lihat applyTicker() di
+        // present.html) -- jadi checkbox itu betul cuma pajangan, tidak
+        // berpengaruh apa pun, dan pesan PENDEK (di bawah 40 karakter,
+        // seperti "sekarang waktunya jalan" di laporan) SELALU tampil
+        // diam di tengah walau checkbox "Berjalan" dicentang.
+        // SEKARANG: pilihan checkbox ini yang MENENTUKAN, dikirim
+        // eksplisit lewat `scroll` -- present.html tidak lagi menebak
+        // sendiri dari panjang teks (lihat applyTicker() di sana, sudah
+        // diperbarui juga). Warna teks (`msgColor`, dari palet "Warna
+        // Teks" di atas) JUGA baru sekarang ikut dikirim -- sebelumnya
+        // tersimpan di variabel ini tapi tidak pernah dipakai sama
+        // sekali, jadi pilihan warnanya juga tidak berpengaruh apa pun.
+        const scroll = !!(el("psMsgRunning") && el("psMsgRunning").checked);
         if (msgRunning) {
           if (!text) { msgRunning = false; return; }
           btn.textContent = "⏹️ Stop";
           btn.classList.add("blinking");
-          if (msgPos === "top") rawPost({ type: "warta", show: true, text });
-          else if (msgPos === "bottom") rawPost({ type: "footnote", show: true, text });
+          if (msgPos === "top") rawPost({ type: "warta", show: true, text, scroll, color: msgColor });
+          else if (msgPos === "bottom") rawPost({ type: "footnote", show: true, text, scroll, color: msgColor });
           else post({ type: "text", text });
         } else {
           btn.textContent = "▶️ Tayangkan";
@@ -2758,18 +2776,46 @@ const PresentationStudio = (() => {
       });
     }
 
+    // BARU (28 Agu 2026) -- link CADANGAN ("Publish to web" -> CSV,
+    // beda bentuk dari DEFAULT_SHEET_URL di atas yang pakai
+    // "/export?format=csv") -- dicoba OTOMATIS kalau link UTAMA (yang
+    // dipakai operator, tersimpan di localStorage ATAU DEFAULT_SHEET_URL)
+    // gagal dimuat/gagal di-fetch sama sekali. Dua bentuk link Google
+    // Sheet ini biasanya menunjuk ke data yang SAMA (Sheet operator
+    // sendiri, cuma diterbitkan lewat 2 cara berbeda) -- kalau salah
+    // satu bentuknya diblokir/gagal (mis. gara-gara sesi Google sedang
+    // bermasalah, redirect internal Google yang gagal di-fetch dari
+    // browser tertentu, dst), yang satunya sering kali TETAP jalan.
+    const FALLBACK_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFnIaLTF5o2XVdXT-hivwPT4qTGB1y6VHIKFex4gKHggWIcp0f3JJusnUXvQeHw0pCGVVeMiJUhxYf/pub?output=csv";
+
+    async function fetchAndParse(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const text = await res.text();
+      return parseSheetCsv(text);
+    }
+
     async function loadSheet() {
       const url = normalizeSheetUrl(urlInput.value);
       if (!url) { if (statusEl) statusEl.textContent = "Tempel dulu link Google Sheet-nya (Publish to web -> CSV)."; return; }
       if (statusEl) statusEl.textContent = "⏳ Memuat…";
       try {
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const text = await res.text();
-        allVideos = parseSheetCsv(text);
+        allVideos = await fetchAndParse(url);
         if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat (terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
         renderList();
       } catch (e) {
+        // Link utama gagal -- coba link cadangan sebelum benar-benar
+        // menyerah, TAPI HANYA kalau link utama yang dipakai operator
+        // BUKAN link cadangan itu sendiri (supaya tidak mencoba 2x link
+        // yang sama persis kalau memang itu yang gagal).
+        if (url !== FALLBACK_SHEET_URL) {
+          try {
+            allVideos = await fetchAndParse(FALLBACK_SHEET_URL);
+            if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat lewat link cadangan (link utama gagal dimuat -- terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
+            renderList();
+            return;
+          } catch (e2) { /* cadangan juga gagal -- lanjut tampilkan pesan gagal di bawah */ }
+        }
         if (statusEl) statusEl.textContent = "❌ Gagal memuat Sheet. Pastikan link sudah \"Publish to web\" (bukan cuma \"Share\") sebagai CSV, dan koneksi internet aktif.";
       }
     }
