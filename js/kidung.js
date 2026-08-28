@@ -654,7 +654,7 @@ function buildKidungShareButton(meta, baits) {
 // Tombol "📋 Salin Teks" -- BEDA dari buildKidungShareButton() di atas:
 // tombol ini SELALU langsung salin ke clipboard, TIDAK PERNAH membuka
 // kotak share bawaan OS (navigator.share). Alasan ditambahkan terpisah:
-// di HP, tombol "🔗 Bagikan" langsung membuka kotak pilih aplikasi
+// di HP, tombol "🔗 Bagikan" langsung membuka kotak pilih aplikasi 
 // (WhatsApp/dll) begitu ditekan -- kalau operator cuma mau MENGETES/
 // memastikan teksnya benar (mis. tempel ke editor/Notes untuk dicek),
 // tidak ada cara mudah melakukannya lewat kotak share itu, jadi terasa
