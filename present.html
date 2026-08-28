@@ -820,12 +820,39 @@
     if (!data.show || !data.text) { barEl.hidden = true; return; }
     barEl.hidden = false;
     textEl2.textContent = data.text + "     ";
-    const scrolling = data.text.length > 40;
+    // PERBAIKAN (laporan operator 28 Agu 2026) -- SEBELUMNYA scroll/diam
+    // ditebak SENDIRI dari panjang teks (>40 karakter = geser, kalau
+    // tidak = selalu diam di tengah) -- checkbox "▶️ Berjalan" di Studio
+    // (js/presentation-studio.js, wireMessage()) sama sekali tidak
+    // berpengaruh. SEKARANG: kalau Studio secara EKSPLISIT mengirim
+    // `data.scroll` (true/false, sesuai centang checkbox itu), itu yang
+    // dipakai apa adanya -- pesan PENDEK sekalipun (mis. "sekarang
+    // waktunya jalan") akan tetap bergeser kanan->kiri kalau operator
+    // memang mencentang "Berjalan". Auto-tebak dari panjang teks HANYA
+    // dipakai sebagai fallback kalau `data.scroll` tidak dikirim sama
+    // sekali (`undefined` -- untuk jaga-jaga kalau ada pemanggil lain di
+    // masa depan yang belum mengirim field ini).
+    const scrolling = typeof data.scroll === "boolean" ? data.scroll : (data.text.length > 40);
     barEl.classList.toggle("scrolling", scrolling);
     barEl.classList.toggle("static", !scrolling);
+    // Warna teks -- SEBELUMNYA `msgColor` di Studio tersimpan tapi tidak
+    // pernah dikirim sama sekali, jadi pilihan warna di palet "Warna
+    // Teks" tidak berpengaruh apa pun (selalu putih bawaan CSS). Sekarang
+    // dipakai kalau dikirim, jatuh balik ke putih kalau tidak ada.
+    barEl.style.color = data.color || "#ffffff";
     if (scrolling) {
+      // Lama teks bergeser 1 KALI PUTARAN PENUH (dari tepi kanan sampai
+      // hilang total di kiri, lihat @keyframes tickerScroll) -- makin
+      // panjang teksnya, makin lama durasinya (supaya kecepatan geser
+      // per-hurufnya terasa konsisten, bukan tambah cepat kalau teksnya
+      // panjang), minimal 8 detik supaya pesan PENDEK pun sempat terbaca
+      // jelas & tidak melesat lewat terlalu cepat ("sesuai tulisan" --
+      // ukuran/kecepatan menyesuaikan panjang tulisannya, bukan angka
+      // tetap).
       const secs = Math.max(8, data.text.length / 8);
       textEl2.parentElement.style.animationDuration = secs + "s";
+    } else {
+      textEl2.parentElement.style.animationDuration = "";
     }
   }
 
@@ -1132,7 +1159,7 @@
 
   // ------------------------------------------------------------
   // Laporkan bentuk (rasio) jendela Layar 2 yang SUNGGUH aktif ke
-  // jendela utama -- dipakai untuk mengunci bentuk kotak pratinjau 
+  // jendela utama -- dipakai untuk mengunci bentuk kotak pratinjau
   // (#psPreviewBoxWrap di Studio Presentasi / #presentPreviewBox di
   // panel ⋮ biasa) supaya SELALU sama persis dengan Layar 2 yang
   // sesungguhnya, apa pun ukurannya (termasuk kalau operator
