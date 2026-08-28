@@ -634,6 +634,18 @@ const Presentation = (() => {
         applyPreviewRatio(data.width, data.height);
         return;
       }
+      // BARU (28 Agu 2026) -- 🎥 Kamera Latar: Layar 2 (present.html)
+      // melaporkan hasil nyata menyalakan/mematikan kamera (berhasil,
+      // atau gagal + pesan errornya -- mis. izin ditolak / tidak ada
+      // kamera) lewat pesan ini. Diteruskan sebagai CustomEvent di
+      // window supaya js/presentation-studio.js (tab "🎥 Kamera") bisa
+      // memperbarui status/tombolnya TANPA file ini perlu tahu apa-apa
+      // soal markup tab tersebut -- pola sama persis dengan
+      // "ps-preview-ratio-changed" di atas untuk present_geometry.
+      if (data.type === "present_camera_status") {
+        try { window.dispatchEvent(new CustomEvent("ps-camera-status", { detail: { on: data.on, error: data.error || null } })); } catch (e) {}
+        return;
+      }
       if (data.type === "present_ready") {
         winReady = true;
         updateStatusUi();
