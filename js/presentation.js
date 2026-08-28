@@ -237,13 +237,13 @@ const Presentation = (() => {
   // footnote/timer/pointer/pen) supaya "kirim ulang konten terakhir"
   // saat Layar 2 dibuka ulang tetap berupa konten utama (verse/text/
   // black/logo), bukan overlay sesaat.
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "pointer", "pen", "yt_control"];
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) {
       // Overlay (pointer/pen/tick timer) tidak perlu memaksa buka jendela
       // baru berkali-kali; hanya buka untuk aksi yang jelas disengaja.
-      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "warta" || payload.type === "footnote") {
+      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote") {
         openWindow();
       } else {
         return;
@@ -446,6 +446,62 @@ const Presentation = (() => {
   }
 
   // ------------------------------------------------------------
+  // BARU (27 Agu 2026) -- ⏱️ Stopwatch, versi panel sederhana (HP / layar
+  // sempit) -- pola & payload SAMA PERSIS dengan versi Studio
+  // (wireStopwatch() di js/presentation-studio.js), lihat komentar
+  // panjang di sana untuk arti `baseStartAt`/`action`.
+  // ------------------------------------------------------------
+  let simpleSwBaseStartAt = null;
+  let simpleSwAccumulatedMs = 0;
+  let simpleSwRunning = false;
+  let simpleSwInterval = null;
+
+  function fmtStopwatchLocal(totalSec) {
+    const s = Math.max(0, Math.floor(totalSec));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    const pad2 = (n) => String(n).padStart(2, "0");
+    return hh > 0 ? `${hh}:${pad2(mm)}:${pad2(ss)}` : `${pad2(mm)}:${pad2(ss)}`;
+  }
+
+  function wireStopwatchSimple() {
+    const disp = el("presentStopwatchDisplay");
+    function tick() {
+      if (!simpleSwRunning || simpleSwBaseStartAt == null) return;
+      if (disp) disp.textContent = fmtStopwatchLocal((Date.now() - simpleSwBaseStartAt) / 1000);
+    }
+    function start() {
+      if (simpleSwRunning) return;
+      simpleSwBaseStartAt = Date.now() - simpleSwAccumulatedMs;
+      simpleSwRunning = true;
+      const label = (el("presentStopwatchLabel") && el("presentStopwatchLabel").value.trim()) || "";
+      postRaw({ type: "stopwatch", action: "start", label, baseStartAt: simpleSwBaseStartAt });
+      if (simpleSwInterval) clearInterval(simpleSwInterval);
+      simpleSwInterval = setInterval(tick, 250);
+      tick();
+    }
+    function pause() {
+      if (!simpleSwRunning) return;
+      simpleSwRunning = false;
+      simpleSwAccumulatedMs = Date.now() - simpleSwBaseStartAt;
+      if (simpleSwInterval) { clearInterval(simpleSwInterval); simpleSwInterval = null; }
+      postRaw({ type: "stopwatch", action: "stop" });
+    }
+    function reset() {
+      simpleSwRunning = false;
+      simpleSwBaseStartAt = null;
+      simpleSwAccumulatedMs = 0;
+      if (simpleSwInterval) { clearInterval(simpleSwInterval); simpleSwInterval = null; }
+      if (disp) disp.textContent = "00:00";
+      postRaw({ type: "stopwatch", action: "reset" });
+    }
+    if (el("presentStopwatchStartBtn")) el("presentStopwatchStartBtn").addEventListener("click", start);
+    if (el("presentStopwatchStopBtn")) el("presentStopwatchStopBtn").addEventListener("click", pause);
+    if (el("presentStopwatchResetBtn")) el("presentStopwatchResetBtn").addEventListener("click", reset);
+  }
+
+  // ------------------------------------------------------------
   // UI: toggle 1/2 Layar + wiring tombol panel
   // ------------------------------------------------------------
   // Tombol "🖥️ Buka Layar 2" cuma relevan untuk laptop/komputer yang
@@ -507,6 +563,7 @@ const Presentation = (() => {
     renderPreview(lastPayload);
     wireAnnouncementSimple();
     wireTimerSimple();
+    wireStopwatchSimple();
 
     if (el("presentModeToggle")) {
       el("presentModeToggle").addEventListener("change", (e) => setMode(e.target.checked));
