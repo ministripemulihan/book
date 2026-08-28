@@ -699,6 +699,13 @@
         <div class="ps-tab-panel" data-ps-left-panel="kumpulan">
           <div class="ps-collection-select-row">
             <select id="psCollectionSelect" class="columns-lang-select"></select>
+            <!-- BARU (28 Agu 2026) -- sebelumnya kumpulan baru HANYA bisa
+                 tercipta lewat tab lain (Alkitab/Kidung/File/Pengumuman)
+                 saat menambah item pertama -- tidak ada jalan membuat
+                 kumpulan KOSONG langsung dari sini. Tombol ini membuka
+                 dialog nama yang sama (promptCollectionName()) lalu
+                 memanggil createEmptyCollection() (js/collections.js). -->
+            <button type="button" id="psCollectionNewBtn" class="chip-btn small" title="Buat Kumpulan Ayat baru (kosong)">＋ Buat Baru</button>
             <!-- BARU -- kalau aktif, tiap baris di bawah dapat 4 tombol
                  mini ⏮️⬆️⬇️⏭️ untuk memindah urutan item (awal/naik/
                  turun/akhir) TANPA berpindah dari Studio dulu, lihat
@@ -859,7 +866,7 @@
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="file" hidden>
-          <div class="ps-dropzone" id="psFileDropzone">Seret file ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">pptx, pdf, docx, jpg, png, webp, gif — maksimal 25MB per file</span></div>
+          <div class="ps-dropzone" id="psFileDropzone">Seret file ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">pptx, pdf, docx, doc, jpg, png, webp, gif — maksimal 25MB per file</span></div>
           <input type="file" id="psFileInput" accept=".pptx,.pdf,.docx,.jpg,.jpeg,.png,.webp,.gif" multiple hidden />
           <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
             <input type="checkbox" id="psKeepOriginalPdf" style="margin:0;" />
@@ -869,7 +876,7 @@
             <input type="checkbox" id="psSyncToDrive" style="margin:0;" />
             ☁️ Sinkron ke akun (berkas ikut diunggah ke Google Drive akun ini, supaya nanti bisa ditarik lagi dari HP/komputer lain — perlu koneksi internet saat menekan "➕ Daftar", tidak menggantikan penyimpanan di perangkat ini)
           </label>
-          <p class="announcement-compose-hint">ℹ️ File .pptx diubah menjadi gambar per slide saat diunggah. Bila slide punya teks yang sangat penuh, hasilnya bisa sedikit berbeda dari PowerPoint — simpan sebagai PDF lalu unggah PDF-nya untuk hasil persis sama. File .ppt lama harus disimpan sebagai .pptx atau PDF dahulu. File .docx diubah jadi gambar per "halaman" berisi TEKS SAJA (gambar/tabel di dalam Word tidak ikut, dan pembagian halamannya perkiraan) — file .doc lama harus disimpan ulang sebagai .docx atau PDF dahulu.</p>
+          <p class="announcement-compose-hint">ℹ️ File .pptx diubah menjadi gambar per slide saat diunggah. Bila slide punya teks yang sangat penuh, hasilnya bisa sedikit berbeda dari PowerPoint — simpan sebagai PDF lalu unggah PDF-nya untuk hasil persis sama. File .ppt lama harus disimpan sebagai .pptx atau PDF dahulu. File Word (.docx & .doc lama) diubah jadi beberapa "halaman" TEKS SAJA (gambar/tabel di dalam Word tidak ikut, pembagian halamannya perkiraan) — bisa langsung ditayangkan (ikut Ukuran Teks/Spasi Baris di tab "🎨 Tampilan") & ditambahkan ke Kumpulan Ayat (1 halaman atau semua sekaligus). Hasil baca .doc lama BISA kurang rapi dibanding .docx — untuk hasil paling akurat, simpan ulang sebagai .docx atau PDF di Word.</p>
           <div id="psFileList" class="ps-file-list"></div>
         </div>
 
@@ -1007,6 +1014,7 @@
           <button type="button" class="ps-tab" data-ps-right-tab="warta">📰 Warta / FootNote</button>
           <button type="button" class="ps-tab" data-ps-right-tab="pointer">✏️ Penunjuk &amp; Pen</button>
           <button type="button" class="ps-tab" data-ps-right-tab="tampilan">🎨 Tampilan</button>
+          <button type="button" class="ps-tab" data-ps-right-tab="kamera">🎥 Kamera</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="teks">
@@ -1114,6 +1122,120 @@
             <input type="range" id="psFontScale" min="60" max="160" value="100" style="flex:1;" />
             <button type="button" id="psFontInc" class="chip-btn small">A+</button>
           </div>
+          <!-- BARU (28 Agu 2026) -- "Spasi Baris" (jarak antar baris di
+               Layar 2), dipisah dari "Ukuran Teks" -- lihat --p-line-height
+               di present.html & applyLineHeight() (js/presentation-studio.js).
+               Berguna terutama untuk teks panjang dari file Word/.doc yang
+               diunggah lewat tab File, supaya lebih banyak baris muat di
+               layar (spasi dirapatkan) atau lebih lega dibaca (direnggangkan). -->
+          <div class="ps-field-label">Spasi Baris</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psLineHeightDec" class="chip-btn small" title="Rapatkan spasi baris">≡-</button>
+            <input type="range" id="psLineHeight" min="90" max="250" value="135" style="flex:1;" />
+            <button type="button" id="psLineHeightInc" class="chip-btn small" title="Renggangkan spasi baris">≡+</button>
+          </div>
+          <!-- BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak
+               teks/jarak tepi di Layar 2) -- lihat applyContentScale()
+               di js/presentation-studio.js. Dipersempit cocok dipakai
+               bersama tab 🎥 Kamera (Kamera Latar/Gambar Latar) supaya
+               latarnya lebih terlihat di tepi layar. -->
+          <div class="ps-field-label">Ukuran Konten (Layar)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psContentScaleDec" class="chip-btn small" title="Persempit kotak teks">▭-</button>
+            <input type="range" id="psContentScale" min="60" max="140" value="100" style="flex:1;" />
+            <button type="button" id="psContentScaleInc" class="chip-btn small" title="Lebarkan kotak teks">▭+</button>
+            <span id="psContentScaleValue" class="ps-pen-size-value">100%</span>
+          </div>
+          <div class="ps-pointer-hint">Mengatur seberapa lebar kotak teks memakai layar -- persempit supaya latar (Kamera/Gambar) lebih terlihat di tepi, atau lebarkan supaya teks memakai hampir seluruh layar.</div>
+        </div>
+
+        <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
+             PERANGKAT YANG MEMBUKA LAYAR 2 (laptop/HP yang tersambung
+             ke proyektor -- BUKAN kamera di jendela Studio/Monitor 1
+             ini) sebagai latar belakang hidup di belakang ayat/kidung/
+             pengumuman yang tayang. Izin kamera browser diminta di
+             jendela Layar 2 itu sendiri (present.html memanggil
+             getUserMedia() langsung di sana, lihat wireCamera() &
+             sendCameraState() di bawah) -- BUKAN di jendela Studio ini,
+             karena kameranya memang harus yang terpasang/menghadap ke
+             arah yang benar di perangkat yang tersambung proyektor,
+             bukan kamera laptop operator yang mengetik di sini.
+             Supaya tulisan tetap kelihatan jelas di atas latar hidup
+             apa pun (terang/gelap/berubah-ubah), teks ayat/kidung/
+             pengumuman otomatis diberi GARIS TEPI (border/outline)
+             tebal berlawanan warna dengan warna tulisannya sendiri
+             (Putih+Border Hitam ATAU Hitam+Border Putih -- operator
+             pilih sesuai kondisi kamera/pencahayaan) -- lihat teknik
+             text-shadow melingkar di applyCamTextStyle()/present.html
+             (dipilih ketimbang -webkit-text-stroke supaya kompatibel
+             luas lintas browser tanpa terpotong menimpa isi hurufnya). -->
+        <div class="ps-tab-panel" data-ps-right-panel="kamera" hidden>
+          <div class="ps-field-label" style="margin-top:0;">🎥 Kamera Latar Layar 2</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Menyalakan kamera perangkat yang MEMBUKA LAYAR 2 (laptop/HP yang tersambung ke proyektor) sebagai latar belakang hidup di belakang ayat/kidung/pengumuman. Izin kamera akan diminta browser DI JENDELA LAYAR 2 itu sendiri saat pertama kali diaktifkan -- pastikan Layar 2 sudah dibuka dulu.</p>
+          <div class="ps-btn-row">
+            <button type="button" id="psCamToggle" class="chip-btn small" data-ps-cam-toggle>🎥 Aktifkan Kamera</button>
+          </div>
+          <div class="ps-pointer-hint" id="psCamStatus">⚪ Kamera belum aktif.</div>
+
+          <div class="ps-field-label" style="margin-top:14px;">Kamera mana</div>
+          <select id="psCamFacingSelect" class="columns-lang-select">
+            <option value="user">Depan (menghadap operator/ruangan)</option>
+            <option value="environment">Belakang (menghadap jemaat/panggung)</option>
+          </select>
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:8px;">
+            <input type="checkbox" id="psCamMirror" style="margin:0;" />
+            🪞 Cermin (balik horizontal -- cocok kalau kamera menghadap operator sendiri)
+          </label>
+
+          <!-- BARU (28 Agu 2026) -- 🖼️ Gambar Latar: alternatif dari
+               Kamera -- gambar diam yang diunggah, dipakai sebagai
+               latar belakang statis (mis. logo besar, dekorasi,
+               backdrop acara). Kamera & Gambar Latar SALING MENIADAKAN
+               -- menyalakan salah satu otomatis mematikan yang lain,
+               lihat setLatarSource() di js/presentation-studio.js. -->
+          <div class="ps-field-label" style="margin-top:20px;">🖼️ Gambar Latar (alternatif Kamera)</div>
+          <div class="ps-dropzone" id="psBgImageDropzone">Seret gambar ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">jpg, png, webp, gif — maksimal 25MB</span></div>
+          <input type="file" id="psBgImageInput" accept="image/*" hidden />
+          <div class="ps-btn-row" id="psBgImagePreviewRow" style="align-items:center;">
+            <img id="psBgImagePreview" hidden style="width:64px; height:36px; object-fit:cover; border-radius:6px; border:1px solid var(--ps-dropzone-border, #4a3c28);" />
+            <span id="psBgImageName" class="ps-pen-size-value" style="flex:1;"></span>
+            <button type="button" id="psBgImageRemove" class="chip-btn small">🗑️ Hapus</button>
+          </div>
+          <div class="ps-btn-row">
+            <button type="button" id="psBgImageToggle" class="chip-btn small" data-ps-cam-toggle>🖼️ Pakai sebagai Latar</button>
+          </div>
+          <div class="ps-pointer-hint">Unggah 1 gambar lalu tekan "Pakai sebagai Latar" untuk menayangkannya di belakang ayat/kidung/pengumuman -- tidak perlu izin kamera, langsung tayang.</div>
+
+          <div class="ps-field-label" style="margin-top:20px;">Gaya tulisan saat Kamera/Gambar Latar aktif</div>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small active" data-ps-cam-text="white-black">⬜ Putih + Border Hitam</button>
+            <button type="button" class="chip-btn small" data-ps-cam-text="black-white">⬛ Hitam + Border Putih</button>
+          </div>
+          <div class="ps-pointer-hint">Pilih "Putih + Border Hitam" untuk latar yang cenderung terang, atau "Hitam + Border Putih" untuk latar yang cenderung gelap -- border tebal menjaga tulisan tetap terbaca apa pun warna di baliknya.</div>
+
+          <!-- BARU (28 Agu 2026) -- warna tulisan & border BEBAS
+               (24-bit penuh lewat <input type="color">), bukan cuma 2
+               preset hitam/putih di atas -- pilih warna di sini untuk
+               langsung pindah ke mode kustom. -->
+          <div class="ps-btn-row" style="margin-top:10px; align-items:center; gap:14px;">
+            <div style="flex:1;">
+              <div class="ps-pen-size-label" style="display:block; margin-bottom:4px;">Warna Tulisan (bebas)</div>
+              <input type="color" id="psCamInkColor" value="#ffffff" class="ps-color-input" />
+            </div>
+            <div style="flex:1;">
+              <div class="ps-pen-size-label" style="display:block; margin-bottom:4px;">Warna Border (bebas)</div>
+              <input type="color" id="psCamOutlineColor" value="#000000" class="ps-color-input" />
+            </div>
+          </div>
+
+          <div class="ps-field-label" style="margin-top:14px;">Ketebalan Border</div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Tipis">•</span>
+            <input type="range" id="psCamOutlineSlider" min="1" max="8" step="1" value="3" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Tebal">●</span>
+            <span id="psCamOutlineValue" class="ps-pen-size-value">3px</span>
+          </div>
+          <div class="ps-pointer-hint">Latar (Kamera/Gambar) & gaya tulisan ini otomatis tersembunyi saat "⬛ Hitam" / "◆ Logo" / slide file / video YouTube sedang tayang -- muncul lagi otomatis saat kembali ke ayat/kidung/pengumuman. Ukuran huruf (A-/A+), spasi baris, dan lebar kotak teks diatur di tab "🎨 Tampilan".</div>
         </div>
       </div>
     </div>
@@ -1143,8 +1265,8 @@
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260822a"></script>
   <script src="js/kidung-ui.js?v=20260827a"></script>
-  <script src="js/presentation.js?v=20260827a"></script>
-  <script src="js/presentation-studio.js?v=20260827f"></script>
+  <script src="js/presentation.js?v=20260828a"></script>
+  <script src="js/presentation-studio.js?v=20260828a"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260827b"></script>
