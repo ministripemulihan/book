@@ -93,6 +93,15 @@ const LocalDB = {
         if (!kidungStore.indexNames.contains("byBukuNo")) {
           kidungStore.createIndex("byBukuNo", ["buku", "noKidung"], { unique: false });
         }
+        // v8 -- store "mediaUploadQueue" (Tahap 7 peta jalan Drive, lihat
+        // catatan panjang di CONFIG.MEDIA_QUEUE_STORE_NAME di js/config.js)
+        // -- antrean unggahan media ke Drive yang gagal (offline/server
+        // tidak terjangkau), diindeks per `username` supaya bisa dicoba
+        // ulang per akun saja saat processMediaUploadQueue() dipanggil.
+        if (!db.objectStoreNames.contains(CONFIG.MEDIA_QUEUE_STORE_NAME)) {
+          const queueStore = db.createObjectStore(CONFIG.MEDIA_QUEUE_STORE_NAME, { keyPath: "id" });
+          queueStore.createIndex("byUsername", "username", { unique: false });
+        }
       };
       req.onsuccess = (e) => {
         this._db = e.target.result;
@@ -251,6 +260,55 @@ const LocalDB = {
     });
   },
 
+  // Dipakai processMediaUploadQueue() (js/collections.js, Tahap 7) untuk
+  // mengambil 1 item Media Tersimpan by id langsung (tanpa perlu ambil
+  // semua milik 1 username dulu lalu cari manual).
+  async getMediaItem(id) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_STORE_NAME], "readonly");
+      const req = tx.objectStore(CONFIG.MEDIA_STORE_NAME).get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // ---------------- Antrean upload media -- Tahap 7 peta jalan Drive ----------------
+  // Lihat catatan panjang di CONFIG.MEDIA_QUEUE_STORE_NAME (js/config.js)
+  // & queueMediaUpload()/processMediaUploadQueue() (js/collections.js)
+  // untuk lapisan yang dipakai UI -- fungsi di sini murni akses IndexedDB,
+  // pola sama seperti store Media Tersimpan di atas.
+  async putQueuedMediaUpload(entry) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_QUEUE_STORE_NAME], "readwrite");
+      tx.objectStore(CONFIG.MEDIA_QUEUE_STORE_NAME).put(entry);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async getQueuedMediaUploadsByUsername(username) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_QUEUE_STORE_NAME], "readonly");
+      const idx = tx.objectStore(CONFIG.MEDIA_QUEUE_STORE_NAME).index("byUsername");
+      const req = idx.getAll(IDBKeyRange.only(username || "guest"));
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async deleteQueuedMediaUpload(id) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.MEDIA_QUEUE_STORE_NAME], "readwrite");
+      tx.objectStore(CONFIG.MEDIA_QUEUE_STORE_NAME).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
   // ---------------- Kidung / Hymn ----------------
   // Lihat js/kidung.js (resyncKidungSheet/getKidungList/getKidungRows)
   // untuk lapisan yang dipakai UI -- fungsi di sini murni akses IndexedDB,
@@ -307,7 +365,7 @@ const LocalDB = {
     });
   },
 
-  // Sama seperti di atas, tapi dipersempit per BUKU juga (Kidung vs
+  // Sama seperti di atas, tapi dipersempit per BUKU juga (Kidung vs 
   // Suplemen) -- dipakai supaya nomor yang sama di 2 buku berbeda tidak
   // ikut tercampur (lihat catatan index "byBukuNo" di open() di atas).
   //
