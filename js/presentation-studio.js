@@ -2587,6 +2587,14 @@ const PresentationStudio = (() => {
     if (!urlInput || !listWrap) return;
 
     const SHEET_KEY = "bible_app_yt_playlist_sheet_v1";
+    // BARU (28 Agu 2026) -- link Google Sheet BAWAAN (dipakai kalau
+    // operator belum pernah menyimpan link sendiri di perangkat ini,
+    // lihat urlInput.value di bawah). UBAH NILAI INI kalau mau ganti
+    // Sheet bawaan untuk SEMUA operator/perangkat -- operator sendiri
+    // tetap bisa menimpanya lewat kotak input + "💾 Simpan Link" (yang
+    // tersimpan di localStorage per perangkat itu SELALU menang di atas
+    // nilai bawaan ini).
+    const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFnIaLTF5o2XVdXT-hivwPT4qTGB1y6VHIKFex4gKHggWIcp0f3JJusnUXvQeHw0pCGVVeMiJUhxYf/pub?output=csv";
     const CATS = [
       { key: "anak", label: "Anak" },
       { key: "remaja", label: "Remaja" },
@@ -2598,16 +2606,27 @@ const PresentationStudio = (() => {
     let allVideos = []; // [{ title, channel, url, videoId, embedUrl, cats:{anak,remaja,...} }]
     let activeFilter = "all";
 
-    urlInput.value = localStorage.getItem(SHEET_KEY) || "";
+    urlInput.value = localStorage.getItem(SHEET_KEY) || DEFAULT_SHEET_URL;
 
     // Terima juga link Sheet biasa (.../edit#gid=0) selain link "Publish
     // to web" CSV -- diubah otomatis jadi bentuk export CSV supaya
     // operator tidak perlu tahu bedanya.
+    //
+    // PERBAIKAN: link "Publish to web" berbentuk
+    // "/spreadsheets/d/e/<id-panjang>/pub?output=csv" (BUKAN "/d/<id>/edit"
+    // biasa) SUDAH berupa CSV siap pakai -- sebelumnya regex di bawah ini
+    // salah mengira "e" (segmen path SETELAH "/d/" pada link pub) sebagai
+    // ID spreadsheet, lalu merusaknya jadi ".../d/e/export?format=csv..."
+    // yang tidak pernah ada. Sekarang link yang sudah mengandung "/pub"
+    // atau "output=csv" (dan link CSV lain apa pun) dibiarkan APA ADANYA;
+    // hanya link "/d/<id>/edit" (Share biasa, bukan Publish to web) yang
+    // dikonversi.
     function normalizeSheetUrl(raw) {
       const s = (raw || "").trim();
       if (!s) return "";
-      const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-      if (!m) return s; // bukan link Google Sheet biasa -- pakai apa adanya (mis. sudah link CSV)
+      if (/\/pub\b/.test(s) || /output=csv/i.test(s)) return s; // sudah link CSV siap pakai (Publish to web)
+      const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/edit/);
+      if (!m) return s; // bukan link "Share" biasa -- pakai apa adanya
       const gidMatch = s.match(/[?#&]gid=(\d+)/);
       const gid = gidMatch ? gidMatch[1] : "0";
       return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
@@ -2619,32 +2638,28 @@ const PresentationStudio = (() => {
     }
 
     function parseSheetCsv(text) {
+      // PERBAIKAN: parseCSV() (js/csv.js) SUDAH mengembalikan array
+      // OBJEK per baris (kunci = nama kolom huruf kecil, mis.
+      // rec.title/rec.url/rec.anak) -- bukan array-per-baris mentah
+      // seperti asumsi awal. Baris header ditangani otomatis oleh
+      // parseCSV() itu sendiri, jadi di sini tinggal dipetakan langsung.
       if (typeof parseCSV !== "function") return [];
-      const rows = parseCSV(text).filter((r) => r.some((c) => String(c || "").trim() !== ""));
-      if (!rows.length) return [];
-      const header = rows[0].map((h) => String(h || "").trim().toLowerCase());
-      const colIdx = (names) => header.findIndex((h) => names.includes(h));
-      const iTitle = colIdx(["title", "judul"]);
-      const iChannel = colIdx(["channel", "channel name", "saluran"]);
-      const iUrl = colIdx(["url", "link"]);
-      const catIdx = {};
-      CATS.forEach((c) => { catIdx[c.key] = colIdx([c.key, c.label.toLowerCase()]); });
+      const records = parseCSV(text);
       const out = [];
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-        const url = iUrl >= 0 ? (r[iUrl] || "").trim() : "";
+      records.forEach((rec) => {
+        const url = (rec.url || rec.link || "").trim();
         const id = typeof extractYoutubeId === "function" ? extractYoutubeId(url) : null;
-        if (!id) continue; // baris tanpa link YouTube yang dikenali -- lewati diam-diam
+        if (!id) return; // baris tanpa link YouTube yang dikenali -- lewati diam-diam
         const cats = {};
-        CATS.forEach((c) => { cats[c.key] = catIdx[c.key] >= 0 ? truthy(r[catIdx[c.key]]) : false; });
+        CATS.forEach((c) => { cats[c.key] = truthy(rec[c.key] || rec[c.label.toLowerCase()]); });
         out.push({
-          title: (iTitle >= 0 && r[iTitle] ? r[iTitle].trim() : null) || id,
-          channel: iChannel >= 0 ? (r[iChannel] || "").trim() : "",
+          title: (rec.title || rec.judul || "").trim() || id,
+          channel: (rec.channel || rec["channel name"] || rec.saluran || "").trim(),
           url, videoId: id,
           embedUrl: buildYoutubeEmbedUrl(id),
           cats,
         });
-      }
+      });
       return out;
     }
 
