@@ -1,5 +1,5 @@
 // ============================================================
-//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS,
+//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS, 
 //  KHUSUS laptop/komputer (layar lebar). Menggantikan panel kecil
 //  lama yang "turun terus ke bawah" di menu ⋮ untuk kasus 2 layar --
 //  panel lama (js/presentation.js) tetap dipakai apa adanya untuk
@@ -720,6 +720,7 @@ const PresentationStudio = (() => {
         buku: currentMeta.buku,
         kidungNo: currentMeta.noKidung,
         title: currentMeta.judul,
+        ikon: currentMeta.ikon || "",
         bait: s.baits,
         koorTeks: s.koorTeks,
       }));
@@ -772,7 +773,7 @@ const PresentationStudio = (() => {
         currentSlides.forEach((slide) => {
           addKidungToCollection(username, name, {
             buku: currentMeta.buku, kidungNo: currentMeta.noKidung, title: currentMeta.judul,
-            bait: slide.baits, koorTeks: slide.koorTeks,
+            ikon: currentMeta.ikon || "", bait: slide.baits, koorTeks: slide.koorTeks,
           });
         });
         renderCollectionSelect();
@@ -2775,8 +2776,23 @@ const PresentationStudio = (() => {
     if (!handle || !studio) return;
     const STORAGE_KEY = "bible_app_studio_preview_row_h_v1";
     const LABEL_OVERHEAD = 60; // tinggi label "Berikutnya/Tayang" + padding panel
-    const MIN_ROW = 150;
-    function maxRow() { return Math.round(window.innerHeight * 0.82); }
+    const MIN_ROW = 130;
+    // PERMINTAAN OPERATOR (28 Agu 2026): batas atas lama (82% tinggi
+    // jendela) kebablasan -- kotak "Berikutnya"/"Tayang" bisa diseret
+    // nyaris sebesar seluruh Studio, sampai TIDAK CUKUP ruang tersisa
+    // buat panel kontrol di bawahnya (Kumpulan Ayat / Kidung / Aksi &
+    // Tema) -- itulah sebab panel-panel itu jadi kepotong & butuh
+    // discroll (muncul garis scrollbar vertikal di tepi kanan, lihat
+    // titik No. 2 di tangkapan layar operator). Sekarang baris pratinjau
+    // dikunci JAUH lebih kecil (mockup "2 monitor kecil" sungguhan,
+    // bukan lagi bisa segede layar): maksimum 220px ATAU sisa tinggi
+    // jendela dikurangi 460px (kira-kira tinggi minimum panel kontrol
+    // supaya tidak perlu discroll) -- yang lebih kecil di antara
+    // keduanya yang dipakai. Nilai lama yang mungkin sudah kepalang
+    // tersimpan di localStorage (dari sebelum perbaikan ini) IKUT
+    // dikecilkan otomatis lewat clamp ini setiap kali dimuat/diresize,
+    // operator tidak perlu menyeret ulang secara manual.
+    function maxRow() { return Math.max(MIN_ROW, Math.min(220, window.innerHeight - 460)); }
     function apply(rowPx) {
       const clamped = Math.max(MIN_ROW, Math.min(maxRow(), Math.round(rowPx)));
       studio.style.setProperty("--ps-preview-row-h", clamped + "px");
