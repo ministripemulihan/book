@@ -1,5 +1,5 @@
 // ============================================================
-//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG. 
+//  KIDUNG / HYMN — sinkron dari Google Sheet terpisah (CONFIG.
 //  KIDUNG_SHEET_CSV_URL di js/config.js), disimpan lokal di IndexedDB
 //  (store "kidung", lihat js/db.js), lalu dibaca ulang dari sini
 //  tanpa perlu internet lagi -- pola SAMA PERSIS seperti Alkitab
@@ -56,19 +56,20 @@
 // kalau suatu saat operator sheet cuma mengisi baris pertama saja seperti
 // judul/pengarang/kategori -- tidak menimpa nilai yang memang sudah diisi.
 function forwardFillKidungRows(rows) {
-  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", kategori: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "" };
+  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", kategori: "", ikon: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "" };
   return rows.map((r) => {
     if (r.noKidung !== last.noKidung || r.buku !== last.buku) {
       // Kidung baru mulai -- reset "ingatan" forward-fill supaya tidak
       // ketularan metadata kidung sebelumnya kalau baris pertama kidung
       // baru ini entah kenapa kosong juga.
-      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, kategori: r.kategori, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi };
+      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, kategori: r.kategori, ikon: r.ikon, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi };
     } else {
       if (!r.buku || r.buku === "Kidung") r.buku = last.buku; else last.buku = r.buku;
       if (!r.judul) r.judul = last.judul; else last.judul = r.judul;
       if (!r.pengarang) r.pengarang = last.pengarang; else last.pengarang = r.pengarang;
       if (!r.birama) r.birama = last.birama; else last.birama = r.birama;
       if (!r.kategori) r.kategori = last.kategori; else last.kategori = r.kategori;
+      if (!r.ikon) r.ikon = last.ikon; else last.ikon = r.ikon;
       if (!r.tags || !r.tags.length) r.tags = last.tags; else last.tags = r.tags;
       if (!r.linkMp3_1) r.linkMp3_1 = last.linkMp3_1; else last.linkMp3_1 = r.linkMp3_1;
       if (!r.linkMp3_2) r.linkMp3_2 = last.linkMp3_2; else last.linkMp3_2 = r.linkMp3_2;
@@ -121,7 +122,7 @@ async function getKidungList(bukuFilter) {
     if (!map.has(key)) {
       map.set(key, {
         buku: r.buku, noKidung: r.noKidung, judul: r.judul, pengarang: r.pengarang, birama: r.birama || "",
-        kategori: r.kategori, tags: r.tags || [], jumlahBait: 0,
+        kategori: r.kategori, ikon: r.ikon || "", tags: r.tags || [], jumlahBait: 0,
         linkMp3_1: r.linkMp3_1 || "", linkMp3_2: r.linkMp3_2 || "", linkVideo: r.linkVideo || "",
         linkYoutube: r.linkYoutube || "", linkMidi: r.linkMidi || "",
       });
