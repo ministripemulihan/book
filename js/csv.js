@@ -1,4 +1,4 @@
-// ============================================================ 
+// ============================================================
 //  PARSER CSV  — mendeteksi otomatis pemisah kolom (koma/titik koma/tab)
 //  dan menangani nilai yang dibungkus tanda kutip (bisa berisi koma/baris baru)
 // ============================================================
@@ -382,6 +382,17 @@ function normalizeKidungRecord(rec) {
     // di js/kidung.js).
     birama: (get("birama", "notasi", "time signature", "birama/notasi") || "").trim(),
     kategori: (get("kategori", "category") || "").trim(),
+    // Ikon/simbol kecil yang tampil di depan "No. XXX -- Judul" di Layar 2
+    // (present.html) & label daftar Kumpulan Ayat -- PERMINTAAN OPERATOR
+    // (28 Agu 2026): dulu ikon musik ("🎵") ditulis TETAP di kode
+    // (js/app.js: collectionItemRef()), sekarang bisa diatur LANGSUNG
+    // dari Sheet lewat kolom opsional "ikon" ini (mis. isi "♪", "🎼",
+    // atau kosongkan saja) -- supaya operator bisa ganti tanpa minta
+    // ubah kode, dan bisa beda-beda per buku/kategori kalau perlu (mis.
+    // kidung pujian pakai "♪", bacaan/pengakuan iman dikosongkan saja).
+    // OPSIONAL sama seperti `birama`/`buku`: kolom belum ada di Sheet ->
+    // otomatis "" -> collectionItemRef() (js/app.js) pakai fallback "♪".
+    ikon: (get("ikon", "icon", "simbol", "symbol") || "").trim(),
     tags,
     urutan: parseInt(urutanRaw, 10) || 0,
     jenis,
