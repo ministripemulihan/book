@@ -4412,7 +4412,18 @@ function collectionItemRef(it) {
     // fallback "♪" (karakter not musik polos, BUKAN emoji berwarna) --
     // supaya kidung yang belum diisi kolom "ikon"-nya tetap tampil wajar.
     const ikon = it.ikon || "♪";
-    return `${ikon} ${bukuLabel}No. ${noLabel}${it.title ? " — " + it.title : ""}`;
+    // PERMINTAAN OPERATOR (28 Agu 2026, revisi lagi hari yang sama): tulisan
+    // "No." dulu selalu ditulis di antara ikon & nomor (mis. "K No. 169"),
+    // membuat baris judul di Layar 2 (present.html) terasa panjang &
+    // bertele-tele. Sekarang "No." DIHAPUS dan ikon disambung LANGSUNG ke
+    // nomornya tanpa spasi (mis. "K169") -- kalau bukunya bukan "Kidung"
+    // (mis. "Suplemen"), nama bukunya tetap tampil di antara ikon & nomor
+    // seperti sebelumnya (mis. "♪Suplemen 200"), cuma "No." -nya yang
+    // hilang. Ref ini dipakai ULANG di mana pun kidung ditampilkan (baris
+    // daftar di sini, pratinjau Studio, MAUPUN judul besar di Layar 2 --
+    // lihat genericItemRefText() di js/presentation-studio.js), jadi
+    // perubahan ini otomatis konsisten di semua tempat sekaligus.
+    return `${ikon}${bukuLabel}${noLabel}${it.title ? " — " + it.title : ""}`;
   }
   // BARU (27 Agu 2026) -- item PDF/gambar dari Media Tersimpan, lihat
   // addMediaToCollection() di js/collections.js.
