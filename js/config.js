@@ -35,7 +35,7 @@ const CONFIG = {
   // yang perlu diketik manual oleh administrator. Lihat
   // saveMeasuredBibleSizeMb_() & getEffectiveBibleSizeMb() di js/app.js,
   // dan updateMeasuredBibleSizeMb_() di apps-script/Code.gs.
-  BIBLE_DATA_APPROX_SIZE_MB: 57,
+  BIBLE_DATA_APPROX_SIZE_MB: 55,
 
   // ----------------------------------------------------------
   // 2) SUMBER DATA PENGGUNA — Google Sheet #2 (BERBEDA dari sheet Alkitab)
@@ -211,10 +211,18 @@ const CONFIG = {
   // di KEDUA cabang, dan versi dinaikkan lagi ke 7 di sini supaya
   // onupgradeneeded benar-benar terpicu ulang & menambal HP yang sudah
   // kadung rusak skemanya di versi 6.
-  DB_VERSION: 7,
+  // v8 (27 Agu 2026): menambah store "mediaUploadQueue" -- Tahap 7 peta
+  // jalan sinkron Drive (ROADMAP-drive-sync.md): antrean upload media
+  // (PDF/gambar) yang GAGAL terkirim ke Drive (offline / server tidak
+  // terjangkau) saat "☁️ Sinkron ke akun" dicentang, supaya otomatis
+  // dicoba lagi nanti (saat online lagi / Media Tersimpan dibuka lagi)
+  // TANPA operator harus mengunggah ulang manual dari awal. Lihat
+  // queueMediaUpload()/processMediaUploadQueue() di js/collections.js.
+  DB_VERSION: 8,
   STORE_NAME: "verses",
   USERS_STORE_NAME: "users",
   MEDIA_STORE_NAME: "studioMedia",
+  MEDIA_QUEUE_STORE_NAME: "mediaUploadQueue",
   // v4 (20 Agu 2026): menambah store "kidung" -- teks Kidung/Hymn (lihat
   // js/kidung.js). Dipilih IndexedDB juga (bukan localStorage seperti
   // js/outlines.js) supaya bisa diindeks per no_kidung untuk pencarian
@@ -337,7 +345,7 @@ const CONFIG = {
   // sinkron, tidak wajib akurat (beda dengan BIBLE_DATA_APPROX_SIZE_MB
   // yang punya mekanisme ukur-otomatis; data Kidung jauh lebih kecil
   // jadi tidak perlu progress bar rumit).
-  KIDUNG_DATA_APPROX_KB: 1300,
+  KIDUNG_DATA_APPROX_KB: 1500,
 
   // Urutan buku Kidung untuk navigasi ◀/▶ LINTAS BUKU (22 Agu 2026) --
   // dipakai findAdjacentKidungCrossBook() di js/kidung.js supaya waktu
@@ -357,7 +365,7 @@ const CONFIG = {
   //   sebelum "Tambahan"), tinggal masukkan namanya ke array ini di
   //   posisi yang diinginkan -- ejaannya HARUS SAMA PERSIS dengan isi
   //   kolom "Buku" di Sheet Kidung (termasuk besar/kecil huruf).
-  KIDUNG_BOOK_ORDER: ["Kidung", "Supplemen", "Tambahan"],
+  KIDUNG_BOOK_ORDER: ["Kidung", "Supplemen", "Tambahan","Young People","Anak-anak"],
 
   // ----------------------------------------------------------
   // 8) PENGETAHUAN TAMBAHAN AI CHAT (istilah/kategori & topik) -- OPSIONAL
