@@ -1,7 +1,7 @@
 // ============================================================
 //  MODE PRESENTASI 2 LAYAR (baru)
 // ============================================================
-// Fitur: 
+// Fitur:
 //  1. Toggle "1 Layar" (biasa, seperti sekarang) <-> "2 Layar" (menu ⋮ ->
 //     panel "🖥️ Mode Presentasi"). Saat diaktifkan, membuka jendela BARU
 //     (present.html) yang isinya bisa dikendalikan dari jendela utama.
@@ -107,9 +107,48 @@ const Presentation = (() => {
   // SUNGGUH aktif (lihat "present_geometry" di present.html) -- jadi
   // preview SELALU sama bentuk dengan Layar 2 sesungguhnya, tanpa
   // operator perlu memilih resolusi apa pun secara manual.
+  //
+  // PERBAIKAN (28 Agu 2026, laporan operator): rasio kotak (bentuknya)
+  // sudah lama akurat, TAPI ukuran huruf di dalamnya TERNYATA masih
+  // bisa meleset dari Layar 2 sungguhan -- inilah sebab kotak pratinjau
+  // sering terlihat "kepotong"/perlu discroll padahal isi yang SAMA
+  // muat sempurna tanpa terpotong di Layar 2 asli. Penyebabnya: rumus
+  // #ref/#text di present.html memakai `clamp(min, N vw/vh, MAKS px)`
+  // -- di layar/proyektor lebar (>~1200px, umum utk Layar 2), bagian
+  // "N vw/vh"-nya SERING keburu lebih besar dari batas atas (mis. 68px
+  // utk #text), jadi yang sungguh dipakai Layar 2 ya batas atas itu,
+  // BUKAN proporsi murni N%. Kotak pratinjau Studio jauh lebih kecil
+  // dari Layar 2, jadi versi cqw/cqh-nya (lihat css/style.css) nyaris
+  // TIDAK PERNAH mentok ke batas atas yang sama -- akibatnya kotak
+  // pratinjau memakai huruf RELATIF LEBIH BESAR (dibanding lebarnya
+  // sendiri) daripada Layar 2 sungguhan, sehingga baris kalimat patah
+  // lebih banyak & makan lebih banyak ruang vertikal -> terlihat
+  // "kepotong"/perlu discroll di pratinjau walau Layar 2 asli baik-baik
+  // saja. Perbaikannya: setiap kali ukuran Layar 2 yang SUNGGUH aktif
+  // diketahui, hitung ULANG persentase yang SUNGGUH DIPAKAI di sana
+  // (setelah kena batas atas px, kalau kena) lalu simpan sebagai
+  // variabel CSS baru (--ps-*-pct) -- css/style.css memakai variabel
+  // ini (bukan lagi angka clamp tetap) supaya proporsi hurufnya SELALU
+  // sama persis dengan yang SUNGGUH dipakai Layar 2 saat itu, apa pun
+  // ukuran kotak pratinjau/Layar 2-nya.
+  function effectivePct(minPx, vPct, maxPx, dimensionPx) {
+    const raw = (vPct / 100) * dimensionPx;
+    const used = Math.min(maxPx, Math.max(minPx, raw));
+    return (used / dimensionPx) * 100;
+  }
   function applyPreviewRatio(w, h) {
     if (!(w > 0) || !(h > 0)) return;
     document.documentElement.style.setProperty("--ps-preview-ratio", `${w} / ${h}`);
+    // Beri tahu Studio (js/presentation-studio.js) supaya splitter pratinjau
+    // menghitung ULANG batas atasnya -- rasio Layar 2 yang baru bisa
+    // membuat lebar/tinggi maksimum kotak "Berikutnya"/"Tayang" berubah
+    // (lihat wirePreviewResize()/maxRowByWidth()), jadi ukuran yang sedang
+    // dipakai perlu disesuaikan lagi supaya tidak jadi penyok.
+    try { window.dispatchEvent(new CustomEvent("ps-preview-ratio-changed")); } catch (e) {}
+    const root = document.documentElement.style;
+    root.setProperty("--ps-text-pct", effectivePct(28, 4.6, 68, w).toFixed(3));
+    root.setProperty("--ps-ref-pct", effectivePct(16, 2.4, 30, w).toFixed(3));
+    root.setProperty("--ps-ref-margin-pct", effectivePct(14, 2.4, 34, h).toFixed(3));
     // Simpan sebagai "ukuran terakhir yang diketahui" supaya lain kali
     // Layar 2 dibuka, ukurannya melanjutkan dari yang terakhir dipakai
     // (bukan selalu balik ke ukuran bawaan 1280×720).
@@ -610,6 +649,15 @@ const Presentation = (() => {
   function init() {
     initUi();
     refreshGuestGate();
+    // Terapkan proporsi huruf pratinjau dari ukuran Layar 2 TERAKHIR
+    // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak
+    // "Berikutnya"/"Tayang" langsung memakai proporsi yang benar sedari
+    // pertama kali Studio dibuka, tanpa menunggu Layar 2 benar-benar
+    // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry".
+    try {
+      const { w, h } = getStoredScreenSize();
+      applyPreviewRatio(w, h);
+    } catch (e) {}
     // Kalau mode 2 Layar tersimpan dari kunjungan sebelumnya, jangan
     // otomatis membuka jendela baru sendiri (browser akan memblokir
     // popup yang tidak berasal dari aksi klik pengguna) -- cukup
