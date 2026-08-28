@@ -11,6 +11,7 @@
     --p-accent: #d8b45c;
     --p-font: "Literata", Georgia, serif;
     --p-scale: 1;
+    --p-koor: #ffd84a;
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -97,7 +98,7 @@
   .kidung-bait-line { margin: 0 auto clamp(10px, 1.6vh, 20px); }
   .kidung-line-gap { display: block; height: clamp(6px, 1vh, 14px); }
   .kidung-koor-line {
-    color: #ffd84a;
+    color: var(--p-koor, #ffd84a);
     font-weight: 600;
   }
   .kidung-koor-label {
@@ -523,11 +524,21 @@
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
   }
 
+  function koorColorForBg(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "#ffd84a";
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b; // 0 (gelap) - 255 (terang)
+    return luma > 170 ? "#8a6d00" : "#ffd84a";
+  }
   function applyTheme(theme) {
     if (!theme) return;
     const root = document.documentElement.style;
     if (theme.font) root.setProperty("--p-font", theme.font);
-    if (theme.bgColor) root.setProperty("--p-bg", theme.bgColor);
+    if (theme.bgColor) {
+      root.setProperty("--p-bg", theme.bgColor);
+      root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
+    }
     // Perbaikan utama: dulu warna tulisan (--p-ink) TIDAK PERNAH ikut
     // berubah saat ganti tema -- jadi tema latar terang (Terang/Klasik
     // Sepia) membuat tulisan (krem-terang bawaan) nyaris tak kelihatan
