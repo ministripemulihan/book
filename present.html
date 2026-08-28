@@ -195,6 +195,23 @@
   }
   #timerTime.done-text { fill: #d9463a; }
 
+  /* ---- Stopwatch (BARU 27 Agu 2026) -- hitung MAJU dari 0, tanpa
+     cincin progres (tidak ada "target" yang bisa diisi persentasenya
+     seperti Timer mundur di atas). Pola display:none/:not([hidden])
+     SAMA seperti #timerWrap di atas (alasannya sama persis, lihat
+     komentar panjangnya). ---- */
+  #stopwatchWrap { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1.4vh; }
+  #stopwatchWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
+  #stopwatchLabel {
+    font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.01em;
+    font-size: calc(clamp(20px, 3.2vw, 42px) * var(--p-scale)); color: var(--p-ink); text-align: center;
+  }
+  #stopwatchTime {
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
+    font-size: calc(clamp(56px, 12vw, 160px) * var(--p-scale)); color: var(--p-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ---- Pointer (Penunjuk) ---- */
   #pointerDot {
     position: fixed; width: 22px; height: 22px; border-radius: 50%;
@@ -204,6 +221,23 @@
   }
   /* ---- Pen (coret-coret) ---- */
   #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
+
+  /* ---- 🔍 Kaca Pembesar (BARU 27 Agu 2026) -- lihat showMagnify()/
+     hideMagnify() di bawah & wirePointerPen() di js/presentation-studio.js.
+     Cuma aktif untuk file yang ditayangkan sebagai gambar (PDF/gambar/
+     Word/PPT, tipe "slide" -- #slideView), disembunyikan otomatis kalau
+     bukan gambar yang sedang tayang. ---- */
+  #magnifierLens {
+    position: fixed; width: 220px; height: 220px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,.85); box-shadow: 0 6px 28px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.25);
+    pointer-events: none; z-index: 55; display: none; background-repeat: no-repeat; background-color: #111;
+  }
+  #magnifierBadge {
+    position: fixed; z-index: 56; display: none; pointer-events: none;
+    background: rgba(0,0,0,.7); color: #fff; font-family: "Inter", Arial, sans-serif; font-weight: 700;
+    font-size: 13px; padding: 4px 11px; border-radius: 999px; transform: translate(-50%, -100%);
+    white-space: nowrap;
+  }
 
   /* ---- Lapisan "aktifkan kontrol suara" (lihat komentar HTML-nya) ---- */
   #activateOverlay {
@@ -244,6 +278,11 @@
       </svg>
       <div id="timerLabel"></div>
     </div>
+    <!-- BARU (27 Agu 2026) -- lihat catatan CSS #stopwatchWrap di atas. -->
+    <div id="stopwatchWrap" hidden>
+      <div id="stopwatchLabel"></div>
+      <div id="stopwatchTime">00:00</div>
+    </div>
     <div id="idle">Menunggu tayangan dari layar utama…</div>
   </div>
 
@@ -251,6 +290,9 @@
 
   <canvas id="penCanvas"></canvas>
   <div id="pointerDot"></div>
+  <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
+  <div id="magnifierLens"></div>
+  <div id="magnifierBadge"></div>
 
   <!-- Lapisan "aktifkan kontrol suara" -- browser (Chrome dkk) TIDAK
        mengizinkan jendela ini diputar/dibunyikan lewat perintah dari
@@ -276,14 +318,64 @@
   const timerTimeEl = document.getElementById("timerTime");
   const timerLabelEl = document.getElementById("timerLabel");
   const timerRingFg = document.getElementById("timerRingFg");
+  // BARU (27 Agu 2026) -- lihat showStopwatch()/tickStopwatch() di bawah.
+  const stopwatchWrap = document.getElementById("stopwatchWrap");
+  const stopwatchTimeEl = document.getElementById("stopwatchTime");
+  const stopwatchLabelEl = document.getElementById("stopwatchLabel");
   const wartaBar = document.getElementById("wartaBar");
   const wartaText = document.getElementById("wartaText");
   const footBar = document.getElementById("footBar");
   const footText = document.getElementById("footText");
   const pointerDot = document.getElementById("pointerDot");
+  const magnifierLens = document.getElementById("magnifierLens");
+  const magnifierBadge = document.getElementById("magnifierBadge");
   const penCanvas = document.getElementById("penCanvas");
   const penCtx = penCanvas.getContext("2d");
   penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+
+  // ------------------------------------------------------------
+  // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar. Posisi kursor (`x`,`y`, 0..1
+  // relatif ke SELURUH jendela, sama seperti Penunjuk di atas) dipetakan
+  // dulu ke posisi RELATIF terhadap gambar #slideView (yang mungkin
+  // tidak memenuhi seluruh layar -- object-fit:contain bisa menyisakan
+  // ruang kosong di kiri-kanan/atas-bawah) sebelum dipakai menghitung
+  // `background-position` lensa, supaya titik yang diperbesar benar-
+  // benar pas dengan yang ditunjuk operator di kotak pratinjau Studio,
+  // bukan geser karena ruang kosong tadi. Kalau bukan gambar yang
+  // sedang tayang (`slideEl.hidden`), lensa disembunyikan -- kaca
+  // pembesar memang cuma untuk file yang diunggah (PDF/gambar/Word/PPT),
+  // bukan untuk teks ayat/Kidung.
+  // ------------------------------------------------------------
+  function hideMagnify() {
+    magnifierLens.style.display = "none";
+    magnifierBadge.style.display = "none";
+  }
+  function showMagnify(xFrac, yFrac, percent) {
+    if (!slideEl || slideEl.hidden || !slideEl.src) { hideMagnify(); return; }
+    const rect = slideEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) { hideMagnify(); return; }
+    const px = xFrac * window.innerWidth;
+    const py = yFrac * window.innerHeight;
+    let ix = (px - rect.left) / rect.width;
+    let iy = (py - rect.top) / rect.height;
+    ix = Math.min(1, Math.max(0, ix));
+    iy = Math.min(1, Math.max(0, iy));
+    const lensSize = magnifierLens.offsetWidth || 220;
+    const zoom = Math.max(0.1, (Number(percent) || 100) / 100); // 10% s.d. 10000% -> faktor 0.1 s.d. 100
+    const bgW = rect.width * zoom;
+    const bgH = rect.height * zoom;
+    magnifierLens.style.display = "block";
+    magnifierLens.style.left = px + "px";
+    magnifierLens.style.top = py + "px";
+    magnifierLens.style.transform = "translate(-50%, -50%)";
+    magnifierLens.style.backgroundImage = `url("${slideEl.src}")`;
+    magnifierLens.style.backgroundSize = `${bgW}px ${bgH}px`;
+    magnifierLens.style.backgroundPosition = `${-(ix * bgW - lensSize / 2)}px ${-(iy * bgH - lensSize / 2)}px`;
+    magnifierBadge.style.display = "block";
+    magnifierBadge.style.left = px + "px";
+    magnifierBadge.style.top = (py - lensSize / 2 - 10) + "px";
+    magnifierBadge.textContent = "🔍 " + Math.round(percent) + "%";
+  }
 
   // Sekali diklik, browser akan menganggap operator sudah "berinteraksi"
   // dengan halaman/domain ini -- setelah itu perintah Play/Pause/Mute
@@ -348,8 +440,17 @@
     }
   }
 
+  function stopStopwatch(showIdle) {
+    if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
+    stopwatchState = null;
+    stopwatchWrap.hidden = true;
+    if (showIdle) idleEl.hidden = false;
+  }
+
   function showTimer(data) {
     stopTimer(false);
+    stopStopwatch(false); // BARU -- Timer & Stopwatch berbagi ruang tengah yang sama, tidak boleh berbarengan
+    hideMagnify(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
     timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, _rang: false };
     timerLabelEl.textContent = timerState.label;
     timerWrap.hidden = false;
@@ -364,6 +465,62 @@
     timerState = null;
     timerWrap.hidden = true;
     if (showIdle) idleEl.hidden = false;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (27 Agu 2026) -- ⏱️ Stopwatch (hitung MAJU dari 0, dikendalikan
+  // dari Layar 1/Controller lewat #psStopwatchStartBtn dkk di
+  // js/presentation-studio.js & #presentStopwatchStartBtn dkk di
+  // js/presentation.js -- lihat komentar panjang di kedua file itu).
+  // Pola SAMA seperti Timer (hitung mundur) di atas -- BEDANYA cuma di
+  // arah hitungannya & tidak ada cincin progres (tidak ada "target").
+  //   - `baseStartAt` = kapan (epoch ms) stopwatch ini SEHARUSNYA mulai
+  //     dari 0 kalau berjalan TERUS TANPA JEDA -- dihitung ulang di sisi
+  //     Controller tiap kali "▶️ Mulai" ditekan (baik pertama kali
+  //     maupun melanjutkan dari jeda): `Date.now() - sudahBerjalanMs`.
+  //     Elapsed SEKARANG = `Date.now() - baseStartAt`, cukup 1 angka
+  //     ini untuk tetap akurat lewat postMessage tanpa perlu kirim
+  //     "centang" tiap detik.
+  //   - `action:"stop"` (jeda): TIDAK mengirim elapsed apa pun -- Layar 2
+  //     cukup BERHENTI meng-update tampilan (nilai TERAKHIR yang sempat
+  //     dihitung otomatis tetap terlihat, beku di situ) sampai
+  //     "start" berikutnya datang.
+  //   - `action:"reset"`: sembunyikan & kembali ke 00:00.
+  // ------------------------------------------------------------
+  let stopwatchState = null; // { baseStartAt, label }
+  let stopwatchInterval = null;
+  function fmtStopwatch(totalSec) {
+    const s = Math.max(0, Math.floor(totalSec));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    const pad2 = (n) => String(n).padStart(2, "0");
+    return hh > 0 ? `${hh}:${pad2(mm)}:${pad2(ss)}` : `${pad2(mm)}:${pad2(ss)}`;
+  }
+  function tickStopwatch() {
+    if (!stopwatchState) return;
+    const elapsed = (Date.now() - stopwatchState.baseStartAt) / 1000;
+    stopwatchTimeEl.textContent = fmtStopwatch(elapsed);
+  }
+  function showStopwatch(data) {
+    stopTimer(false); // Timer & Stopwatch tidak boleh berbarengan (lihat catatan di atas)
+    hideMagnify();
+    stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
+    stopwatchLabelEl.textContent = stopwatchState.label;
+    stopwatchWrap.hidden = false;
+    idleEl.hidden = true;
+    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    tickStopwatch();
+    if (stopwatchInterval) clearInterval(stopwatchInterval);
+    stopwatchInterval = setInterval(tickStopwatch, 250);
+  }
+  function pauseStopwatchDisplay() {
+    // "Jeda" -- BEDA dari stopStopwatch(): overlay & label TETAP tampil,
+    // cuma centangnya berhenti (angka terakhir tetap beku di layar),
+    // supaya operator/jemaat masih bisa melihat berapa lama sesi
+    // berjalan sejauh ini walau sedang dijeda.
+    if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
   }
 
   function applyTheme(theme) {
@@ -395,6 +552,8 @@
 
   function showMain(kind, data) {
     stopTimer(false);
+    stopStopwatch(false);
+    hideMagnify(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
     idleEl.hidden = true;
     logoEl.hidden = true;
     slideEl.hidden = true;
@@ -466,6 +625,8 @@
       textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
       if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
       stopTimer(true);
+      stopStopwatch(true);
+      hideMagnify();
       return;
     }
     if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung") {
@@ -475,6 +636,14 @@
     if (data.type === "timer") {
       if (data.action === "stop") { stopTimer(true); }
       else { showTimer(data); }
+      return;
+    }
+    if (data.type === "stopwatch") {
+      // BARU (27 Agu 2026) -- lihat catatan panjang di showStopwatch() di
+      // atas untuk arti tiap `action`.
+      if (data.action === "start") showStopwatch(data);
+      else if (data.action === "stop") pauseStopwatchDisplay();
+      else if (data.action === "reset") stopStopwatch(true);
       return;
     }
     if (data.type === "theme") { applyTheme(data.theme); return; }
@@ -487,6 +656,11 @@
       pointerDot.style.background = data.color || "#ff3b30";
       pointerDot.style.left = (data.x * window.innerWidth) + "px";
       pointerDot.style.top = (data.y * window.innerHeight) + "px";
+      return;
+    }
+    if (data.type === "magnify") {
+      if (!data.on) { hideMagnify(); return; }
+      showMagnify(data.x, data.y, data.percent || 100);
       return;
     }
     if (data.type === "yt_control") {
@@ -537,11 +711,14 @@
         // sebelumnya canvas cuma di-resize (otomatis menghapus isi) lalu
         // cuma segmen BARU yang digambar, jadi coretan lama hilang/
         // terlihat terpotong saat jendela ditarik-ubah ukurannya.
-        penStrokeHistory.push({ pts: data.stroke, color: data.color || "#ff3b30" });
+        // BARU (27 Agu 2026) -- ukuran coretan dikirim dari Studio lewat
+        // `data.size` (px), disimpan juga di riwayat supaya redraw saat
+        // resize tetap setebal aslinya (bukan selalu 4px seperti dulu).
+        penStrokeHistory.push({ pts: data.stroke, color: data.color || "#ff3b30", size: data.size || 4 });
         if (penCanvas.width !== window.innerWidth || penCanvas.height !== window.innerHeight) {
           redrawAllPenStrokes();
         } else {
-          drawPenSegment(data.stroke, data.color || "#ff3b30");
+          drawPenSegment(data.stroke, data.color || "#ff3b30", data.size || 4);
         }
       }
       return;
@@ -551,9 +728,9 @@
   // Riwayat semua segmen coretan Pen (koordinat pecahan 0..1) supaya bisa
   // digambar ulang penuh & akurat tiap kali ukuran jendela berubah.
   let penStrokeHistory = [];
-  function drawPenSegment(stroke, color) {
+  function drawPenSegment(stroke, color, size) {
     penCtx.strokeStyle = color;
-    penCtx.lineWidth = 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
+    penCtx.lineWidth = size || 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
     penCtx.beginPath();
     stroke.forEach((pt, i) => {
       const x = pt.x * penCanvas.width, y = pt.y * penCanvas.height;
@@ -564,7 +741,7 @@
   function redrawAllPenStrokes() {
     penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
     penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
-    penStrokeHistory.forEach((s) => drawPenSegment(s.pts, s.color));
+    penStrokeHistory.forEach((s) => drawPenSegment(s.pts, s.color, s.size));
   }
 
   window.addEventListener("message", (e) => {
