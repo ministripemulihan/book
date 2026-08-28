@@ -3035,7 +3035,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
      terpotong), DAN bisa diseret membesar/mengecil lewat splitter
      (#psPreviewResizeHandle, lihat wirePreviewResize() di
      js/presentation-studio.js) yang menyetel variabel --ps-preview-row-h. */
-  grid-template-rows: var(--ps-preview-row-h, minmax(170px, 22vh)) 1fr;
+  grid-template-rows: var(--ps-preview-row-h, minmax(160px, 18vh)) 1fr;
   grid-template-areas:
     "preview preview preview"
     "controls-left controls-mid controls-right";
