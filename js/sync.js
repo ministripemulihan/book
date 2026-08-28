@@ -407,4 +407,71 @@ const Sync = {
       return null;
     }
   },
+
+  // ---------------- Sinkron Media -- Tahap 4 (tarik dari perangkat lain) ----------------
+  // Daftar RINGAN (tanpa isi berkas) semua file yang sudah diunggah
+  // `username` ini ke Drive lewat uploadMedia() di atas -- dipakai
+  // syncMediaFromDrive() (js/collections.js) saat Media Tersimpan
+  // dibuka, supaya perangkat BARU (IndexedDB masih kosong) tahu file
+  // apa saja yang sudah pernah disinkron dari perangkat LAIN. Lihat
+  // listDriveFilesForUser_() di apps-script/Code.gs.
+  async listMediaFiles(username) {
+    try {
+      const data = await this._get({ type: "media_list", username });
+      return (data && data.ok && data.files) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // ---------------- Sinkron Media -- Tahap 6 (admin: pemakaian Drive) ----------------
+  async driveUsage(username) {
+    try {
+      const data = await this._get({ type: "drive_usage", username });
+      if (data && data.ok) return data;
+      return { ok: false, error: (data && data.error) || "Tidak ada balasan dari server." };
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server (periksa sambungan internet)." };
+    }
+  },
+
+  // ---------------- Sinkron Media -- kepemilikan & persetujuan hapus (27 Agu 2026) ----------------
+  // Lihat catatan panjang di konstanta MEDIA_OWNERSHIP_SHEET/
+  // MEDIA_DELETE_REQUESTS_SHEET (apps-script/Code.gs) untuk latar
+  // belakangnya: hanya pengunggah PERTAMA yang boleh menyetujui
+  // penghapusan permanen dari Drive.
+  async mediaOwners(fileId) {
+    try {
+      const data = await this._get({ type: "media_owners", fileId });
+      if (data && data.ok) return data;
+      return { ok: false, error: (data && data.error) || "Tidak ada balasan dari server." };
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
+  // Mengembalikan {ok, deleted, pending, requestId, originalOwner} --
+  // `deleted:true` kalau langsung terhapus (peminta = pemilik pertama),
+  // `pending:true` kalau masih menunggu persetujuan orang lain.
+  async requestMediaDelete(username, fileId, fileName, reason) {
+    try {
+      return await this._post({ type: "media_delete_request", username, fileId, fileName, reason });
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
+  async pendingMediaDeleteRequests(username) {
+    try {
+      const data = await this._get({ type: "media_delete_requests_pending", username });
+      return (data && data.ok && data.requests) || [];
+    } catch (e) {
+      return [];
+    }
+  },
+  async respondMediaDelete(username, requestId, approve) {
+    try {
+      return await this._post({ type: "media_delete_respond", username, requestId, approve });
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
 };
