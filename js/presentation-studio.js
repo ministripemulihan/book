@@ -1,5 +1,5 @@
 // ============================================================
-//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS, 
+//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS,
 //  KHUSUS laptop/komputer (layar lebar). Menggantikan panel kecil
 //  lama yang "turun terus ke bawah" di menu ⋮ untuk kasus 2 layar --
 //  panel lama (js/presentation.js) tetap dipakai apa adanya untuk
@@ -2776,23 +2776,65 @@ const PresentationStudio = (() => {
     if (!handle || !studio) return;
     const STORAGE_KEY = "bible_app_studio_preview_row_h_v1";
     const LABEL_OVERHEAD = 60; // tinggi label "Berikutnya/Tayang" + padding panel
-    const MIN_ROW = 130;
-    // PERMINTAAN OPERATOR (28 Agu 2026): batas atas lama (82% tinggi
-    // jendela) kebablasan -- kotak "Berikutnya"/"Tayang" bisa diseret
-    // nyaris sebesar seluruh Studio, sampai TIDAK CUKUP ruang tersisa
-    // buat panel kontrol di bawahnya (Kumpulan Ayat / Kidung / Aksi &
-    // Tema) -- itulah sebab panel-panel itu jadi kepotong & butuh
-    // discroll (muncul garis scrollbar vertikal di tepi kanan, lihat
-    // titik No. 2 di tangkapan layar operator). Sekarang baris pratinjau
-    // dikunci JAUH lebih kecil (mockup "2 monitor kecil" sungguhan,
-    // bukan lagi bisa segede layar): maksimum 220px ATAU sisa tinggi
-    // jendela dikurangi 460px (kira-kira tinggi minimum panel kontrol
-    // supaya tidak perlu discroll) -- yang lebih kecil di antara
-    // keduanya yang dipakai. Nilai lama yang mungkin sudah kepalang
-    // tersimpan di localStorage (dari sebelum perbaikan ini) IKUT
-    // dikecilkan otomatis lewat clamp ini setiap kali dimuat/diresize,
-    // operator tidak perlu menyeret ulang secara manual.
-    function maxRow() { return Math.max(MIN_ROW, Math.min(220, window.innerHeight - 460)); }
+    const MIN_ROW = 150;
+    // PERMINTAAN OPERATOR (28 Agu 2026, direvisi lagi hari yang sama, lalu
+    // direvisi SEKALI LAGI di hari yang sama juga -- lihat mockup yang
+    // dikirim operator): batas atas 82% tinggi jendela SEHARUSNYA sudah
+    // longgar, TAPI ternyata kotak "Berikutnya"/"Tayang" tidak pernah
+    // benar-benar mencapai sebesar itu -- sebabnya BUKAN batas tinggi ini,
+    // melainkan LEBAR kotak yang diam-diam terpotong oleh aturan CSS
+    // `max-width: 47%` di .ps-preview-slot (lihat css/style.css, blok
+    // .ps-dual-live). Dulu tinggi kotak (--ps-preview-box-h) terus
+    // membesar mengikuti seretan splitter TANPA PERNAH dicek apakah
+    // lebar hasil rasio 16:9-nya (tinggi × 16/9) masih muat di dalam
+    // batas 47% lebar panel itu -- begitu tidak muat, CSS max-width
+    // "menang" & memotong lebarnya, sehingga kotak jadi PENYOK (rasio
+    // rusak, bukan lagi 16:9) alih-alih membesar rapi. Splitter jadi
+    // TERASA mentok jauh lebih awal daripada batas 82vh yang sebenarnya.
+    //
+    // Perbaikan: batas atas splitter sekarang dihitung dari DUA sisi
+    // sekaligus -- (a) tinggi jendela (longgar, 92%) DAN (b) lebar panel
+    // pratinjau yang sungguh tersedia untuk 1 kotak (lebar baris dikurangi
+    // tombol "▶ Tayangkan" di tengah & jarak antar-elemen, dibagi 2),
+    // dikonversi balik ke tinggi maksimum lewat rasio Layar 2 yang
+    // sungguh aktif (--ps-preview-ratio, sama seperti present.html) --
+    // lalu dipakai yang PALING KECIL di antara keduanya. Hasilnya:
+    // splitter selalu bisa diseret sampai BENAR-BENAR mentok (kotak
+    // sebesar mungkin, memenuhi lebar ATAU tinggi yang tersedia, mana
+    // yang lebih dulu habis) TANPA PERNAH membuat kotaknya penyok --
+    // bentuknya selalu identik dengan Layar 2 (present.html) sungguhan.
+    function currentRatio() {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue("--ps-preview-ratio");
+      const m = raw && raw.match(/([\d.]+)\s*\/\s*([\d.]+)/);
+      if (m) {
+        const w = parseFloat(m[1]), h = parseFloat(m[2]);
+        if (w > 0 && h > 0) return w / h;
+      }
+      return 16 / 9;
+    }
+    function maxRowByWidth() {
+      const row = el("psPreviewRow");
+      if (!row) return Infinity;
+      const rowW = row.getBoundingClientRect().width;
+      if (!(rowW > 0)) return Infinity;
+      const center = el("psPreviewCenter");
+      const centerW = (center && !center.hidden) ? center.getBoundingClientRect().width : 0;
+      let gap = 14;
+      try {
+        const g = parseFloat(getComputedStyle(row).columnGap || getComputedStyle(row).gap);
+        if (g >= 0) gap = g;
+      } catch (e) {}
+      // 2 celah (kiri & kanan tombol tengah) dikurangi dari lebar baris,
+      // sisanya dibagi 2 untuk 1 kotak (Berikutnya ATAU Tayang).
+      const perSlotW = Math.max(60, (rowW - centerW - gap * 2) / 2);
+      const boxH = perSlotW / currentRatio();
+      return Math.round(boxH + LABEL_OVERHEAD);
+    }
+    function maxRow() {
+      const byHeight = Math.round(window.innerHeight * 0.92);
+      const byWidth = maxRowByWidth();
+      return Math.max(MIN_ROW, Math.min(byHeight, byWidth));
+    }
     function apply(rowPx) {
       const clamped = Math.max(MIN_ROW, Math.min(maxRow(), Math.round(rowPx)));
       studio.style.setProperty("--ps-preview-row-h", clamped + "px");
@@ -2834,6 +2876,11 @@ const PresentationStudio = (() => {
     handle.addEventListener("mousedown", onDown);
     handle.addEventListener("touchstart", onDown, { passive: false });
     window.addEventListener("resize", () => apply(currentRowH()));
+    // Rasio Layar 2 sungguhan bisa berubah kapan saja (mis. jendela Layar 2
+    // di-resize operator) -- lihat dispatch "ps-preview-ratio-changed" di
+    // applyPreviewRatio() (js/presentation.js). Hitung ulang & terapkan
+    // batas baru supaya kotak "Berikutnya"/"Tayang" tidak jadi penyok.
+    window.addEventListener("ps-preview-ratio-changed", () => apply(currentRowH()));
   }
 
   // ------------------------------------------------------------
