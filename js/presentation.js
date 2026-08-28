@@ -293,7 +293,7 @@ const Presentation = (() => {
       // js/presentation-studio.js, dengan penanganan "kidung" yang sama).
       const kRefHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtmlLocal(payload.ref)}</div>` : "";
       const baitHtml = (payload.bait || []).map((b) => `<div class="present-preview-text">${escapeHtmlLocal((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`).join("");
-      const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:#ffd84a; font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtmlLocal(payload.koorTeks)}</div>` : "";
+      const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:var(--ps-preview-koor, #ffd84a); font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtmlLocal(payload.koorTeks)}</div>` : "";
       box.innerHTML = `${kRefHtml}${baitHtml}${koorHtml}`;
       return;
     }
