@@ -209,6 +209,51 @@ function addKidungToCollection(username, name, kidungItem) {
   });
 }
 
+// `mediaItem`: hasil loadMediaItems() (js/collections.js) -- SATU baris
+// Media Tersimpan (PDF/gambar yang sudah diunggah lewat tab File Studio
+// Presentasi). `pageIndex`: halaman mana dari `mediaItem.images` yang
+// mau disimpan sebagai item ini (0 = halaman pertama).
+//
+// BARU (27 Agu 2026) -- SEBELUM INI, "➕ Daftar" di tab File Studio Presentasi
+// cuma menyimpan berkas ke "🖼️ Media Tersimpan" (perpustakaan pribadi,
+// TERPISAH dari Kumpulan Ayat) -- tidak ada jalan sama sekali untuk
+// memasukkan PDF/gambar ke dalam Kumpulan Ayat (daftar tayang berurutan
+// di kolom kiri), padahal Kidung & Alkitab sudah bisa langsung lewat
+// addKidungToCollection()/addVerseToCollection(). Fungsi ini menutup
+// celah itu, dipanggil dari renderMediaList() (js/presentation-studio.js).
+//
+// SENGAJA cuma menyimpan REFERENSI (mediaItemId + pageIndex), BUKAN
+// menyalin data gambarnya (data-URL) langsung ke dalam kumpulan --
+// gambar hasil render PDF bisa besar (ratusan KB per halaman), kalau
+// disalin ke SETIAP kumpulan yang memakainya, localStorage (tempat
+// Kumpulan Ayat disimpan) bisa cepat penuh. Konsekuensinya: kalau
+// mediaItemId aslinya dihapus dari Media Tersimpan, item ini akan
+// tampil "media tidak ditemukan" saat ditayangkan (lihat sendGenericItemLive
+// di js/presentation-studio.js) -- itu risiko yang disengaja diambil demi
+// hemat ruang, sama seperti item "verse" yang juga cuma simpan verseId,
+// bukan salinan teks ayatnya.
+function addMediaToCollection(username, name, mediaItem, pageIndex) {
+  if (!mediaItem || !mediaItem.id) return null;
+  return addItemToCollection(username, name, {
+    type: "media",
+    mediaItemId: mediaItem.id,
+    name: mediaItem.name || mediaItem.sourceFileName || "Berkas",
+    pageIndex: pageIndex || 0,
+    pageCount: (mediaItem.images || []).length || 1,
+    // BARU (Tahap 5 peta jalan Drive, ROADMAP-drive-sync.md) -- kalau
+    // berkas ASLI item ini pernah disinkron ke Drive (Tahap 3, lihat
+    // `driveFileId` di catatan bentuk item Media Tersimpan di atas),
+    // id-nya ikut disimpan di sini juga (dikirim ke server lewat
+    // ItemsJson saat pushCollection). SATU-SATUNYA gunanya: kalau
+    // kumpulan ini nanti di-🔗Bagikan ke akun lain, shareCollectionToUser_()
+    // di apps-script/Code.gs bisa MENYALIN berkas Drive-nya (makeCopy())
+    // ke akun penerima, supaya file media ikut terbagikan, bukan cuma
+    // teks referensinya. null kalau item ini belum pernah disinkron ke
+    // Drive -- tetap dibagikan seperti biasa, cuma tanpa berkas medianya.
+    driveFileId: mediaItem.driveFileId || null,
+  });
+}
+
 // Hapus/pindah item berdasarkan INDEX di array items (bukan verseId --
 // item teks/pengumuman/kidung tidak punya id unik alami). Dipakai oleh
 // panel Kumpulan Ayat generik di js/app.js.
@@ -592,14 +637,37 @@ async function addMediaItem(username, name, images, sourceFileName, type, videoL
       // CONFIG.APPS_SCRIPT_URL belum diisi sama sekali -- beda dari
       // "gagal karena offline", jadi dilaporkan beda pesannya supaya
       // tidak membingungkan (pengguna tidak akan mengira internetnya
-      // yang bermasalah, padahal memang belum dikonfigurasi).
+      // yang bermasalah, padahal memang belum dikonfigurasi). TIDAK
+      // diantre (Tahap 7) -- mencoba lagi tidak akan pernah berhasil
+      // selama CONFIG.APPS_SCRIPT_URL tetap kosong.
       if (typeof onSyncResult === "function") onSyncResult(false, "Sinkron belum dikonfigurasi (CONFIG.APPS_SCRIPT_URL kosong).");
+    } else if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      // BARU (Tahap 7, ROADMAP-drive-sync.md) -- HP/komputer SEDANG
+      // offline saat ini: jangan buang waktu mencoba fetch() yang sudah
+      // pasti gagal (browser biasanya tetap menunggu timeout dulu) --
+      // langsung diantre lewat queueMediaUpload() di bawah, dicoba lagi
+      // otomatis nanti (lihat processMediaUploadQueue(), dipanggil saat
+      // event "online" & saat Media Tersimpan dibuka lagi, lihat
+      // wireMediaUploadQueueAutoRetry() di bawah). Penyimpanan LOKAL
+      // (di atas) sudah 100% berhasil terlepas dari ini -- media tetap
+      // bisa dipakai/ditayangkan seperti biasa di perangkat ini, cuma
+      // salinan Drive-nya yang menyusul belakangan.
+      queueMediaUpload(username, item.id, sourceFileName || trimmedName, uploadSource);
+      if (typeof onSyncResult === "function") onSyncResult(false, "☁️ Sedang offline -- diantre, akan otomatis dicoba lagi saat online.");
     } else {
       Sync.uploadMedia(username, sourceFileName || trimmedName, uploadSource)
         .then((fileId) => {
           if (!fileId) {
+            // BARU (Tahap 7) -- server menolak/tidak membalas (mis.
+            // deployment belum di-redeploy ulang, ATAU jaringan sempat
+            // putus di tengah jalan walau navigator.onLine masih true
+            // saat awal dicoba) -- diantre juga supaya otomatis dicoba
+            // lagi, alih-alih operator harus mengunggah ulang manual
+            // dari awal begitu penyebabnya (mis. deployment) sudah
+            // diperbaiki.
+            queueMediaUpload(username, item.id, sourceFileName || trimmedName, uploadSource);
             if (typeof onSyncResult === "function") {
-              onSyncResult(false, "Server menolak/tidak membalas fileId (cek deployment Apps Script sudah versi terbaru & izin akses Drive sudah disetujui).");
+              onSyncResult(false, "Server menolak/tidak membalas fileId (cek deployment Apps Script sudah versi terbaru & izin akses Drive sudah disetujui) -- diantre untuk dicoba lagi otomatis.");
             }
             return;
           }
@@ -611,11 +679,124 @@ async function addMediaItem(username, name, images, sourceFileName, type, videoL
           if (typeof onSyncResult === "function") onSyncResult(true, null);
         })
         .catch((e) => {
-          if (typeof onSyncResult === "function") onSyncResult(false, "Jaringan/permintaan gagal: " + String((e && e.message) || e));
+          // BARU (Tahap 7) -- gagal jaringan di tengah jalan (mis.
+          // sinyal hilang pas sedang mengunggah) -- diantre, sama
+          // seperti 2 cabang gagal di atas.
+          queueMediaUpload(username, item.id, sourceFileName || trimmedName, uploadSource);
+          if (typeof onSyncResult === "function") onSyncResult(false, "Jaringan/permintaan gagal: " + String((e && e.message) || e) + " -- diantre untuk dicoba lagi otomatis.");
         });
     }
   }
   return item.id;
+}
+
+// ------------------------------------------------------------
+// TAHAP 7 (ROADMAP-drive-sync.md) -- "Penanganan offline/gagal-kirim
+// (antrean 'menunggu sinkron')". Sebelum ini, kalau unggahan ke Drive
+// gagal (offline / server tidak terjangkau saat itu), item tersebut
+// SELAMANYA tidak akan ikut ke Drive kecuali diunggah ULANG SECARA
+// MANUAL dari awal (hapus dari Media Tersimpan, unggah lagi) -- tidak
+// ada mekanisme coba-lagi otomatis sama sekali. Fungsi-fungsi di bawah
+// menutup celah itu: entri antrean disimpan di IndexedDB (store
+// "mediaUploadQueue", lihat js/db.js), dicoba lagi otomatis:
+//   (a) begitu koneksi kembali online (event "online" di window), &
+//   (b) setiap kali Media Tersimpan dibuka/disegarkan (renderMediaList(),
+//       js/presentation-studio.js) -- jaring pengaman kalau event
+//       "online" tidak sempat terpasang/terlewat (mis. app baru dibuka
+//       lagi setelah offline).
+// SELALU best-effort & tidak pernah memblokir apa pun -- kalau gagal
+// lagi, entri tetap di antrean untuk dicoba lagi nanti, TIDAK
+// menampilkan error yang mengganggu di tengah pemakaian normal.
+// ------------------------------------------------------------
+
+// 1 entri antrean = 1 percobaan unggah yang tertunda. `id` dibuat dari
+// `mediaItemId` (bukan acak) SUPAYA idempotent -- kalau addMediaItem()
+// gagal berkali-kali untuk item yang SAMA (mis. offline lama), entrinya
+// cuma DITIMPA ulang (put() dengan id sama), tidak menumpuk jadi banyak
+// salinan antrean untuk 1 item yang sama.
+function _mediaQueueId(mediaItemId) { return "q_" + mediaItemId; }
+
+async function queueMediaUpload(username, mediaItemId, fileName, dataUrl) {
+  try {
+    if (typeof LocalDB === "undefined") return false;
+    const now = new Date().toISOString();
+    await LocalDB.putQueuedMediaUpload({
+      id: _mediaQueueId(mediaItemId),
+      username: username || "guest",
+      mediaItemId,
+      fileName: fileName || "berkas",
+      dataUrl,
+      attempts: 0,
+      queuedAt: now,
+    });
+    // Perbarui badge "⏳N" SEKETIKA (jangan menunggu renderMediaList()
+    // berikutnya dibuka) -- lihat updateMediaQueueBadge() di
+    // js/presentation-studio.js.
+    if (typeof window.updateMediaQueueBadge === "function") window.updateMediaQueueBadge(username);
+    return true;
+  } catch (e) {
+    return false; // penyimpanan penuh -- diamkan, item tetap jalan lokal
+  }
+}
+
+// Dipanggil saat online lagi / Media Tersimpan dibuka -- mencoba SEMUA
+// entri antrean milik `username` ini satu-per-satu (berurutan, BUKAN
+// paralel, supaya tidak membanjiri Apps Script dengan banyak permintaan
+// besar sekaligus kalau antreannya panjang). Mengembalikan jumlah yang
+// BERHASIL disinkronkan (dipakai UI untuk menampilkan notifikasi
+// singkat kalau > 0, lihat wireMediaUploadQueueAutoRetry() di bawah).
+async function processMediaUploadQueue(username) {
+  try {
+    if (typeof Sync === "undefined" || !Sync.enabled() || typeof LocalDB === "undefined") return 0;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return 0;
+    const queue = await LocalDB.getQueuedMediaUploadsByUsername(username || "guest");
+    if (!queue.length) return 0;
+    let successCount = 0;
+    for (const entry of queue) {
+      try {
+        const fileId = await Sync.uploadMedia(entry.username, entry.fileName, entry.dataUrl);
+        if (!fileId) continue; // masih gagal -- biarkan di antrean, coba lagi lain kali
+        // Berhasil -- perbarui item Media Tersimpan aslinya (kalau masih
+        // ada -- operator mungkin sudah menghapusnya duluan sebelum
+        // sempat tersinkron, itu bukan masalah, cukup buang entri
+        // antreannya saja tanpa error) dengan driveFileId barunya.
+        const item = await LocalDB.getMediaItem(entry.mediaItemId).catch(() => null);
+        if (item) {
+          item.driveFileId = fileId;
+          item.updatedAt = new Date().toISOString();
+          await LocalDB.putMediaItem(item).catch(() => {});
+        }
+        await LocalDB.deleteQueuedMediaUpload(entry.id).catch(() => {});
+        successCount++;
+      } catch (e) {
+        // masih gagal (jaringan putus lagi di tengah antrean, dst) --
+        // biarkan entri ini di antrean, lanjut ke entri berikutnya
+        // (bukan langsung berhenti semua, siapa tahu sisanya berhasil).
+      }
+    }
+    return successCount;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Dipasang SEKALI saja (dipanggil dari app.js setelah login berhasil) --
+// pasang listener "online" & langsung coba proses antrean sekali di
+// awal (jaring pengaman kalau app dibuka sudah dalam keadaan online
+// setelah sempat ditutup saat offline dengan antrean tertunda).
+let _mediaQueueAutoRetryWired = false;
+function wireMediaUploadQueueAutoRetry(username) {
+  if (typeof window === "undefined") return;
+  const tryNow = async () => {
+    const n = await processMediaUploadQueue(username);
+    if (typeof window.updateMediaQueueBadge === "function") window.updateMediaQueueBadge(username);
+    if (n > 0 && typeof renderMediaList === "function") renderMediaList();
+  };
+  if (!_mediaQueueAutoRetryWired) {
+    _mediaQueueAutoRetryWired = true;
+    window.addEventListener("online", tryNow);
+  }
+  tryNow(); // coba sekali langsung juga, tidak menunggu event "online"
 }
 
 async function loadMediaItems(username) {
@@ -630,6 +811,68 @@ async function loadMediaItems(username) {
   }
 }
 
+// ------------------------------------------------------------
+// TAHAP 4 (ROADMAP-drive-sync.md) -- "Tarik media dari Drive di
+// perangkat lain". Dipanggil dari renderMediaList() (js/presentation-
+// studio.js) SETIAP KALI panel "🖼️ Media Tersimpan" dibuka/disegarkan --
+// membandingkan daftar file yang sudah ada di Drive milik akun ini
+// (Sync.listMediaFiles(), metadata ringan saja) dengan `driveFileId`
+// yang SUDAH dikenal secara lokal (IndexedDB perangkat ini). File Drive
+// yang belum punya padanan lokal berarti diunggah dari PERANGKAT LAIN
+// (mis. PDF disinkron dari komputer, sekarang dibuka lewat HP) --
+// untuk itu dibuatkan item "stub" lokal (`images: []`, `driveOnly:
+// true`) supaya MUNCUL di daftar Media Tersimpan perangkat ini juga,
+// TAPI isi gambarnya belum diunduh sama sekali (hemat kuota HP, sesuai
+// permintaan "baru diunduh saat mau ditayangkan, bukan auto-download
+// semua sekaligus") -- baru benar-benar diunduh saat operator menekan
+// tombol "☁️ Muat dari Drive" (loadDriveMediaOnDemand(), di
+// js/presentation-studio.js).
+//
+// Best-effort & SEPENUHNYA aman dipanggil berulang kali: kalau offline/
+// Sync belum dikonfigurasi, langsung kembali tanpa melakukan apa-apa
+// (daftar lokal yang sudah ada tetap seperti biasa, sama seperti
+// sebelum Tahap 4 ada). TIDAK PERNAH menghapus/menimpa item lokal yang
+// sudah punya gambarnya sendiri -- hanya MENAMBAH stub untuk file yang
+// benar-benar belum dikenal perangkat ini.
+async function syncMediaFromDrive(username) {
+  try {
+    if (typeof Sync === "undefined" || !Sync.enabled() || typeof Sync.listMediaFiles !== "function") return false;
+    if (typeof LocalDB === "undefined") return false;
+    const remoteFiles = await Sync.listMediaFiles(username);
+    if (!remoteFiles || !remoteFiles.length) return false;
+
+    const localItems = await loadMediaItems(username);
+    const knownFileIds = {};
+    localItems.forEach((it) => { if (it.driveFileId) knownFileIds[it.driveFileId] = true; });
+
+    const newOnes = remoteFiles.filter((f) => f.fileId && !knownFileIds[f.fileId]);
+    if (!newOnes.length) return false;
+
+    const now = new Date().toISOString();
+    for (const f of newOnes) {
+      const item = {
+        id: _genMediaId(),
+        username: username || "guest",
+        name: f.name || "Berkas dari Drive",
+        images: [], // BELUM diunduh -- lihat loadDriveMediaOnDemand()
+        sourceFileName: f.name || "",
+        type: "image", // ditentukan ulang saat diunduh (bisa jadi PDF)
+        videoLabels: null,
+        createdAt: f.createdAt || now,
+        updatedAt: f.createdAt || now,
+        originalFile: null,
+        driveFileId: f.fileId,
+        driveMimeType: f.mimeType || "",
+        driveOnly: true, // BARU -- ditandai belum diunduh isinya sama sekali
+      };
+      await LocalDB.putMediaItem(item).catch(() => {});
+    }
+    return true;
+  } catch (e) {
+    return false; // offline / gagal -- daftar lokal tetap seperti biasa
+  }
+}
+
 async function removeMediaItem(username, id) {
   try {
     if (typeof LocalDB === "undefined") return false;
@@ -638,6 +881,55 @@ async function removeMediaItem(username, id) {
   } catch (e) {
     return false;
   }
+}
+
+// ------------------------------------------------------------
+// BARU (27 Agu 2026) -- penghapusan PERMANEN dari Drive (bukan cuma
+// menyembunyikan dari daftar lokal seperti removeMediaItem() di atas),
+// dengan aturan yang diminta secara eksplisit: hanya pengunggah PERTAMA
+// yang boleh menyetujui. Lihat catatan panjang di konstanta
+// MEDIA_OWNERSHIP_SHEET/MEDIA_DELETE_REQUESTS_SHEET di
+// apps-script/Code.gs untuk latar belakang lengkapnya. Fungsi-fungsi di
+// sini murni membungkus Sync.* (js/sync.js) supaya UI (js/presentation-
+// studio.js & js/app.js) tidak perlu tahu soal Sync langsung, pola sama
+// seperti checkPendingCollectionShares()/respondToCollectionShare() di
+// atas untuk 🔗 Bagikan Kumpulan Ayat.
+// ------------------------------------------------------------
+
+// "Siapa saja yang pakai file ini?" -- dipanggil SEBELUM dialog
+// konfirmasi hapus ditampilkan, supaya operator melihat daftar pemakai
+// dulu sebelum menekan "Ya, hapus" (permintaan eksplisit: "ada
+// persetujuan apa yakin mau dihapus").
+async function getMediaFileUsers(fileId) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) return { ok: false, users: [] };
+  return Sync.mediaOwners(fileId);
+}
+
+// Mengajukan hapus permanen. Kalau `username` adalah pengunggah pertama,
+// server langsung menghapusnya (res.deleted === true). Kalau bukan,
+// server membuat permintaan tertunda (res.pending === true) yang harus
+// disetujui `res.originalOwner` dulu (lihat checkPendingMediaDeleteRequests()
+// di bawah, dicek saat pemilik pertama itu login).
+async function requestDeleteMediaFromDrive(username, fileId, fileName, reason) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    return { ok: false, error: "Sinkronisasi ke server belum aktif." };
+  }
+  return Sync.requestMediaDelete(username, fileId, fileName, reason);
+}
+
+// Dipanggil saat login (js/app.js, mirip checkPendingCollectionShares) --
+// daftar permintaan hapus yang MENUNGGU keputusan `username` ini sebagai
+// pemilik pertama.
+async function checkPendingMediaDeleteRequests(username) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) return [];
+  return Sync.pendingMediaDeleteRequests(username);
+}
+
+async function respondToMediaDeleteRequest(username, requestId, approve) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    return { ok: false, error: "Sinkronisasi ke server belum aktif." };
+  }
+  return Sync.respondMediaDelete(username, requestId, approve);
 }
 
 // Nama item Media Tersimpan yang PALING BARU dipakai, sama pola seperti
