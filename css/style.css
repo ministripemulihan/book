@@ -2892,24 +2892,32 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    menunjuk kata yang sama di kedua tempat. Fallback ke px tetap di
    browser lama yang belum kenal cqw (clamp tetap jalan, minus skala). */
 .ps-preview-box-wrap .ps-preview-box {
-  /* Sama seperti padding "5vh 6vw" #stage di present.html, versi cqh/cqw
-     supaya proporsinya ikut sama walau kotak pratinjau jauh lebih kecil. */
-  padding: clamp(8px, 5cqh, 60px) clamp(8px, 6cqw, 72px);
+  /* Sama seperti padding "5vh 6vw" #stage di present.html -- TIDAK ada
+     batas atas px di sana, jadi di sini juga TIDAK dibatasi atas (dulu
+     ada batas 60px/72px yang bikin padding di kotak besar berhenti
+     membesar sementara di Layar 2 asli terus mengikuti persentase --
+     max() cukup jaga batas BAWAH saja supaya tetap kelihatan di kotak
+     yang sangat kecil). */
+  padding: max(8px, 5cqh) max(8px, 6cqw);
 }
-/* Persentase & batas atas SENGAJA disamakan PERSIS dengan #ref/#text di
-   present.html (2.4vw/30px & 4.6vw/68px) -- batas bawah (min) dibuat
-   jauh lebih kecil di sini (bukan ikut 16px/28px punya Layar 2) supaya
-   di kotak pratinjau yang fisiknya kecil, huruf tetap mengikuti rasio
-   "persen dari lebar" yang sama seperti Layar 2 sungguhan (bukan malah
-   mentok ke batas minimum lebih dulu) -- ini kunci supaya baris
-   kalimat patah di titik yang kurang lebih sama di kedua tempat. */
+/* PERBAIKAN (28 Agu 2026): dulu batas atas (mis. 68px utk #text) DITULIS
+   TETAP di sini, sama seperti di present.html -- tapi karena kotak
+   pratinjau jauh lebih kecil, batas itu jarang/tidak pernah kena duluan
+   sebagaimana di Layar 2 sungguhan (yang lebar/besar, sering kena batas
+   atas duluan). Sekarang persentasenya SUDAH DIHITUNG ULANG oleh
+   applyPreviewRatio() (js/presentation.js) berdasarkan ukuran Layar 2
+   yang SUNGGUH aktif saat itu, disimpan sebagai --ps-*-pct -- di sini
+   tinggal dipakai sebagai cqw/cqh, TANPA batas atas px lagi (karena
+   batas atas itu SUDAH ikut terhitung masuk ke dalam nilai persen ini).
+   Fallback (kalau var belum sempat diset, mis. sebelum Layar 2 pernah
+   dibuka sama sekali) tetap proporsi aslinya (2.4%/4.6% dst). */
 .ps-preview-box-wrap .present-preview-ref {
-  font-size: clamp(7px, 2.4cqw, 30px);
-  margin-bottom: clamp(4px, 2.4cqh, 34px);
+  font-size: max(7px, calc(var(--ps-ref-pct, 2.4) * 1cqw));
+  margin-bottom: max(4px, calc(var(--ps-ref-margin-pct, 2.4) * 1cqh));
 }
 .ps-preview-box-wrap .present-preview-text,
 .ps-preview-box-wrap .present-preview-version {
-  font-size: clamp(9px, 4.6cqw, 68px);
+  font-size: max(9px, calc(var(--ps-text-pct, 4.6) * 1cqw));
   line-height: 1.35;
 }
 
@@ -3046,7 +3054,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
      terpotong), DAN bisa diseret membesar/mengecil lewat splitter
      (#psPreviewResizeHandle, lihat wirePreviewResize() di
      js/presentation-studio.js) yang menyetel variabel --ps-preview-row-h. */
-  grid-template-rows: var(--ps-preview-row-h, minmax(130px, 11vh)) 1fr;
+  grid-template-rows: var(--ps-preview-row-h, minmax(140px, 14vh)) 1fr;
   grid-template-areas:
     "preview preview preview"
     "controls-left controls-mid controls-right";
