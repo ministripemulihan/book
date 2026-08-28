@@ -1006,6 +1006,53 @@ dikirim untuk dibandingkan:
    `index.html` sudah dinaikkan supaya HP/browser tidak memakai
    berkas lama dari cache).
 
+## Update lanjutan (Agustus 2026, tahap 17) — tekan tanda catatan kaki kedua kali sekarang MENUTUP catatan
+
+Perubahan kecil atas perilaku dari tahap 16 di atas, sesuai permintaan
+lanjutan setelah dicoba: sebelumnya menekan tanda/kata yang SAMA untuk
+kedua kalinya hanya menghapus SOROTANNYA saja (panel catatan lengkap tetap
+terbuka). Sekarang menekan tanda/kata yang sama untuk kedua kalinya
+**menutup panel catatannya sepenuhnya** (persis seperti menekan dua kali
+nomor ayat lalu menekannya dua kali lagi) — jadi: tekan sekali = buka +
+lompat ke bagian itu, tekan lagi pada tanda yang sama = tutup. Menekan
+tanda LAIN selagi panel terbuka tidak menutup apa-apa, hanya berpindah
+sorotan ke bagian catatan yang baru (tidak tutup-buka dari awal).
+
+- Berkas yang diubah: `js/footnotes.js` (`setupFootnoteMarkerHandlers()` —
+  `closeJump()` diganti jadi `closePanel()` yang juga menyembunyikan
+  `notePanel` & melepas class `note-open`; ditambah `MutationObserver`
+  kecil supaya kalau panel ditutup lewat jalur lain — tekan dua kali nomor
+  ayat lagi — status "aktif" tandanya ikut disetel ulang, supaya tekan
+  tanda yang sama sesudahnya membuka lagi dari awal, bukan malah dianggap
+  "tekan kedua kali").
+- Berkas lain **tidak berubah isi fiturnya** — `js/app.js`, `css/style.css`
+  dari tahap 16 sudah benar dan tetap dipakai apa adanya (blue accent per
+  kata, setting ⋮ → "🔵 Warna biru…", parsing `<FR><sup>..</sup><Fr>` dari
+  kolom Text, dan TTS yang otomatis melewati tanda ini — semua ini SUDAH
+  berfungsi, bukan baru).
+- `index.html`: nomor versi `?v=` dinaikkan dari `20260826b` jadi
+  `20260826c` supaya HP/browser tidak memakai `js/footnotes.js` versi lama
+  dari cache.
+
+### Soal pertanyaan "warna biru dinyalakan terus atau boleh dimatikan?"
+
+Sudah tersedia KEDUANYA sejak tahap 16 — bukan salah satu saja:
+- **Default: NYALA** (`footnoteAccentBlue: true` di `js/settings.js`),
+  supaya pembaca langsung tahu kata mana yang punya catatan tanpa perlu
+  menekan-nekan coba-coba dulu.
+- Bisa dimatikan per-pengguna lewat menu ⋮ → "🔵 Warna biru pada tanda
+  catatan kaki + kata setelahnya" (`index.html` baris ~371,
+  `footnoteAccentToggle`) — kalau dimatikan, tanda & kata itu jadi warna
+  teks biasa (`body.footnote-accent-off`, lihat `css/style.css`), tapi
+  tetap bisa ditekan seperti biasa (cuma warnanya yang berubah).
+
+Rekomendasi: **biarkan default NYALA.** Alasannya persis seperti yang
+Anda amati sendiri — tanpa warna, pembaca tidak akan tahu kata mana saja
+yang sebenarnya punya catatan penjelasan, jadi fitur catatan kaki jadi
+nyaris tak berguna kalau warnanya dimatikan dari awal. Opsi mematikannya
+tetap disediakan untuk pembaca yang merasa warna biru mengganggu fokus
+membaca teks utama, tapi bukan sebagai pengaturan bawaan.
+
 ## Struktur berkas
 
 ```
