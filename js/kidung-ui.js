@@ -23,14 +23,20 @@
 //  SETIAP layar Kidung (kidungTopRow()) supaya pindah balik ke bacaan
 //  Alkitab 1 sentuh, pasangan dari #kidungHeaderBtn di header (index.html)
 //  yang membawa dari Alkitab masuk ke Kidung.
-//  BELUM ada (menyusul, lihat referensi tangkapan layar app "Kidung"
-//  yang dikirim -- 4 ikon: 🔍 cari, 📋 daftar, ❤️ favorit, ⚙️
-//  pengaturan):
-//    - ❤️ Favorit (perlu tempat penyimpanan per pengguna, mis. pola
-//      sama seperti js/highlights.js).
-//    - ⚙️ Pengaturan tampilan (ukuran huruf, dst -- pola sama seperti
-//      pengaturan Kumpulan Ayat mode Layar Penuh di js/app.js).
-//    - Filter tag (SPR/Pemuda/Remaja/dst) & kategori di layar Daftar.
+//  Status 4 ikon acuan (🔍 cari, 📋 daftar, ❤️ favorit, ⚙️ pengaturan):
+//    - ❤️ Favorit -- SUDAH ada & jalan (kidungFavoriteKey/
+//      loadKidungFavorites/toggleKidungFavorite/kidungFavoriteButton,
+//      lihat di bawah).
+//    - ⚙️ Pengaturan tampilan (ukuran huruf & jenis huruf) -- BARU (27
+//      Agu 2026), lihat applyKidungReaderStyle()/kidungSettingsButton()/
+//      openKidungSettingsDialog() di bawah. Pola SAMA seperti pengaturan
+//      Kumpulan Ayat mode Layar Penuh di js/app.js
+//      (COLLECTION_FS_FONT_KEY dkk) -- tersimpan per PERANGKAT lewat
+//      localStorage (bukan per akun/server), langsung terlihat begitu
+//      diubah (live), dan dipakai di layar baca Kidung biasa saja
+//      (tidak memengaruhi tampilan Kidung di Studio Presentasi).
+//    - Filter tag (SPR/Pemuda/Remaja/dst) & kategori di layar Daftar --
+//      belum dikerjakan (di luar cakupan perbaikan ini).
 // ============================================================
 
 let kidungCurrentBuku = "Kidung";
@@ -709,7 +715,13 @@ function renderKidungReader(meta, baits) {
   });
   panel.appendChild(body);
 
-  panel.appendChild(buildKidungToolbar(meta, baits));
+  panel.appendChild(buildKidungToolbar(meta, baits, body));
+
+  // ⚙️ Pengaturan tampilan (ukuran huruf/jenis huruf) -- lihat
+  // applyKidungReaderStyle() di bawah. Diterapkan SETELAH body dipasang
+  // ke panel supaya style-nya langsung kelihatan begitu layar baca
+  // dibuka (bukan cuma setelah tombol ⚙️ pertama kali ditekan).
+  applyKidungReaderStyle(body);
 }
 
 // ------------------------------------------------------------
@@ -746,6 +758,151 @@ function toggleKidungFavorite(meta) {
   localStorage.setItem(KIDUNG_FAVORITES_KEY, JSON.stringify(list));
   return idx === -1; // true = baru ditambahkan
 }
+// ------------------------------------------------------------
+//  ⚙️ PENGATURAN TAMPILAN (ukuran huruf & jenis huruf) -- BARU (27 Agu
+//  2026). Sebelum ini BENAR-BENAR belum ada fungsi apa pun untuk ini
+//  (cuma disebut di komentar TODO kepala file) -- bukan cuma "belum
+//  disambung ke tombol", kodenya memang belum pernah ditulis.
+//  Pola SAMA seperti pengaturan Kumpulan Ayat mode Layar Penuh
+//  (COLLECTION_FS_FONT_KEY dkk di js/app.js): tersimpan per PERANGKAT
+//  lewat localStorage, terpisah dari ukuran huruf pembaca Alkitab biasa
+//  supaya bisa diubah bebas di sini tanpa memengaruhi tampilan lain.
+//  Diterapkan ke `.kidung-reader-body` (bait+koor) saja -- header (No/
+//  judul/pengarang/birama) sengaja tetap ukuran tetap seperti sebelumnya.
+// ------------------------------------------------------------
+const KIDUNG_FONT_SIZE_KEY = "kidung_reader_font_size_v1";
+const KIDUNG_FONT_SIZE_MIN = 14;
+const KIDUNG_FONT_SIZE_MAX = 40;
+const KIDUNG_FONT_SIZE_STEP = 2;
+const KIDUNG_FONT_SIZE_DEFAULT = 17;
+// Jenis huruf khusus layar baca Kidung -- pakai daftar FONT_FAMILIES yang
+// sama seperti pembaca Alkitab (js/app.js, bagian 11) supaya tidak perlu
+// menduplikasi daftar font, tapi PILIHANNYA disimpan terpisah (kunci
+// localStorage beda) supaya tidak ikut berubah kalau jenis huruf pembaca
+// Alkitab diganti, begitu juga sebaliknya.
+const KIDUNG_FONT_FAMILY_KEY = "kidung_reader_font_family_v1";
+
+function kidungCurrentFontSize() {
+  return parseInt(localStorage.getItem(KIDUNG_FONT_SIZE_KEY), 10) || KIDUNG_FONT_SIZE_DEFAULT;
+}
+function kidungCurrentFontFamily() {
+  const id = localStorage.getItem(KIDUNG_FONT_FAMILY_KEY) || "default";
+  if (typeof FONT_FAMILIES !== "undefined" && FONT_FAMILIES.length) {
+    return FONT_FAMILIES.find((f) => f.id === id) || FONT_FAMILIES[0];
+  }
+  return { id: "default", body: "", weight: "" };
+}
+// Dipanggil dari renderKidungReader() setiap kali layar baca dibangun
+// ulang (mis. pindah nomor kidung ◀/▶) supaya pengaturan tersimpan tetap
+// terpakai, BUKAN cuma pas tombol ⚙️ ditekan.
+function applyKidungReaderStyle(bodyEl) {
+  if (!bodyEl) return;
+  bodyEl.style.fontSize = kidungCurrentFontSize() + "px";
+  const f = kidungCurrentFontFamily();
+  bodyEl.style.fontFamily = f.body || "";
+  bodyEl.style.fontWeight = f.weight || "";
+}
+
+function kidungSettingsButton(bodyEl) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "square-media-btn";
+  btn.textContent = "⚙️";
+  btn.title = "Pengaturan tampilan (ukuran & jenis huruf)";
+  btn.setAttribute("aria-label", btn.title);
+  btn.addEventListener("click", () => openKidungSettingsDialog(bodyEl));
+  return btn;
+}
+
+// Dialog ringkas A-/A+ + pilih jenis huruf, DITERAPKAN LANGSUNG (live) ke
+// layar baca yang sedang terbuka begitu diubah -- tidak perlu menunggu
+// tombol "Simpan"/"Tutup" ditekan dulu, sama seperti pola A-/A+ di mode
+// Layar Penuh Kumpulan Ayat (js/app.js).
+function openKidungSettingsDialog(bodyEl) {
+  if (typeof showSimpleDialog !== "function") return;
+  showSimpleDialog("⚙️ Pengaturan Tampilan Kidung", (box) => {
+    let sizeValEl = null;
+    const refreshSizeLabel = () => { if (sizeValEl) sizeValEl.textContent = kidungCurrentFontSize() + "px"; };
+    const setSize = (px) => {
+      const clamped = Math.max(KIDUNG_FONT_SIZE_MIN, Math.min(KIDUNG_FONT_SIZE_MAX, px));
+      localStorage.setItem(KIDUNG_FONT_SIZE_KEY, String(clamped));
+      applyKidungReaderStyle(bodyEl);
+      refreshSizeLabel();
+    };
+
+    const sizeField = document.createElement("div");
+    sizeField.className = "simple-dialog-field";
+    const sizeLabel = document.createElement("label");
+    sizeLabel.textContent = "Ukuran huruf:";
+    sizeField.appendChild(sizeLabel);
+    const sizeRow = document.createElement("div");
+    sizeRow.style.display = "flex";
+    sizeRow.style.alignItems = "center";
+    sizeRow.style.gap = "10px";
+    const minusBtn = document.createElement("button");
+    minusBtn.type = "button";
+    minusBtn.className = "chip-btn small";
+    minusBtn.textContent = "A-";
+    minusBtn.addEventListener("click", () => setSize(kidungCurrentFontSize() - KIDUNG_FONT_SIZE_STEP));
+    sizeValEl = document.createElement("span");
+    sizeValEl.textContent = kidungCurrentFontSize() + "px";
+    const plusBtn = document.createElement("button");
+    plusBtn.type = "button";
+    plusBtn.className = "chip-btn small";
+    plusBtn.textContent = "A+";
+    plusBtn.addEventListener("click", () => setSize(kidungCurrentFontSize() + KIDUNG_FONT_SIZE_STEP));
+    sizeRow.appendChild(minusBtn);
+    sizeRow.appendChild(sizeValEl);
+    sizeRow.appendChild(plusBtn);
+    sizeField.appendChild(sizeRow);
+    box.appendChild(sizeField);
+
+    if (typeof FONT_FAMILIES !== "undefined" && FONT_FAMILIES.length) {
+      const familyField = document.createElement("div");
+      familyField.className = "simple-dialog-field";
+      const familyLabel = document.createElement("label");
+      familyLabel.textContent = "Jenis huruf:";
+      familyField.appendChild(familyLabel);
+      const sel = document.createElement("select");
+      sel.className = "columns-lang-select";
+      FONT_FAMILIES.forEach((f) => {
+        const opt = document.createElement("option");
+        opt.value = f.id;
+        opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+      sel.value = kidungCurrentFontFamily().id;
+      sel.addEventListener("change", () => {
+        localStorage.setItem(KIDUNG_FONT_FAMILY_KEY, sel.value);
+        applyKidungReaderStyle(bodyEl);
+      });
+      familyField.appendChild(sel);
+      box.appendChild(familyField);
+    }
+
+    const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.className = "chip-btn small";
+    resetBtn.textContent = "↺ Kembalikan ke bawaan";
+    resetBtn.style.marginTop = "4px";
+    resetBtn.addEventListener("click", () => {
+      localStorage.removeItem(KIDUNG_FONT_SIZE_KEY);
+      localStorage.removeItem(KIDUNG_FONT_FAMILY_KEY);
+      applyKidungReaderStyle(bodyEl);
+      refreshSizeLabel();
+      const sel2 = box.querySelector("select");
+      if (sel2) sel2.value = "default";
+    });
+    box.appendChild(resetBtn);
+
+    // getValue() -- tidak ada nilai untuk "disimpan" lewat tombol
+    // konfirmasi (semua perubahan di atas sudah langsung tersimpan &
+    // diterapkan saat itu juga), jadi cukup kembalikan nilai apa pun yang
+    // bukan null/undefined supaya tombol "Tutup" bisa menutup dialog.
+    return () => true;
+  }, () => {}, "Tutup");
+}
+
 // ------------------------------------------------------------
 // BARU (27 Agu 2026) -- "📚 Kumpulan" di layar baca Kidung biasa (menu
 // ☰, BUKAN Studio Presentasi). Sebelum ini, hanya ayat Alkitab yang
@@ -908,7 +1065,7 @@ function kidungSquareLoopToggle(url, titleForSession, label) {
   return btn;
 }
 
-function buildKidungToolbar(meta, baits) {
+function buildKidungToolbar(meta, baits, bodyEl) {
   const wrap = document.createElement("div");
   wrap.className = "kidung-toolbar";
 
@@ -1044,6 +1201,7 @@ function buildKidungToolbar(meta, baits) {
 
   middle.appendChild(kidungFavoriteButton(meta));
   middle.appendChild(kidungCollectionButton(meta, baits));
+  middle.appendChild(kidungSettingsButton(bodyEl));
 
   const copyBtn = buildKidungCopyButton(meta, baits);
   copyBtn.classList.add("square-media-btn");
