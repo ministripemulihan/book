@@ -2427,6 +2427,12 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .admin-bell-panel-title { font-weight: 700; font-size: 13.5px; margin-bottom: 8px; color: var(--ink); }
 .admin-bell-total { font-size: 13.5px; margin: 0 0 8px; color: var(--ink); }
 .admin-bell-breakdown { margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 4px; }
+/* BARU (27 Agu 2026) -- bagian "🔔 perlu persetujuan Anda" (kiriman
+   Kumpulan Ayat & permintaan hapus media) di dalam panel lonceng, lihat
+   pendingApprovalsHtml() di js/adminbell.js. */
+.admin-bell-pending { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border, #e2e2e2); }
+.admin-bell-pending .admin-bell-breakdown { gap: 6px; }
+.admin-bell-pending li { line-height: 1.4; }
 
 @media (max-width: 640px) {
   .admin-bell-panel { width: 220px; }
@@ -2545,6 +2551,27 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   font-weight: 600;
 }
 .ps-tab.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+/* TAHAP 7 lanjutan (ROADMAP-drive-sync.md, indikator antrean sinkron) --
+   badge kecil "⏳N" di tab "🖼️ Media Tersimpan", cuma tampil kalau ada
+   item yang masih menunggu disinkronkan ke Drive (lihat
+   updateMediaQueueBadge() di js/presentation-studio.js). */
+.ps-tab-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+  background: #d97706; color: #fff; font-size: 11px; font-weight: 700; line-height: 1.5;
+  vertical-align: middle;
+}
+.ps-media-queue-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  background: #fff7ed; border: 1px solid #fdba74; color: #7c2d12; border-radius: 8px;
+  padding: 8px 10px; font-size: 12.5px; margin-bottom: 10px;
+}
+/* BARU (27 Agu 2026) -- daftar rincian per-file di panel admin "📦
+   Pemakaian Drive" (lihat loadAndRenderDriveUsagePanel() di js/app.js). */
+.drive-usage-file-list { list-style: none; margin: 6px 0; padding: 0; }
+.drive-usage-file-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 4px 0; border-bottom: 1px dashed var(--ps-tab-border, #ddd); font-size: 12.5px;
+}
 
 .ps-field-label { font-size: 12px; font-weight: 700; color: var(--ps-ink-soft); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
 .ps-preview-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -2644,6 +2671,14 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .ps-color-chip.active { border-color: var(--brass); }
 .ps-color-input { width: 100%; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer; }
+
+/* BARU (27 Agu 2026) -- slider ukuran Pen/Penunjuk, lihat index.html
+   (#psPenSizeSlider) & wirePointerPen() di js/presentation-studio.js. */
+.ps-pen-size-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.ps-pen-size-row input[type="range"] { flex: 1; min-width: 0; }
+.ps-pen-size-label { font-size: 11px; color: var(--ps-ink-soft, #888); line-height: 1; user-select: none; }
+.ps-pen-size-label-big { font-size: 20px; }
+.ps-pen-size-value { font-size: 12px; font-weight: 700; color: var(--ps-ink, #222); min-width: 38px; text-align: right; }
 
 .ps-timer-box { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ps-border); }
 .ps-timer-label-preview {
