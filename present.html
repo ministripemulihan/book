@@ -382,6 +382,16 @@
   const slideEl = document.getElementById("slideView");
   const ytEl = document.getElementById("ytView");
   const ytBgEl = document.getElementById("ytBg");
+  // BARU (28 Agu 2026) -- Repeat One/Repeat All + daftar putar (playlist)
+  // untuk video YouTube utama (#ytView), lihat wireYtControls() &
+  // wireYtPlaylistTab() di js/presentation-studio.js, dan handler
+  // "yt_repeat"/"yt_queue" di bawah. ytRepeatMode: "off" | "one" | "all".
+  // ytQueue: [{embedUrl,...}, ...] -- dipakai "Ulang: Semua" untuk tahu
+  // video berikutnya begitu video yang sedang tayang selesai.
+  let ytRepeatMode = "off";
+  let ytQueue = [];
+  let ytQueueIndex = 0;
+  let ytLastState = null; // state terakhir yang dilaporkan player (lihat infoDelivery di bawah)
   // BARU (28 Agu 2026) -- lihat wireCamera()/applyCamera-nya di bawah.
   const camBgEl = document.getElementById("camBg");
   const imgBgEl = document.getElementById("imgBg"); // BARU (28 Agu 2026) -- lihat applyBgImagePayload() di bawah.
@@ -866,7 +876,17 @@
       // Video YouTube penuh 1 layar (tab "▶️ YouTube" di Studio Presentasi).
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = "";
-      if (data.embedUrl) { ytEl.src = data.embedUrl; ytEl.hidden = false; }
+      if (data.embedUrl) {
+        ytEl.src = data.embedUrl;
+        ytEl.hidden = false;
+        // BARU (28 Agu 2026) -- daftar putar utk "Ulang: Semua" (Repeat
+        // All). Kalau pengirim tidak menyertakan queue (mis. 1 video
+        // tunggal dari tab File/kotak "Tampilkan"), anggap saja daftarnya
+        // 1 video ini sendiri supaya "Ulang: Satu" tetap bekerja normal.
+        ytQueue = Array.isArray(data.queue) && data.queue.length ? data.queue : [{ embedUrl: data.embedUrl }];
+        ytQueueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : 0;
+        ytLastState = null;
+      }
     } else if (kind === "kidung") {
       // Slide Kidung (bait + koor snapshot, lihat Presentation.sendKidung()
       // di js/presentation.js & tab "🎵 Kidung / Hymn" di js/presentation-
@@ -950,8 +970,29 @@
       // js/presentation-studio.js) supaya player mau menerima perintah ini.
       // Kalau belum ada video yang tayang, abaikan saja (tidak error).
       if (ytEl.hidden || !ytEl.src || !ytEl.contentWindow) return;
-      const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[data.action];
+      // BARU (28 Agu 2026) -- "stop": ⏹️ Stop di Studio. "stopVideo" (beda
+      // dari pauseVideo) membatalkan pemutaran & mengembalikan player ke
+      // keadaan belum-main, bukan cuma menjeda di posisi terakhir.
+      const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute" }[data.action];
       if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      return;
+    }
+    // BARU (28 Agu 2026) -- 🔁 Ulang (Repeat) dari Studio: "off" (mati,
+    // baku) | "one" (ulang video ini terus) | "all" (lanjut ke video
+    // berikutnya di ytQueue, lalu kembali ke awal daftar). Lihat
+    // listener "message" dari ytEl.contentWindow di bawah untuk logika
+    // saat video BENAR-BENAR selesai (ended).
+    if (data.type === "yt_repeat") {
+      ytRepeatMode = data.mode === "one" || data.mode === "all" ? data.mode : "off";
+      return;
+    }
+    // BARU (28 Agu 2026) -- daftar putar (playlist) terkini dikirim ulang
+    // dari Studio (mis. saat filter Playlist Video berubah) TANPA ikut
+    // mengganti video yang sedang tayang -- cukup perbarui apa yang akan
+    // diputar berikutnya kalau "Ulang: Semua" aktif & video ini selesai.
+    if (data.type === "yt_queue") {
+      ytQueue = Array.isArray(data.queue) && data.queue.length ? data.queue : [];
+      ytQueueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : 0;
       return;
     }
     // ------------------------------------------------------------
@@ -1029,6 +1070,55 @@
     const data = e.data || {};
     if (data.source !== "bibleAppPresenter") return;
     render(data.payload);
+  });
+
+  // BARU (28 Agu 2026) -- deteksi video YouTube utama (#ytView) SELESAI
+  // (ended) lewat "raw" postMessage bawaan pemutar YouTube sendiri
+  // (bukan lewat API resmi YT.Player, supaya tidak perlu memuat skrip
+  // tambahan cuma untuk 1 layar ini) -- lihat "enablejsapi=1" di
+  // buildYoutubeEmbedUrl() (js/presentation-studio.js). Player
+  // otomatis mengirim { event:"infoDelivery", info:{ playerState } }
+  // setelah kita kirim { event:"listening" } sekali ke dalamnya;
+  // playerState 0 = video berakhir. Berdasar itu, "Ulang: Satu Video"
+  // mengulang video yang sama dari awal, "Ulang: Semua" lanjut ke video
+  // berikut di ytQueue (berputar balik ke awal daftar di akhir).
+  ytEl.addEventListener("load", () => {
+    if (!ytEl.src || !ytEl.contentWindow) return;
+    ytLastState = null;
+    try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "ytView" }), "*"); } catch (e) {}
+  });
+  function ytSendCommand(func, args) {
+    if (!ytEl.contentWindow) return;
+    try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: args || [] }), "*"); } catch (e) {}
+  }
+  function appendAutoplay(embedUrl) {
+    const sep = embedUrl.includes("?") ? "&" : "?";
+    return embedUrl + sep + "autoplay=1";
+  }
+  window.addEventListener("message", (e) => {
+    if (e.source !== ytEl.contentWindow) return; // hanya pesan dari player YouTube utama
+    let data;
+    try { data = JSON.parse(e.data); } catch (err) { return; }
+    if (!data || data.event !== "infoDelivery" || !data.info || typeof data.info.playerState !== "number") return;
+    const state = data.info.playerState;
+    if (state === ytLastState) return;
+    const prevState = ytLastState;
+    ytLastState = state;
+    if (state === 0 && prevState !== null) { // 0 = berakhir (ended)
+      if (ytRepeatMode === "one") {
+        ytSendCommand("seekTo", [0, true]);
+        ytSendCommand("playVideo");
+      } else if (ytRepeatMode === "all" && ytQueue.length > 1) {
+        ytQueueIndex = (ytQueueIndex + 1) % ytQueue.length;
+        const next = ytQueue[ytQueueIndex];
+        if (next && next.embedUrl) { ytEl.src = appendAutoplay(next.embedUrl); }
+      } else if (ytRepeatMode === "all" && ytQueue.length === 1) {
+        // Cuma 1 video di daftar -- "Ulang: Semua" berarti sama seperti
+        // "Ulang: Satu" untuk kasus ini.
+        ytSendCommand("seekTo", [0, true]);
+        ytSendCommand("playVideo");
+      }
+    }
   });
 
   // Beri tahu jendela utama bahwa Layar 2 sudah siap menerima konten --
