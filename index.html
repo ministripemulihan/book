@@ -912,6 +912,28 @@
           <div class="ps-btn-row">
             <button type="button" id="psYtSaveQueueBtn" class="chip-btn small" disabled>💾 Simpan ke Media Tersimpan</button>
           </div>
+
+          <hr class="ps-yt-sep" />
+          <div class="ps-field-label">📺 Playlist Video (dari Google Sheet)</div>
+          <p class="announcement-compose-hint">Tempel link Google Sheet yang sudah "Publish to web" sebagai CSV (kolom: Title, Channel, URL, lalu Anak, Remaja, Pemuda, SPR, Injil, Bebas -- isi "1" di kolom kategori yang cocok, boleh lebih dari satu). Sheet ini tetap milik &amp; dikelola sendiri -- boleh terus diperbarui isinya kapan saja, aplikasi cuma membaca ulang isinya tiap ditekan "🔄 Muat Ulang".</p>
+          <div class="ps-yt-row">
+            <input type="text" id="psYtPlaylistSheetUrl" class="columns-lang-select" placeholder="Link Google Sheet (Publish to web -> CSV), atau link Sheet biasa" />
+          </div>
+          <div class="ps-btn-row">
+            <button type="button" id="psYtPlaylistSaveBtn" class="chip-btn small">💾 Simpan Link</button>
+            <button type="button" id="psYtPlaylistReloadBtn" class="chip-btn small primary">🔄 Muat Ulang</button>
+          </div>
+          <div class="ps-yt-hint" id="psYtPlaylistStatus">Belum ada link Google Sheet yang disimpan.</div>
+          <div class="ps-btn-row" id="psYtPlaylistFilters">
+            <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
+            <button type="button" class="chip-btn small" data-filter="anak">Anak</button>
+            <button type="button" class="chip-btn small" data-filter="remaja">Remaja</button>
+            <button type="button" class="chip-btn small" data-filter="pemuda">Pemuda</button>
+            <button type="button" class="chip-btn small" data-filter="spr">SPR</button>
+            <button type="button" class="chip-btn small" data-filter="injil">Injil</button>
+            <button type="button" class="chip-btn small" data-filter="bebas">Bebas</button>
+          </div>
+          <div id="psYtPlaylistList" class="ps-file-list"><p class="present-saved-empty">Belum ada video dimuat -- tempel link Google Sheet lalu tekan "🔄 Muat Ulang".</p></div>
         </div>
       </div>
 
@@ -951,7 +973,9 @@
                  video. -->
             <button type="button" id="psYtPlayBtn" class="chip-btn small" title="Putar video YouTube di Layar 2">▶️ Play</button>
             <button type="button" id="psYtPauseBtn" class="chip-btn small" title="Jeda video YouTube di Layar 2">⏸️ Pause</button>
+            <button type="button" id="psYtStopBtn" class="chip-btn small" title="Hentikan video YouTube di Layar 2">⏹️ Stop</button>
             <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube di Layar 2">🔇 Mute</button>
+            <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
           </div>
         </div>
         <!-- Tombol "Tayangkan" SEKARANG di TENGAH, di antara kotak
