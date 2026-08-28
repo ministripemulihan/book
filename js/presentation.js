@@ -1,7 +1,7 @@
 // ============================================================
 //  MODE PRESENTASI 2 LAYAR (baru)
 // ============================================================
-// Fitur:
+// Fitur: 
 //  1. Toggle "1 Layar" (biasa, seperti sekarang) <-> "2 Layar" (menu ⋮ ->
 //     panel "🖥️ Mode Presentasi"). Saat diaktifkan, membuka jendela BARU
 //     (present.html) yang isinya bisa dikendalikan dari jendela utama.
