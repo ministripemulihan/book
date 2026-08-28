@@ -266,6 +266,10 @@
       <button id="logViewerBtn" class="more-menu-btn" hidden>📊 Log Aktivitas</button>
       <!-- BARU -- persetujuan akun hasil "Daftar Akun Baru", khusus administrator -->
       <button id="userManageBtn" class="more-menu-btn" hidden>🗂️ Kelola Pengguna</button>
+      <!-- TAHAP 6 (ROADMAP-drive-sync.md) -- panel admin "Pemakaian
+           Penyimpanan Drive", khusus administrator, sama seperti logViewerBtn/
+           userManageBtn di atas. -->
+      <button id="driveUsageBtn" class="more-menu-btn" hidden>📦 Pemakaian Drive</button>
       <!-- Satu tombol untuk unduh pertama kali MAUPUN sinkron ulang -- teks
            tombol disesuaikan otomatis lewat updateResyncBtnLabel() di
            js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
@@ -463,6 +467,17 @@
             <button type="button" id="presentTimerStartBtn" class="chip-btn small primary">▶️ Mulai</button>
             <button type="button" id="presentTimerStopBtn" class="chip-btn small">⏹️ Stop</button>
           </div>
+
+          <!-- BARU (27 Agu 2026) -- Stopwatch, versi HP/panel sederhana
+               (lihat juga versi Studio di #psStopwatchLabel). -->
+          <div class="more-menu-section-title" style="margin-top:14px;">⏱️ Stopwatch</div>
+          <input type="text" id="presentStopwatchLabel" class="columns-lang-select" value="" placeholder="Judul di atas stopwatch (opsional)" />
+          <div class="ps-timer-display" id="presentStopwatchDisplay">00:00</div>
+          <div class="ps-btn-row">
+            <button type="button" id="presentStopwatchStartBtn" class="chip-btn small primary">▶️ Mulai</button>
+            <button type="button" id="presentStopwatchStopBtn" class="chip-btn small">⏸️ Jeda</button>
+            <button type="button" id="presentStopwatchResetBtn" class="chip-btn small danger">🔄 Ulang</button>
+          </div>
         </div>
       </div>
 
@@ -543,6 +558,12 @@
 
           <!-- panel log aktivitas (khusus administrator) -->
           <div id="logPanel" class="log-panel" hidden></div>
+
+          <!-- TAHAP 6 (ROADMAP-drive-sync.md) -- panel admin "📦 Pemakaian
+               Drive", diisi JS lewat showDriveUsagePanel() di js/app.js
+               (pola sama seperti #logPanel di atas: div kosong, diisi
+               innerHTML saat dibuka). -->
+          <div id="driveUsagePanel" class="log-panel" hidden></div>
 
           <!-- hasil pencarian kata -->
           <div id="searchResults" class="search-results" hidden>
@@ -670,7 +691,7 @@
       <div class="ps-col ps-col-left">
         <div class="ps-tabs" id="psLeftTabs">
           <button type="button" class="ps-tab active" data-ps-left-tab="kumpulan">📚 Kumpulan Ayat</button>
-          <button type="button" class="ps-tab" data-ps-left-tab="media">🖼️ Media Tersimpan</button>
+          <button type="button" class="ps-tab" data-ps-left-tab="media">🖼️ Media Tersimpan<span id="psMediaQueueBadge" class="ps-tab-badge" hidden></span></button>
           <button type="button" class="ps-tab" data-ps-left-tab="pengumuman">📢 Pengumuman</button>
           <button type="button" class="ps-tab" data-ps-left-tab="pesan">💬 Pesan</button>
         </div>
@@ -755,6 +776,24 @@
             <button type="button" id="psTimerStartBtn" class="chip-btn small primary" title="Mulai">▶️ Mulai</button>
             <button type="button" id="psTimerStopBtn" class="chip-btn small" title="Stop">⏹️ Stop</button>
             <button type="button" id="psTimerCancelBtn" class="chip-btn small danger" title="Batal">✖️</button>
+          </div>
+        </div>
+
+        <!-- BARU (27 Agu 2026) -- ⏱️ Stopwatch (hitung MAJU dari 0, beda
+             dari ⏱️ Timer di atas yang hitung MUNDUR dari durasi
+             tertentu). Dikendalikan dari sini (Layar 1/Controller),
+             tampil di Layar 2 (present.html, #stopwatchWrap) -- lihat
+             wireStopwatch() di js/presentation-studio.js. Ada kotak
+             judul yang bisa diisi bebas, sama seperti Timer di atas. -->
+        <div class="ps-timer-box">
+          <div class="ps-field-label">⏱️ Stopwatch</div>
+          <input type="text" id="psStopwatchLabel" class="columns-lang-select" value="" placeholder="Judul di atas stopwatch (opsional)" />
+          <div class="ps-timer-label-preview" id="psStopwatchLabelPreview"></div>
+          <div class="ps-timer-display" id="psStopwatchDisplay">00:00</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psStopwatchStartBtn" class="chip-btn small primary" title="Mulai">▶️ Mulai</button>
+            <button type="button" id="psStopwatchStopBtn" class="chip-btn small" title="Jeda">⏸️ Jeda</button>
+            <button type="button" id="psStopwatchResetBtn" class="chip-btn small danger" title="Ulang dari 0">🔄 Ulang</button>
           </div>
         </div>
       </div>
@@ -1008,8 +1047,52 @@
             <button type="button" class="ps-color-chip active" data-color="#ff3b30" style="background:#ff3b30" title="Merah"></button>
             <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
             <button type="button" class="ps-color-chip" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+            <!-- BARU (27 Agu 2026) -- warna pastel tambahan atas permintaan
+                 ("apa bisa pilih warna lain, misal jadi putih, pink, biru
+                 muda, hijau muda, warna pastel lainnya"). Putih sudah ada
+                 di atas sejak sebelumnya. -->
+            <button type="button" class="ps-color-chip" data-color="#ffb3d1" style="background:#ffb3d1" title="Pink pastel"></button>
+            <button type="button" class="ps-color-chip" data-color="#aee1ff" style="background:#aee1ff" title="Biru muda pastel"></button>
+            <button type="button" class="ps-color-chip" data-color="#b8f2c9" style="background:#b8f2c9" title="Hijau muda pastel"></button>
+            <button type="button" class="ps-color-chip" data-color="#e0c3fc" style="background:#e0c3fc" title="Ungu pastel"></button>
+            <button type="button" class="ps-color-chip" data-color="#ffd8a8" style="background:#ffd8a8" title="Oranye pastel"></button>
+          </div>
+          <!-- BARU (27 Agu 2026) -- ukuran Pen/Penunjuk lewat progress bar
+               (bisa diperkecil sekali/diperbesar banget), lihat
+               wirePointerPen() di js/presentation-studio.js. Rentang
+               2px (sangat tipis) s.d. 40px (sangat tebal), default 17px
+               (disamakan dengan ukuran dasar huruf/font yang umum
+               dipakai di aplikasi ini, sesuai permintaan "default
+               ukurannya sama dulu dengan ukuran font"). -->
+          <div class="ps-field-label" style="margin-top:10px;">Ukuran Pen/Penunjuk</div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Paling kecil">•</span>
+            <input type="range" id="psPenSizeSlider" min="2" max="40" step="1" value="17" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Paling besar">●</span>
+            <span id="psPenSizeValue" class="ps-pen-size-value">17px</span>
           </div>
           <div class="ps-pointer-hint" id="psPointerHint">Gerakkan kursor di atas kotak pratinjau "Tayang" di atas saat Penunjuk/Pen aktif.</div>
+
+          <!-- BARU (27 Agu 2026) -- 🔍 Kaca Pembesar (magnifier), khusus
+               untuk file yang diunggah (PDF/gambar/Word/PPT -- semuanya
+               ditayangkan sebagai gambar per halaman, tipe "slide", lihat
+               catatan panjang di js/presentation-studio.js &
+               js/collections.js). Sama seperti Penunjuk/Pen di atas:
+               gerakkan kursor di atas kotak pratinjau "Tayang", posisi
+               kursor itulah yang jadi TITIK TENGAH kaca pembesar di
+               Layar 2 -- lihat wirePointerPen() (js/presentation-studio.js)
+               & showMagnify()/hideMagnify() (present.html). -->
+          <div class="ps-field-label" style="margin-top:14px;">🔍 Kaca Pembesar (untuk PDF/gambar/Word/PPT yang ditayangkan)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psMagnifyToggle" class="chip-btn small" data-ps-magnify-toggle>🔍 Kaca Pembesar</button>
+          </div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Paling kecil (10%)">🔍<sub>-</sub></span>
+            <input type="range" id="psMagnifyZoomSlider" min="10" max="10000" step="10" value="100" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Paling besar (10000%)">🔍<sup>+</sup></span>
+            <span id="psMagnifyZoomValue" class="ps-pen-size-value">100%</span>
+          </div>
+          <div class="ps-pointer-hint">Gerakkan kursor di atas kotak pratinjau "Tayang" saat Kaca Pembesar aktif -- kotak kecil di Layar 2 menunjukkan besar zoom saat ini (10%–10000%).</div>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="tampilan" hidden>
@@ -1048,7 +1131,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260827d"></script>
+  <script src="js/collections.js?v=20260827f"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -1060,11 +1143,11 @@
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260822a"></script>
   <script src="js/kidung-ui.js?v=20260827a"></script>
-  <script src="js/presentation.js?v=20260826a"></script>
-  <script src="js/presentation-studio.js?v=20260827d"></script>
+  <script src="js/presentation.js?v=20260827a"></script>
+  <script src="js/presentation-studio.js?v=20260827f"></script>
   <script src="js/signup.js?v=20260818b"></script>
-  <script src="js/adminbell.js?v=20260827a"></script>
-  <script src="js/app.js?v=20260827c"></script>
+  <script src="js/adminbell.js?v=20260827b"></script>
+  <script src="js/app.js?v=20260827b"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260818b"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
