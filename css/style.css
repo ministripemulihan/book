@@ -3092,7 +3092,18 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .present-studio.ps-dual-live .ps-preview-slot:not(.ps-preview-slot-next) {
   flex: 0 0 auto !important;
   width: auto !important;
-  max-width: 47% !important;
+  /* PERBAIKAN (28 Agu 2026, revisi ke-3): batas ini dulu 47% -- ternyata
+     LEBIH KECIL daripada lebar yang sebenarnya dihitung & diizinkan oleh
+     wirePreviewResize() di js/presentation-studio.js (bisa sedikit di
+     atas 47% tergantung lebar tombol "▶ Tayangkan" di tengah), jadi CSS
+     ini diam-diam MEMOTONG lebar kotak sebelum splitter benar-benar
+     mentok -- akibatnya kotak jadi penyok (rasio 16:9 rusak) saat
+     diseret besar. Sekarang batas CSS ini dilonggarkan jadi 49.5%
+     (murni jaring pengaman kalau JS belum sempat menghitung ulang,
+     mis. sepersekian detik sebelum layout selesai) -- batas yang
+     SUNGGUH menentukan ukuran maksimum tetap dihitung presisi oleh
+     JS (maxRowByWidth()), bukan lagi angka tetap di sini. */
+  max-width: 49.5% !important;
   min-width: 0 !important;
   height: 100% !important;
 }
