@@ -2875,6 +2875,10 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    sebagai jaring pengaman (operator masih bisa scroll pakai mouse
    wheel/trackpad kalau perlu), cuma tidak lagi digambar sebagai garis
    di tepi kotak. */
+.ps-preview-box-wrap .ps-preview-box {
+  scrollbar-width: none;
+}
+.ps-preview-box-wrap .ps-preview-box::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .ps-preview-box-wrap.ps-pointer-mode { cursor: crosshair; }
 
 /* Skala font di kotak pratinjau Studio dibuat PROPORSIONAL terhadap
@@ -3042,7 +3046,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
      terpotong), DAN bisa diseret membesar/mengecil lewat splitter
      (#psPreviewResizeHandle, lihat wirePreviewResize() di
      js/presentation-studio.js) yang menyetel variabel --ps-preview-row-h. */
-  grid-template-rows: var(--ps-preview-row-h, minmax(80px, 14vh)) 1fr;
+  grid-template-rows: var(--ps-preview-row-h, minmax(130px, 11vh)) 1fr;
   grid-template-areas:
     "preview preview preview"
     "controls-left controls-mid controls-right";
