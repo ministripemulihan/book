@@ -1,12 +1,12 @@
 // ============================================================
-//  MODE TAMU (akses tanpa login/daftar) 
+//  MODE TAMU (akses tanpa login/daftar)
 // ============================================================
 // File ini SATU tempat untuk semua logika mode tamu:
 //   - Identitas perangkat (device-id acak, tersimpan di browser)
 //   - Cek + catat setiap kali tombol PENCARIAN ditekan, ditegakkan
 //     PUSAT lewat Apps Script (lihat apps-script/Code.gs, endpoint
 //     type=guest_search, tab Sheet "GuestUsage") supaya batas
-//     10x/perangkat/hari & 100x gabungan semua tamu/hari tidak bisa
+//     10x/perangkat/hari & 100x gabungan semua tamu/hari tidak bisa 
 //     diakali cuma dengan hapus data browser di 1 HP.
 //   - Modal kecil kalau batas tercapai / kalau tamu menekan menu
 //     yang memang tidak dibuka untuk tamu (lihat applyGuestModeUi()
