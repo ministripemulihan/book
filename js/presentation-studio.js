@@ -2609,6 +2609,17 @@ const PresentationStudio = (() => {
 
   const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1 };
 
+  // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
+  // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
+  // latar terang (tema Terang/Sepia), jadi diganti emas gelap otomatis.
+  function koorColorForBg(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "#ffd84a";
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luma > 170 ? "#8a6d00" : "#ffd84a";
+  }
+
   // Selain dikirim ke Layar 2, font & warna tema juga diterapkan ke
   // kotak pratinjau Studio sendiri (#psPreviewBoxWrap) -- supaya
   // pratinjau "Tayang" benar-benar 1:1 mirip Layar 2 (bukan cuma warna
@@ -2617,8 +2628,10 @@ const PresentationStudio = (() => {
   function applyThemeToStudioPreview(theme) {
     const wrap = el("psPreviewBoxWrap");
     if (!wrap) return;
-    wrap.style.setProperty("--ps-preview-bg", theme.bgColor || DEFAULT_STAGE_THEME.bgColor);
+    const bg = theme.bgColor || DEFAULT_STAGE_THEME.bgColor;
+    wrap.style.setProperty("--ps-preview-bg", bg);
     wrap.style.setProperty("--ps-preview-ink", theme.ink || DEFAULT_STAGE_THEME.ink);
+    wrap.style.setProperty("--ps-preview-koor", koorColorForBg(bg));
     const box = el("psPreviewBox");
     if (box) box.style.fontFamily = theme.font || DEFAULT_STAGE_THEME.font;
   }
@@ -2762,7 +2775,7 @@ const PresentationStudio = (() => {
     if (!handle || !studio) return;
     const STORAGE_KEY = "bible_app_studio_preview_row_h_v1";
     const LABEL_OVERHEAD = 60; // tinggi label "Berikutnya/Tayang" + padding panel
-    const MIN_ROW = 190;
+    const MIN_ROW = 150;
     function maxRow() { return Math.round(window.innerHeight * 0.82); }
     function apply(rowPx) {
       const clamped = Math.max(MIN_ROW, Math.min(maxRow(), Math.round(rowPx)));
