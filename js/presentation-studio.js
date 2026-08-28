@@ -2605,28 +2605,50 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
-  // BARU (28 Agu 2026) -- 🎥 KAMERA LATAR (tab "🎥 Kamera", kolom kanan).
-  // Menyalakan kamera PERANGKAT YANG MEMBUKA LAYAR 2 (bukan kamera di
-  // laptop operator yang membuka Studio ini) sebagai latar hidup di
-  // belakang ayat/kidung/pengumuman -- getUserMedia() SUNGGUH dipanggil
-  // di present.html (lihat catatan panjang di sana), file ini cuma
-  // mengirim PERINTAH (on/off + pengaturan) lewat rawPost() & menerima
-  // KEMBALI status nyatanya lewat event "ps-camera-status" (dipancarkan
-  // js/presentation.js dari pesan "present_camera_status", pola sama
-  // seperti "ps-preview-ratio-changed" untuk present_geometry).
+  // BARU (28 Agu 2026) -- 🎥 KAMERA & 🖼️ GAMBAR LATAR (tab "🎥 Kamera",
+  // kolom kanan). "Sumber Latar" bisa salah satu dari 3: "off" (tanpa
+  // latar, tampilan biasa), "camera" (kamera perangkat yang membuka
+  // LAYAR 2 -- BUKAN kamera laptop operator yang membuka Studio ini --
+  // dipakai sebagai latar hidup), atau "image" (gambar diam yang
+  // diunggah operator). Kamera & Gambar SALING MENIADAKAN -- memilih
+  // salah satu otomatis mematikan yang lain (lihat applyLatarSource()).
   //
-  // Pengaturan (arah kamera/cermin/gaya tulisan/tebal border) DISIMPAN
-  // (localStorage, bertahan lintas sesi) -- status NYALA/MATI kameranya
-  // sendiri SENGAJA TIDAK disimpan (`camOn` cuma variabel biasa, mulai
-  // dari `false` tiap Studio dibuka ulang) supaya kamera TIDAK pernah
-  // otomatis meminta izin/menyala sendiri tanpa operator menekan tombol
-  // dulu di sesi itu -- baik demi privasi (kamera tidak diam-diam
-  // nyala) maupun karena Layar 2-nya sendiri belum tentu sudah terbuka
-  // lagi di sesi baru.
+  // getUserMedia() SUNGGUH dipanggil di present.html (lihat catatan
+  // panjang di sana), file ini cuma mengirim PERINTAH (on/off +
+  // pengaturan) lewat rawPost() & menerima KEMBALI status nyatanya
+  // lewat event "ps-camera-status" (dipancarkan js/presentation.js
+  // dari pesan "present_camera_status", pola sama seperti
+  // "ps-preview-ratio-changed" untuk present_geometry).
+  //
+  // Gaya tulisan (warna tulisan/border/tebal border) dipakai bersama
+  // oleh Kamera & Gambar -- disimpan & dikirim TERPISAH dari payload
+  // "camera"/"bgimage" itu sendiri (lewat {type:"latartext"}, lihat
+  // sendLatarTextState()) supaya menggeser slider/ganti warna TIDAK
+  // memicu ulang stream kamera atau kirim ulang gambar (data-URL bisa
+  // besar).
+  //
+  // Pengaturan (arah kamera/cermin/gaya tulisan/tebal border/warna
+  // kustom) DISIMPAN (localStorage, bertahan lintas sesi) -- status
+  // NYALA/MATI kamera & gambar gambar itu SENDIRI SENGAJA TIDAK
+  // disimpan (`camOn`/`bgImageOn` cuma variabel biasa, mulai dari
+  // `false` tiap Studio dibuka ulang) supaya kamera TIDAK pernah
+  // otomatis meminta izin/menyala sendiri tanpa operator menekan
+  // tombol dulu di sesi itu -- baik demi privasi (kamera tidak
+  // diam-diam nyala) maupun karena Layar 2-nya sendiri belum tentu
+  // sudah terbuka lagi di sesi baru. Gambar yang diunggah sendiri
+  // (data-URL, bisa besar) SENGAJA TIDAK ikut disimpan ke localStorage
+  // (risiko kuota penuh) -- hilang begitu Studio ditutup/dimuat ulang,
+  // operator perlu unggah ulang di sesi baru.
   // ------------------------------------------------------------
   const CAMERA_KEY = "bible_app_studio_camera_v1";
-  const DEFAULT_CAMERA_SETTINGS = { facing: "user", mirror: false, textMode: "white-black", outlineWidth: 3 };
+  const DEFAULT_CAMERA_SETTINGS = {
+    facing: "user", mirror: false,
+    textMode: "white-black", outlineWidth: 3,
+    customInk: "#ffffff", customOutline: "#000000",
+  };
   let camOn = false;
+  let bgImageOn = false;
+  let bgImageDataUrl = null; // BARU -- data-URL gambar latar yang sedang diunggah, tidak disimpan ke localStorage (lihat catatan di atas)
 
   function loadCameraSettings() {
     let s = { ...DEFAULT_CAMERA_SETTINGS };
@@ -2639,13 +2661,24 @@ const PresentationStudio = (() => {
     localStorage.setItem(CAMERA_KEY, JSON.stringify(s));
     return s;
   }
-  // Selalu kirim SELURUH pengaturan (bukan cuma yang berubah) -- sama
-  // pola dengan saveAndSendTheme() di bawah -- `on` dioper terpisah
-  // (bukan bagian dari objek tersimpan) karena memang tidak ikut
-  // disimpan (lihat catatan di atas).
   function sendCameraState(on) {
     const s = loadCameraSettings();
-    rawPost({ type: "camera", on: !!on, facingMode: s.facing, mirror: s.mirror, textMode: s.textMode, outlineWidth: s.outlineWidth });
+    rawPost({ type: "camera", on: !!on, facingMode: s.facing, mirror: s.mirror });
+  }
+  // BARU -- gambar latar dikirim APA ADANYA sebagai data-URL (sama
+  // pola seperti "slide" di File tab) -- hanya dikirim ULANG saat
+  // benar-benar nyala/mati/ganti gambar, TIDAK setiap kali gaya
+  // tulisan berubah (lihat sendLatarTextState()).
+  function sendBgImageState(on) {
+    rawPost({ type: "bgimage", on: !!(on && bgImageDataUrl), url: on ? bgImageDataUrl : null });
+  }
+  // BARU -- gaya tulisan (dipakai bersama Kamera & Gambar), dikirim
+  // WALAU keduanya masih mati -- applyCamTextStyle() di present.html
+  // tetap menerapkan gaya tulisannya duluan (siap dipakai begitu latar
+  // dinyalakan).
+  function sendLatarTextState() {
+    const s = loadCameraSettings();
+    rawPost({ type: "latartext", mode: s.textMode, widthPx: s.outlineWidth, ink: s.customInk, outline: s.customOutline });
   }
   function setCamStatusText(text) {
     if (el("psCamStatus")) el("psCamStatus").textContent = text;
@@ -2656,6 +2689,36 @@ const PresentationStudio = (() => {
     btn.classList.toggle("active", on);
     btn.textContent = on ? "🎥 Matikan Kamera" : "🎥 Aktifkan Kamera";
   }
+  function setBgImageToggleUi(on) {
+    const btn = el("psBgImageToggle");
+    if (!btn) return;
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? "🖼️ Matikan Gambar Latar" : "🖼️ Pakai sebagai Latar";
+  }
+
+  // BARU -- "Sumber Latar" (off/camera/image): satu fungsi tunggal
+  // yang menjaga kamera & gambar latar SALING MENIADAKAN. Dipanggil
+  // dari tombol toggle Kamera & tombol toggle Gambar, bukan dari
+  // event ps-camera-status (status kamera NYATA tetap dilaporkan
+  // balik lewat listener terpisah di bawah).
+  function setLatarSource(next) {
+    if (next === "camera") {
+      camOn = true;
+      if (bgImageOn) { bgImageOn = false; setBgImageToggleUi(false); sendBgImageState(false); }
+      setCamToggleUi(true);
+      setCamStatusText("⏳ Meminta izin kamera di jendela Layar 2…");
+      sendCameraState(true);
+    } else if (next === "image") {
+      if (!bgImageDataUrl) return; // belum ada gambar diunggah -- tombol dinonaktifkan lewat CSS/atribut disabled, ini jaga-jaga
+      bgImageOn = true;
+      if (camOn) { camOn = false; setCamToggleUi(false); setCamStatusText("⚪ Kamera dimatikan."); sendCameraState(false); }
+      setBgImageToggleUi(true);
+      sendBgImageState(true);
+    } else {
+      if (camOn) { camOn = false; setCamToggleUi(false); setCamStatusText("⚪ Kamera dimatikan."); sendCameraState(false); }
+      if (bgImageOn) { bgImageOn = false; setBgImageToggleUi(false); sendBgImageState(false); }
+    }
+  }
 
   function wireCamera() {
     const s = loadCameraSettings();
@@ -2663,15 +2726,15 @@ const PresentationStudio = (() => {
     if (el("psCamMirror")) el("psCamMirror").checked = !!s.mirror;
     if (el("psCamOutlineSlider")) el("psCamOutlineSlider").value = String(s.outlineWidth);
     if (el("psCamOutlineValue")) el("psCamOutlineValue").textContent = s.outlineWidth + "px";
+    if (el("psCamInkColor")) el("psCamInkColor").value = s.customInk;
+    if (el("psCamOutlineColor")) el("psCamOutlineColor").value = s.customOutline;
     document.querySelectorAll("[data-ps-cam-text]").forEach((b) => b.classList.toggle("active", b.dataset.psCamText === s.textMode));
 
     if (el("psCamToggle")) {
-      el("psCamToggle").addEventListener("click", () => {
-        camOn = !camOn;
-        setCamToggleUi(camOn);
-        setCamStatusText(camOn ? "⏳ Meminta izin kamera di jendela Layar 2…" : "⚪ Kamera dimatikan.");
-        sendCameraState(camOn);
-      });
+      el("psCamToggle").addEventListener("click", () => setLatarSource(camOn ? "off" : "camera"));
+    }
+    if (el("psBgImageToggle")) {
+      el("psBgImageToggle").addEventListener("click", () => setLatarSource(bgImageOn ? "off" : "image"));
     }
     if (el("psCamFacingSelect")) {
       el("psCamFacingSelect").addEventListener("change", () => {
@@ -2690,19 +2753,74 @@ const PresentationStudio = (() => {
         document.querySelectorAll("[data-ps-cam-text]").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         saveCameraSettings({ textMode: btn.dataset.psCamText });
-        // Dikirim WALAU kamera masih mati -- applyCamTextStyle() di
-        // present.html tetap menerapkan gaya tulisannya duluan (siap
-        // dipakai begitu kamera dinyalakan), lihat applyCameraPayload().
-        sendCameraState(camOn);
+        sendLatarTextState();
       });
     });
+    // BARU -- warna tulisan & warna border BEBAS (24-bit, dipilih
+    // lewat <input type="color">, bukan cuma 2 preset hitam/putih) --
+    // memilih salah satu warna otomatis memindahkan mode ke "custom".
+    function activateCustomTextMode() {
+      document.querySelectorAll("[data-ps-cam-text]").forEach((b) => b.classList.toggle("active", b.dataset.psCamText === "custom"));
+      saveCameraSettings({ textMode: "custom" });
+      sendLatarTextState();
+    }
+    if (el("psCamInkColor")) {
+      el("psCamInkColor").addEventListener("input", () => {
+        saveCameraSettings({ customInk: el("psCamInkColor").value });
+        activateCustomTextMode();
+      });
+    }
+    if (el("psCamOutlineColor")) {
+      el("psCamOutlineColor").addEventListener("input", () => {
+        saveCameraSettings({ customOutline: el("psCamOutlineColor").value });
+        activateCustomTextMode();
+      });
+    }
     function applyOutline() {
       const v = Number(el("psCamOutlineSlider").value);
       if (el("psCamOutlineValue")) el("psCamOutlineValue").textContent = v + "px";
       saveCameraSettings({ outlineWidth: v });
-      sendCameraState(camOn);
+      sendLatarTextState();
     }
     if (el("psCamOutlineSlider")) el("psCamOutlineSlider").addEventListener("input", applyOutline);
+    sendLatarTextState(); // kirim gaya tersimpan sekali di awal, siap dipakai begitu Kamera/Gambar dinyalakan
+
+    // BARU -- 🖼️ Unggah Gambar Latar (dropzone sama pola dengan tab
+    // File, tapi 1 gambar saja -- gambar BARU menggantikan yang lama).
+    const bgDz = el("psBgImageDropzone");
+    const bgInput = el("psBgImageInput");
+    function handleBgImageFile(file) {
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { alert("Pilih file gambar (jpg/png/webp/gif)."); return; }
+      if (file.size > 25 * 1024 * 1024) { alert(`${file.name}: melebihi 25MB.`); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        bgImageDataUrl = reader.result;
+        if (el("psBgImagePreview")) { el("psBgImagePreview").src = bgImageDataUrl; el("psBgImagePreview").hidden = false; }
+        if (el("psBgImageToggle")) el("psBgImageToggle").disabled = false;
+        if (el("psBgImageName")) el("psBgImageName").textContent = file.name;
+        if (bgImageOn) sendBgImageState(true); // gambar sedang tayang & diganti -- kirim ulang yang baru
+      };
+      reader.readAsDataURL(file);
+    }
+    if (bgDz && bgInput) {
+      bgDz.addEventListener("click", () => bgInput.click());
+      bgDz.addEventListener("dragover", (e) => { e.preventDefault(); bgDz.classList.add("dragover"); });
+      bgDz.addEventListener("dragleave", () => bgDz.classList.remove("dragover"));
+      bgDz.addEventListener("drop", (e) => { e.preventDefault(); bgDz.classList.remove("dragover"); handleBgImageFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
+      bgInput.addEventListener("change", () => handleBgImageFile(bgInput.files && bgInput.files[0]));
+    }
+    if (el("psBgImageRemove")) {
+      el("psBgImageRemove").addEventListener("click", () => {
+        bgImageDataUrl = null;
+        if (bgImageOn) setLatarSource("off");
+        if (el("psBgImagePreview")) { el("psBgImagePreview").hidden = true; el("psBgImagePreview").src = ""; }
+        if (el("psBgImageToggle")) el("psBgImageToggle").disabled = true;
+        if (el("psBgImageName")) el("psBgImageName").textContent = "";
+        if (bgInput) bgInput.value = "";
+      });
+    }
+    if (el("psBgImageToggle")) el("psBgImageToggle").disabled = true; // aktif lagi begitu 1 gambar berhasil diunggah
 
     // Status NYATA dari Layar 2 (berhasil/gagal -- lihat
     // present_camera_status di present.html, diteruskan sebagai event
@@ -2916,7 +3034,7 @@ const PresentationStudio = (() => {
     }
   }
 
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35 };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1 };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -2954,8 +3072,11 @@ const PresentationStudio = (() => {
     if (el("psBgColor")) el("psBgColor").value = theme.bgColor;
     if (el("psFontScale")) el("psFontScale").value = String(Math.round(theme.scale * 100));
     if (el("psLineHeight")) el("psLineHeight").value = String(Math.round(theme.lineHeight * 100));
+    // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
+    // layar), lihat catatan --p-content-scale di present.html.
+    if (el("psContentScale")) el("psContentScale").value = String(Math.round((theme.contentScale || 1) * 100));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale } });
   }
 
   function saveAndSendTheme(partial) {
@@ -2965,7 +3086,7 @@ const PresentationStudio = (() => {
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -3077,6 +3198,20 @@ const PresentationStudio = (() => {
     if (el("psLineHeight")) el("psLineHeight").addEventListener("input", applyLineHeight);
     if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(90, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
     if (el("psLineHeightInc")) el("psLineHeightInc").addEventListener("click", () => { el("psLineHeight").value = Math.min(250, Number(el("psLineHeight").value) + 10); applyLineHeight(); });
+
+    // BARU (28 Agu 2026) -- "Ukuran Konten": lebar kotak teks/jarak
+    // tepi di Layar 2 (lihat --p-content-scale di present.html) --
+    // dipersempit (<100%) cocok dipakai bersama 🎥 Kamera/🖼️ Gambar
+    // Latar supaya latar lebih terlihat di tepi layar, atau dilebarkan
+    // (>100%) supaya teks memakai hampir seluruh lebar layar.
+    function applyContentScale() {
+      const pct = Number(el("psContentScale").value);
+      if (el("psContentScaleValue")) el("psContentScaleValue").textContent = pct + "%";
+      saveAndSendTheme({ contentScale: pct / 100 });
+    }
+    if (el("psContentScale")) el("psContentScale").addEventListener("input", applyContentScale);
+    if (el("psContentScaleDec")) el("psContentScaleDec").addEventListener("click", () => { el("psContentScale").value = Math.max(60, Number(el("psContentScale").value) - 10); applyContentScale(); });
+    if (el("psContentScaleInc")) el("psContentScaleInc").addEventListener("click", () => { el("psContentScale").value = Math.min(140, Number(el("psContentScale").value) + 10); applyContentScale(); });
   }
 
   // ------------------------------------------------------------
