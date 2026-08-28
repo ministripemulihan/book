@@ -617,8 +617,21 @@ const PresentationStudio = (() => {
       return;
     }
     const url = found.images[Math.min(it.pageIndex || 0, found.images.length - 1)];
-    rawPost({ type: "slide", imageUrl: url });
-    renderStudioPreview({ type: "slide", imageUrl: url });
+    // PERBAIKAN (28 Agu 2026) -- sebelum ini SELALU dikirim sebagai
+    // {type:"slide", imageUrl}, padahal untuk item Media Tersimpan
+    // bertipe "youtube" isi `images` adalah embed-URL video, BUKAN URL
+    // gambar -- akibatnya video YouTube yang ditambahkan ke Kumpulan
+    // Ayat (lihat addMediaToCollection(), sekarang juga bisa dipakai
+    // untuk video lewat tombol "➕ Kumpulan" di Media Tersimpan &
+    // Playlist Video) gagal tayang (Layar 2 mencoba menampilkannya
+    // sebagai <img>). Sekarang dicek dulu jenis aslinya.
+    if (found.type === "youtube") {
+      rawPost({ type: "youtube", embedUrl: url });
+      renderStudioPreview({ type: "youtube", embedUrl: url });
+    } else {
+      rawPost({ type: "slide", imageUrl: url });
+      renderStudioPreview({ type: "slide", imageUrl: url });
+    }
   }
 
   function sendKidungSlide(it) {
@@ -1014,7 +1027,7 @@ const PresentationStudio = (() => {
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
           ${isYt ? `<button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai audio latar (video disembunyikan)">🎧</button>` : ""}
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="copyname" title="Salin nama file ini">📋</button>` : ""}
-          ${!isYt ? `<button type="button" class="chip-btn small" data-act="addcol" title="Tambahkan halaman yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)">➕ Kumpulan</button>` : ""}
+          <button type="button" class="chip-btn small" data-act="addcol" title="${isYt ? "Tambahkan video yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)" : "Tambahkan halaman yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)"}">➕ Kumpulan</button>
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="download" title="Unduh halaman yang sedang ditampilkan sebagai gambar">⬇️</button>` : ""}
           ${item.originalFile ? `<button type="button" class="chip-btn small" data-act="downloadOriginal" title="Unduh file PDF ASLI (utuh, bukan gambar per halaman)">⬇️ PDF Asli</button>` : ""}
           ${item.driveFileId ? `<button type="button" class="chip-btn small danger" data-act="deldrive" title="Hapus PERMANEN dari Drive (bukan cuma dari daftar ini)">🗑️ Hapus dari Drive</button>` : ""}
@@ -2543,6 +2556,196 @@ const PresentationStudio = (() => {
     renderQueue();
   }
 
+  // ------------------------------------------------------------
+  // BARU (28 Agu 2026) -- "📺 Playlist Video (dari Google Sheet)", tab
+  // ▶️ YouTube. Operator menempel link Google Sheet yang sudah di-
+  // "Publish to web" sebagai CSV (kolom: Title, Channel, URL, Anak,
+  // Remaja, Pemuda, SPR, Injil, Bebas -- persis susunan yang dipakai di
+  // Excel/Sheet operator sendiri, isi "1" di kolom kategori yang
+  // cocok). Sheet itu TETAP milik/dikelola operator sendiri (bisa terus
+  // diperbarui isinya kapan saja) -- aplikasi ini cuma membaca ulang
+  // isinya tiap kali "🔄 Muat Ulang" ditekan, tidak menyimpan salinan
+  // videonya. Link Sheet yang sudah dimasukkan disimpan di localStorage
+  // (per perangkat/browser) supaya tidak perlu ditempel ulang tiap buka
+  // Studio.
+  //
+  // Video dari daftar ini bisa langsung "▶️ Tampilkan" (ikut playlist
+  // TERSARING/filter kategori yang sedang aktif, supaya "🔁 Ulang:
+  // Semua" -- lihat wireYtControls() & present.html -- lanjut ke video
+  // berikutnya DI DALAM filter yang sama, bukan lompat ke kategori
+  // lain), atau "➕ Kumpulan" untuk menaruhnya ke Kumpulan Ayat (lewat
+  // addMediaItem()+addMediaToCollection(), sama seperti video yang
+  // ditempel manual di atas -- lihat wireYoutubeTab()).
+  // ------------------------------------------------------------
+  function wireYtPlaylistTab() {
+    const urlInput = el("psYtPlaylistSheetUrl");
+    const saveBtn = el("psYtPlaylistSaveBtn");
+    const reloadBtn = el("psYtPlaylistReloadBtn");
+    const statusEl = el("psYtPlaylistStatus");
+    const filterWrap = el("psYtPlaylistFilters");
+    const listWrap = el("psYtPlaylistList");
+    if (!urlInput || !listWrap) return;
+
+    const SHEET_KEY = "bible_app_yt_playlist_sheet_v1";
+    const CATS = [
+      { key: "anak", label: "Anak" },
+      { key: "remaja", label: "Remaja" },
+      { key: "pemuda", label: "Pemuda" },
+      { key: "spr", label: "SPR" },
+      { key: "injil", label: "Injil" },
+      { key: "bebas", label: "Bebas" },
+    ];
+    let allVideos = []; // [{ title, channel, url, videoId, embedUrl, cats:{anak,remaja,...} }]
+    let activeFilter = "all";
+
+    urlInput.value = localStorage.getItem(SHEET_KEY) || "";
+
+    // Terima juga link Sheet biasa (.../edit#gid=0) selain link "Publish
+    // to web" CSV -- diubah otomatis jadi bentuk export CSV supaya
+    // operator tidak perlu tahu bedanya.
+    function normalizeSheetUrl(raw) {
+      const s = (raw || "").trim();
+      if (!s) return "";
+      const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!m) return s; // bukan link Google Sheet biasa -- pakai apa adanya (mis. sudah link CSV)
+      const gidMatch = s.match(/[?#&]gid=(\d+)/);
+      const gid = gidMatch ? gidMatch[1] : "0";
+      return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
+    }
+
+    function truthy(v) {
+      const s = String(v == null ? "" : v).trim().toLowerCase();
+      return s === "1" || s === "true" || s === "ya" || s === "yes" || s === "x" || s === "v" || s === "✓";
+    }
+
+    function parseSheetCsv(text) {
+      if (typeof parseCSV !== "function") return [];
+      const rows = parseCSV(text).filter((r) => r.some((c) => String(c || "").trim() !== ""));
+      if (!rows.length) return [];
+      const header = rows[0].map((h) => String(h || "").trim().toLowerCase());
+      const colIdx = (names) => header.findIndex((h) => names.includes(h));
+      const iTitle = colIdx(["title", "judul"]);
+      const iChannel = colIdx(["channel", "channel name", "saluran"]);
+      const iUrl = colIdx(["url", "link"]);
+      const catIdx = {};
+      CATS.forEach((c) => { catIdx[c.key] = colIdx([c.key, c.label.toLowerCase()]); });
+      const out = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const url = iUrl >= 0 ? (r[iUrl] || "").trim() : "";
+        const id = typeof extractYoutubeId === "function" ? extractYoutubeId(url) : null;
+        if (!id) continue; // baris tanpa link YouTube yang dikenali -- lewati diam-diam
+        const cats = {};
+        CATS.forEach((c) => { cats[c.key] = catIdx[c.key] >= 0 ? truthy(r[catIdx[c.key]]) : false; });
+        out.push({
+          title: (iTitle >= 0 && r[iTitle] ? r[iTitle].trim() : null) || id,
+          channel: iChannel >= 0 ? (r[iChannel] || "").trim() : "",
+          url, videoId: id,
+          embedUrl: buildYoutubeEmbedUrl(id),
+          cats,
+        });
+      }
+      return out;
+    }
+
+    function filteredVideos() {
+      if (activeFilter === "all") return allVideos;
+      return allVideos.filter((v) => v.cats[activeFilter]);
+    }
+
+    function renderFilters() {
+      if (!filterWrap) return;
+      filterWrap.querySelectorAll("[data-filter]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.filter === activeFilter);
+      });
+    }
+
+    function renderList() {
+      const videos = filteredVideos();
+      if (!videos.length) {
+        listWrap.innerHTML = `<p class="present-saved-empty">${allVideos.length ? "Tidak ada video untuk filter ini." : "Belum ada video dimuat -- tempel link Google Sheet lalu tekan \"🔄 Muat Ulang\"."}</p>`;
+        return;
+      }
+      listWrap.innerHTML = "";
+      videos.forEach((v, i) => {
+        const row = document.createElement("div");
+        row.className = "ps-yt-playlist-row";
+        const tagsHtml = CATS.filter((c) => v.cats[c.key])
+          .map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c.label)}</span>`).join("");
+        row.innerHTML = `
+          <img class="ps-yt-playlist-thumb" src="https://i.ytimg.com/vi/${escapeHtml(v.videoId)}/mqdefault.jpg" alt="" loading="lazy" />
+          <div class="ps-yt-playlist-info">
+            <span class="ps-yt-playlist-title">${escapeHtml(v.title)}</span>
+            <span class="ps-yt-playlist-channel">${escapeHtml(v.channel || "")}</span>
+            ${tagsHtml ? `<span class="ps-yt-playlist-tags">${tagsHtml}</span>` : ""}
+          </div>
+          <div class="ps-file-actions">
+            <button type="button" class="chip-btn small primary" data-act="show">▶️ Tampilkan</button>
+            <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
+          </div>`;
+        row.querySelector('[data-act="show"]').addEventListener("click", () => {
+          const queue = videos.map((q) => ({ embedUrl: q.embedUrl }));
+          const doSend = () => {
+            rawPost({ type: "youtube", embedUrl: v.embedUrl, queue, queueIndex: i });
+            renderStudioPreview({ type: "youtube", embedUrl: v.embedUrl });
+          };
+          stageOrSend(v.title, v.title, doSend);
+        });
+        row.querySelector('[data-act="addcol"]').addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          if (typeof addMediaItem !== "function" || typeof addMediaToCollection !== "function") return;
+          const sel = el("psCollectionSelect");
+          const username = typeof currentUser !== "undefined" ? currentUser : null;
+          const name = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+            ? loadCollections(username)[sel.value].name
+            : await promptCollectionName(username);
+          if (!name) return;
+          btn.disabled = true;
+          const mediaId = await addMediaItem(username, v.title, [v.embedUrl], v.title, "youtube", [{ title: v.title, durationLabel: "" }]);
+          btn.disabled = false;
+          if (!mediaId) { alert("Gagal menyimpan (penyimpanan perangkat penuh?)."); return; }
+          addMediaToCollection(username, name, { id: mediaId, name: v.title }, 0);
+          if (typeof renderMediaList === "function") renderMediaList();
+          if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+          btn.textContent = "✅ Ditambahkan";
+          setTimeout(() => { btn.textContent = "➕ Kumpulan"; }, 1200);
+        });
+        listWrap.appendChild(row);
+      });
+    }
+
+    async function loadSheet() {
+      const url = normalizeSheetUrl(urlInput.value);
+      if (!url) { if (statusEl) statusEl.textContent = "Tempel dulu link Google Sheet-nya (Publish to web -> CSV)."; return; }
+      if (statusEl) statusEl.textContent = "⏳ Memuat…";
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const text = await res.text();
+        allVideos = parseSheetCsv(text);
+        if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat (terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
+        renderList();
+      } catch (e) {
+        if (statusEl) statusEl.textContent = "❌ Gagal memuat Sheet. Pastikan link sudah \"Publish to web\" (bukan cuma \"Share\") sebagai CSV, dan koneksi internet aktif.";
+      }
+    }
+
+    if (saveBtn) saveBtn.addEventListener("click", () => {
+      localStorage.setItem(SHEET_KEY, urlInput.value.trim());
+      loadSheet();
+    });
+    if (reloadBtn) reloadBtn.addEventListener("click", loadSheet);
+    if (filterWrap) filterWrap.querySelectorAll("[data-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeFilter = btn.dataset.filter;
+        renderFilters();
+        renderList();
+      });
+    });
+    renderFilters();
+    if (urlInput.value.trim()) loadSheet(); // sudah pernah disimpan sebelumnya -- langsung muat
+  }
+
   // Tombol ▶️ Play / ⏸️ Pause / 🔇 Mute di baris ikon atas kotak "Tayang"
   // -- mengontrol video YouTube yang SEDANG tayang di Layar 2 lewat
   // postMessage (lihat yt_control di present.html), DAN skrng juga ikut
@@ -2556,25 +2759,57 @@ const PresentationStudio = (() => {
     const playBtn = el("psYtPlayBtn");
     const pauseBtn = el("psYtPauseBtn");
     const muteBtn = el("psYtMuteBtn");
+    // BARU (28 Agu 2026) -- ⏹️ Stop & 🔁 Ulang (Repeat), lihat catatan
+    // panjang di present.html (handler "yt_control" action "stop" &
+    // "yt_repeat"). Repeat berputar: Mati -> Satu Video -> Semua
+    // (Playlist) -> Mati, disimpan juga ke localStorage supaya tetap
+    // sama kalau Studio ditutup lalu dibuka lagi.
+    const stopBtn = el("psYtStopBtn");
+    const repeatBtn = el("psYtRepeatBtn");
     let muted = false;
+    const REPEAT_KEY = "bible_app_yt_repeat_mode_v1";
+    const REPEAT_LABELS = { off: "🔁 Ulang: Mati", one: "🔂 Ulang: Satu Video", all: "🔁 Ulang: Semua" };
+    let repeatMode = localStorage.getItem(REPEAT_KEY) || "off";
+    if (!REPEAT_LABELS[repeatMode]) repeatMode = "off";
 
     function sendYtCommand(action) {
       rawPost({ type: "yt_control", action }); // -> Layar 2 (present.html)
       const previewFrame = el("psYtPreviewFrame"); // -> pratinjau mini di Studio
       if (previewFrame && previewFrame.contentWindow) {
-        const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[action];
+        const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute" }[action];
         if (cmd) previewFrame.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
       }
     }
 
+    function applyRepeatUi() {
+      if (!repeatBtn) return;
+      repeatBtn.textContent = REPEAT_LABELS[repeatMode];
+      repeatBtn.classList.toggle("active", repeatMode !== "off");
+    }
+
     if (playBtn) playBtn.addEventListener("click", () => sendYtCommand("play"));
     if (pauseBtn) pauseBtn.addEventListener("click", () => sendYtCommand("pause"));
+    if (stopBtn) stopBtn.addEventListener("click", () => sendYtCommand("stop"));
     if (muteBtn) muteBtn.addEventListener("click", () => {
       muted = !muted;
       sendYtCommand(muted ? "mute" : "unmute");
       muteBtn.textContent = muted ? "🔇 Bersuara" : "🔇 Mute";
       muteBtn.classList.toggle("active", muted);
     });
+    if (repeatBtn) {
+      repeatBtn.addEventListener("click", () => {
+        repeatMode = repeatMode === "off" ? "one" : repeatMode === "one" ? "all" : "off";
+        localStorage.setItem(REPEAT_KEY, repeatMode);
+        applyRepeatUi();
+        rawPost({ type: "yt_repeat", mode: repeatMode }); // -> Layar 2 (present.html)
+      });
+      applyRepeatUi();
+      rawPost({ type: "yt_repeat", mode: repeatMode }); // beri tahu Layar 2 mode tersimpan begitu Studio dibuka
+    }
+    // Dipakai wireYoutubeTab()/wireYtPlaylistTab() supaya video baru yang
+    // ditampilkan langsung ikut mode Ulang yang sedang aktif tanpa
+    // operator perlu menekan ulang tombol Ulang tiap ganti video.
+    window.getYtRepeatMode = () => repeatMode;
   }
 
   // ------------------------------------------------------------
@@ -3382,6 +3617,7 @@ const PresentationStudio = (() => {
     wireUiTheme();
     wireClock();
     wireYoutubeTab();
+    wireYtPlaylistTab();
     wireYtControls();
     wireKidungTab();
     wirePlaylistKeyNav();
