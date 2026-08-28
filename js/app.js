@@ -4403,7 +4403,16 @@ function collectionItemRef(it) {
   if (it.type === "kidung") {
     const bukuLabel = it.buku && it.buku !== "Kidung" ? it.buku + " " : "";
     const noLabel = typeof formatKidungNo === "function" ? formatKidungNo(it.buku || "Kidung", it.kidungNo) : it.kidungNo;
-    return `🎵 ${bukuLabel}No. ${noLabel}${it.title ? " — " + it.title : ""}`;
+    // PERMINTAAN OPERATOR (28 Agu 2026): ikon di depan "No. XXX -- Judul"
+    // ini SEKARANG diambil dari kolom "ikon" di Google Sheet Kidung
+    // (lihat normalizeKidungRecord() di js/csv.js), BUKAN lagi ditulis
+    // tetap di kode ("🎵" dulu, sering tampil sebagai glyph polos "♪"
+    // di sebagian layar/monitor dan terlihat seperti "gambar musik").
+    // Kalau kolom itu masih kosong/belum ditambahkan di Sheet, dipakai
+    // fallback "♪" (karakter not musik polos, BUKAN emoji berwarna) --
+    // supaya kidung yang belum diisi kolom "ikon"-nya tetap tampil wajar.
+    const ikon = it.ikon || "♪";
+    return `${ikon} ${bukuLabel}No. ${noLabel}${it.title ? " — " + it.title : ""}`;
   }
   // BARU (27 Agu 2026) -- item PDF/gambar dari Media Tersimpan, lihat
   // addMediaToCollection() di js/collections.js.
