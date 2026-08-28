@@ -496,6 +496,12 @@ async function startApp() {
     // sedikit jeda supaya tidak "berebut" dengan showEmptyState() yang
     // dipanggil di akhir afterDataReady() (terutama saat sinkron pertama kali)
     setTimeout(() => checkAnnouncementsAtStart(), 400);
+    // TAHAP 7 (ROADMAP-drive-sync.md) -- pasang pemantau "online" &
+    // langsung coba sekali antrean unggahan media yang tertunda (lihat
+    // wireMediaUploadQueueAutoRetry()/processMediaUploadQueue() di
+    // js/collections.js) -- best-effort, tidak menghalangi apa pun di
+    // atas kalau gagal/fungsinya belum dimuat.
+    if (typeof wireMediaUploadQueueAutoRetry === "function") wireMediaUploadQueueAutoRetry(currentUser);
   }
 }
 
@@ -1075,6 +1081,8 @@ function updateLevelGatedMenus() {
   // (statistik pencarian utk administrator, waktu login terakhir utk
   // yang lain), lihat js/adminbell.js.
   if (el("userManageBtn")) el("userManageBtn").hidden = !isAdministrator();
+  // TAHAP 6 -- lihat showDriveUsagePanel() di bawah.
+  if (el("driveUsageBtn")) el("driveUsageBtn").hidden = !isAdministrator();
   if (typeof AdminBell !== "undefined") AdminBell.refreshVisibility(isAdministrator());
   applyGuestModeUi();
 }
@@ -4397,6 +4405,12 @@ function collectionItemRef(it) {
     const noLabel = typeof formatKidungNo === "function" ? formatKidungNo(it.buku || "Kidung", it.kidungNo) : it.kidungNo;
     return `🎵 ${bukuLabel}No. ${noLabel}${it.title ? " — " + it.title : ""}`;
   }
+  // BARU (27 Agu 2026) -- item PDF/gambar dari Media Tersimpan, lihat
+  // addMediaToCollection() di js/collections.js.
+  if (it.type === "media") {
+    const pageLabel = it.pageCount > 1 ? ` (hal ${(it.pageIndex || 0) + 1}/${it.pageCount})` : "";
+    return `📎 ${it.name || "Berkas"}${pageLabel}`;
+  }
   return "(jenis tidak dikenal)";
 }
 
@@ -4421,6 +4435,14 @@ function collectionItemBodyText(it) {
     if (!baitText && !it.koorTeks) return "(syair kidung tidak tersedia untuk slide ini)";
     return it.koorTeks ? `${baitText}${baitText ? "\n\n" : ""}Koor:\n${it.koorTeks}` : baitText;
   }
+  // BARU (27 Agu 2026) -- item "media" (PDF/gambar) TIDAK punya bentuk
+  // teks yang masuk akal (isinya gambar, bukan syair/ayat) -- di sini
+  // (dipakai daftar teks polos & Mode Layar Penuh 1-monitor, js/app.js)
+  // cuma ditampilkan sebagai keterangan singkat. Untuk MENAYANGKANNYA
+  // sungguhan (gambarnya, bukan cuma keterangan ini), pakai Studio
+  // Presentasi (js/presentation-studio.js, sendGenericItemLive() sudah
+  // menangani jenis ini dengan mengambil gambarnya dari Media Tersimpan).
+  if (it.type === "media") return "(berkas PDF/gambar -- tayangkan lewat Studio Presentasi)";
   return "";
 }
 
@@ -5073,6 +5095,173 @@ function renderLogTable(tableWrap) {
 }
 
 // ------------------------------------------------------------
+// TAHAP 6 (ROADMAP-drive-sync.md) -- panel admin "📦 Pemakaian
+// Penyimpanan Drive". Pola SAMA seperti showLogPanel()/
+// loadAndRenderLogPanel() di atas (khusus administrator, div kosong
+// diisi innerHTML), TAPI datanya diambil dari 1 permintaan saja
+// (Sync.driveUsage(), lihat getDriveUsageReport_() di
+// apps-script/Code.gs) -- tidak perlu filter/rentang tanggal seperti
+// Log Aktivitas karena datanya memang cuma "kondisi SEKARANG", bukan
+// riwayat dari waktu ke waktu.
+function formatBytesHuman_(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + " MB";
+  return (n / 1024 / 1024 / 1024).toFixed(2) + " GB";
+}
+
+async function showDriveUsagePanel() {
+  hideAllPanels();
+  el("driveUsagePanel").hidden = false;
+  logActivity("Pemakaian Drive (Admin)");
+  await loadAndRenderDriveUsagePanel();
+}
+
+async function loadAndRenderDriveUsagePanel() {
+  const container = el("driveUsagePanel");
+  container.innerHTML = "";
+  const title = document.createElement("h2");
+  title.textContent = "📦 Pemakaian Penyimpanan Drive";
+  container.appendChild(title);
+
+  // Sama seperti loadAndRenderLogPanel() -- panel ini HANYA untuk
+  // administrator, dikunci di sini juga (bukan cuma disembunyikan
+  // tombolnya) supaya tidak bisa dibuka lewat cara lain.
+  if (!isAdministrator()) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Menu ini hanya untuk administrator.";
+    container.appendChild(p);
+    return;
+  }
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Sinkronisasi (Apps Script) belum dikonfigurasi, jadi pemakaian Drive belum bisa diambil.";
+    container.appendChild(p);
+    return;
+  }
+
+  const controls = document.createElement("div");
+  controls.className = "log-controls";
+  controls.innerHTML = `<button id="driveUsageRefreshBtn" class="chip-btn primary" type="button">🔄 Segarkan</button>`;
+  container.appendChild(controls);
+  controls.querySelector("#driveUsageRefreshBtn").addEventListener("click", () => loadAndRenderDriveUsagePanel());
+
+  const bodyWrap = document.createElement("div");
+  bodyWrap.className = "log-table-wrap";
+  bodyWrap.innerHTML = `<p class="media-empty">Memuat data pemakaian Drive…</p>`;
+  container.appendChild(bodyWrap);
+
+  const report = await Sync.driveUsage(currentUser);
+  bodyWrap.innerHTML = "";
+
+  if (!report || !report.ok) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Gagal mengambil data: " + ((report && report.error) || "tidak diketahui sebabnya.");
+    bodyWrap.appendChild(p);
+    return;
+  }
+
+  const summary = document.createElement("p");
+  summary.innerHTML = `Total <strong>${formatBytesHuman_(report.totalBytes)}</strong> dipakai oleh <strong>${report.totalFiles}</strong> berkas dari <strong>${report.userCount}</strong> akun.`;
+  bodyWrap.appendChild(summary);
+
+  if (report.truncated) {
+    const warn = document.createElement("p");
+    warn.className = "media-empty";
+    warn.textContent = "⚠️ Terlalu banyak akun untuk dihitung semuanya sekaligus -- angka di atas belum mencakup SEMUA akun (lihat DRIVE_USAGE_MAX_FOLDERS_ di apps-script/Code.gs kalau perlu dinaikkan).";
+    bodyWrap.appendChild(warn);
+  }
+
+  if (!report.perUser || !report.perUser.length) {
+    const p = document.createElement("p");
+    p.className = "media-empty";
+    p.textContent = "Belum ada berkas media yang tersinkron ke Drive dari akun mana pun.";
+    bodyWrap.appendChild(p);
+    return;
+  }
+
+  const table = document.createElement("table");
+  table.className = "log-table";
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>Akun</th><th>Jumlah berkas</th><th>Ukuran</th><th></th></tr>";
+  table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  report.perUser.forEach((u) => {
+    const tr = document.createElement("tr");
+    const detailId = "driveUsageDetail_" + u.username.replace(/[^a-z0-9]/gi, "_");
+    tr.innerHTML = `<td>${escapeHtml(u.username)}</td><td>${u.files}</td><td>${formatBytesHuman_(u.bytes)}</td><td><button type="button" class="chip-btn small" data-toggle="${detailId}">📄 Rincian</button></td>`;
+    tbody.appendChild(tr);
+
+    // BARU (27 Agu 2026) -- baris rincian per FILE (bisa dibuka/tutup),
+    // tiap file punya tombol "🗑️" yang memakai alur PERSETUJUAN yang
+    // sama seperti di panel "🖼️ Media Tersimpan" (lihat
+    // requestDeleteMediaFromDrive()/getMediaFileUsers() di
+    // js/collections.js) -- administrator TIDAK diistimewakan di sini:
+    // kalau dia BUKAN pengunggah pertama file itu, permintaannya juga
+    // cuma jadi PERMINTAAN TERTUNDA seperti pengguna biasa, sesuai
+    // aturan yang diminta ("hanya pemilik mula-mula yang boleh
+    // menyetujui").
+    const detailTr = document.createElement("tr");
+    detailTr.id = detailId;
+    detailTr.hidden = true;
+    const detailTd = document.createElement("td");
+    detailTd.colSpan = 4;
+    if (!u.fileList || !u.fileList.length) {
+      detailTd.innerHTML = `<em>Tidak ada berkas.</em>`;
+    } else {
+      const list = document.createElement("ul");
+      list.className = "drive-usage-file-list";
+      u.fileList.forEach((f) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${escapeHtml(f.name)} <em>(${formatBytesHuman_(f.bytes)})</em></span> <button type="button" class="chip-btn small danger" data-del-file="${escapeHtml(f.fileId)}" data-del-name="${escapeHtml(f.name)}">🗑️ Hapus</button>`;
+        list.appendChild(li);
+      });
+      detailTd.appendChild(list);
+      if (u.filesTruncated) {
+        const note = document.createElement("p");
+        note.className = "media-empty";
+        note.textContent = `Menampilkan ${u.fileList.length} dari ${u.files} berkas (dibatasi supaya laporan tidak terlalu besar).`;
+        detailTd.appendChild(note);
+      }
+    }
+    detailTr.appendChild(detailTd);
+    tbody.appendChild(detailTr);
+
+    tr.querySelector("[data-toggle]").addEventListener("click", () => {
+      detailTr.hidden = !detailTr.hidden;
+    });
+    detailTr.querySelectorAll("[data-del-file]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const fileId = btn.getAttribute("data-del-file");
+        const fileName = btn.getAttribute("data-del-name");
+        btn.disabled = true;
+        btn.textContent = "⏳ Memeriksa…";
+        const info = (typeof getMediaFileUsers === "function") ? await getMediaFileUsers(fileId) : null;
+        const others = ((info && info.users) || []).filter((x) => String(x.owner).toLowerCase() !== String(u.username).toLowerCase());
+        let msg = `Hapus PERMANEN "${fileName}" (akun: ${u.username}) dari Drive?\n\nTindakan ini TIDAK BISA dibatalkan.`;
+        if (others.length) msg += `\n\nBerkas ini juga dipakai oleh: ${others.map((x) => x.owner).join(", ")}.`;
+        const originalOwner = info && info.originalOwner;
+        const isOriginalOwner = !originalOwner || String(originalOwner).toLowerCase() === String(currentUser).toLowerCase();
+        if (!isOriginalOwner) msg += `\n\nAnda (${currentUser}) BUKAN pengunggah pertama berkas ini (pengunggah pertama: ${originalOwner}) -- permintaan ini akan MENUNGGU PERSETUJUAN mereka dulu.`;
+        if (!confirm(msg)) { btn.disabled = false; btn.textContent = "🗑️ Hapus"; return; }
+        btn.textContent = "⏳ Mengirim…";
+        const res = (typeof requestDeleteMediaFromDrive === "function") ? await requestDeleteMediaFromDrive(currentUser, fileId, fileName, "") : { ok: false, error: "Fungsi tidak tersedia." };
+        if (!res || !res.ok) { alert("Gagal: " + ((res && res.error) || "Terjadi kesalahan.")); btn.disabled = false; btn.textContent = "🗑️ Hapus"; return; }
+        if (res.deleted) alert(`"${fileName}" sudah dihapus permanen dari Drive.`);
+        else if (res.pending) alert(`Permintaan dikirim ke pengunggah pertama (${res.originalOwner}) -- menunggu persetujuan.`);
+        loadAndRenderDriveUsagePanel();
+      });
+    });
+  });
+  table.appendChild(tbody);
+  bodyWrap.appendChild(table);
+}
+
+// ------------------------------------------------------------
 // 8e) PANTAU PEMBACAAN (7 HARI) — untuk level administrator, penatua,
 //     gembala distrik, gembala, pra gembala, inti (bukan Kaum Saleh).
 //     Aturan bertingkat siapa-boleh-lihat-siapa memakai canViewLevel()
@@ -5516,6 +5705,7 @@ function hideAllPanels() {
   if (el("collectionsPanel")) el("collectionsPanel").hidden = true;
   if (el("kidungPanel")) el("kidungPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
+  if (el("driveUsagePanel")) el("driveUsagePanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
   if (el("curhatPanel")) el("curhatPanel").hidden = true;
   if (el("aiChatPanel")) el("aiChatPanel").hidden = true;
@@ -6686,6 +6876,14 @@ function initUIEvents() {
     el("logViewerBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
       showLogPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("driveUsageBtn")) {
+    // TAHAP 6 (ROADMAP-drive-sync.md) -- lihat showDriveUsagePanel() di atas.
+    el("driveUsageBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      showDriveUsagePanel();
       closeSidebarOnMobile();
     });
   }
