@@ -183,8 +183,8 @@ const PresentationStudio = (() => {
       // keduanya (pratinjau & Layar 2) selalu terlihat sinkron.
       box.innerHTML = payload.embedUrl
         ? `<div style="position:absolute; inset:0;">
-             <iframe id="psYtPreviewFrame" src="${escapeHtml(toStudioPreviewEmbedUrl(payload.embedUrl))}" style="position:absolute; inset:0; width:100%; height:100%; border:0; pointer-events:none;" allow="autoplay; encrypted-media" title="Pratinjau video (bisu, tidak bisa diklik)"></iframe>
-             <div style="position:absolute; left:0; right:0; bottom:0; padding:3px 8px; font-size:11px; background:rgba(0,0,0,.55); color:#fff; pointer-events:none;">🔇 Pratinjau (bisu) — pakai ▶️/⏸️/🔇 di atas untuk Layar 2</div>
+             <iframe id="psYtPreviewFrame" src="${escapeHtml(toStudioPreviewEmbedUrl(payload.embedUrl))}" style="position:absolute; inset:0; width:100%; height:100%; border:0; pointer-events:none;" allow="autoplay; encrypted-media" title="Pratinjau video"></iframe>
+             <div style="position:absolute; left:0; right:0; bottom:0; padding:3px 8px; font-size:11px; background:rgba(0,0,0,.55); color:#fff; pointer-events:none;">${ytPreviewSoundMode ? "🔊 Pratinjau (bersuara -- mode uji coba 1 laptop) — tekan ▶️/⏸️/🔇 di atas" : "🔇 Pratinjau (bisu) — pakai ▶️/⏸️/🔇 di atas untuk Layar 2"}</div>
            </div>`
         : '<div class="present-preview-idle">▶️ Video YouTube</div>';
       return;
@@ -2312,12 +2312,29 @@ const PresentationStudio = (() => {
     return `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1&modestbranding=1&iv_load_policy=3&playsinline=1`;
   }
 
+  // BARU (28 Agu 2026) -- lihat catatan panjang di checkbox
+  // "#psYtPreviewSoundMode" (index.html) & di toStudioPreviewEmbedUrl()/
+  // sendYtCommand() di bawah. Mati (default) = perilaku LAMA (pratinjau
+  // Studio SELALU bisu, autoplay langsung -- pas untuk pemakaian
+  // sungguhan 2 layar). Nyala = pratinjau ikut bersuara, TAPI menunggu
+  // ▶️ Play ditekan dulu (sama seperti Layar 2), khusus uji coba 1 laptop.
+  const YT_PREVIEW_SOUND_KEY = "bible_app_yt_preview_sound_v1";
+  let ytPreviewSoundMode = localStorage.getItem(YT_PREVIEW_SOUND_KEY) === "1";
+
   function toStudioPreviewEmbedUrl(embedUrl) {
-    // Khusus untuk kotak mini "Tayang" di Studio (bukan Layar 2 asli):
-    // dibuat autoplay + bisu, supaya operator langsung lihat videonya
-    // "hidup" di layar kecil tanpa perlu menekan apa pun & tanpa dobel
-    // suara dengan Layar 2 sungguhan.
+    // Khusus untuk kotak mini "Tayang" di Studio (bukan Layar 2 asli).
     if (!embedUrl) return "";
+    if (ytPreviewSoundMode) {
+      // Mode "ikut bersuara" -- JANGAN autoplay & JANGAN mute, biarkan
+      // sama persis seperti Layar 2 (present.html): dimuat dalam keadaan
+      // siap/pause, baru mulai (dengan suara) begitu operator menekan
+      // ▶️ Play di atas -- lihat sendYtCommand() di bawah, yang di mode
+      // ini JUGA meneruskan play/pause/stop/mute/unmute ke pratinjau.
+      return embedUrl;
+    }
+    // Mode bawaan -- autoplay + bisu, supaya operator langsung lihat
+    // videonya "hidup" di layar kecil tanpa perlu menekan apa pun &
+    // tanpa dobel suara dengan Layar 2 sungguhan.
     const sep = embedUrl.includes("?") ? "&" : "?";
     return embedUrl + sep + "autoplay=1&mute=1";
   }
@@ -2392,6 +2409,18 @@ const PresentationStudio = (() => {
     const saveBtn = el("psYtSaveQueueBtn");
     const queueList = el("psYtQueueList");
     if (!input || !showBtn) return;
+
+    // BARU (28 Agu 2026) -- checkbox "🔊 Pratinjau ikut bersuara", lihat
+    // ytPreviewSoundMode/toStudioPreviewEmbedUrl()/sendYtCommand() di
+    // atas untuk penjelasan lengkap.
+    const soundModeCb = el("psYtPreviewSoundMode");
+    if (soundModeCb) {
+      soundModeCb.checked = ytPreviewSoundMode;
+      soundModeCb.addEventListener("change", () => {
+        ytPreviewSoundMode = soundModeCb.checked;
+        localStorage.setItem(YT_PREVIEW_SOUND_KEY, ytPreviewSoundMode ? "1" : "0");
+      });
+    }
 
     // Daftar sesi (di memori, belum tersimpan) -- dibangun dulu di sini
     // sebelum ditekan "💾 Simpan ke Media Tersimpan" jadi 1 item dengan
@@ -2594,7 +2623,7 @@ const PresentationStudio = (() => {
     // tetap bisa menimpanya lewat kotak input + "💾 Simpan Link" (yang
     // tersimpan di localStorage per perangkat itu SELALU menang di atas
     // nilai bawaan ini).
-    const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSFnIaLTF5o2XVdXT-hivwPT4qTGB1y6VHIKFex4gKHggWIcp0f3JJusnUXvQeHw0pCGVVeMiJUhxYf/pub?output=csv";
+    const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1UdMQ3JZkeXr8KYwVNW8cmipp0B9oH2FYLwudTFxqR0g/export?format=csv&gid=0";
     const CATS = [
       { key: "anak", label: "Anak" },
       { key: "remaja", label: "Remaja" },
@@ -2788,10 +2817,39 @@ const PresentationStudio = (() => {
     if (!REPEAT_LABELS[repeatMode]) repeatMode = "off";
 
     function sendYtCommand(action) {
-      rawPost({ type: "yt_control", action }); // -> Layar 2 (present.html)
-      const previewFrame = el("psYtPreviewFrame"); // -> pratinjau mini di Studio
+      rawPost({ type: "yt_control", action }); // -> Layar 2 (present.html) -- SATU-SATUNYA yang boleh bersuara
+      const previewFrame = el("psYtPreviewFrame"); // -> pratinjau mini di Studio (SENGAJA selalu bisu)
       if (previewFrame && previewFrame.contentWindow) {
-        const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute" }[action];
+        // PERBAIKAN (laporan operator 28 Agu 2026, "suara jadi dobel saat
+        // Play dari daftar YouTube"): "mute"/"unmute" TIDAK LAGI ikut
+        // diteruskan ke pratinjau mini ini. Pratinjau ini SENGAJA dibuat
+        // permanen bisu (lihat toStudioPreviewEmbedUrl(), parameter
+        // "mute=1" saat iframe-nya dibuat) supaya operator TIDAK PERNAH
+        // dengar suara dari sini -- cuma Layar 2 (`#ytView` di
+        // present.html) yang boleh bersuara ke pendengar.
+        //   BUG SEBELUMNYA: perintah "unmute" (dikirim tombol "🔇 Mute"
+        //   di atas, dipakai untuk MENYALAKAN suara Layar 2) ikut
+        //   dikirim ke pratinjau mini ini juga lewat map `cmd` di bawah
+        //   -- begitu operator menekan tombol itu untuk membunyikan
+        //   Layar 2, pratinjau mini di Studio JUGA ikut jadi bersuara,
+        //   sehingga video yang SAMA terdengar 2x sekaligus (dobel) dari
+        //   2 sumber (Layar 2 asli + pratinjau mini Studio) -- terutama
+        //   kentara saat menguji coba di 1 komputer yang sama (Layar 1 &
+        //   Layar 2 sama-sama kedengaran dari speaker yang sama).
+        //   PERBAIKAN: "mute"/"unmute" DIHAPUS dari peta perintah ini --
+        //   Play/Pause/Stop TETAP diteruskan (supaya pratinjau terlihat
+        //   sinkron SECARA VISUAL dengan Layar 2), tapi status bisu/
+        //   bersuara pratinjau TIDAK PERNAH lagi disamakan dengan Layar 2
+        //   -- KECUALI operator SENGAJA menyalakan checkbox "🔊 Pratinjau
+        //   ikut bersuara" (khusus uji coba 1 laptop, lihat
+        //   ytPreviewSoundMode & toStudioPreviewEmbedUrl() di atas) --
+        //   dalam mode itu, mute/unmute BOLEH ikut diteruskan lagi,
+        //   karena memang itu maksudnya (operator sadar & sengaja minta
+        //   pratinjau bersuara).
+        const cmdMap = ytPreviewSoundMode
+          ? { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute" }
+          : { play: "playVideo", pause: "pauseVideo", stop: "stopVideo" };
+        const cmd = cmdMap[action];
         if (cmd) previewFrame.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
       }
     }
