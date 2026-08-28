@@ -483,6 +483,30 @@ const PresentationStudio = (() => {
     });
   }
 
+  // BARU (28 Agu 2026) -- tombol "＋ Buat Baru" di panel Kumpulan Ayat:
+  // buka dialog nama yang sama dipakai jalur lama (promptCollectionName(),
+  // dengan daftar nama terbaru sebagai chip), lalu buat kumpulan KOSONG
+  // lewat createEmptyCollection() (js/collections.js) -- TANPA perlu
+  // menambah 1 item dulu lewat tab lain. Kumpulan baru langsung dipilih
+  // di dropdown & naik ke paling atas (diurutkan terbaru-dulu, lihat
+  // renderCollectionSelect() di atas).
+  function wireCollectionNewButton() {
+    const btn = el("psCollectionNewBtn");
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      if (typeof promptCollectionName !== "function" || typeof createEmptyCollection !== "function") return;
+      const name = await promptCollectionName(username, "");
+      if (!name) return;
+      const id = createEmptyCollection(username, name);
+      if (!id) return;
+      renderCollectionSelect();
+      const sel = el("psCollectionSelect");
+      if (sel) sel.value = id; // langsung pilih kumpulan baru ini
+      renderCollectionList();
+    });
+  }
+
   // Tombol "🔗 Bagikan" -- membagikan SALINAN kumpulan yang sedang
   // dipilih di dropdown ke akun pengguna lain (mengetik username lewat
   // prompt() sederhana di sini -- panel Kumpulan Ayat biasa di js/app.js
@@ -1754,18 +1778,39 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
-  // BARU -- Word (.docx) diunggah & diubah jadi gambar per "halaman",
-  // sama pola dengan PDF di atas (pdf.js), memakai mammoth.js (dimuat
-  // lazy dari CDN, hanya saat ada .docx diunggah). mammoth hanya bisa
-  // membaca TEKS (extractRawText) -- gambar/tabel/format asli di dalam
-  // dokumen Word TIDAK ikut tersalin, hanya teksnya -- lalu teks itu
-  // kita bungkus (word-wrap) & pisah per "halaman" sendiri lewat
-  // <canvas>. PENTING: Word tidak punya jumlah baris/halaman yang tetap
-  // seperti PDF (mengalir bebas, tergantung ukuran kertas & font
-  // aslinya) -- jadi pembagian halaman di sini PERKIRAAN saja (dipotong
-  // ulang per sekitar 12 baris), bukan sama persis dengan tampilan di
-  // Microsoft Word. Format lama .doc (bukan .docx) TIDAK didukung
-  // mammoth -- pengguna diarahkan menyimpan ulang sebagai .docx atau PDF.
+  // BARU (28 Agu 2026, revisi total) -- Word (.docx DAN .doc lama)
+  // diunggah & dijadikan TEKS BIASA (bukan lagi gambar per "halaman"
+  // seperti PDF/pptx) -- dipecah jadi beberapa "halaman" teks lewat
+  // paginatePlainText() di bawah. Perubahan ini PENTING karena:
+  //   1. Dulu tiap halaman Word "dipanggang" jadi 1 gambar <canvas>
+  //      ukuran & font TETAP -- Ukuran Teks (A-/A+) & tema Layar 2 SAMA
+  //      SEKALI tidak berpengaruh ke gambar itu (huruf di gambar sudah
+  //      "beku"). Sekarang teksnya dikirim ke Layar 2 lewat jalur "Teks
+  //      Bebas" yang SAMA seperti tab Pesan (lihat sendGenericItemLive(),
+  //      it.type === "text") -- otomatis ikut Ukuran Teks, Spasi Baris,
+  //      font, & warna tema yang sedang aktif, sama seperti teks lain.
+  //   2. Karena jadi item generik bertipe "text", tiap halaman bisa
+  //      langsung ditambahkan ke Kumpulan Ayat lewat addTextToCollection()
+  //      (js/collections.js) -- TIDAK perlu disimpan ke Media Tersimpan
+  //      dulu seperti PDF/gambar (yang memang harus, karena isinya
+  //      biner). Kumpulan tujuan boleh yang sudah ada ATAU nama baru
+  //      (dialog "➕ Kumpulan"/"➕ Semua ke Kumpulan" di bawah memakai
+  //      promptCollectionName() yang sama, yang memang sudah mendukung
+  //      mengetik nama kumpulan BARU).
+  //   3. Setelah semua halaman ditambahkan ke 1 kumpulan (tombol "➕
+  //      Semua ke Kumpulan"), tiap halaman jadi 1 ITEM BERURUTAN di
+  //      kumpulan itu -- klik salah satu di panel "Kumpulan Ayat" akan
+  //      menjadikannya "playlist aktif" (lihat setActivePlaylist() &
+  //      wirePlaylistKeyNav()), sehingga panah kiri/kanan papan
+  //      ketik/clicker bisa menggeser maju-mundur ANTAR HALAMAN dokumen
+  //      ini, dan begitu lewat halaman pertama/terakhir otomatis lanjut
+  //      ke item lain di kumpulan yang sama ("keluar" dari dokumen ini).
+  //
+  // Catatan keterbatasan (SAMA seperti sebelumnya, cuma dipindah ke
+  // sini): mammoth.js hanya membaca TEKS mentah (extractRawText) --
+  // gambar/tabel/format asli di Word TIDAK ikut, dan pembagian halaman
+  // di sini PERKIRAAN (dipotong ulang per sekitar 700 karakter, bukan
+  // sama persis dengan halaman di Microsoft Word).
   // ------------------------------------------------------------
   const MAMMOTH_VERSION = "1.6.0";
   let mammothLoadPromise = null;
@@ -1782,61 +1827,112 @@ const PresentationStudio = (() => {
     return mammothLoadPromise;
   }
 
-  function wrapTextLines(ctx, text, maxWidth) {
-    const words = text.split(/\s+/).filter(Boolean);
-    if (!words.length) return [""];
-    const lines = [];
-    let line = "";
-    words.forEach((w) => {
-      const test = line ? line + " " + w : w;
-      if (line && ctx.measureText(test).width > maxWidth) {
-        lines.push(line);
-        line = w;
+  // Pecah teks panjang jadi beberapa "halaman" (~700 karakter/halaman),
+  // SEBISA MUNGKIN di batas paragraf supaya tidak memotong kalimat di
+  // tengah -- kalau ada 1 paragraf yang sendirian sudah lebih panjang
+  // dari itu (mis. 1 paragraf raksasa tanpa enter), baru dipotong paksa
+  // di spasi terdekat. Dipakai bersama oleh docx (.docx) & doc lama
+  // (.doc) di bawah, supaya perilaku "halaman"-nya konsisten.
+  function paginatePlainText(rawText, charsPerPage) {
+    const LIMIT = charsPerPage || 700;
+    const paragraphs = String(rawText || "").split(/\n+/).map((p) => p.trim()).filter(Boolean);
+    if (!paragraphs.length) return [String(rawText || "").trim()].filter(Boolean);
+    const pages = [];
+    let current = "";
+    function flush() { if (current.trim()) pages.push(current.trim()); current = ""; }
+    paragraphs.forEach((para) => {
+      // Paragraf tunggal yang sudah lebih panjang dari 1 halaman -- potong
+      // paksa jadi beberapa bagian di spasi terdekat sebelum diproses lagi.
+      let remaining = para;
+      while (remaining.length > LIMIT * 1.4) {
+        let cut = remaining.lastIndexOf(" ", LIMIT);
+        if (cut < LIMIT * 0.5) cut = LIMIT;
+        flush();
+        pages.push(remaining.slice(0, cut).trim());
+        remaining = remaining.slice(cut).trim();
+      }
+      const candidate = current ? current + "\n\n" + remaining : remaining;
+      if (candidate.length > LIMIT && current) {
+        flush();
+        current = remaining;
       } else {
-        line = test;
+        current = candidate;
       }
     });
-    if (line) lines.push(line);
-    return lines;
+    flush();
+    return pages.length ? pages : [String(rawText || "").trim()];
   }
 
-  async function docxFileToImages(file) {
+  async function docxFileToPages(file) {
     const mammoth = await loadMammoth();
     const buf = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer: buf });
     const rawText = ((result && result.value) || "").trim();
     if (!rawText) throw new Error("Berkas ini tidak berisi teks yang bisa dibaca (mungkin isinya cuma gambar/tabel).");
+    return paginatePlainText(rawText);
+  }
 
-    const W = 1280, H = 720, PAD_X = 90, PAD_Y = 80, LINE_H = 46, FONT = "30px 'Literata', Georgia, serif";
-    const LINES_PER_PAGE = Math.floor((H - PAD_Y * 2) / LINE_H);
+  // ------------------------------------------------------------
+  // BARU (28 Agu 2026) -- format Word LAMA (.doc biner, sebelum era
+  // .docx) dulu DITOLAK MENTAH-MENTAH karena tidak ada pustaka pembaca
+  // resmi yang ringan untuk browser. Sekarang dicoba dibaca lewat
+  // pendekatan "usaha terbaik" (best-effort): berkas .doc lama pada
+  // dasarnya berupa file biner (OLE Compound File) yang MENYELIPKAN teks
+  // aslinya di antara data format/biner lain -- di sini kita cukup
+  // menyisir seluruh isi berkas & mengambil rangkaian karakter tercetak
+  // (huruf/angka/tanda baca) yang cukup panjang sebagai teks, membuang
+  // sisanya. Ini BUKAN pembaca .doc yang sungguh mengerti strukturnya
+  // (beda dari mammoth.js untuk .docx yang memang format XML resmi) --
+  // hasilnya BISA berantakan tergantung isi & versi Word yang membuatnya
+  // (mis. ada potongan kata aneh, urutan sedikit meleset). Kalau hasilnya
+  // terlalu berantakan/kosong, operator diarahkan membuka di Word lalu
+  // "Save As" -> .docx atau PDF untuk hasil yang akurat (jalur itu SUDAH
+  // didukung sempurna lewat mammoth.js/pdf.js).
+  // ------------------------------------------------------------
+  function extractLegacyDocText(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer);
+    // Decode byte mentah jadi teks -- pakai TextDecoder (jauh lebih cepat
+    // & tidak membekukan tab untuk berkas besar dibanding menyambung
+    // String.fromCharCode satu-per-satu dalam loop, yang bisa sangat
+    // lambat untuk file sampai puluhan MB). "windows-1252" dipilih
+    // (bukan utf-8) supaya SETIAP byte tetap menghasilkan 1 karakter apa
+    // adanya (fatal:false, tidak melempar error walau banyak byte biner
+    // yang bukan teks sungguhan -- bagian itu nanti tersaring sendiri
+    // oleh pola regex tercetak di bawah).
+    let raw;
+    try {
+      raw = new TextDecoder("windows-1252", { fatal: false }).decode(bytes);
+    } catch (e) {
+      // Fallback browser lama yang belum kenal "windows-1252": latin1
+      // (ISO-8859-1) hasilnya nyaris sama untuk keperluan menyisir teks.
+      raw = new TextDecoder("iso-8859-1", { fatal: false }).decode(bytes);
+    }
+    // Ambil rangkaian karakter tercetak (spasi s/d ~) sepanjang >= 4 --
+    // potongan biner/format non-teks nyaris selalu berisi byte kontrol
+    // (0-31) yang memutus rangkaian ini, jadi otomatis tersaring.
+    const runs = raw.match(/[\x20-\x7E]{4,}/g) || [];
+    const cleaned = runs
+      .map((r) => r.replace(/\s+/g, " ").trim())
+      // Buang rangkaian yang tidak benar-benar berisi kata (mis. deretan
+      // simbol/kode format Word seperti "HYPERLINK" mentah, garis border
+      // tabel dsb) -- syaratnya minimal ada 1 potongan 3+ huruf berurutan.
+      .filter((r) => /[A-Za-z]{3,}/.test(r))
+      // Buang baris yang KEBANYAKAN simbol non-huruf (biasanya sisa kode
+      // internal Word, bukan isi dokumen sungguhan).
+      .filter((r) => {
+        const letters = (r.match(/[A-Za-z]/g) || []).length;
+        return letters / r.length > 0.55;
+      });
+    return cleaned.join("\n").trim();
+  }
 
-    const measureCanvas = document.createElement("canvas");
-    const mctx = measureCanvas.getContext("2d");
-    mctx.font = FONT;
-
-    const allLines = [];
-    rawText.split(/\n+/).map((p) => p.trim()).filter(Boolean).forEach((para) => {
-      wrapTextLines(mctx, para, W - PAD_X * 2).forEach((l) => allLines.push(l));
-      allLines.push(""); // baris kosong pemisah antar paragraf
-    });
-    while (allLines.length && allLines[allLines.length - 1] === "") allLines.pop();
-
-    const pages = [];
-    for (let i = 0; i < allLines.length; i += LINES_PER_PAGE) pages.push(allLines.slice(i, i + LINES_PER_PAGE));
-    if (!pages.length) pages.push([""]);
-
-    return pages.map((lines) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = W; canvas.height = H;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#1a1a1a";
-      ctx.font = FONT;
-      ctx.textBaseline = "top";
-      lines.forEach((line, i) => ctx.fillText(line, PAD_X, PAD_Y + i * LINE_H));
-      return canvas.toDataURL("image/jpeg", 0.92);
-    });
+  async function oldDocFileToPages(file) {
+    const buf = await file.arrayBuffer();
+    const rawText = extractLegacyDocText(buf);
+    if (!rawText || rawText.length < 20) {
+      throw new Error('Tidak bisa membaca isi file .doc lama ini secara otomatis (hasil ekstraksi kosong/terlalu sedikit). Buka file ini di Word, lalu "Save As" -> pilih .docx (atau PDF), baru unggah lagi di sini untuk hasil yang akurat.');
+    }
+    return paginatePlainText(rawText);
   }
 
   // ------------------------------------------------------------
@@ -1996,6 +2092,93 @@ const PresentationStudio = (() => {
       return wrapper;
     }
 
+    // ------------------------------------------------------------
+    // BARU (28 Agu 2026) -- baris khusus untuk file yang hasilnya TEKS
+    // (bukan gambar): Word .docx & .doc lama, lihat docxFileToPages()/
+    // oldDocFileToPages() di atas. Beda dari buildRow() (gambar):
+    //   - "▶️ Tayangkan" mengirim TEKS halaman aktif (Presentation.sendFreeText,
+    //     lewat rawPost type "text") -- otomatis ikut Ukuran Teks/Spasi
+    //     Baris/tema Layar 2 yang sedang aktif, tidak seperti gambar.
+    //   - "➕ Kumpulan" menambah HALAMAN AKTIF SAJA ke Kumpulan Ayat
+    //     (addTextToCollection, TANPA perlu disimpan ke Media Tersimpan
+    //     dulu -- teks bisa langsung disalin ke kumpulan, beda dari
+    //     gambar/PDF yang harus lewat referensi Media Tersimpan).
+    //   - "➕ Semua ke Kumpulan" menambah SELURUH halaman sekaligus,
+    //     1 pertanyaan nama kumpulan untuk semuanya -- inilah yang
+    //     dipakai supaya operator tidak perlu mengklik "➕ Kumpulan"
+    //     satu per satu untuk dokumen panjang (mis. 41 halaman). Kedua
+    //     tombol memakai promptCollectionName() yang sama seperti
+    //     tombol "➕ Kumpulan" di Media Tersimpan -- boleh pilih kumpulan
+    //     yang sudah ada ATAU mengetik nama kumpulan BARU.
+    // ------------------------------------------------------------
+    function buildTextRow(file, pages, statusText) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "ps-file-item";
+      const row = document.createElement("div");
+      row.className = "ps-file-row";
+      let idx = 0;
+      const multi = pages.length > 1;
+      row.innerHTML = `<span class="ps-file-name">${escapeHtml(file.name)}${statusText ? ` <em class="ps-file-status">${escapeHtml(statusText)}</em>` : ""}</span>
+        <span class="ps-file-actions">
+          ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${pages.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
+          <button type="button" class="chip-btn small" data-act="play">▶️</button>
+          <button type="button" class="chip-btn small" data-act="addcol" title="Tambahkan halaman yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)">➕ Kumpulan</button>
+          ${multi ? `<button type="button" class="chip-btn small" data-act="addcolall" title="Tambahkan SEMUA ${pages.length} halaman sekaligus, berurutan, ke Kumpulan Ayat">➕ Semua ke Kumpulan</button>` : ""}
+          <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
+        </span>`;
+      wrapper.appendChild(row);
+      const snippetEl = document.createElement("p");
+      snippetEl.className = "ps-verse-snippet ps-file-text-snippet";
+      wrapper.appendChild(snippetEl);
+      const countEl = row.querySelector('[data-role="count"]');
+      function updateView() {
+        if (countEl) countEl.textContent = `${idx + 1}/${pages.length}`;
+        snippetEl.textContent = (pages[idx] || "").slice(0, 160);
+      }
+      updateView();
+      function doSend() {
+        const text = pages[idx];
+        if (!text) return;
+        rawPost({ type: "text", text });
+        renderStudioPreview({ type: "text", text });
+      }
+      const playBtn = row.querySelector('[data-act="play"]');
+      if (!pages.length) playBtn.disabled = true;
+      playBtn.addEventListener("click", doSend);
+      const prevBtn = row.querySelector('[data-act="prev"]');
+      const nextBtn = row.querySelector('[data-act="next"]');
+      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + pages.length) % pages.length; updateView(); doSend(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % pages.length; updateView(); doSend(); });
+      const addColBtn = row.querySelector('[data-act="addcol"]');
+      if (!pages.length) addColBtn.disabled = true;
+      addColBtn.addEventListener("click", async () => {
+        if (typeof addTextToCollection !== "function") return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const sel = el("psCollectionSelect");
+        const name = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+          ? loadCollections(username)[sel.value].name
+          : await promptCollectionName(username);
+        if (!name) return;
+        addTextToCollection(username, name, pages[idx]);
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        addColBtn.textContent = "✅ Ditambahkan";
+        setTimeout(() => { addColBtn.textContent = "➕ Kumpulan"; }, 1200);
+      });
+      const addAllBtn = row.querySelector('[data-act="addcolall"]');
+      if (addAllBtn) addAllBtn.addEventListener("click", async () => {
+        if (typeof addTextToCollection !== "function") return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const name = await promptCollectionName(username, file.name.replace(/\.[^.]+$/, ""));
+        if (!name) return;
+        pages.forEach((p) => addTextToCollection(username, name, p));
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        addAllBtn.textContent = `✅ ${pages.length} halaman ditambahkan`;
+        setTimeout(() => { addAllBtn.textContent = `➕ Semua ke Kumpulan`; }, 1800);
+      });
+      row.querySelector('[data-act="del"]').addEventListener("click", () => wrapper.remove());
+      return wrapper;
+    }
+
     function handleFiles(files) {
       const keepOriginalPdfBox = el("psKeepOriginalPdf");
       Array.from(files || []).forEach((file) => {
@@ -2031,10 +2214,10 @@ const PresentationStudio = (() => {
         }
 
         if (isDocx) {
-          const row = buildRow(file, [], "mengonversi…");
+          const row = buildTextRow(file, [], "mengonversi…");
           list.appendChild(row);
-          docxFileToImages(file).then((images) => {
-            row.replaceWith(buildRow(file, images, `${images.length} halaman (perkiraan, teks saja)`));
+          docxFileToPages(file).then((pages) => {
+            row.replaceWith(buildTextRow(file, pages, `${pages.length} halaman (perkiraan, teks saja)`));
           }).catch((err) => {
             row.querySelector(".ps-file-status").textContent = "gagal dikonversi";
             console.error(err);
@@ -2044,7 +2227,15 @@ const PresentationStudio = (() => {
         }
 
         if (isOldDoc) {
-          alert(`${file.name}: format .doc lama belum didukung. Buka di Word, lalu "Save As" -> pilih .docx (atau PDF), baru unggah lagi di sini.`);
+          const row = buildTextRow(file, [], "membaca .doc lama…");
+          list.appendChild(row);
+          oldDocFileToPages(file).then((pages) => {
+            row.replaceWith(buildTextRow(file, pages, `${pages.length} halaman (perkiraan, hasil baca .doc lama BISA kurang rapi -- untuk hasil akurat, simpan ulang sebagai .docx/PDF)`));
+          }).catch((err) => {
+            row.querySelector(".ps-file-status").textContent = "gagal dibaca";
+            console.error(err);
+            alert(err.message || `Gagal membaca ${file.name}.`);
+          });
           return;
         }
 
@@ -2053,7 +2244,7 @@ const PresentationStudio = (() => {
           return;
         }
 
-        alert(`${file.name}: jenis file ini belum didukung. Gunakan pptx, pdf, docx, jpg, png, webp, atau gif.`);
+        alert(`${file.name}: jenis file ini belum didukung. Gunakan pptx, pdf, docx, doc, jpg, png, webp, atau gif.`);
       });
     }
   }
@@ -2414,6 +2605,123 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // BARU (28 Agu 2026) -- 🎥 KAMERA LATAR (tab "🎥 Kamera", kolom kanan).
+  // Menyalakan kamera PERANGKAT YANG MEMBUKA LAYAR 2 (bukan kamera di
+  // laptop operator yang membuka Studio ini) sebagai latar hidup di
+  // belakang ayat/kidung/pengumuman -- getUserMedia() SUNGGUH dipanggil
+  // di present.html (lihat catatan panjang di sana), file ini cuma
+  // mengirim PERINTAH (on/off + pengaturan) lewat rawPost() & menerima
+  // KEMBALI status nyatanya lewat event "ps-camera-status" (dipancarkan
+  // js/presentation.js dari pesan "present_camera_status", pola sama
+  // seperti "ps-preview-ratio-changed" untuk present_geometry).
+  //
+  // Pengaturan (arah kamera/cermin/gaya tulisan/tebal border) DISIMPAN
+  // (localStorage, bertahan lintas sesi) -- status NYALA/MATI kameranya
+  // sendiri SENGAJA TIDAK disimpan (`camOn` cuma variabel biasa, mulai
+  // dari `false` tiap Studio dibuka ulang) supaya kamera TIDAK pernah
+  // otomatis meminta izin/menyala sendiri tanpa operator menekan tombol
+  // dulu di sesi itu -- baik demi privasi (kamera tidak diam-diam
+  // nyala) maupun karena Layar 2-nya sendiri belum tentu sudah terbuka
+  // lagi di sesi baru.
+  // ------------------------------------------------------------
+  const CAMERA_KEY = "bible_app_studio_camera_v1";
+  const DEFAULT_CAMERA_SETTINGS = { facing: "user", mirror: false, textMode: "white-black", outlineWidth: 3 };
+  let camOn = false;
+
+  function loadCameraSettings() {
+    let s = { ...DEFAULT_CAMERA_SETTINGS };
+    const raw = localStorage.getItem(CAMERA_KEY);
+    if (raw) { try { s = { ...s, ...JSON.parse(raw) }; } catch (e) {} }
+    return s;
+  }
+  function saveCameraSettings(partial) {
+    const s = { ...loadCameraSettings(), ...partial };
+    localStorage.setItem(CAMERA_KEY, JSON.stringify(s));
+    return s;
+  }
+  // Selalu kirim SELURUH pengaturan (bukan cuma yang berubah) -- sama
+  // pola dengan saveAndSendTheme() di bawah -- `on` dioper terpisah
+  // (bukan bagian dari objek tersimpan) karena memang tidak ikut
+  // disimpan (lihat catatan di atas).
+  function sendCameraState(on) {
+    const s = loadCameraSettings();
+    rawPost({ type: "camera", on: !!on, facingMode: s.facing, mirror: s.mirror, textMode: s.textMode, outlineWidth: s.outlineWidth });
+  }
+  function setCamStatusText(text) {
+    if (el("psCamStatus")) el("psCamStatus").textContent = text;
+  }
+  function setCamToggleUi(on) {
+    const btn = el("psCamToggle");
+    if (!btn) return;
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? "🎥 Matikan Kamera" : "🎥 Aktifkan Kamera";
+  }
+
+  function wireCamera() {
+    const s = loadCameraSettings();
+    if (el("psCamFacingSelect")) el("psCamFacingSelect").value = s.facing;
+    if (el("psCamMirror")) el("psCamMirror").checked = !!s.mirror;
+    if (el("psCamOutlineSlider")) el("psCamOutlineSlider").value = String(s.outlineWidth);
+    if (el("psCamOutlineValue")) el("psCamOutlineValue").textContent = s.outlineWidth + "px";
+    document.querySelectorAll("[data-ps-cam-text]").forEach((b) => b.classList.toggle("active", b.dataset.psCamText === s.textMode));
+
+    if (el("psCamToggle")) {
+      el("psCamToggle").addEventListener("click", () => {
+        camOn = !camOn;
+        setCamToggleUi(camOn);
+        setCamStatusText(camOn ? "⏳ Meminta izin kamera di jendela Layar 2…" : "⚪ Kamera dimatikan.");
+        sendCameraState(camOn);
+      });
+    }
+    if (el("psCamFacingSelect")) {
+      el("psCamFacingSelect").addEventListener("change", () => {
+        saveCameraSettings({ facing: el("psCamFacingSelect").value });
+        if (camOn) sendCameraState(true); // ganti arah kamera SAAT AKTIF -- present.html akan me-restart stream-nya (lihat applyCameraPayload())
+      });
+    }
+    if (el("psCamMirror")) {
+      el("psCamMirror").addEventListener("change", () => {
+        saveCameraSettings({ mirror: el("psCamMirror").checked });
+        if (camOn) sendCameraState(true);
+      });
+    }
+    document.querySelectorAll("[data-ps-cam-text]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-ps-cam-text]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        saveCameraSettings({ textMode: btn.dataset.psCamText });
+        // Dikirim WALAU kamera masih mati -- applyCamTextStyle() di
+        // present.html tetap menerapkan gaya tulisannya duluan (siap
+        // dipakai begitu kamera dinyalakan), lihat applyCameraPayload().
+        sendCameraState(camOn);
+      });
+    });
+    function applyOutline() {
+      const v = Number(el("psCamOutlineSlider").value);
+      if (el("psCamOutlineValue")) el("psCamOutlineValue").textContent = v + "px";
+      saveCameraSettings({ outlineWidth: v });
+      sendCameraState(camOn);
+    }
+    if (el("psCamOutlineSlider")) el("psCamOutlineSlider").addEventListener("input", applyOutline);
+
+    // Status NYATA dari Layar 2 (berhasil/gagal -- lihat
+    // present_camera_status di present.html, diteruskan sebagai event
+    // ini oleh js/presentation.js) -- SUMBER KEBENARAN AKHIR, bisa beda
+    // dari `camOn` lokal (mis. operator menekan tombol tapi izin
+    // kamera ditolak browser -- tombol & status di sini otomatis
+    // kembali ke "mati" begitu kabar itu tiba, tidak menggantung
+    // menampilkan "aktif" padahal sebenarnya gagal).
+    window.addEventListener("ps-camera-status", (e) => {
+      const detail = (e && e.detail) || {};
+      camOn = !!detail.on;
+      setCamToggleUi(camOn);
+      if (camOn) setCamStatusText("🟢 Kamera aktif.");
+      else if (detail.error) setCamStatusText("❌ Gagal mengaktifkan kamera: " + detail.error);
+      else setCamStatusText("⚪ Kamera belum aktif.");
+    });
+  }
+
+  // ------------------------------------------------------------
   // "Teks Cepat" -- kalimat sekali pakai langsung tayang, tanpa perlu
   // disimpan dulu ke Pengumuman (kolom kiri). Ikut aturan antre di
   // mode dual monitor lewat stageOrSend(), sama seperti tipe konten
@@ -2608,7 +2916,7 @@ const PresentationStudio = (() => {
     }
   }
 
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1 };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35 };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -2645,8 +2953,9 @@ const PresentationStudio = (() => {
     if (el("psFontSelect")) el("psFontSelect").value = theme.font;
     if (el("psBgColor")) el("psBgColor").value = theme.bgColor;
     if (el("psFontScale")) el("psFontScale").value = String(Math.round(theme.scale * 100));
+    if (el("psLineHeight")) el("psLineHeight").value = String(Math.round(theme.lineHeight * 100));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight } });
   }
 
   function saveAndSendTheme(partial) {
@@ -2656,7 +2965,7 @@ const PresentationStudio = (() => {
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -2754,6 +3063,20 @@ const PresentationStudio = (() => {
     // tombol (di sini & di tab "🎨 Tampilan") selalu sinkron satu sama lain.
     if (el("psFontDecTop")) el("psFontDecTop").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
     if (el("psFontIncTop")) el("psFontIncTop").addEventListener("click", () => { el("psFontScale").value = Math.min(160, Number(el("psFontScale").value) + 10); applyScale(); });
+    // BARU (28 Agu 2026) -- "Spasi Baris" (line-height Layar 2, lihat
+    // --p-line-height di present.html). PERMINTAAN OPERATOR: teks
+    // panjang (mis. hasil unggah file Word/.doc, lihat wireFileTab())
+    // butuh bisa dirapatkan spasinya supaya lebih banyak muat di layar,
+    // atau direnggangkan supaya lebih lega dibaca -- terpisah dari
+    // "Ukuran Teks" (psFontScale) supaya kedua hal ini bisa diatur
+    // sendiri-sendiri (font besar+spasi rapat, atau sebaliknya).
+    function applyLineHeight() {
+      const pct = Number(el("psLineHeight").value);
+      saveAndSendTheme({ lineHeight: pct / 100 });
+    }
+    if (el("psLineHeight")) el("psLineHeight").addEventListener("input", applyLineHeight);
+    if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(90, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
+    if (el("psLineHeightInc")) el("psLineHeightInc").addEventListener("click", () => { el("psLineHeight").value = Math.min(250, Number(el("psLineHeight").value) + 10); applyLineHeight(); });
   }
 
   // ------------------------------------------------------------
@@ -2914,6 +3237,7 @@ const PresentationStudio = (() => {
     wireQuickVerse();
     wireFileTab();
     wireQuickActions();
+    wireCamera();
     wireQuickText();
     wireTicker("psWarta", "warta");
     wireTicker("psFoot", "footnote");
@@ -2927,6 +3251,7 @@ const PresentationStudio = (() => {
     wireKidungTab();
     wirePlaylistKeyNav();
     wireCollectionReorderToggle();
+    wireCollectionNewButton();
     wireCollectionShareButton();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
