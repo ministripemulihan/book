@@ -889,6 +889,21 @@
             <input type="checkbox" id="psYtBgMode" />
             Latar suara saja (video disembunyikan, ayat/pengumuman tetap tampil di Layar 2)
           </label>
+          <!-- BARU (28 Agu 2026) -- opsi "pratinjau ikut bersuara", khusus
+               untuk uji coba di 1 laptop/komputer TANPA Layar 2 (proyektor)
+               sungguhan terpasang. Mati (default): kotak pratinjau mini di
+               Studio SELALU bisu, cuma Layar 2 (present.html) yang
+               bersuara -- ini yang benar untuk pemakaian SUNGGUHAN (2
+               layar) supaya suara tidak dobel. Nyala: kotak pratinjau ikut
+               bersuara juga, supaya operator bisa dengar videonya langsung
+               dari 1 layar tanpa perlu membuka jendela Layar 2 terpisah --
+               cocok untuk latihan/uji coba sendirian. Tersimpan per
+               perangkat (localStorage), lihat wireYtControls()/
+               toStudioPreviewEmbedUrl() di js/presentation-studio.js. -->
+          <label class="ps-yt-bg-toggle">
+            <input type="checkbox" id="psYtPreviewSoundMode" />
+            🔊 Pratinjau di Studio ikut bersuara (khusus uji coba 1 laptop tanpa Layar 2 sungguhan -- kalau Layar 2/proyektor betulan dipakai, biarkan MATI supaya suara tidak dobel)
+          </label>
           <div class="ps-btn-row">
             <button type="button" id="psYtShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
             <button type="button" id="psYtAddQueueBtn" class="chip-btn small">➕ Tambah ke Daftar</button>
