@@ -127,6 +127,8 @@ const PresentationStudio = (() => {
   let pointerActive = false;
   let penActive = false;
   let penStroke = [];
+  // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar, lihat wirePointerPen() di bawah.
+  let magnifyActive = false;
 
   function el(id) { return document.getElementById(id); }
   function isDesktop() { return window.innerWidth >= DESKTOP_MIN_WIDTH; }
@@ -568,7 +570,31 @@ const PresentationStudio = (() => {
       renderStudioPreview({ type: "text", text: txt });
     } else if (it.type === "kidung") {
       sendKidungSlide(it);
+    } else if (it.type === "media") {
+      sendMediaSlideFromCollection(it);
     }
+  }
+
+  // BARU (27 Agu 2026) -- lihat addMediaToCollection() (js/collections.js)
+  // untuk alasan kenapa item "media" cuma simpan REFERENSI (mediaItemId +
+  // pageIndex), bukan salinan gambarnya -- jadi di sinilah, saat mau
+  // ditayangkan, gambar aslinya baru diambil dari Media Tersimpan
+  // (loadMediaItems(), IndexedDB). ASYNC (beda dari cabang lain di
+  // sendGenericItemLive yang semuanya sinkron) -- tidak masalah, semua
+  // pemanggil (klik baris, playlistGoTo/panah-clicker) tidak menunggu
+  // nilai baliknya sama sekali.
+  async function sendMediaSlideFromCollection(it) {
+    if (typeof loadMediaItems !== "function" || typeof Presentation === "undefined") return;
+    const username = typeof currentUser !== "undefined" ? currentUser : null;
+    const items = await loadMediaItems(username);
+    const found = items.find((m) => m.id === it.mediaItemId);
+    if (!found || !found.images || !found.images.length) {
+      alert(`"${it.name || "Berkas ini"}" sudah tidak ada lagi di Media Tersimpan (mungkin terhapus) -- tidak bisa ditayangkan. Hapus item ini dari Kumpulan Ayat lalu tambahkan ulang dari Media Tersimpan yang masih ada.`);
+      return;
+    }
+    const url = found.images[Math.min(it.pageIndex || 0, found.images.length - 1)];
+    rawPost({ type: "slide", imageUrl: url });
+    renderStudioPreview({ type: "slide", imageUrl: url });
   }
 
   function sendKidungSlide(it) {
@@ -764,17 +790,147 @@ const PresentationStudio = (() => {
   // Tayang sama seperti tab File: 1 monitor langsung tayang, dual
   // monitor diantre dulu (stageOrSend), dan ◀ ▶ pindah halaman/slide.
   // ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // BARU -- indikator "⏳N" di tab "🖼️ Media Tersimpan" (lihat CSS
+  // .ps-tab-badge di css/style.css) supaya operator tahu ada berkas
+  // yang masih menunggu sinkron ke Drive TANPA harus membuka tab itu
+  // dulu. Aman dipanggil kapan pun/berkali-kali -- no-op kalau elemen
+  // badge-nya belum ada di DOM (mis. dipanggil sebelum Studio dibuka).
+  async function updateMediaQueueBadge(username) {
+    const badge = el("psMediaQueueBadge");
+    if (!badge || typeof LocalDB === "undefined") return;
+    try {
+      const queued = await LocalDB.getQueuedMediaUploadsByUsername(username || "guest");
+      if (queued && queued.length) {
+        badge.textContent = "⏳" + queued.length;
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
+    } catch (e) {
+      badge.hidden = true;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (27 Agu 2026) -- lihat catatan di titik pemanggilannya
+  // (renderMediaList() di bawah). Pola SAMA seperti
+  // renderPendingSharesInto() di js/app.js (kartu 🔔 untuk 🔗 Bagikan
+  // Kumpulan Ayat) -- `wrap` diisi ulang tiap dipanggil supaya kartu
+  // yang sudah diputuskan (Setujui/Tolak) langsung hilang tanpa perlu
+  // buka-tutup panel.
+  async function renderPendingMediaDeleteRequestsInto(wrap, username) {
+    if (typeof checkPendingMediaDeleteRequests !== "function") return;
+    const requests = await checkPendingMediaDeleteRequests(username);
+    if (!requests || !requests.length) return;
+    const box = document.createElement("div");
+    box.className = "collection-pending-box";
+    const h = document.createElement("h3");
+    h.className = "collection-pending-title";
+    h.textContent = `🔔 ${requests.length} Permintaan Hapus Media Menunggu Persetujuan Anda`;
+    box.appendChild(h);
+    requests.forEach((req) => {
+      const card = document.createElement("div");
+      card.className = "collection-pending-card";
+      const info = document.createElement("span");
+      info.className = "collection-pending-info";
+      info.innerHTML = `<b>${escapeHtml(req.fileName || "(berkas tanpa nama)")}</b><br>diminta hapus PERMANEN oleh <b>${escapeHtml(req.requestedBy)}</b>${req.reason ? `<br><em>Alasan: ${escapeHtml(req.reason)}</em>` : ""}`;
+      card.appendChild(info);
+      const btnRow = document.createElement("span");
+      btnRow.className = "collection-pending-actions";
+      const approveBtn = document.createElement("button");
+      approveBtn.type = "button";
+      approveBtn.className = "chip-btn small danger";
+      approveBtn.textContent = "✅ Setujui (hapus permanen)";
+      approveBtn.addEventListener("click", async () => {
+        if (!confirm(`Yakin menyetujui penghapusan PERMANEN "${req.fileName}" dari Drive? Tindakan ini TIDAK BISA dibatalkan.`)) return;
+        approveBtn.disabled = true;
+        const res = await respondToMediaDeleteRequest(username, req.id, true);
+        if (res && res.ok) renderMediaList();
+        else { alert("Gagal memproses: " + ((res && res.error) || "Terjadi kesalahan.")); approveBtn.disabled = false; }
+      });
+      const rejectBtn = document.createElement("button");
+      rejectBtn.type = "button";
+      rejectBtn.className = "chip-btn small";
+      rejectBtn.textContent = "❌ Tolak";
+      rejectBtn.addEventListener("click", async () => {
+        rejectBtn.disabled = true;
+        const res = await respondToMediaDeleteRequest(username, req.id, false);
+        if (res && res.ok) renderMediaList();
+        else { alert("Gagal memproses: " + ((res && res.error) || "Terjadi kesalahan.")); rejectBtn.disabled = false; }
+      });
+      btnRow.appendChild(approveBtn);
+      btnRow.appendChild(rejectBtn);
+      card.appendChild(btnRow);
+      box.appendChild(card);
+    });
+    wrap.appendChild(box);
+  }
+
   async function renderMediaList() {
     const wrap = el("psMediaList");
     if (!wrap || typeof loadMediaItems !== "function") return;
     if (typeof window.populateYtBgPicker === "function") window.populateYtBgPicker();
     const username = typeof currentUser !== "undefined" ? currentUser : null;
+    // TAHAP 4 (ROADMAP-drive-sync.md) -- sebelum menggambar daftar, coba
+    // tarik dulu metadata file Drive milik akun ini yang belum dikenal
+    // perangkat ini (lihat syncMediaFromDrive(), js/collections.js).
+    // Best-effort & tidak memblokir lama (cuma metadata ringan, bukan
+    // isi berkas) -- kalau offline/gagal, daftar lokal tetap tampil
+    // seperti biasa seolah Tahap 4 tidak ada.
+    if (typeof syncMediaFromDrive === "function") await syncMediaFromDrive(username);
+    // TAHAP 7 -- jaring pengaman kedua (selain event "online" yang
+    // dipasang wireMediaUploadQueueAutoRetry() di js/app.js): setiap
+    // kali panel ini dibuka/disegarkan, coba juga proses antrean upload
+    // yang tertunda -- berguna kalau event "online" sempat tidak
+    // terpasang/terlewat (mis. app baru dibuka lagi setelah sempat
+    // ditutup total saat offline).
+    if (typeof processMediaUploadQueue === "function") await processMediaUploadQueue(username);
+    await updateMediaQueueBadge(username);
     const items = await loadMediaItems(username);
+    wrap.innerHTML = "";
+    // BARU (27 Agu 2026) -- kartu "🔔 Permintaan Hapus Media Menunggu
+    // Persetujuan" -- muncul kalau AKUN INI adalah pengunggah pertama
+    // dari 1/lebih berkas yang orang lain minta hapus permanen (lihat
+    // requestDeleteMediaFromDrive()/checkPendingMediaDeleteRequests() di
+    // js/collections.js). Ditaruh PALING ATAS (sebelum spanduk antrean
+    // sinkron) supaya tidak terlewat -- SENGAJA dicek sebelum
+    // "!items.length" di bawah, supaya tetap tampil walau daftar media
+    // LOKAL akun ini kosong (mis. item aslinya sudah dihapus lokal, tapi
+    // berkas Drive-nya masih ada & masih dipakai orang lain).
+    await renderPendingMediaDeleteRequestsInto(wrap, username);
     if (!items.length) {
-      wrap.innerHTML = '<p class="present-saved-empty">Belum ada media tersimpan.</p>';
+      const p = document.createElement("p");
+      p.className = "present-saved-empty";
+      p.textContent = "Belum ada media tersimpan.";
+      wrap.appendChild(p);
       return;
     }
-    wrap.innerHTML = "";
+    // BARU (indikator antrean sinkron, lihat updateMediaQueueBadge() di
+    // bawah) -- spanduk kecil di ATAS daftar Media Tersimpan kalau masih
+    // ada item yang menunggu disinkronkan ke Drive, supaya operator
+    // langsung tahu tanpa harus menyorot satu-per-satu nama file (status
+    // "⏳ menunggu sinkron" di tiap baris tetap ada juga, ini cuma
+    // ringkasannya di satu tempat). Tombol "🔄 Coba sekarang" memaksa
+    // percobaan ulang seketika, tidak perlu menunggu online lagi/tab
+    // ditutup-buka.
+    if (typeof LocalDB !== "undefined") {
+      const queued = await LocalDB.getQueuedMediaUploadsByUsername(username || "guest").catch(() => []);
+      if (queued && queued.length) {
+        const banner = document.createElement("div");
+        banner.className = "ps-media-queue-banner";
+        const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+        banner.innerHTML = `<span>⏳ ${queued.length} berkas menunggu disinkronkan ke Drive${offline ? " (sedang offline)" : ""} -- akan dicoba otomatis.</span>
+          <button type="button" class="chip-btn small" data-act="retryqueue">🔄 Coba sekarang</button>`;
+        banner.querySelector('[data-act="retryqueue"]').addEventListener("click", async (ev) => {
+          ev.target.disabled = true;
+          ev.target.textContent = "⏳ Mencoba…";
+          await processMediaUploadQueue(username);
+          renderMediaList();
+        });
+        wrap.appendChild(banner);
+      }
+    }
     items.forEach((item) => {
       let idx = 0;
       const isYt = item.type === "youtube";
@@ -784,22 +940,108 @@ const PresentationStudio = (() => {
       itemWrap.className = "ps-file-item";
       const row = document.createElement("div");
       row.className = "ps-file-row";
+
+      // TAHAP 4 -- item "stub" yang baru diketahui dari Drive tapi ISINYA
+      // BELUM diunduh sama sekali (lihat syncMediaFromDrive() di
+      // js/collections.js) tampil dengan baris tombol yang JAUH lebih
+      // sederhana: cuma "☁️ Muat dari Drive" (mengunduh isinya on-demand,
+      // lihat loadDriveMediaOnDemand() di bawah) & "✖️" hapus dari daftar
+      // (TIDAK menghapus file aslinya di Drive, cuma menyembunyikan dari
+      // perangkat ini). Tombol lain (▶️ tayang, ⬇️ unduh, dst) baru
+      // muncul SETELAH isinya diunduh -- sama seperti item biasa.
+      if (item.driveOnly && !images.length) {
+        row.innerHTML = `<span class="ps-file-name">☁️ ${escapeHtml(item.name)} <em>(belum diunduh)</em></span>
+          <span class="ps-file-actions">
+            <button type="button" class="chip-btn small primary" data-act="loaddrive">☁️ Muat dari Drive</button>
+            <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
+          </span>`;
+        itemWrap.appendChild(row);
+        const loadBtn = row.querySelector('[data-act="loaddrive"]');
+        loadBtn.addEventListener("click", async () => {
+          loadBtn.disabled = true;
+          loadBtn.textContent = "⏳ Memuat…";
+          const ok = await loadDriveMediaOnDemand(item);
+          if (!ok) {
+            loadBtn.disabled = false;
+            loadBtn.textContent = "☁️ Muat dari Drive";
+            alert("Gagal memuat berkas dari Drive (periksa sambungan internet, atau berkasnya sudah dihapus di Drive).");
+            return;
+          }
+          renderMediaList();
+        });
+        row.querySelector('[data-act="del"]').addEventListener("click", async () => {
+          if (!confirm(`Sembunyikan "${item.name}" dari daftar perangkat ini? (Berkas aslinya TETAP ada di Drive)`)) return;
+          await removeMediaItem(username, item.id);
+          renderMediaList();
+        });
+        wrap.appendChild(itemWrap);
+        return; // lewati sisa baris tombol biasa di bawah untuk item ini
+      }
+
       // Tombol "🔳" (grid mini-preview halaman) HANYA untuk item gambar/PDF
       // bertumpuk (bukan YouTube -- video sudah punya sub-daftar judul
       // sendiri di bawah, lihat videoLabels di bawah).
       const showGrid = multi && !isYt;
-      row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${escapeHtml(item.name)}</span>
+      row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${item.driveFileId ? "☁️ " : ""}${escapeHtml(item.name)}</span>
         <span class="ps-file-actions">
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
           ${showGrid ? `<button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
           ${isYt ? `<button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai audio latar (video disembunyikan)">🎧</button>` : ""}
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="copyname" title="Salin nama file ini">📋</button>` : ""}
+          ${!isYt ? `<button type="button" class="chip-btn small" data-act="addcol" title="Tambahkan halaman yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)">➕ Kumpulan</button>` : ""}
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="download" title="Unduh halaman yang sedang ditampilkan sebagai gambar">⬇️</button>` : ""}
           ${item.originalFile ? `<button type="button" class="chip-btn small" data-act="downloadOriginal" title="Unduh file PDF ASLI (utuh, bukan gambar per halaman)">⬇️ PDF Asli</button>` : ""}
+          ${item.driveFileId ? `<button type="button" class="chip-btn small danger" data-act="deldrive" title="Hapus PERMANEN dari Drive (bukan cuma dari daftar ini)">🗑️ Hapus dari Drive</button>` : ""}
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
       itemWrap.appendChild(row);
+      const deleteFromDriveBtn = row.querySelector('[data-act="deldrive"]');
+      if (deleteFromDriveBtn) deleteFromDriveBtn.addEventListener("click", async () => {
+        // BARU (27 Agu 2026) -- lihat catatan panjang di
+        // requestDeleteMediaFromDrive()/getMediaFileUsers() (js/collections.js)
+        // & MEDIA_OWNERSHIP_SHEET (apps-script/Code.gs). Alur:
+        //   1. Tanya server dulu siapa saja yang masih pakai file ini
+        //      (rantai salinan hasil Tahap 5), supaya operator TAHU
+        //      sebelum menekan "Ya, hapus" -- bukan cuma "yakin?" polos.
+        //   2. Kalau operator ADALAH pengunggah pertama: langsung
+        //      terhapus dari Drive begitu dikonfirmasi.
+        //   3. Kalau BUKAN: hanya jadi PERMINTAAN tertunda, menunggu
+        //      pengunggah pertama menyetujui (lihat kartu 🔔 di atas).
+        deleteFromDriveBtn.disabled = true;
+        deleteFromDriveBtn.textContent = "⏳ Memeriksa…";
+        const info = await getMediaFileUsers(item.driveFileId);
+        deleteFromDriveBtn.disabled = false;
+        deleteFromDriveBtn.textContent = "🗑️ Hapus dari Drive";
+        const others = (info && info.users || []).filter((u) => String(u.owner).toLowerCase() !== String(username).toLowerCase());
+        let msg = `Hapus PERMANEN "${item.name}" dari Drive?\n\nTindakan ini TIDAK BISA dibatalkan.`;
+        if (others.length) {
+          msg += `\n\nBerkas ini juga dipakai oleh: ${others.map((u) => u.owner).join(", ")}.`;
+        }
+        const originalOwner = info && info.originalOwner;
+        const isOriginalOwner = !originalOwner || String(originalOwner).toLowerCase() === String(username).toLowerCase();
+        if (!isOriginalOwner) {
+          msg += `\n\nAnda BUKAN pengunggah pertama berkas ini (pengunggah pertama: ${originalOwner}) -- permintaan Anda akan MENUNGGU PERSETUJUAN mereka dulu, tidak langsung terhapus.`;
+        }
+        if (!confirm(msg)) return;
+        let reason = "";
+        if (!isOriginalOwner) reason = prompt("Alasan (opsional, akan dilihat oleh pengunggah pertama):", "") || "";
+        deleteFromDriveBtn.disabled = true;
+        deleteFromDriveBtn.textContent = "⏳ Mengirim…";
+        const res = await requestDeleteMediaFromDrive(username, item.driveFileId, item.name, reason);
+        if (!res || !res.ok) {
+          alert("Gagal: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+          deleteFromDriveBtn.disabled = false;
+          deleteFromDriveBtn.textContent = "🗑️ Hapus dari Drive";
+          return;
+        }
+        if (res.deleted) {
+          alert(`"${item.name}" sudah dihapus permanen dari Drive.`);
+        } else if (res.pending) {
+          alert(`Permintaan hapus sudah dikirim ke pengunggah pertama (${res.originalOwner}) -- menunggu persetujuan mereka.`);
+        }
+        renderMediaList();
+      });
       const downloadOriginalBtn = row.querySelector('[data-act="downloadOriginal"]');
       if (downloadOriginalBtn) downloadOriginalBtn.addEventListener("click", () => {
         const a = document.createElement("a");
@@ -839,6 +1081,28 @@ const PresentationStudio = (() => {
       const copyNameBtn = row.querySelector('[data-act="copyname"]');
       if (copyNameBtn) copyNameBtn.addEventListener("click", () => {
         copyTextWithFeedback(item.sourceFileName || item.name, copyNameBtn);
+      });
+      // "➕ Kumpulan" -- BARU (27 Agu 2026), lihat addMediaToCollection()
+      // (js/collections.js) & catatan panjang di atasnya untuk kenapa
+      // ini dulu tidak ada sama sekali (celah yang dilaporkan pengguna:
+      // "+ Daftar" di tab File cuma menyimpan ke Media Tersimpan, tidak
+      // pernah masuk ke Kumpulan Ayat, beda dari Kidung yang langsung
+      // bisa). Menambahkan HALAMAN YANG SEDANG AKTIF (idx saat tombol
+      // diklik, sama seperti "⬇️" download halaman aktif) -- kalau mau
+      // beberapa halaman PDF ini masuk semua, klik ◀ ▶ dulu ke halaman
+      // lain lalu klik "➕ Kumpulan" lagi untuk tiap halaman yang diinginkan.
+      const addColBtn = row.querySelector('[data-act="addcol"]');
+      if (addColBtn) addColBtn.addEventListener("click", async () => {
+        if (typeof addMediaToCollection !== "function") return;
+        const sel = el("psCollectionSelect");
+        const name = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+          ? loadCollections(username)[sel.value].name
+          : await promptCollectionName(username);
+        if (!name) return;
+        addMediaToCollection(username, name, item, idx);
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        addColBtn.textContent = "✅ Ditambahkan";
+        setTimeout(() => { addColBtn.textContent = "➕ Kumpulan"; }, 1200);
       });
       // "⬇️" Unduh halaman/gambar yang SEDANG ditampilkan (idx saat ini).
       // PENTING: untuk PDF yang diunggah, aplikasi ini menyimpan hasil
@@ -1091,6 +1355,76 @@ const PresentationStudio = (() => {
       if (el("psTimerCustomBtn")) el("psTimerCustomBtn").classList.remove("active");
     });
     syncTimerLabelPreview();
+  }
+
+  // ------------------------------------------------------------
+  // BARU (27 Agu 2026) -- ⏱️ Stopwatch, hitung MAJU dari 0 (beda dari
+  // ⏱️ Timer hitung mundur di atas). Dikendalikan dari Studio (di sini)
+  // MAUPUN panel sederhana HP (js/presentation.js, wireStopwatchSimple())
+  // -- keduanya kirim pesan `{type:"stopwatch", ...}` yang SAMA persis ke
+  // Layar 2 (present.html, lihat showStopwatch() di sana), cuma beda
+  // elemen DOM yang dipakai (prefix "ps" utk Studio, "present" utk panel
+  // sederhana) -- lihat juga wireStopwatchSimple() di js/presentation.js.
+  // ------------------------------------------------------------
+  let swBaseStartAt = null; // Date.now() - (durasi yang sudah berjalan sejauh ini, dalam ms) -- SELAMA berjalan
+  let swAccumulatedMs = 0; // durasi yang sudah terkumpul SAAT dijeda (dipakai start() berikutnya untuk melanjutkan, bukan mengulang dari 0)
+  let swRunning = false;
+  let swDisplayInterval = null;
+
+  function fmtStopwatch(totalSec) {
+    const s = Math.max(0, Math.floor(totalSec));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    const pad2 = (n) => String(n).padStart(2, "0");
+    return hh > 0 ? `${hh}:${pad2(mm)}:${pad2(ss)}` : `${pad2(mm)}:${pad2(ss)}`;
+  }
+
+  function wireStopwatch() {
+    const labelEl = el("psStopwatchLabel");
+    const labelPreview = el("psStopwatchLabelPreview");
+    const disp = el("psStopwatchDisplay");
+    function syncLabelPreview() {
+      if (labelPreview) labelPreview.textContent = (labelEl && labelEl.value.trim()) || "";
+    }
+    function tick() {
+      if (!swRunning || swBaseStartAt == null) return;
+      if (disp) disp.textContent = fmtStopwatch((Date.now() - swBaseStartAt) / 1000);
+    }
+    function start() {
+      if (swRunning) return;
+      // Melanjutkan dari jeda (swAccumulatedMs > 0) ATAU mulai murni dari
+      // 0 -- baseStartAt digeser mundur sejauh durasi yang SUDAH terkumpul
+      // supaya "Date.now() - baseStartAt" tetap menghasilkan total yang
+      // benar tanpa perlu melacak jeda secara terpisah di Layar 2.
+      swBaseStartAt = Date.now() - swAccumulatedMs;
+      swRunning = true;
+      const label = (labelEl && labelEl.value.trim()) || "";
+      rawPost({ type: "stopwatch", action: "start", label, baseStartAt: swBaseStartAt });
+      if (swDisplayInterval) clearInterval(swDisplayInterval);
+      swDisplayInterval = setInterval(tick, 250);
+      tick();
+    }
+    function pause() {
+      if (!swRunning) return;
+      swRunning = false;
+      swAccumulatedMs = Date.now() - swBaseStartAt; // simpan durasi yang sudah berjalan sejauh ini
+      if (swDisplayInterval) { clearInterval(swDisplayInterval); swDisplayInterval = null; }
+      rawPost({ type: "stopwatch", action: "stop" });
+    }
+    function reset() {
+      swRunning = false;
+      swBaseStartAt = null;
+      swAccumulatedMs = 0;
+      if (swDisplayInterval) { clearInterval(swDisplayInterval); swDisplayInterval = null; }
+      if (disp) disp.textContent = "00:00";
+      rawPost({ type: "stopwatch", action: "reset" });
+    }
+    if (labelEl) labelEl.addEventListener("input", syncLabelPreview);
+    if (el("psStopwatchStartBtn")) el("psStopwatchStartBtn").addEventListener("click", start);
+    if (el("psStopwatchStopBtn")) el("psStopwatchStopBtn").addEventListener("click", pause);
+    if (el("psStopwatchResetBtn")) el("psStopwatchResetBtn").addEventListener("click", reset);
+    syncLabelPreview();
   }
 
   // ------------------------------------------------------------
@@ -1370,6 +1704,55 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // TAHAP 4 (ROADMAP-drive-sync.md) -- mengunduh ISI 1 item "stub" (baru
+  // diketahui dari Drive, images masih kosong -- lihat syncMediaFromDrive()
+  // di js/collections.js) ON-DEMAND, dipanggil dari tombol "☁️ Muat dari
+  // Drive" di renderMediaList(). Mengembalikan true/false (berhasil atau
+  // tidak) -- item yang sama diTIMPA ulang (put() dengan id sama) di
+  // IndexedDB begitu berhasil, supaya lain kali dibuka lagi (mis. sesi
+  // berikutnya) tidak perlu diunduh ulang.
+  async function loadDriveMediaOnDemand(item) {
+    if (!item || !item.driveFileId || typeof Sync === "undefined" || typeof Sync.fetchMediaFile !== "function") return false;
+    const username = typeof currentUser !== "undefined" ? currentUser : null;
+    const dataUrl = await Sync.fetchMediaFile(username, item.driveFileId);
+    if (!dataUrl) return false;
+    const mime = (dataUrl.match(/^data:([^;]+);/) || [, ""])[1] || item.driveMimeType || "";
+    try {
+      if (/^application\/pdf$/i.test(mime)) {
+        // Render ulang jadi gambar per halaman (sama seperti saat PERTAMA
+        // kali diunggah, lihat pdfFileToImages() di atas) -- fetchMediaFile
+        // cuma mengembalikan berkas PDF MENTAH (itulah yang diunggah,
+        // lihat uploadSource di addMediaItem() js/collections.js), jadi
+        // perlu dirender ulang lagi di perangkat ini supaya bisa ditayangkan
+        // per halaman seperti biasa, bukan cuma bisa diunduh.
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], item.sourceFileName || item.name || "berkas.pdf", { type: "application/pdf" });
+        const images = await pdfFileToImages(file);
+        item.images = images;
+        item.originalFile = dataUrl; // simpan juga PDF aslinya, sama seperti psKeepOriginalPdf
+        item.type = "image";
+      } else if (/^image\//i.test(mime)) {
+        item.images = [dataUrl];
+        item.type = "image";
+      } else {
+        // Jenis lain (jarang -- uploadSource seharusnya selalu gambar/PDF)
+        // -- tetap disimpan apa adanya supaya minimal bisa diunduh lewat
+        // "⬇️" walau preview-nya mungkin tidak terbentuk sempurna.
+        item.images = [dataUrl];
+        item.originalFile = dataUrl;
+      }
+      item.driveOnly = false;
+      item.updatedAt = new Date().toISOString();
+      if (typeof LocalDB !== "undefined") await LocalDB.putMediaItem(item);
+      return true;
+    } catch (e) {
+      console.error("loadDriveMediaOnDemand gagal:", e);
+      return false;
+    }
+  }
+
+  // ------------------------------------------------------------
   // BARU -- Word (.docx) diunggah & diubah jadi gambar per "halaman",
   // sama pola dengan PDF di atas (pdf.js), memakai mammoth.js (dimuat
   // lazy dari CDN, hanya saat ada .docx diunggah). mammoth hanya bisa
@@ -1589,6 +1972,14 @@ const PresentationStudio = (() => {
             if (ok) {
               statusEl.textContent = " ☁️ tersinkron ke Drive";
               statusEl.title = "";
+            } else if (errorMessage && errorMessage.indexOf("diantre") !== -1) {
+              // TAHAP 7 -- dibedakan dari "gagal permanen" supaya operator
+              // tahu ini akan DICOBA LAGI OTOMATIS (bukan perlu diunggah
+              // ulang manual), lihat queueMediaUpload()/
+              // processMediaUploadQueue() di js/collections.js.
+              statusEl.textContent = " ⏳ menunggu sinkron (offline/gagal, akan dicoba lagi otomatis)";
+              statusEl.title = errorMessage;
+              statusEl.style.cursor = "help";
             } else {
               statusEl.textContent = " ⚠️ gagal sinkron ke Drive";
               statusEl.title = errorMessage || "Gagal, tidak diketahui sebabnya.";
@@ -1886,6 +2277,19 @@ const PresentationStudio = (() => {
       });
     }
     window.populateYtBgPicker = populateYtBgPicker;
+    // BARU (Tahap 7, ROADMAP-drive-sync.md) -- diekspos ke window supaya
+    // wireMediaUploadQueueAutoRetry() (js/collections.js, dipasang dari
+    // js/app.js setelah login) bisa menyegarkan daftar Media Tersimpan
+    // begitu antrean upload yang tertunda berhasil disinkronkan di latar
+    // belakang (mis. koneksi baru kembali online), walau panel Studio
+    // Presentasi sedang tidak terbuka sekalipun -- aman dipanggil kapan
+    // pun (no-op kalau elemen psMediaList belum ada di DOM saat itu).
+    window.renderMediaList = renderMediaList;
+    // BARU -- lihat updateMediaQueueBadge() di atas & wireMediaUploadQueueAutoRetry()
+    // (js/collections.js) / startApp() (js/app.js) yang memanggilnya
+    // setelah login supaya badge sudah benar SEBELUM Studio Presentasi
+    // dibuka sama sekali.
+    window.updateMediaQueueBadge = updateMediaQueueBadge;
     if (el("psYtBgSavedPicker")) el("psYtBgSavedPicker").addEventListener("change", (e) => {
       const url = e.target.value;
       if (!url) return;
@@ -2060,8 +2464,37 @@ const PresentationStudio = (() => {
     const canvas = el("psPenCanvas");
     const ctx = canvas ? canvas.getContext("2d") : null;
     let color = "#ff3b30";
+    // BARU (27 Agu 2026) -- ukuran Pen lewat progress bar (#psPenSizeSlider),
+    // default 17px (disamakan kira-kira dengan ukuran dasar huruf yang
+    // umum dipakai di aplikasi ini, sesuai permintaan). Dikirim juga ke
+    // Layar 2 (lewat rawPost({type:"pen", ..., size})) supaya coretan di
+    // sana setebal yang dipilih di sini, bukan selalu 4px seperti dulu.
+    let penSize = 17;
+    const sizeSlider = el("psPenSizeSlider");
+    const sizeValueEl = el("psPenSizeValue");
+    if (sizeSlider) {
+      penSize = Number(sizeSlider.value) || 17;
+      sizeSlider.addEventListener("input", () => {
+        penSize = Number(sizeSlider.value) || 17;
+        if (sizeValueEl) sizeValueEl.textContent = penSize + "px";
+      });
+    }
 
-    // Tombol Penunjuk/Pen kini ADA DI 2 TEMPAT (tab "Penunjuk & Pen" +
+    // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar: zoom 10%-10000% (default
+    // 100%), dikirim bersama posisi kursor tiap mousemove (lihat blok
+    // wrap.addEventListener("mousemove", ...) di bawah).
+    let magnifyPercent = 100;
+    const magnifyZoomSlider = el("psMagnifyZoomSlider");
+    const magnifyZoomValue = el("psMagnifyZoomValue");
+    if (magnifyZoomSlider) {
+      magnifyPercent = Number(magnifyZoomSlider.value) || 100;
+      magnifyZoomSlider.addEventListener("input", () => {
+        magnifyPercent = Number(magnifyZoomSlider.value) || 100;
+        if (magnifyZoomValue) magnifyZoomValue.textContent = magnifyPercent + "%";
+      });
+    }
+    const magnifyBtns = () => Array.from(document.querySelectorAll("[data-ps-magnify-toggle]"));
+
     // akses cepat di atas kotak "Tayang") -- keduanya dicari lewat
     // data-attribute yang sama supaya statusnya selalu sinkron, apa pun
     // tombol mana yang diklik operator.
@@ -2078,7 +2511,7 @@ const PresentationStudio = (() => {
     }
 
     function updateMode() {
-      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive);
+      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || magnifyActive);
     }
 
     document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((chip) => {
@@ -2091,17 +2524,35 @@ const PresentationStudio = (() => {
     pointerBtns().forEach((btn) => btn.addEventListener("click", () => {
       pointerActive = !pointerActive;
       penActive = false;
+      magnifyActive = false;
       pointerBtns().forEach((b) => b.classList.toggle("active", pointerActive));
       penBtns().forEach((b) => b.classList.remove("active"));
+      magnifyBtns().forEach((b) => b.classList.remove("active"));
       if (!pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+      rawPost({ type: "magnify", on: false });
       updateMode();
     }));
     penBtns().forEach((btn) => btn.addEventListener("click", () => {
       penActive = !penActive;
       pointerActive = false;
+      magnifyActive = false;
       penBtns().forEach((b) => b.classList.toggle("active", penActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
+      magnifyBtns().forEach((b) => b.classList.remove("active"));
       if (!penActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+      rawPost({ type: "magnify", on: false });
+      updateMode();
+    }));
+    magnifyBtns().forEach((btn) => btn.addEventListener("click", () => {
+      magnifyActive = !magnifyActive;
+      pointerActive = false;
+      penActive = false;
+      magnifyBtns().forEach((b) => b.classList.toggle("active", magnifyActive));
+      pointerBtns().forEach((b) => b.classList.remove("active"));
+      penBtns().forEach((b) => b.classList.remove("active"));
+      if (!magnifyActive) rawPost({ type: "magnify", on: false });
+      if (dot) dot.style.display = "none";
+      rawPost({ type: "pointer", on: false });
       updateMode();
     }));
     penClearBtns().forEach((btn) => btn.addEventListener("click", () => {
@@ -2128,12 +2579,12 @@ const PresentationStudio = (() => {
         if (penActive && e.buttons === 1) {
           penStroke.push({ x, y });
           const seg = penStroke.slice(-2);
-          rawPost({ type: "pen", stroke: seg, color });
+          rawPost({ type: "pen", stroke: seg, color, size: penSize });
           if (ctx && canvas) {
             syncCanvasSize();
             canvas.style.display = "block";
             if (seg.length > 1) {
-              ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.lineCap = "round"; ctx.lineJoin = "round";
+              ctx.strokeStyle = color; ctx.lineWidth = penSize; ctx.lineCap = "round"; ctx.lineJoin = "round";
               ctx.beginPath();
               seg.forEach((pt, i) => {
                 const px = pt.x * canvas.width, py = pt.y * canvas.height;
@@ -2143,10 +2594,14 @@ const PresentationStudio = (() => {
             }
           }
         }
+        if (magnifyActive) {
+          rawPost({ type: "magnify", on: true, x, y, percent: magnifyPercent });
+        }
       });
       wrap.addEventListener("mousedown", () => { penStroke = []; });
       wrap.addEventListener("mouseleave", () => {
         if (pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+        if (magnifyActive) rawPost({ type: "magnify", on: false });
       });
       window.addEventListener("resize", syncCanvasSize);
     }
@@ -2379,6 +2834,7 @@ const PresentationStudio = (() => {
     wireAnnouncement();
     wireMessage();
     wireTimer();
+    wireStopwatch();
     wireQuickVerse();
     wireFileTab();
     wireQuickActions();
