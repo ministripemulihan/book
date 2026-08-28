@@ -12,6 +12,14 @@
     --p-font: "Literata", Georgia, serif;
     --p-scale: 1;
     --p-koor: #ffd84a;
+    --p-line-height: 1.35;
+    /* BARU (28 Agu 2026) -- "Ukuran Konten" (tab Tampilan): mengalikan
+       lebar maksimum kotak teks (#text) & jarak tepi kotak (#stage
+       padding) -- 1 = bawaan lama (tidak berubah), <1 mempersempit
+       (lebih banyak ruang latar terlihat di tepi, cocok dipakai
+       bersama 🎥 Kamera/Gambar Latar), >1 melebarkan (teks memakai
+       hampir seluruh lebar layar). Lihat applyTheme() -> contentScale. */
+    --p-content-scale: 1;
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -27,6 +35,42 @@
     position: fixed; inset: 0; pointer-events: none; z-index: 1;
     background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.28) 100%);
   }
+  /* BARU (28 Agu 2026) -- 🎥 Kamera Latar: video kamera hidup ditaruh
+     SEBAGAI ANAK <body> paling awal, position:fixed z-index:0 -- di
+     BAWAH #stage (z-index:2) & vignette di atas (z-index:1), tapi di
+     ATAS latar polos body (--p-bg), yang secara CSS selalu dilukis
+     paling dasar duluan apa pun z-index anak-anaknya -- jadi video ini
+     otomatis "mengintip" di balik ayat/kidung/pengumuman TANPA perlu
+     mengosongkan/mengubah background body sama sekali. Disembunyikan
+     total (atribut `hidden`) selama kamera belum diaktifkan operator --
+     TIDAK memuat/meminta izin kamera sama sekali sebelum itu (lihat
+     startCamera() di skrip bawah, dipanggil HANYA saat pesan "camera"
+     dengan on:true diterima dari Studio). */
+  #camBg, #imgBg {
+    position: fixed; inset: 0; z-index: 0;
+    width: 100vw; height: 100vh; object-fit: cover;
+    background: #000;
+    transition: opacity .35s ease;
+  }
+  /* BARU (28 Agu 2026) -- 🖼️ Latar Gambar: gambar latar yang diunggah
+     operator (tab "🎥 Kamera" -> "Sumber Latar" -> "Gambar"), lapisan
+     PERSIS SAMA seperti #camBg (di bawah #stage, di atas --p-bg polos)
+     tapi <img> biasa, bukan video -- keduanya TIDAK PERNAH aktif
+     bersamaan (Studio hanya mengirim satu sumber latar aktif dalam
+     satu waktu lewat "latarMode", lihat applyLatarSource() di bawah). */
+  /* Dim tipis merata di atas latar hidup/gambar (di BAWAH vignette
+     tepi, di ATAS latar) supaya tulisan (bahkan tanpa memilih gaya
+     Putih/Hitam Border sekalipun) tetap sedikit lebih kontras
+     terhadap latar yang warna/kecerahannya bisa berubah-ubah kapan
+     saja (mis. lampu ruangan berkedip, orang lewat di depan kamera).
+     Kelas "cam-active" dipertahankan namanya (dipakai sejak fitur
+     Kamera pertama dibuat) tapi sekarang dipicu oleh KAMERA ATAU
+     GAMBAR latar, mana pun yang aktif -- lihat updateLatarDimClass(). */
+  body.cam-active::after {
+    content: "";
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: rgba(0,0,0,0.18);
+  }
   #stage {
     position: relative; z-index: 2;
     height: 100%;
@@ -35,29 +79,46 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 5vh 6vw;
+    padding: 5vh calc(6vw / var(--p-content-scale, 1));
     box-sizing: border-box;
-    transition: background-color .3s ease, color .3s ease;
+    transition: background-color .3s ease, color .3s ease, padding .25s ease;
   }
   #ref {
     font-family: "Inter", Arial, sans-serif;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--p-accent);
+    color: var(--p-cam-ink, var(--p-accent));
     font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale));
     margin-bottom: clamp(14px, 2.4vh, 34px);
     opacity: 0.92;
+    /* BARU (28 Agu 2026) -- lihat catatan panjang di #text di bawah:
+       warna & garis tepi ini hanya berubah saat 🎥 Kamera Latar aktif
+       (--p-cam-ink/--p-outline-shadow terisi), jatuh ke tampilan lama
+       (var(--p-accent), tanpa outline) selebihnya -- lihat
+       applyCamTextStyle() di skrip bawah. */
+    text-shadow: var(--p-outline-shadow, none);
   }
   #ref::before, #ref::after {
     content: "—"; opacity: 0.55; margin: 0 0.6em; font-weight: 400;
   }
   #text {
     font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
-    line-height: 1.35;
-    max-width: 1200px;
+    /* BARU (28 Agu 2026) -- dulu terkunci "1.35" tetap, sekarang bisa
+       diatur dari Studio (slider "Spasi Baris", lihat --p-line-height
+       di applyTheme()/js/presentation-studio.js) supaya teks panjang
+       (mis. hasil unggah file Word/.doc) bisa dirapatkan/direnggangkan
+       spasi antar barisnya tanpa mengubah ukuran hurufnya. */
+    line-height: var(--p-line-height, 1.35);
+    max-width: calc(1200px * var(--p-content-scale, 1));
     white-space: pre-wrap;
-    text-shadow: 0 2px 18px rgba(0,0,0,0.5);
+    /* BARU (28 Agu 2026) -- 🎥 Kamera Latar: --p-cam-ink & --p-outline-shadow
+       cuma TERISI saat kamera aktif (diset lewat applyCamTextStyle() di
+       bawah) -- kalau tidak, var() jatuh ke nilai lama (var(--p-ink),
+       tanpa outline) persis seperti sebelum fitur ini ada, jadi TIDAK
+       mengubah tampilan sama sekali kalau kamera tidak dipakai. */
+    color: var(--p-cam-ink, var(--p-ink));
+    text-shadow: var(--p-outline-shadow, none), 0 2px 18px rgba(0,0,0,0.5);
   }
   #idle {
     font-family: "Inter", Arial, sans-serif;
@@ -262,6 +323,12 @@
 </style>
 </head>
 <body>
+  <!-- BARU (28 Agu 2026) -- lihat catatan panjang #camBg di <style> di
+       atas. hidden secara default; muncul otomatis begitu operator
+       menekan "🎥 Aktifkan Kamera" di tab "🎥 Kamera" Studio Presentasi. -->
+  <video id="camBg" hidden autoplay playsinline muted></video>
+  <!-- BARU (28 Agu 2026) -- lihat catatan #imgBg di <style> di atas. -->
+  <img id="imgBg" hidden />
   <div id="wartaBar" class="ticker-bar" hidden><span class="ticker-inner" id="wartaText"></span></div>
 
   <div id="stage">
@@ -315,6 +382,9 @@
   const slideEl = document.getElementById("slideView");
   const ytEl = document.getElementById("ytView");
   const ytBgEl = document.getElementById("ytBg");
+  // BARU (28 Agu 2026) -- lihat wireCamera()/applyCamera-nya di bawah.
+  const camBgEl = document.getElementById("camBg");
+  const imgBgEl = document.getElementById("imgBg"); // BARU (28 Agu 2026) -- lihat applyBgImagePayload() di bawah.
   const timerWrap = document.getElementById("timerWrap");
   const timerTimeEl = document.getElementById("timerTime");
   const timerLabelEl = document.getElementById("timerLabel");
@@ -531,6 +601,191 @@
     const luma = 0.299 * r + 0.587 * g + 0.114 * b; // 0 (gelap) - 255 (terang)
     return luma > 170 ? "#8a6d00" : "#ffd84a";
   }
+  // ------------------------------------------------------------
+  // BARU (28 Agu 2026) -- 🎥 KAMERA LATAR. Menyalakan kamera PERANGKAT
+  // YANG MEMBUKA JENDELA INI (laptop/HP yang tersambung ke proyektor)
+  // sebagai latar belakang hidup di belakang ayat/kidung/pengumuman --
+  // lihat tab "🎥 Kamera" di Studio (js/presentation-studio.js,
+  // wireCamera()) untuk kontrolnya. Izin kamera browser (getUserMedia)
+  // SENGAJA diminta di SINI (jendela Layar 2), bukan di jendela Studio,
+  // supaya kameranya benar-benar yang terpasang & menghadap ke arah
+  // yang dipakai di lokasi acara -- bukan kamera laptop operator yang
+  // sedang mengetik di jendela lain.
+  //
+  // Teks (#ref/#text) diberi GARIS TEPI (outline) memakai teknik
+  // "text-shadow melingkar" (buildOutlineShadow() -- beberapa lapis
+  // text-shadow kecil ke segala arah membentuk garis tepi) -- dipilih
+  // ketimbang properti `-webkit-text-stroke` karena text-shadow
+  // didukung SEMUA browser tanpa perlu prefiks & tidak berisiko garis
+  // tepinya "memakan" isi huruf (masalah umum -webkit-text-stroke kalau
+  // urutan lukis stroke-di-atas-fill tidak didukung `paint-order` di
+  // browser tertentu). --p-outline-shadow & --p-cam-ink adalah CSS
+  // custom property yang HANYA diisi selama kamera aktif (lihat
+  // applyCamTextStyle() di bawah) -- kosong/tidak diset = var() di
+  // #ref/#text (lihat <style> di atas) otomatis jatuh ke tampilan lama
+  // (warna tema biasa, tanpa outline), jadi TIDAK mengubah tampilan
+  // sama sekali selama fitur ini tidak dipakai.
+  // ------------------------------------------------------------
+  let camStream = null;
+  let camActive = false;
+  let camFacing = null;
+  let camMirror = false;
+  // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (lihat catatan #imgBg di
+  // <style> & applyBgImagePayload() di bawah).
+  let imgBgActive = false;
+
+  function buildOutlineShadow(color, widthPx) {
+    const w = Math.max(0.5, Number(widthPx) || 3);
+    const STEPS = 16; // cukup rapat supaya garis tepinya terlihat mulus melingkar, bukan segi-N kasar
+    const parts = [];
+    for (let i = 0; i < STEPS; i++) {
+      const angle = (i / STEPS) * Math.PI * 2;
+      parts.push(`${(Math.cos(angle) * w).toFixed(2)}px ${(Math.sin(angle) * w).toFixed(2)}px 0 ${color}`);
+    }
+    return parts.join(", ");
+  }
+
+  // `mode`: "white-black" (tulisan putih, border hitam -- cocok utk
+  // latar yang cenderung TERANG) | "black-white" (tulisan hitam,
+  // border putih -- cocok utk latar yang cenderung GELAP) | "custom"
+  // (BARU 28 Agu 2026 -- warna tulisan & border BEBAS dipilih operator
+  // lewat color picker, dioper lewat `ink`/`outline`, bukan cuma 2
+  // pilihan hitam/putih) | "none"/kosong (matikan, kembali ke
+  // tampilan tema biasa). Dipakai baik untuk 🎥 Kamera maupun 🖼️
+  // Gambar Latar -- keduanya sama-sama butuh tulisan yang tetap
+  // terbaca di atas latar yang tidak polos.
+  function applyCamTextStyle(mode, widthPx, ink, outline) {
+    const root = document.documentElement.style;
+    if (!mode || mode === "none") {
+      root.removeProperty("--p-outline-shadow");
+      root.removeProperty("--p-cam-ink");
+      return;
+    }
+    let outlineColor, fillColor;
+    if (mode === "custom") {
+      fillColor = ink || "#ffffff";
+      outlineColor = outline || "#000000";
+    } else {
+      outlineColor = mode === "black-white" ? "#ffffff" : "#000000";
+      fillColor = mode === "black-white" ? "#000000" : "#ffffff";
+    }
+    root.setProperty("--p-outline-shadow", buildOutlineShadow(outlineColor, widthPx));
+    root.setProperty("--p-cam-ink", fillColor);
+  }
+
+  // Latar (kamera ATAU gambar) cuma masuk akal di BELAKANG teks (ayat/
+  // teks bebas/kidung) -- disembunyikan (opacity 0, stream/gambar
+  // TETAP terpasang, tidak dimatikan/dibuang) begitu tayangan pindah
+  // ke Hitam/Logo/Slide/YouTube, yang masing-masing sudah punya
+  // kontennya sendiri & tidak butuh (atau malah terganggu oleh) latar
+  // di baliknya. Muncul lagi otomatis begitu kembali ke ayat/teks/
+  // kidung -- operator tidak perlu menyalakan-matikan latar manual
+  // tiap ganti jenis tayangan.
+  function setCamVisibleForKind(kind) {
+    if (!camActive && !imgBgActive) return;
+    const show = kind === "verse" || kind === "text" || kind === "kidung";
+    if (camActive) camBgEl.style.opacity = show ? "1" : "0";
+    if (imgBgActive) imgBgEl.style.opacity = show ? "1" : "0";
+  }
+
+  // BARU (28 Agu 2026) -- 🖼️ Latar Gambar: kebalikan dari #camBg tidak
+  // perlu izin browser (getUserMedia) sama sekali -- cukup pasang
+  // `src` gambar (data-URL, dikirim apa adanya dari Studio, sama pola
+  // seperti "slide" di showMain()) begitu diterima. Kamera & Gambar
+  // Latar SALING MENIADAKAN (satu aktif, yang lain otomatis mati) --
+  // Studio yang menjaga aturan ini (lihat applyLatarSource() di
+  // js/presentation-studio.js), di sini cukup taati apa yang dikirim.
+  function applyBgImagePayload(data) {
+    if (data.on && data.url) {
+      imgBgEl.src = data.url;
+      imgBgEl.hidden = false;
+      imgBgEl.style.opacity = "1";
+      imgBgActive = true;
+      if (camActive) stopCamera(); // pastikan tidak dua-duanya aktif sekaligus
+    } else {
+      imgBgActive = false;
+      imgBgEl.style.opacity = "0";
+      imgBgEl.hidden = true;
+    }
+    updateLatarDimClass();
+  }
+
+  function reportCameraStatus(on, error) {
+    if (!window.opener) return;
+    try {
+      window.opener.postMessage({ source: "bibleAppPresenter", type: "present_camera_status", on, error: error || null }, location.origin);
+    } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
+  }
+
+  // BARU (28 Agu 2026) -- dipanggil di beberapa tempat (startCamera,
+  // stopCamera, applyBgImagePayload) -- satu tempat untuk menjaga
+  // kelas "cam-active" (dim overlay) menyala kalau SALAH SATU dari
+  // kamera/gambar latar aktif, mati kalau dua-duanya mati.
+  function updateLatarDimClass() {
+    document.body.classList.toggle("cam-active", camActive || imgBgActive);
+  }
+
+  async function startCamera(facingMode, mirror) {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Browser ini tidak mendukung akses kamera.");
+      }
+      if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode || "user" }, audio: false });
+      // Kamera & Gambar Latar saling meniadakan (lihat catatan
+      // applyBgImagePayload()) -- menyalakan kamera otomatis mematikan
+      // gambar latar kalau sedang aktif.
+      if (imgBgActive) { imgBgActive = false; imgBgEl.hidden = true; imgBgEl.style.opacity = "0"; }
+      camBgEl.srcObject = camStream;
+      camActive = true;
+      camFacing = facingMode || "user";
+      camMirror = !!mirror;
+      camBgEl.style.transform = camMirror ? "scaleX(-1)" : "none";
+      camBgEl.style.opacity = "1";
+      camBgEl.hidden = false;
+      updateLatarDimClass();
+      reportCameraStatus(true, null);
+    } catch (e) {
+      camActive = false;
+      camBgEl.hidden = true;
+      updateLatarDimClass();
+      // Pesan error asli browser (mis. "Permission denied", "Requested
+      // device not found") diteruskan apa adanya ke Studio supaya
+      // operator tahu persis kenapa (izin ditolak / tidak ada kamera /
+      // dsb), bukan cuma "gagal" tanpa keterangan.
+      reportCameraStatus(false, String((e && e.message) || e));
+    }
+  }
+
+  function stopCamera() {
+    if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
+    camActive = false;
+    camBgEl.hidden = true;
+    camBgEl.srcObject = null;
+    updateLatarDimClass();
+    reportCameraStatus(false, null);
+  }
+
+  // Dipanggil dari render() saat menerima payload {type:"camera", ...}.
+  // Stream kamera HANYA dinyalakan ulang (startCamera) kalau memang
+  // belum aktif atau arah kameranya (`facingMode`) berubah -- supaya
+  // pengaturan lain (gaya tulisan dsb, sekarang dikirim terpisah lewat
+  // {type:"latartext"}) TIDAK memicu video berkedip/diminta ulang
+  // izinnya setiap kali.
+  function applyCameraPayload(data) {
+    if (data.on) {
+      const needsRestart = !camActive || camFacing !== (data.facingMode || "user");
+      if (needsRestart) {
+        startCamera(data.facingMode, data.mirror);
+      } else if (camMirror !== !!data.mirror) {
+        camMirror = !!data.mirror;
+        camBgEl.style.transform = camMirror ? "scaleX(-1)" : "none";
+      }
+    } else if (camActive) {
+      stopCamera();
+    }
+  }
+
   function applyTheme(theme) {
     if (!theme) return;
     const root = document.documentElement.style;
@@ -546,6 +801,9 @@
     // bersamaan dengan bgColor supaya kontrasnya selalu terjaga.
     if (theme.ink) root.setProperty("--p-ink", theme.ink);
     if (theme.scale) root.setProperty("--p-scale", theme.scale);
+    if (theme.lineHeight) root.setProperty("--p-line-height", theme.lineHeight);
+    // BARU (28 Agu 2026) -- lihat catatan --p-content-scale di <style> di atas.
+    if (theme.contentScale) root.setProperty("--p-content-scale", theme.contentScale);
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -565,6 +823,7 @@
     stopTimer(false);
     stopStopwatch(false);
     hideMagnify(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
+    setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
     idleEl.hidden = true;
     logoEl.hidden = true;
     slideEl.hidden = true;
@@ -638,6 +897,7 @@
       stopTimer(true);
       stopStopwatch(true);
       hideMagnify();
+      setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
     }
     if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung") {
@@ -658,6 +918,15 @@
       return;
     }
     if (data.type === "theme") { applyTheme(data.theme); return; }
+    if (data.type === "camera") { applyCameraPayload(data); return; }
+    // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (upload), lihat applyBgImagePayload().
+    if (data.type === "bgimage") { applyBgImagePayload(data); return; }
+    // BARU (28 Agu 2026) -- gaya tulisan (warna tulisan/border) saat
+    // 🎥 Kamera ATAU 🖼️ Gambar Latar aktif -- dipisah dari payload
+    // "camera"/"bgimage" itu sendiri supaya menggeser slider border/
+    // ganti warna TIDAK memicu ulang stream kamera atau kirim ulang
+    // gambar (yang bisa berukuran besar sebagai data-URL).
+    if (data.type === "latartext") { applyCamTextStyle(data.mode, data.widthPx, data.ink, data.outline); return; }
     if (data.type === "warta") { applyTicker(wartaBar, wartaText, data); return; }
     if (data.type === "footnote") { applyTicker(footBar, footText, data); return; }
     if (data.type === "pointer") {
