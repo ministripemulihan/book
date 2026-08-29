@@ -349,6 +349,22 @@ async function renderKidungHome() {
   listBtn.addEventListener("click", () => renderKidungList(kidungCurrentBuku));
   iconsRow.appendChild(searchBtn);
   iconsRow.appendChild(listBtn);
+
+  // BARU -- pintu masuk ke menu "👶 Kidung Anak" (modul terpisah di
+  // js/kidung-anak.js + css/kidung-anak.css, lihat README.md). Tombol ini
+  // TIDAK mengubah apa pun di renderKidungHome/renderKidungReader yang
+  // sudah ada -- cuma menambah 1 jalan masuk baru. Kalau modulnya (karena
+  // suatu sebab) gagal dimuat, tombol otomatis disembunyikan supaya menu
+  // Kidung Umum yang lama tidak terganggu sama sekali.
+  if (typeof KidungAnak !== "undefined" && typeof KidungAnak.renderHome === "function") {
+    const kidungAnakBtn = document.createElement("button");
+    kidungAnakBtn.type = "button";
+    kidungAnakBtn.className = "chip-btn small";
+    kidungAnakBtn.textContent = "👶 Kidung Anak";
+    kidungAnakBtn.addEventListener("click", () => KidungAnak.renderHome(panel, renderKidungHome));
+    iconsRow.appendChild(kidungAnakBtn);
+  }
+
   panel.appendChild(iconsRow);
 
   numInput.focus();
@@ -1247,7 +1263,7 @@ function kidungDisabledSquare(icon, title) {
   return btn;
 }
 
-// Kotak yang MEMBUKA pemutar sebaris (buildStandaloneMediaPlayer, HANYA 
+// Kotak yang MEMBUKA pemutar sebaris (buildStandaloneMediaPlayer, HANYA
 // elemen pemutarnya -- tanpa baris tombol bulat + bagikan bawaan, itu
 // sudah ada sendiri di baris ini) langsung di `body` (bawah grid) begitu
 // ditekan; ditekan lagi -> tertutup lagi (hide), sesuai permintaan
