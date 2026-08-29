@@ -3155,7 +3155,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .present-studio.ps-dual-live .ps-col-mid { grid-area: controls-mid; border-right: 1px solid var(--ps-col-border); }
 .present-studio.ps-dual-live .ps-col-right { grid-area: controls-right; border-right: none; }
 
-/* Bingkai ala "monitor kecil" -- dipakai di KEDUA mode (1 & 2 monitor) 
+/* Bingkai ala "monitor kecil" -- dipakai di KEDUA mode (1 & 2 monitor)
    supaya kotak "Berikutnya"/"Tayang" selalu terasa seperti mockup layar
    sungguhan (bezel gelap + kaki tipis), bukan cuma kotak polos. Rasio
    16:9-nya sendiri sudah dikunci lewat --ps-preview-ratio (lihat
