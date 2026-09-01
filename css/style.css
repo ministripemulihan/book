@@ -3174,3 +3174,24 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   border-radius: 0 0 3px 3px;
 }
 .ps-preview-slot .ps-preview-slot-btn { margin-top: 8px; }
+/* ============================================================
+   BARU -- MODE TAMU: PEMBATASAN KITAB (lihat js/guest.js
+   applyBookGate()). Ditambahkan di akhir file ini (bukan menyisip di
+   antara aturan .book-item yang sudah ada) supaya tidak mengubah
+   apa pun yang sudah ada -- murni tambahan. Tombol kitab yang terkunci
+   tetap kelihatan (tidak "unavailable"/pudar seperti kitab yang memang
+   belum ada terjemahannya) supaya tamu tahu kitab itu ADA, cuma belum
+   dibuka untuknya -- ditandai gembok kecil di sebelah nama kitab.
+   ============================================================ */
+.book-item.book-guest-locked {
+  position: relative;
+  color: var(--ink-soft);
+  cursor: not-allowed;
+}
+.book-item.book-guest-locked::after {
+  content: "🔒";
+  font-size: 11px;
+  margin-left: 6px;
+  opacity: .7;
+}
+.book-item.book-guest-locked:hover { background: transparent; }
