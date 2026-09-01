@@ -6,7 +6,7 @@
 //   - Cek + catat setiap kali tombol PENCARIAN ditekan, ditegakkan
 //     PUSAT lewat Apps Script (lihat apps-script/Code.gs, endpoint
 //     type=guest_search, tab Sheet "GuestUsage") supaya batas
-//     10x/perangkat/hari & 100x gabungan semua tamu/hari tidak bisa 
+//     10x/perangkat/hari & 100x gabungan semua tamu/hari tidak bisa
 //     diakali cuma dengan hapus data browser di 1 HP.
 //   - Modal kecil kalau batas tercapai / kalau tamu menekan menu
 //     yang memang tidak dibuka untuk tamu (lihat applyGuestModeUi()
@@ -167,5 +167,102 @@ const Guest = (() => {
     );
   }
 
-  return { getDeviceId, isGuest, enter, exit, checkAndLog, showLimitReached, showFeatureLocked, showModal };
+  // ------------------------------------------------------------
+  // BARU -- PEMBATASAN KITAB UNTUK MODE TAMU
+  // ------------------------------------------------------------
+  // Administrator bisa membatasi tamu supaya cuma boleh membuka kitab
+  // tertentu, diatur dari tab "Setup" di Google Sheet (key
+  // "guest_allowed_books", isi nama kitab dipisah koma, PERSIS ejaan
+  // di js/books.js, mis. "Kejadian, Matius, Yohanes"). Kalau baris ini
+  // KOSONG atau belum dibuat sama sekali, TIDAK ADA pembatasan (semua
+  // 66 kitab tetap boleh dibuka tamu, seperti sebelumnya) -- jadi fitur
+  // ini aman ditambahkan tanpa mengubah perilaku siapa pun yang belum
+  // mengisi setting ini. Lihat README.md bagian "MODE TAMU — Batasi
+  // Kitab" untuk cara mengisi di Google Sheet.
+  //
+  // Sengaja MEMAKAI ULANG fetchRemoteAppSetup_() yang sudah ada di
+  // js/app.js (dipakai juga untuk baca guest_daily_limit_per_device
+  // dkk) -- TIDAK ADA endpoint Apps Script baru yang perlu dibuat,
+  // karena endpoint "app_setup" (apps-script/Code.gs) sudah mengirim
+  // SEMUA baris tab Setup apa adanya, termasuk baris baru ini begitu
+  // administrator menambahkannya -- 0 baris Code.gs yang perlu diubah.
+  //
+  // CATATAN JUJUR soal keamanan: karena data Alkitab sudah diunduh
+  // PENUH ke perangkat (IndexedDB) begitu tersinkron, pembatasan ini
+  // sifatnya "sopan-sopanan" di tampilan (sembunyikan/kunci tombol
+  // kitab + cegat klik) -- BUKAN mencegah akses tingkat data di
+  // perangkat itu sendiri. Cocok untuk mengarahkan tamu awam supaya
+  // tidak "nyasar" ke kitab yang belum ingin dibuka publik, TAPI bukan
+  // perlindungan teknis yang tidak bisa ditembus sama sekali oleh
+  // orang yang paham cara buka DevTools browser.
+  let allowedBooksCache = null; // null = belum ada pembatasan (default)
+  let allowedBooksLoaded = false;
+
+  function normalizeBookName_(s) {
+    return String(s || "").trim().toLowerCase();
+  }
+
+  async function loadAllowedBooks() {
+    if (allowedBooksLoaded) return allowedBooksCache;
+    allowedBooksLoaded = true;
+    try {
+      const setup = typeof fetchRemoteAppSetup_ === "function" ? await fetchRemoteAppSetup_() : null;
+      const raw = (setup && setup["guest_allowed_books"]) || "";
+      const names = raw.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean);
+      allowedBooksCache = names.length ? new Set(names.map(normalizeBookName_)) : null;
+    } catch (e) {
+      allowedBooksCache = null; // gagal ambil setting -> jangan batasi apa pun (gagal-terbuka, bukan gagal-tertutup)
+    }
+    return allowedBooksCache;
+  }
+
+  function isBookAllowedSync(bookName) {
+    if (!allowedBooksCache) return true; // belum ada pembatasan / setting kosong
+    return allowedBooksCache.has(normalizeBookName_(bookName));
+  }
+
+  function showBookLocked(bookName) {
+    showModal(
+      "Kitab ini belum dibuka untuk tamu",
+      `Kitab "${bookName}" belum dibuka untuk mode tamu. Sebagai tamu, Anda tetap bisa membuka kitab-kitab lain yang sudah diizinkan. Masuk dengan akun untuk membaca semua kitab.`,
+      { icon: "🔒" }
+    );
+  }
+
+  // Dipanggil dari buildSidebar() (js/app.js) setiap kali daftar kitab
+  // digambar ulang (mis. saat mode tamu mulai, atau ganti bahasa).
+  // Kalau setting belum pernah diambil, otomatis diambil di sini lalu
+  // panel digambar ulang begitu hasilnya datang -- jadi pemanggilnya
+  // (buildSidebar) TIDAK PERLU tahu soal async sama sekali.
+  function applyBookGate() {
+    if (!CONFIG.GUEST_MODE_ENABLED || !isGuest()) {
+      // bukan mode tamu -- pastikan tidak ada sisa kelas terkunci dari sesi tamu sebelumnya
+      document.querySelectorAll(".book-item.book-guest-locked").forEach((btn) => btn.classList.remove("book-guest-locked"));
+      return;
+    }
+    if (!allowedBooksLoaded) {
+      loadAllowedBooks().then(() => applyBookGate());
+    }
+    document.querySelectorAll(".book-item").forEach((btn) => {
+      const bookName = btn.textContent.trim();
+      const locked = !isBookAllowedSync(bookName);
+      btn.classList.toggle("book-guest-locked", locked);
+      if (locked) btn.setAttribute("aria-disabled", "true"); else btn.removeAttribute("aria-disabled");
+      if (locked && !btn.dataset.guestBookGated) {
+        btn.dataset.guestBookGated = "1";
+        // fase CAPTURE (bukan bubble) supaya berjalan LEBIH DULU daripada
+        // klik navigasi asli yang sudah dipasang buildSidebar() -- kalau
+        // sedang terkunci, hentikan di sini (stopImmediatePropagation)
+        // sebelum sempat memanggil openChapterPicker().
+        btn.addEventListener("click", (e) => {
+          if (!(CONFIG.GUEST_MODE_ENABLED && isGuest() && !isBookAllowedSync(btn.textContent.trim()))) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          showBookLocked(btn.textContent.trim());
+        }, true);
+      }
+    });
+  }
+
+  return { getDeviceId, isGuest, enter, exit, checkAndLog, showLimitReached, showFeatureLocked, showModal, loadAllowedBooks, applyBookGate, isBookAllowedSync };
 })();
