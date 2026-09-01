@@ -1385,6 +1385,12 @@ function buildSidebar() {
     }
     (b.testament === "PL" ? plWrap : pbWrap).appendChild(btn);
   });
+
+  // BARU -- terapkan pembatasan kitab mode tamu (lihat js/guest.js
+  // applyBookGate()). Dibungkus typeof supaya kalau guest.js entah
+  // kenapa tidak dimuat, buildSidebar() tetap jalan normal seperti
+  // sebelumnya tanpa error.
+  if (typeof Guest !== "undefined" && Guest.applyBookGate) Guest.applyBookGate();
 }
 
 function setActiveBookButton(bookNum) {
