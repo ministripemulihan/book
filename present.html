@@ -211,7 +211,25 @@
      sengaja dibatasi kecil di tengah. */
   #slideView { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
   /* Video YouTube -- penuh 1 layar, sama seperti #slideView. */
-  #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; }
+  /* PERBAIKAN (4 Sep 2026, permintaan operator): dulu iframe ini BISA
+     diklik langsung (kontrol bawaan YouTube-nya sendiri, termasuk
+     segitiga ▶️ besar di tengah) -- operator yang mengklik segitiga
+     itu langsung membuat video tayang ke jemaat SEBELUM operator siap,
+     tanpa lewat alur ▶️ Play resmi di Studio (yang seharusnya jadi
+     SATU-SATUNYA cara memulai). Sekarang iframe ini dibuat
+     pointer-events:none (sama seperti pola yang sudah dipakai untuk
+     iframe pratinjau mini di Studio, lihat toStudioPreviewEmbedUrl() &
+     renderStudioPreview() di js/presentation-studio.js) -- video tetap
+     tampil penuh 1 layar seperti biasa, tapi TIDAK BISA disentuh
+     langsung: klik/sentuh di mana pun pada video ini tidak berbuah
+     apa-apa, satu-satunya cara main/jeda/lompat tetap lewat
+     ▶️/⏸️/🔇/progress bar di Studio (dikirim lewat postMessage, lihat
+     "yt_control" di bawah). Lapisan #activateOverlay (klik sekali utk
+     aktifkan suara) TIDAK terpengaruh -- dia berada DI ATAS #ytView
+     (z-index lebih tinggi) & baru hilang SETELAH diklik, jadi urutan
+     klik pertama tetap berhasil mendaratkan klik ke overlay itu (atau
+     ke halaman di belakangnya), bukan ke video. */
+  #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; pointer-events: none; }
   /* Audio Latar YouTube ("Latar suara saja" di Studio) -- video ASLI
      tetap dimuat & diputar (supaya suaranya jalan), tapi disembunyikan
      SECARA VISUAL (opacity:0, bukan display:none/hidden -- display:none
@@ -1181,7 +1199,28 @@
   ytEl.addEventListener("load", () => {
     if (!ytEl.src || !ytEl.contentWindow) return;
     ytLastState = null;
-    try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "ytView" }), "*"); } catch (e) {}
+    const sendListening = () => {
+      if (!ytEl.contentWindow) return;
+      try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "ytView" }), "*"); } catch (e) {}
+    };
+    sendListening();
+    // PERBAIKAN (4 Sep 2026, permintaan operator) -- laporan: "▶️ Play
+    // pertama kali kadang tidak terasa, progress bar diam/tidak bisa
+    // digeser, sampai ditekan ⏸️ Pause lalu ▶️ Play lagi baru jalan".
+    // Sebabnya: handshake "listening" di atas dikirim TEPAT saat
+    // event "load" iframe luar ini menyala -- itu cuma berarti
+    // DOKUMEN HTML pembungkus pemutar YouTube sudah selesai dimuat,
+    // BUKAN berarti skrip pemutar YouTube DI DALAMNYA sudah benar-benar
+    // siap mendengarkan pesan. Kalau "listening" tiba SEBELUM pemutar
+    // siap, pesan itu terbuang percuma -- akibatnya perintah "playVideo"
+    // pertama & laporan posisi/durasi (infoDelivery, dipakai progress
+    // bar #psYtLiveBar di Studio) telat/tidak pernah datang, sampai
+    // interaksi ke-2 (Pause -> Play) "membangunkannya". Perbaikan:
+    // ulangi kiriman "listening" beberapa kali di detik-detik pertama
+    // (bukan cuma sekali) -- aman diulang (idempotent, pemutar cuma
+    // mencatat pengirim mana yang mendengarkan), jadi salah satu
+    // percobaan pasti sampai setelah pemutar sungguh siap.
+    [250, 600, 1200, 2000].forEach((ms) => setTimeout(sendListening, ms));
   });
   function ytSendCommand(func, args) {
     if (!ytEl.contentWindow) return;
@@ -1258,7 +1297,7 @@
   // jendela utama -- dipakai untuk mengunci bentuk kotak pratinjau
   // (#psPreviewBoxWrap di Studio Presentasi / #presentPreviewBox di
   // panel ⋮ biasa) supaya SELALU sama persis dengan Layar 2 yang
-  // sesungguhnya, apa pun ukurannya (termasuk kalau operator 
+  // sesungguhnya, apa pun ukurannya (termasuk kalau operator
   // menggeser-ubah ukuran jendelanya secara manual, atau proyektor
   // punya resolusi yang tidak standar). Ini menggantikan pendekatan
   // "pilih resolusi manual" sebelumnya -- sekarang otomatis mengikuti
