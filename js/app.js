@@ -4497,6 +4497,27 @@ function buildCollectionItemRow(id, col, it, i, opts) {
   const ref = collectionItemRef(it);
   const bodyText = collectionItemBodyText(it);
 
+  // BARU (4 Sep 2026, permintaan operator) -- lihat catatan panjang di
+  // removeKidungGroupFromCollection() (js/collections.js): kidung yang
+  // ditambahkan lewat "➕ Semua" tersimpan sebagai BANYAK item terpisah
+  // (1 per bait) -- menghapusnya dulu berarti menekan "Hapus" satu per
+  // satu sebanyak jumlah baitnya. Kalau baris ini kidung DAN ada lebih
+  // dari 1 bait kidung yang sama tersimpan DAN ini kemunculan PERTAMA-nya
+  // (supaya tombolnya cuma muncul 1x, bukan di tiap baris bait), tampilkan
+  // tombol tambahan utk menghapus SEMUA bait kidung itu sekaligus.
+  let groupRemoveBtnHtml = "";
+  let groupCount = 0;
+  if (it.type === "kidung") {
+    const sameGroupIdx = [];
+    col.items.forEach((x, xi) => {
+      if (x && x.type === "kidung" && x.buku === it.buku && String(x.kidungNo) === String(it.kidungNo)) sameGroupIdx.push(xi);
+    });
+    groupCount = sameGroupIdx.length;
+    if (groupCount > 1 && sameGroupIdx[0] === i) {
+      groupRemoveBtnHtml = `<button type="button" class="chip-btn small danger col-remove-group-btn">🗑️ Hapus ${groupCount} Bait Kidung Ini</button>`;
+    }
+  }
+
   const item = document.createElement("div");
   item.className = "collection-verse-item";
   item.innerHTML = `
@@ -4512,6 +4533,7 @@ function buildCollectionItemRow(id, col, it, i, opts) {
         <button type="button" class="chip-btn small col-move-bottom-btn" title="Pindahkan ke paling akhir">⏭️ Akhir</button>
         ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
         ${v ? '<button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>' : ""}
+        ${groupRemoveBtnHtml}
         <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
       </div>
       ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
@@ -4553,6 +4575,13 @@ function buildCollectionItemRow(id, col, it, i, opts) {
   item.querySelector(".col-remove-btn").addEventListener("click", () => {
     if (removeItemFromCollection(currentUser, id, i)) opts.onChanged();
   });
+  const groupRemoveBtn = item.querySelector(".col-remove-group-btn");
+  if (groupRemoveBtn) {
+    groupRemoveBtn.addEventListener("click", () => {
+      if (!confirm(`Hapus SEMUA ${groupCount} bait kidung "${it.title || ("No. " + it.kidungNo)}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+      if (removeKidungGroupFromCollection(currentUser, id, it.buku, it.kidungNo) > 0) opts.onChanged();
+    });
+  }
   const moveTopBtn = item.querySelector(".col-move-top-btn");
   const moveBottomBtn = item.querySelector(".col-move-bottom-btn");
   const moveUpBtn = item.querySelector(".col-move-up-btn");
