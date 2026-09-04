@@ -242,6 +242,21 @@ const PresentationStudio = (() => {
         : '<div class="present-preview-idle">🖼️ Slide</div>';
       return;
     }
+    // BARU (4 Sep 2026) -- pratinjau ringkas untuk Canva/SoundCloud (tab
+    // "🔗 Link"). TIDAK dibuat iframe hidup di sini (beda dari pratinjau
+    // YouTube di atas) -- Canva tidak boleh diklik 2x sembarangan dari
+    // kotak kecil ini (bisa membingungkan mana yang "sungguh Layar 2"),
+    // dan SoundCloud lebih jelas cukup 1 sumber SC.Widget (di Layar 2
+    // sendiri) supaya kontrol Play/Pause Studio selalu sinkron dengan
+    // 1 widget yang sama, bukan 2 widget terpisah yang bisa berbeda.
+    if (payload.type === "canva") {
+      box.innerHTML = `<div class="present-preview-idle">🖼️ Canva${payload.title ? ": " + escapeHtml(payload.title) : ""} — tayang di Layar 2</div>`;
+      return;
+    }
+    if (payload.type === "soundcloud") {
+      box.innerHTML = `<div class="present-preview-idle">🎧 SoundCloud${payload.title ? ": " + escapeHtml(payload.title) : ""} — putar di Layar 2</div>`;
+      return;
+    }
     if (payload.type === "verse" || payload.type === "text") {
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
@@ -478,6 +493,17 @@ const PresentationStudio = (() => {
     const collections = loadCollections(username);
     const col = collections[sel.value];
     const items = col && Array.isArray(col.items) ? col.items : [];
+    // BARU (4 Sep 2026 v3, permintaan operator) -- tulisan jumlah total
+    // item/slide di kumpulan yang sedang dipilih (ayat, kidung/bait,
+    // pengumuman, teks, file/slide -- SEMUA jenis dihitung jadi 1 angka
+    // yang sama seperti di dropdown, cuma lebih kelihatan tanpa perlu
+    // buka dropdown dulu). Kosong (tidak ada kumpulan dipilih) -> kosong.
+    const countEl = el("psCollectionCount");
+    if (countEl) {
+      countEl.textContent = col ? `📄 ${items.length} slide/item di kumpulan ini.` : "";
+    }
+    const deleteAllBtn = el("psCollectionDeleteAllBtn");
+    if (deleteAllBtn) deleteAllBtn.disabled = !col;
     if (!items.length) {
       wrap.innerHTML = '<p class="present-saved-empty">Belum ada item di kumpulan ini.</p>';
       return;
@@ -643,6 +669,99 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // BARU (4 Sep 2026 v3, permintaan operator) -- dialog konfirmasi
+  // kustom untuk tindakan yang TIDAK BISA DIBATALKAN (mis. hapus
+  // seluruh kumpulan) -- BUKAN confirm() bawaan browser, supaya:
+  // 1. Tombolnya jelas "Ya, Hapus" vs "Tidak, Batalkan" (bukan OK/
+  //    Cancel yang ambigu), dan
+  // 2. Tombol "Tidak, Batalkan" yang jadi PILIHAN DEFAULT (mendapat
+  //    fokus begitu dialog terbuka) -- kalau operator tidak sengaja
+  //    menekan Enter/Spasi (mis. jari masih di keyboard bekas mengetik
+  //    sesuatu), yang ke-klik adalah BATAL, bukan HAPUS.
+  // Mengembalikan Promise<boolean> (true = operator menekan "Ya, Hapus").
+  // ------------------------------------------------------------
+  function confirmDangerAction(title, message, confirmLabel) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "simple-dialog-overlay";
+      const box = document.createElement("div");
+      box.className = "simple-dialog-box";
+      const h = document.createElement("h3");
+      h.textContent = title;
+      box.appendChild(h);
+      const p = document.createElement("p");
+      p.className = "simple-dialog-hint";
+      p.textContent = message;
+      box.appendChild(p);
+      const actions = document.createElement("div");
+      actions.className = "simple-dialog-actions";
+      const noBtn = document.createElement("button");
+      noBtn.type = "button";
+      noBtn.className = "chip-btn small";
+      noBtn.textContent = "Tidak, Batalkan";
+      const yesBtn = document.createElement("button");
+      yesBtn.type = "button";
+      yesBtn.className = "chip-btn small danger";
+      yesBtn.textContent = confirmLabel || "Ya, Hapus";
+      actions.appendChild(noBtn);
+      actions.appendChild(yesBtn);
+      box.appendChild(actions);
+      overlay.appendChild(box);
+      function cleanup(result) {
+        overlay.remove();
+        document.removeEventListener("keydown", onKeydown);
+        resolve(result);
+      }
+      function onKeydown(e) {
+        if (e.key === "Escape") cleanup(false);
+        // SENGAJA Enter TIDAK dipetakan ke "Ya, Hapus" di sini -- fokus
+        // sudah ada di tombol "Tidak, Batalkan" (lihat noBtn.focus() di
+        // bawah), jadi Enter bawaan browser pada tombol yang fokus itu
+        // sendiri yang menjalankan pembatalan -- tidak perlu ditangani
+        // manual, dan tidak ada jalan Enter "meloncat" ke Hapus.
+      }
+      noBtn.addEventListener("click", () => cleanup(false));
+      yesBtn.addEventListener("click", () => cleanup(true));
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) cleanup(false); });
+      document.addEventListener("keydown", onKeydown);
+      document.body.appendChild(overlay);
+      // Default fokus ke "Tidak, Batalkan" -- lihat catatan panjang di atas.
+      setTimeout(() => noBtn.focus(), 30);
+    });
+  }
+
+  // Tombol "🗑️ Hapus Master" -- menghapus SELURUH kumpulan yang sedang
+  // dipilih di dropdown (semua item di dalamnya sekaligus), BEDA dari
+  // "🗑️ Hapus Item Ini" per baris (yang cuma hapus 1 item). Dipakai
+  // kalau operator mau bersihkan/buang total 1 kumpulan (mis. sudah
+  // lewat acaranya & tidak dipakai lagi).
+  function wireCollectionDeleteAllButton() {
+    const btn = el("psCollectionDeleteAllBtn");
+    const sel = el("psCollectionSelect");
+    if (!btn || !sel) return;
+    btn.addEventListener("click", async () => {
+      if (!sel.value || typeof loadCollections !== "function" || typeof deleteCollection !== "function") {
+        alert("Pilih dulu Kumpulan Ayat yang mau dihapus.");
+        return;
+      }
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const collections = loadCollections(username);
+      const col = collections[sel.value];
+      if (!col) return;
+      const n = (col.items || col.verseIds || []).length;
+      const ok = await confirmDangerAction(
+        "Hapus Seluruh Kumpulan?",
+        `Kumpulan "${col.name}" beserta SEMUA ${n} item/slide di dalamnya akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`,
+        "Ya, Hapus Semua"
+      );
+      if (!ok) return;
+      deleteCollection(username, sel.value);
+      activePlaylist = null;
+      renderCollectionSelect();
+    });
+  }
+
+  // ------------------------------------------------------------
   // "Playlist aktif" -- dipakai BERSAMA oleh daftar Kumpulan Ayat (di
   // atas) & daftar slide Kidung (wireKidungTab() di bawah), supaya
   // panah kiri/kanan papan ketik ATAU clicker/stylus presentasi nirkabel
@@ -720,7 +839,28 @@ const PresentationStudio = (() => {
       sendKidungSlide(it);
     } else if (it.type === "media") {
       sendMediaSlideFromCollection(it);
+    } else if (it.type === "canva") {
+      sendCanvaSlide(it);
+    } else if (it.type === "soundcloud") {
+      sendSoundCloudSlide(it);
     }
+  }
+
+  // BARU (4 Sep 2026) -- kirim item Canva/SoundCloud dari Kumpulan Ayat
+  // ke Layar 2 SEKARANG JUGA, pola sama seperti sendKidungSlide() di
+  // bawah (rawPost langsung, karena "canva"/"soundcloud" BUKAN tipe
+  // overlay -- lihat OVERLAY_TYPES di js/presentation.js -- jadi
+  // Presentation.postRaw() otomatis membuka Layar 2 kalau belum
+  // terbuka & menyimpannya sebagai `lastPayload`).
+  function sendCanvaSlide(it) {
+    if (!it || !it.embedUrl) return;
+    rawPost({ type: "canva", embedUrl: it.embedUrl });
+    renderStudioPreview({ type: "canva", embedUrl: it.embedUrl, title: it.title });
+  }
+  function sendSoundCloudSlide(it) {
+    if (!it || !it.trackUrl) return;
+    rawPost({ type: "soundcloud", trackUrl: it.trackUrl });
+    renderStudioPreview({ type: "soundcloud", trackUrl: it.trackUrl, title: it.title });
   }
 
   // BARU (27 Agu 2026) -- lihat addMediaToCollection() (js/collections.js)
@@ -2704,6 +2844,403 @@ const PresentationStudio = (() => {
     })).catch(() => null);
   }
 
+  // ============================================================
+  //  TAB "🔗 Link" -- Embed Canva & SoundCloud
+  //  (ROADMAP-ai-presentation.md, Bagian 3 & 4)
+  // ============================================================
+
+  // Canva TIDAK mengizinkan link biasa yang dibagikan operator
+  // (mis. "canva.link/xxxxx" atau "canva.com/design/XXXX/view") dibuka
+  // di dalam <iframe> -- X-Frame-Options/CSP dari sisi server Canva
+  // sendiri memblokirnya, aplikasi ini tidak bisa mengubah itu. SATU-
+  // SATUNYA pola resmi yang boleh di-iframe adalah hasil "Bagikan ->
+  // Sematkan (Embed)" Canva, polanya:
+  //   https://www.canva.com/design/XXXXXXXXXXX/xxxxxxxxxxx/view?embed
+  // Fungsi ini TIDAK bisa "menebak" ID desain dari link pendek
+  // (canva.link/...) tanpa memuatnya dulu di browser (yang berarti
+  // sudah kena X-Frame-Options itu sendiri) -- jadi yang dilakukan di
+  // sini terbatas pada:
+  //   1. Kalau link yang ditempel SUDAH pola "view?embed" (atau
+  //      mengandung "?embed"/"&embed"), dipakai APA ADANYA.
+  //   2. Kalau link berpola "canva.com/design/XXXX/xxxx/view" TANPA
+  //      "?embed", parameter "?embed" ditambahkan otomatis di
+  //      belakangnya (kasus operator lupa mengambil link "Sematkan").
+  //   3. Kalau link berpola LAIN (mis. "canva.link/..." pendek), TIDAK
+  //      bisa dinormalisasi secara aman di sisi klien -- dikembalikan
+  //      apa adanya, DAN wireLinkTab() di bawah menampilkan peringatan
+  //      supaya operator tahu perlu mengambil link "Bagikan -> Sematkan"
+  //      dari Canva-nya sendiri (bukan link "canva.link" pendek biasa).
+  function normalizeCanvaLink(raw) {
+    const url = String(raw || "").trim();
+    if (!url) return { url: "", ok: false, needsEmbedShare: false };
+    let looksLikeShortLink = /canva\.link\//i.test(url) || (/canva\.com/i.test(url) && !/\/design\//i.test(url));
+    if (/canva\.com/i.test(url) && !looksLikeShortLink) {
+      if (/[?&]embed(\b|=)/i.test(url)) return { url, ok: true, needsEmbedShare: false };
+      const sep = url.includes("?") ? "&" : "?";
+      return { url: url + sep + "embed", ok: true, needsEmbedShare: false };
+    }
+    // Link pendek (canva.link/...) atau bukan link Canva sama sekali --
+    // tetap dikirim apa adanya (siapa tahu operator sudah tahu isinya
+    // benar bisa di-iframe, mis. layanan lain), tapi ditandai perlu
+    // peringatan supaya operator mengecek sendiri di Layar 2.
+    return { url, ok: true, needsEmbedShare: looksLikeShortLink };
+  }
+
+  function wireLinkTab() {
+    // ---------- Canva ----------
+    const canvaInput = el("psCanvaInput");
+    const canvaShowBtn = el("psCanvaShowBtn");
+    const canvaSaveBtn = el("psCanvaSaveBtn");
+    const canvaStatus = el("psCanvaStatus");
+    let lastCanvaNormalized = null;
+
+    function readCanva() {
+      if (!canvaInput) return null;
+      const norm = normalizeCanvaLink(canvaInput.value);
+      lastCanvaNormalized = norm;
+      if (canvaStatus) {
+        canvaStatus.textContent = !norm.url
+          ? ""
+          : norm.needsEmbedShare
+            ? "⚠️ Link ini kelihatan seperti link Canva biasa (bukan link \"Sematkan\"/Embed) -- Canva sering MEMBLOKIR link biasa tampil di sini. Di Canva: buka desainnya -> Bagikan -> Sematkan (Embed) -> salin link itu (polanya berakhiran \"view?embed\"), lalu tempel link itu di sini."
+            : "✅ Siap ditayangkan.";
+      }
+      return norm;
+    }
+    if (canvaInput) canvaInput.addEventListener("input", readCanva);
+    if (canvaShowBtn) {
+      canvaShowBtn.addEventListener("click", () => {
+        const norm = readCanva();
+        if (!norm || !norm.url) return;
+        rawPost({ type: "canva", embedUrl: norm.url });
+        renderStudioPreview({ type: "canva", embedUrl: norm.url });
+      });
+    }
+    if (canvaSaveBtn) {
+      canvaSaveBtn.addEventListener("click", async () => {
+        const norm = readCanva();
+        if (!norm || !norm.url) return;
+        if (typeof promptCollectionName !== "function" || typeof addCanvaToCollection !== "function") return;
+        const name = await promptCollectionName();
+        if (!name) return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        addCanvaToCollection(username, name, { embedUrl: norm.url, title: "" });
+        renderCollectionSelect();
+      });
+    }
+
+    // ---------- SoundCloud ----------
+    const scInput = el("psScInput");
+    const scShowBtn = el("psScShowBtn");
+    const scSaveBtn = el("psScSaveBtn");
+    const scPlayBtn = el("psScPlayBtn");
+    const scPauseBtn = el("psScPauseBtn");
+    const scStatus = el("psScStatus");
+
+    function scCommand(action) {
+      rawPost({ type: "sc_control", action });
+    }
+    if (scShowBtn) {
+      scShowBtn.addEventListener("click", () => {
+        const url = (scInput && scInput.value || "").trim();
+        if (!url) return;
+        rawPost({ type: "soundcloud", trackUrl: url });
+        renderStudioPreview({ type: "soundcloud", trackUrl: url });
+        if (scStatus) scStatus.textContent = "▶️ Diputar di Layar 2.";
+      });
+    }
+    if (scPlayBtn) scPlayBtn.addEventListener("click", () => scCommand("play"));
+    if (scPauseBtn) scPauseBtn.addEventListener("click", () => scCommand("pause"));
+    if (scSaveBtn) {
+      scSaveBtn.addEventListener("click", async () => {
+        const url = (scInput && scInput.value || "").trim();
+        if (!url) return;
+        if (typeof promptCollectionName !== "function" || typeof addSoundCloudToCollection !== "function") return;
+        const name = await promptCollectionName();
+        if (!name) return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        addSoundCloudToCollection(username, name, { trackUrl: url, title: "" });
+        renderCollectionSelect();
+      });
+    }
+    // Status main/jeda sesungguhnya dari Layar 2 (lihat reportScState()
+    // di present.html + CustomEvent "ps-sc-state" di js/presentation.js)
+    // -- supaya baris status tetap benar walau operator mengeklik
+    // langsung tombol bawaan di bilah SoundCloud sendiri, bukan lewat
+    // tombol ▶️/⏸️ di atas.
+    window.addEventListener("ps-sc-state", (e) => {
+      if (!scStatus) return;
+      scStatus.textContent = e.detail && e.detail.isPlaying ? "▶️ Sedang diputar di Layar 2." : "⏸️ Dijeda.";
+    });
+  }
+
+  // ============================================================
+  // BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation" (roadmap
+  // ROADMAP-ai-presentation.md Bagian 2). Operator ketik banyak
+  // item (ayat/kidung/pengumuman) SEKALIGUS dipisah koma, mis:
+  //   "matius 11:28, K24, markus 16:16, pengumuman ..., S120"
+  // -> diurai jadi daftar "item generik" (bentuk SAMA seperti item
+  // Kumpulan Ayat/js/collections.js), lalu bisa ditayangkan berurutan
+  // (setActivePlaylist()+sendGenericItemLive(), SUDAH ADA -- lihat
+  // wireKidungTab() di atas) ATAU disimpan sekaligus ke Kumpulan Ayat.
+  //
+  // DIDUKUNG sesi ini: referensi ayat (boleh dirantai ";" utk pasal/
+  // ayat lain di kitab yang sama, lihat parseReferenceList() di atas --
+  // catatan: KARENA koma sudah dipakai sebagai pemisah antar-ITEM di
+  // sini, notasi rantai gaya "wahyu 2:2,5,10" [pakai KOMA, seperti di
+  // kotak Alkitab ketik cepat] tidak bisa dipakai DI DALAM 1 item AI
+  // Presentation -- pakai ";" untuk itu, mis. "wahyu 2:2; 2:5; 2:10"),
+  // K/Kidung, S/Suplemen, T/Tambahan (lewat openKidungByKeypad() +
+  // splitKidungIntoSlides() yang SUDAH ADA, mode pemecah slide default
+  // "1+koor" -- SAMA seperti default tab 🎵 Kidung manual), dan
+  // "pengumuman <isi bebas>".
+  //
+  // BELUM didukung (lihat ROADMAP-ai-presentation.md Bagian 5 poin 4):
+  // notasi "SA"/"Sidang Anak" -- datanya ada di modul TERPISAH
+  // (window.KidungAnak, js/kidung-anak.js, format notasi angka+chord),
+  // BUKAN sistem bait+koor js/kidung.js yang dipakai K/S/T, jadi
+  // openKidungByKeypad() TIDAK BISA langsung dipakai untuknya. Token
+  // "SA..." di sini SENGAJA ditandai ⚠️ "belum didukung" (bukan
+  // dilewati diam-diam, dan BUKAN dipetakan asal ke buku lain) supaya
+  // operator sadar sebelum tayang, sesuai aturan "Token tidak dikenali"
+  // di roadmap Bagian 1.
+  // ============================================================
+
+  // Urutan aturan di bawah PENTING: "SA"/"Sidang Anak" WAJIB dicek
+  // SEBELUM "S"/"Suplemen", supaya token "SA120" tidak ketangkap
+  // (salah) sebagai Suplemen "A120". `buku: null` menandai jenis yang
+  // memang belum didukung.
+  // PERBAIKAN (4 Sep 2026, roadmap Bagian 1 "Yang belum selesai" poin 2):
+  // `buku` untuk SA sekarang diisi `"Sidang Anak"` (bukan `null` lagi) --
+  // jembatan ke `window.KidungAnak` SUDAH ditulis (lihat cabang khusus
+  // di parseAiPresentation() di bawah), jadi token ini tidak lagi
+  // otomatis ditandai "belum didukung".
+  const AI_PRESENT_BOOK_RULES = [
+    { re: /^sa\s*0*(\d+)$/i, buku: "Sidang Anak", label: "Sidang Anak" },
+    { re: /^sidang\s*anak\s*0*(\d+)$/i, buku: "Sidang Anak", label: "Sidang Anak" },
+    { re: /^k\s*0*(\d+)$/i, buku: "Kidung", label: "Kidung" },
+    { re: /^kidung\s*0*(\d+)$/i, buku: "Kidung", label: "Kidung" },
+    { re: /^s\s*0*(\d+)$/i, buku: "Suplemen", label: "Suplemen" },
+    { re: /^suplemen\s*0*(\d+)$/i, buku: "Suplemen", label: "Suplemen" },
+    { re: /^t\s*0*(\d+)$/i, buku: "Tambahan", label: "Tambahan" },
+    { re: /^tambahan\s*0*(\d+)$/i, buku: "Tambahan", label: "Tambahan" },
+  ];
+
+  function matchAiPresentKidungToken(tok) {
+    const t = String(tok || "").trim();
+    for (const rule of AI_PRESENT_BOOK_RULES) {
+      const m = t.match(rule.re);
+      if (m) return { no: m[1], buku: rule.buku, label: rule.label };
+    }
+    return null;
+  }
+
+  // Balikan: array item generik, DITAMBAH item khusus `{type:"warning",
+  // raw, warning}` untuk token yang gagal diartikan (TIDAK dilewati
+  // diam-diam -- lihat aturan "Token tidak dikenali" Bagian 1 roadmap).
+  async function parseAiPresentation(text) {
+    const topTokens = String(text || "").split(/,+/).map((t) => t.trim()).filter(Boolean);
+    const out = [];
+    for (const raw of topTokens) {
+      // 1) "pengumuman <isi bebas>" -- kata "pengumuman" di awal token
+      //    dibuang (boleh diikuti ":"/"-" opsional), sisanya jadi isi.
+      const pengumumanMatch = raw.match(/^pengumuman\s*[:\-]?\s*(.*)$/i);
+      if (pengumumanMatch && pengumumanMatch[1].trim()) {
+        out.push({ type: "announcement", text: pengumumanMatch[1].trim(), title: "", raw });
+        continue;
+      }
+
+      // 2) K / S / SA / T
+      const kidungTok = matchAiPresentKidungToken(raw);
+      if (kidungTok) {
+        if (!kidungTok.buku) {
+          out.push({ type: "warning", raw, warning: `${kidungTok.label} No. ${kidungTok.no} tidak dikenali.` });
+          continue;
+        }
+
+        // 2a) SA (Sidang Anak) -- BARU (4 Sep 2026): data lagunya TIDAK
+        // ada di sistem bait+koor js/kidung.js (beda arsitektur, lihat
+        // catatan Bagian 1 roadmap), jadi dijembatani lewat
+        // window.KidungAnak.getBaitsForPresentation() (js/kidung-anak.js)
+        // yang MENGUBAH `song.Syair` jadi bentuk bait+koor yang PERSIS
+        // sama seperti keluaran getKidungBaitsWithKoor() -- sehingga
+        // splitKidungIntoSlides() di bawah tetap bisa dipakai ULANG
+        // tanpa perubahan, sama seperti K/S/T.
+        if (kidungTok.buku === "Sidang Anak") {
+          try {
+            const bridge = (typeof window !== "undefined" && window.KidungAnak && typeof window.KidungAnak.getBaitsForPresentation === "function")
+              ? window.KidungAnak.getBaitsForPresentation : null;
+            const result = bridge ? await bridge(kidungTok.no) : null;
+            if (!result) {
+              out.push({ type: "warning", raw, warning: `${kidungTok.label} No. ${kidungTok.no} tidak ditemukan di data Kidung Anak.` });
+              continue;
+            }
+            if (!result.baits || !result.baits.length) {
+              out.push({ type: "warning", raw, warning: `${kidungTok.label} No. ${kidungTok.no} tidak punya syair (kosong).` });
+              continue;
+            }
+            const slides = typeof splitKidungIntoSlides === "function" ? splitKidungIntoSlides(result.baits, "1+koor") : [];
+            if (!slides.length) {
+              out.push({ type: "warning", raw, warning: `${kidungTok.label} No. ${kidungTok.no} tidak punya slide (syair kosong).` });
+              continue;
+            }
+            slides.forEach((s) => {
+              out.push({
+                type: "kidung", buku: "Sidang Anak", kidungNo: String(result.song.No || kidungTok.no),
+                title: result.song.Judul || "", ikon: "👶",
+                bait: s.baits, koorTeks: s.koorTeks,
+                pengarang: result.song.Pengarang || "", birama: result.song.Birama || "",
+                jumlahBait: result.baits.filter((b) => b.noBait).length || result.baits.length,
+                raw,
+              });
+            });
+          } catch (e) {
+            out.push({ type: "warning", raw, warning: `Gagal memuat ${kidungTok.label} No. ${kidungTok.no}: ${e && e.message ? e.message : e}` });
+          }
+          continue;
+        }
+
+        try {
+          const result = typeof openKidungByKeypad === "function" ? await openKidungByKeypad(kidungTok.buku, kidungTok.no) : null;
+          if (!result || !result.baits || !result.baits.length) {
+            out.push({ type: "warning", raw, warning: `${kidungTok.label} No. ${kidungTok.no} tidak ditemukan.` });
+            continue;
+          }
+          const meta = Object.assign({ buku: kidungTok.buku }, result.meta || { buku: kidungTok.buku, noKidung: kidungTok.no, judul: "" });
+          // Mode pemecah slide default "1+koor" -- SAMA seperti pilihan
+          // default #psKidungModeSelect di tab 🎵 Kidung manual, supaya
+          // hasilnya "persis seperti kalau operator memilih kidung itu
+          // manual" (sesuai janji tabel notasi Bagian 1).
+          const slides = typeof splitKidungIntoSlides === "function" ? splitKidungIntoSlides(result.baits, "1+koor") : [];
+          if (!slides.length) {
+            out.push({ type: "warning", raw, warning: `${kidungTok.label} No. ${kidungTok.no} tidak punya slide (syair kosong).` });
+            continue;
+          }
+          slides.forEach((s) => {
+            out.push({
+              type: "kidung", buku: meta.buku, kidungNo: meta.noKidung, title: meta.judul || "", ikon: meta.ikon || "",
+              bait: s.baits, koorTeks: s.koorTeks,
+              pengarang: meta.pengarang || "", birama: meta.birama || "", jumlahBait: meta.jumlahBait || 0,
+              raw,
+            });
+          });
+        } catch (e) {
+          out.push({ type: "warning", raw, warning: `Gagal memuat ${kidungTok.label} No. ${kidungTok.no}: ${e && e.message ? e.message : e}` });
+        }
+        continue;
+      }
+
+      // 3) Referensi ayat -- boleh dirantai ";" utk pasal/ayat lain di
+      //    kitab yang sama (lihat parseReferenceList() di atas). Bahasa
+      //    ikut currentLang (jatuh ke CONFIG.DEFAULT_LANGUAGE), SAMA
+      //    seperti kotak Alkitab ketik cepat.
+      let matchedAnyVerse = false;
+      if (typeof parseReferenceList === "function" && typeof getChapterVerses === "function") {
+        const refs = parseReferenceList(raw);
+        if (refs.length) {
+          const lang = (typeof currentLang !== "undefined" && currentLang) ? currentLang : ((typeof CONFIG !== "undefined" && CONFIG.DEFAULT_LANGUAGE) || "ind");
+          refs.forEach((ref) => {
+            const vStart = ref.verseStart || 1;
+            const vEnd = ref.verseEnd || vStart;
+            const verses = getChapterVerses(lang, ref.book.num, ref.chapter);
+            if (!verses.length) return;
+            const matched = ref.verseStart ? verses.filter((v) => v.verse >= vStart && v.verse <= vEnd) : verses;
+            // Konsisten dengan cara "➕ Simpan" kotak Alkitab ketik cepat
+            // yang sudah ada (wireQuickVerse() di atas): 1 ayat = 1 item
+            // tersendiri, walau operator menulis rentang ("28-30").
+            matched.forEach((v) => { out.push({ type: "verse", verseId: v.id, raw }); matchedAnyVerse = true; });
+          });
+        }
+      }
+      if (matchedAnyVerse) continue;
+
+      // 4) Tidak dikenali sama sekali -- TIDAK dilewati diam-diam.
+      out.push({ type: "warning", raw, warning: 'Tidak dikenali -- bukan referensi ayat, K/S/T (Kidung/Suplemen/Tambahan), atau "pengumuman ...". Cek ejaan/format.' });
+    }
+    return out;
+  }
+
+  function wireAiPresentationTab() {
+    const input = el("psAiInput");
+    const previewBtn = el("psAiPreviewBtn");
+    const listWrap = el("psAiPreviewList");
+    const saveAllBtn = el("psAiSaveAllBtn");
+    const status = el("psAiStatus");
+    if (!input || !previewBtn || !listWrap) return;
+
+    let lastItems = []; // hasil parseAiPresentation() TERAKHIR (termasuk warning)
+    let validItems = []; // subset lastItems yang BUKAN warning, siap tayang/simpan
+
+    function rowRefAndBody(it) {
+      if (it.type === "warning") return { ref: `⚠️ ${it.raw}`, body: it.warning };
+      if (typeof collectionItemRef === "function" && typeof collectionItemBodyText === "function") {
+        return { ref: collectionItemRef(it), body: collectionItemBodyText(it) };
+      }
+      return { ref: it.type, body: "" };
+    }
+
+    function renderPreview() {
+      if (!lastItems.length) {
+        listWrap.innerHTML = '<p class="present-saved-empty">Belum ada pratinjau -- ketik di atas lalu tekan "🔎 Pratinjau".</p>';
+        return;
+      }
+      validItems = [];
+      listWrap.innerHTML = "";
+      lastItems.forEach((it) => {
+        const { ref, body } = rowRefAndBody(it);
+        const row = document.createElement("div");
+        row.className = "ps-verse-row" + (it.type === "warning" ? " ps-ai-row-warning" : "");
+        const snippet = (body || "").replace(/\n+/g, " ").slice(0, 90);
+        let validIdx = null;
+        if (it.type !== "warning") { validIdx = validItems.length; validItems.push(it); row.dataset.playlistIdx = String(validIdx); }
+        row.innerHTML = `<span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span>` +
+          (validIdx !== null ? `<div class="ps-btn-row"><button type="button" class="chip-btn small" data-act="show">▶️ Mulai dari sini</button></div>` : "");
+        if (validIdx !== null) {
+          row.querySelector('[data-act="show"]').addEventListener("click", () => {
+            setActivePlaylist(validItems, validIdx, "🤖 AI Presentation");
+            sendGenericItemLive(validItems[validIdx]);
+          });
+        }
+        listWrap.appendChild(row);
+      });
+      highlightActivePlaylistRow();
+      const warnCount = lastItems.length - validItems.length;
+      if (status) status.textContent = warnCount
+        ? `${validItems.length} item siap, ${warnCount} tidak dikenali (⚠️, lihat baris terkait di atas).`
+        : `${validItems.length} item siap ditayangkan/disimpan.`;
+    }
+
+    previewBtn.addEventListener("click", async () => {
+      previewBtn.disabled = true;
+      if (status) status.textContent = "Memproses...";
+      try {
+        lastItems = await parseAiPresentation(input.value);
+      } catch (e) {
+        lastItems = [];
+        if (status) status.textContent = `Gagal memproses: ${e && e.message ? e.message : e}`;
+      }
+      previewBtn.disabled = false;
+      renderPreview();
+    });
+
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener("click", async () => {
+        if (!validItems.length) { if (status) status.textContent = 'Belum ada item siap -- tekan "🔎 Pratinjau" dulu.'; return; }
+        if (typeof promptCollectionName !== "function") return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const name = await promptCollectionName(username);
+        if (!name) return;
+        validItems.forEach((it) => {
+          if (it.type === "verse" && typeof addVerseToCollection === "function") addVerseToCollection(username, name, it.verseId);
+          else if (it.type === "kidung" && typeof addKidungToCollection === "function") addKidungToCollection(username, name, it);
+          else if (it.type === "announcement" && typeof addAnnouncementToCollection === "function") addAnnouncementToCollection(username, name, it.text, it.title);
+        });
+        renderCollectionSelect();
+        if (status) status.textContent = `✅ ${validItems.length} item disimpan ke Kumpulan Ayat "${name}".`;
+      });
+    }
+  }
+
   function wireYoutubeTab() {
     const input = el("psYtInput");
     const showBtn = el("psYtShowBtn");
@@ -4411,10 +4948,13 @@ const PresentationStudio = (() => {
     wireYtPlaylistTab();
     wireYtControls();
     wireKidungTab();
+    wireLinkTab(); // BARU (4 Sep 2026) -- tab "🔗 Link" (Canva & SoundCloud)
+    wireAiPresentationTab(); // BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation"
     wirePlaylistKeyNav();
     wireCollectionReorderToggle();
     wireCollectionNewButton();
     wireCollectionShareButton();
+    wireCollectionDeleteAllButton();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
     // Jalan pintas di header utama (index.html, ikon 🎛️ -- khusus laptop/
