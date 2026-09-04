@@ -2922,10 +2922,18 @@ const PresentationStudio = (() => {
         if (!norm || !norm.url) return;
         if (typeof promptCollectionName !== "function" || typeof addCanvaToCollection !== "function") return;
         const name = await promptCollectionName();
-        if (!name) return;
+        if (!name) return; // operator batal / tutup dialog tanpa nama
         const username = typeof currentUser !== "undefined" ? currentUser : null;
-        addCanvaToCollection(username, name, { embedUrl: norm.url, title: "" });
+        const id = addCanvaToCollection(username, name, { embedUrl: norm.url, title: "" });
         renderCollectionSelect();
+        // BARU (4 Sep 2026, v8) -- konfirmasi tertulis setelah simpan;
+        // sebelumnya TIDAK ADA pemberitahuan sama sekali, jadi operator
+        // tidak bisa memastikan berhasil/tidak dari layar ini saja.
+        if (canvaStatus) {
+          canvaStatus.textContent = id
+            ? `✅ Tersimpan ke kumpulan "${name}".`
+            : "⚠️ Gagal menyimpan (coba lagi).";
+        }
       });
     }
 
@@ -2957,10 +2965,17 @@ const PresentationStudio = (() => {
         if (!url) return;
         if (typeof promptCollectionName !== "function" || typeof addSoundCloudToCollection !== "function") return;
         const name = await promptCollectionName();
-        if (!name) return;
+        if (!name) return; // operator batal / tutup dialog tanpa nama
         const username = typeof currentUser !== "undefined" ? currentUser : null;
-        addSoundCloudToCollection(username, name, { trackUrl: url, title: "" });
+        const id = addSoundCloudToCollection(username, name, { trackUrl: url, title: "" });
         renderCollectionSelect();
+        // BARU (4 Sep 2026, v8) -- konfirmasi tertulis, sama seperti Canva
+        // di atas (sebelumnya tidak ada -- lihat catatan Canva).
+        if (scStatus) {
+          scStatus.textContent = id
+            ? `✅ Tersimpan ke kumpulan "${name}".`
+            : "⚠️ Gagal menyimpan (coba lagi).";
+        }
       });
     }
     // Status main/jeda sesungguhnya dari Layar 2 (lihat reportScState()
