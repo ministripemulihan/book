@@ -1,5 +1,5 @@
 // ============================================================
-//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS,
+//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS, 
 //  KHUSUS laptop/komputer (layar lebar). Menggantikan panel kecil
 //  lama yang "turun terus ke bawah" di menu ⋮ untuk kasus 2 layar --
 //  panel lama (js/presentation.js) tetap dipakai apa adanya untuk
@@ -3033,7 +3033,11 @@ const PresentationStudio = (() => {
     function filteredVideos() {
       let list = activeFilter === "all" ? allVideos : allVideos.filter((v) => v.cats[activeFilter]);
       const q = searchQuery.trim().toLowerCase();
-      if (q) list = list.filter((v) => (v.title || "").toLowerCase().includes(q));
+      // PERBAIKAN (4 Sep 2026 v2, permintaan operator) -- pencarian
+      // SEKARANG ikut mencocokkan NAMA CHANNEL juga, tidak cuma judul
+      // video (mis. ketik "TS Media" langsung ketemu semua videonya,
+      // walau kata itu tidak ada di judul manapun).
+      if (q) list = list.filter((v) => (v.title || "").toLowerCase().includes(q) || (v.channel || "").toLowerCase().includes(q));
       return sortVideos(list);
     }
 
