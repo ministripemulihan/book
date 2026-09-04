@@ -2811,6 +2811,34 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 #psYtPlaylistFilters { flex-wrap: wrap; }
 
+/* BARU (4 Sep 2026, permintaan operator) -- progress bar horizontal +
+   tombol "✏️" untuk memilih detik MULAI pemutaran video, dipakai
+   bersama oleh kotak tempel-link manual (#psYtSeekWrap) & tiap baris
+   Playlist Video dari Google Sheet -- lihat createYtSeekBar() di
+   js/presentation-studio.js. Bawaan SELALU 00:00:00 (paling kiri). */
+.ps-yt-seek { display: flex; align-items: center; gap: 8px; margin-top: 6px; width: 100%; }
+.ps-yt-seek-range { flex: 1 1 auto; min-width: 60px; accent-color: var(--brass); }
+.ps-yt-seek-time { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); white-space: nowrap; min-width: 66px; text-align: right; }
+.ps-yt-seek-edit { flex: 0 0 auto; }
+/* BARU (4 Sep 2026 v2) -- progress bar + kolom waktu LIVE (mengikuti video
+   YouTube yang SUNGGUH sedang tayang di Layar 2, lihat wireYtControls() di
+   js/presentation-studio.js & #psYtLiveBar di index.html). Beda dari
+   .ps-yt-seek di atas (itu cuma "detik mulai" sebelum ditayangkan). */
+.ps-yt-livebar { display: flex; align-items: center; gap: 8px; width: 100%; margin: 2px 0 6px; }
+.ps-yt-livebar .ps-yt-seek-range { flex: 1 1 auto; }
+.ps-yt-live-time-input {
+  width: 84px; text-align: center; font-variant-numeric: tabular-nums; font-size: 12px;
+  padding: 3px 4px; border: 1px solid var(--ps-col-border); border-radius: 6px;
+  background: var(--ps-card-bg, #fff); color: var(--ps-ink);
+}
+.ps-yt-live-sep { color: var(--ps-muted); font-size: 12px; }
+.ps-yt-live-duration { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 62px; }
+/* Baris video Playlist (thumb + info + aksi) sudah flex row rapat --
+   progress bar-nya dipaksa turun ke baris sendiri (flex-basis 100%)
+   supaya tidak menabrak thumbnail/tombol yang sudah ada. */
+.ps-yt-playlist-row { flex-wrap: wrap; }
+.ps-yt-playlist-row > .ps-yt-seek { flex: 1 1 100%; order: 3; }
+
 .ps-preview-box {
   background: var(--ps-preview-bg); border-radius: 10px; padding: 16px; min-height: 120px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
