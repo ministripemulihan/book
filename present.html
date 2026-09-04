@@ -230,6 +230,29 @@
      klik pertama tetap berhasil mendaratkan klik ke overlay itu (atau
      ke halaman di belakangnya), bukan ke video. */
   #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; pointer-events: none; }
+  /* BARU (4 Sep 2026) -- embed Canva ("🤖 AI Presentation" roadmap,
+     Bagian 3). BEDA dari #ytView: Canva TIDAK punya API kontrol
+     jarak-jauh resmi (tidak ada play/pause/seek lewat postMessage
+     seperti YouTube IFrame API) -- satu-satunya cara maju/mundur
+     slide-nya adalah klik langsung di iframe ini sendiri (tombol
+     bawaan Canva, atau panah keyboard saat jendela ini fokus).
+     Karena itu #canvaView SENGAJA TIDAK diberi pointer-events:none
+     (beda dari #ytView) -- operator harus bisa mengklik langsung ke
+     dalamnya untuk menggerakkan slide Canva. */
+  #canvaView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; background: #05070c; }
+  /* BARU (4 Sep 2026) -- embed SoundCloud (roadmap Bagian 4). Widget
+     SoundCloud dirancang sebagai bilah pemutar (bukan penuh 1 layar) --
+     ditaruh di bagian bawah layar supaya ayat/pengumuman/kidung yang
+     sedang tayang (di belakangnya, lewat #text/#ref) tetap bisa dibaca
+     penuh sementara audio jalan (mirip semangat "Latar Suara Saja" di
+     tab YouTube), TAPI beda dari Audio Latar YouTube: di sini widget-nya
+     memang dimaksudkan untuk TERLIHAT (progress bar & tombol bawaan
+     SoundCloud), bukan disembunyikan. Kontrol Play/Pause dari Studio
+     tetap jalan lewat SC Widget API (lihat "sc_control" & SC.Widget di
+     skrip bawah) walau widget bawaan ini kelihatan -- operator boleh
+     pakai salah satu (tombol Studio ATAU klik langsung di bilah ini,
+     keduanya sinkron karena sama-sama lewat 1 objek SC.Widget). */
+  #scView { width: 100vw; height: 166px; position: fixed; left: 0; right: 0; bottom: 0; border: none; }
   /* Audio Latar YouTube ("Latar suara saja" di Studio) -- video ASLI
      tetap dimuat & diputar (supaya suaranya jalan), tapi disembunyikan
      SECARA VISUAL (opacity:0, bukan display:none/hidden -- display:none
@@ -394,6 +417,10 @@
     <img id="slideView" hidden />
     <iframe id="ytView" hidden allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
     <iframe id="ytBg" allow="autoplay; encrypted-media" frameborder="0" tabindex="-1"></iframe>
+    <!-- BARU (4 Sep 2026) -- lihat catatan CSS #canvaView & #scView di
+         atas, dan showMain() kind "canva"/"soundcloud" di skrip bawah. -->
+    <iframe id="canvaView" hidden allow="fullscreen" allowfullscreen frameborder="0"></iframe>
+    <iframe id="scView" hidden allow="autoplay" frameborder="0"></iframe>
     <div id="timerWrap" hidden>
       <svg id="timerRing" viewBox="0 0 100 100">
         <circle id="timerRingBg" cx="50" cy="50" r="44"></circle>
@@ -429,6 +456,15 @@
     <button type="button" id="activateBtn">🔊 Klik sekali untuk aktifkan kontrol Play/Pause/Suara dari Monitor 1</button>
   </div>
 
+  <!-- BARU (4 Sep 2026) -- SDK resmi SoundCloud untuk kontrol Play/Pause
+       dari luar iframe (roadmap ROADMAP-ai-presentation.md Bagian 4).
+       Kalau perangkat Layar 2 sedang OFFLINE saat pertama dibuka, skrip
+       ini gagal termuat -- window.SC di skrip bawah TETAP dicek ada/
+       tidak sebelum dipakai (lihat sc_control), jadi tayangan lain
+       (ayat/kidung/dst) tidak ikut error, cuma kontrol SoundCloud yang
+       tidak akan merespons sampai koneksi & jendela ini dimuat ulang. -->
+  <script src="https://w.soundcloud.com/player/api.js"></script>
+
 <script>
   const stageEl = document.getElementById("stage");
   const refEl = document.getElementById("ref");
@@ -438,6 +474,9 @@
   const logoEl = document.getElementById("logoView");
   const slideEl = document.getElementById("slideView");
   const ytEl = document.getElementById("ytView");
+  const canvaEl = document.getElementById("canvaView"); // BARU (4 Sep 2026)
+  const scEl = document.getElementById("scView"); // BARU (4 Sep 2026)
+  let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
   const ytBgEl = document.getElementById("ytBg");
   // BARU (28 Agu 2026) -- Repeat One/Repeat All + daftar putar (playlist)
   // untuk video YouTube utama (#ytView), lihat wireYtControls() &
@@ -928,6 +967,11 @@
     logoEl.hidden = true;
     slideEl.hidden = true;
     if (kind !== "youtube" && !ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // stop video saat pindah ke konten lain
+    // BARU (4 Sep 2026) -- Canva & SoundCloud dihentikan/disembunyikan
+    // juga saat berpindah ke jenis tayangan lain, pola sama seperti
+    // #ytView di atas.
+    if (kind !== "canva" && !canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (kind !== "soundcloud" && !scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
     stageEl.classList.remove("fade-in");
     void stageEl.offsetWidth;
     // BARU (4 Sep 2026) -- #refSub HANYA dipakai untuk kind "kidung" (lihat
@@ -982,6 +1026,32 @@
         ytQueueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : 0;
         ytLastState = null;
       }
+    } else if (kind === "canva") {
+      // BARU (4 Sep 2026) -- Presentasi Canva penuh 1 layar (roadmap
+      // Bagian 3). embedUrl SUDAH dinormalisasi ke pola resmi Canva
+      // "...view?embed" oleh Studio (normalizeCanvaLink() di js/
+      // presentation-studio.js) sebelum sampai di sini -- lihat catatan
+      // penting di CSS #canvaView atas: TIDAK ada kontrol jarak-jauh,
+      // operator klik langsung di layar ini untuk maju/mundur slide.
+      refEl.hidden = true; refEl.textContent = "";
+      textEl.textContent = "";
+      if (data.embedUrl) { canvaEl.src = data.embedUrl; canvaEl.hidden = false; }
+    } else if (kind === "soundcloud") {
+      // BARU (4 Sep 2026) -- Audio SoundCloud (roadmap Bagian 4). Widget
+      // resmi (w.soundcloud.com/player) dimuat sebagai bilah pemutar di
+      // bawah layar (lihat CSS #scView) -- ayat/pengumuman/kidung yang
+      // sedang tayang di #text/#ref TETAP terlihat penuh di atasnya,
+      // audio jalan di bilah bawah. SC.Widget baru dibuat SETELAH iframe
+      // ini benar memuat (event "load" di bawah), supaya SDK bisa
+      // mengikat ke iframe yang isinya sudah benar.
+      refEl.hidden = true; refEl.textContent = "";
+      if (data.trackUrl) {
+        const src = "https://w.soundcloud.com/player/?url=" + encodeURIComponent(data.trackUrl) +
+          "&auto_play=" + (data.autoplay === false ? "false" : "true") +
+          "&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+        scEl.src = src;
+        scEl.hidden = false;
+      }
     } else if (kind === "kidung") {
       // Slide Kidung (bait + koor snapshot, lihat Presentation.sendKidung()
       // di js/presentation.js & tab "🎵 Kidung / Hymn" di js/presentation-
@@ -1022,13 +1092,15 @@
       refSubEl.hidden = true; refSubEl.textContent = ""; // BARU (4 Sep 2026)
       textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
       if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+      if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; } // BARU (4 Sep 2026)
+      if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; } // BARU (4 Sep 2026)
       stopTimer(true);
       stopStopwatch(true);
       hideMagnify();
       setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
     }
-    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung") {
+    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung" || data.type === "canva" || data.type === "soundcloud") {
       showMain(data.type, data);
       return;
     }
@@ -1089,6 +1161,24 @@
       const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo" }[data.action];
       const args = data.action === "seek" ? [Number(data.arg) || 0, true] : [];
       if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args }), "*");
+      return;
+    }
+    // BARU (4 Sep 2026) -- Kontrol Play/Pause/Toggle SoundCloud dari
+    // Studio (roadmap Bagian 4). BEDA dari "yt_control": tidak dikirim
+    // lewat postMessage manual (SoundCloud Widget API tidak dirancang
+    // begitu) -- dipakai objek `scWidget` (SC.Widget resmi, dibuat saat
+    // #scView selesai memuat, lihat event "load" di bawah). Kalau widget
+    // belum siap (mis. baru saja src diganti & belum sempat "load", atau
+    // SDK api.js gagal termuat karena OFFLINE), perintah ini diam-diam
+    // diabaikan -- TIDAK error, operator cukup tunggu sebentar/coba lagi.
+    // TIDAK ADA "seek 2x speed" di sini -- Widget API resmi SoundCloud
+    // memang tidak punya setPlaybackRate() (beda dari YouTube), lihat
+    // ROADMAP-ai-presentation.md Bagian 4 untuk penjelasan lengkapnya.
+    if (data.type === "sc_control") {
+      if (!scWidget) return;
+      if (data.action === "play") scWidget.play();
+      else if (data.action === "pause") scWidget.pause();
+      else if (data.action === "toggle") scWidget.toggle();
       return;
     }
     // BARU (28 Agu 2026) -- 🔁 Ulang (Repeat) dari Studio: "off" (mati,
@@ -1222,6 +1312,39 @@
     // percobaan pasti sampai setelah pemutar sungguh siap.
     [250, 600, 1200, 2000].forEach((ms) => setTimeout(sendListening, ms));
   });
+
+  // BARU (4 Sep 2026) -- SC.Widget resmi (SDK dimuat di <head>, lihat
+  // <script src="https://w.soundcloud.com/player/api.js">) dipasang
+  // SETELAH #scView selesai memuat src barunya -- supaya SDK mengikat
+  // ke iframe yang isinya sudah benar (trek yang baru ditempel, bukan
+  // trek sebelumnya). Kalau SDK belum sempat termuat (mis. koneksi
+  // lambat saat Layar 2 baru dibuka), `window.SC` belum ada -- di sini
+  // diperiksa dulu, TIDAK error, cuma kontrol Play/Pause dari Studio
+  // belum akan merespons sampai giliran berikut src berganti lagi.
+  scEl.addEventListener("load", () => {
+    if (!scEl.src || typeof window.SC === "undefined" || !window.SC.Widget) { scWidget = null; return; }
+    try {
+      scWidget = SC.Widget(scEl);
+      scWidget.bind(SC.Widget.Events.PLAY, () => reportScState(true));
+      scWidget.bind(SC.Widget.Events.PAUSE, () => reportScState(false));
+      scWidget.bind(SC.Widget.Events.FINISH, () => reportScState(false));
+    } catch (e) { scWidget = null; }
+  });
+  // Lapor balik status main/jeda SoundCloud ke jendela utama (Studio) --
+  // dipakai supaya tombol ▶️/⏸️ di tab "🔗 Link" bisa menunjukkan status
+  // yang BENAR (mis. kalau operator mengeklik langsung tombol bawaan di
+  // bilah SoundCloud sendiri, bukan lewat tombol Studio), sama semangat
+  // seperti reportYtProgress() di atas untuk YouTube.
+  function reportScState(isPlaying) {
+    if (!window.opener) return;
+    try {
+      window.opener.postMessage({
+        source: "bibleAppPresenter",
+        payload: { type: "present_sc_state", isPlaying },
+      }, location.origin);
+    } catch (e) {}
+  }
+
   function ytSendCommand(func, args) {
     if (!ytEl.contentWindow) return;
     try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: args || [] }), "*"); } catch (e) {}
