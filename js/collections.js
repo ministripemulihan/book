@@ -170,6 +170,34 @@ function addItemToCollection(username, name, item) {
   return id;
 }
 
+// BARU (28 Agu 2026) -- buat kumpulan KOSONG secara langsung, tanpa
+// perlu menambah 1 item dulu. Sebelumnya kumpulan HANYA bisa tercipta
+// sebagai efek samping menambah item pertama (addItemToCollection() ->
+// _getOrCreateCollectionByName()) lewat tab lain (Alkitab/Kidung/File/
+// Pengumuman) -- tidak ada jalan untuk membuat kumpulan baru langsung
+// dari tab "📚 Kumpulan Ayat" itu sendiri. Dipakai tombol "＋ Buat Baru"
+// di panel Kumpulan Ayat Studio Presentasi (js/presentation-studio.js,
+// wireCollectionNewButton()). Kalau nama yang sama SUDAH ada, TIDAK
+// membuat duplikat -- balik id yang sudah ada itu (sama seperti
+// addItemToCollection), supaya operator yang tidak sengaja mengetik
+// nama yang sama tidak berakhir dengan 2 kumpulan kembar.
+function createEmptyCollection(username, name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return null;
+  const collections = loadCollections(username);
+  const id = _getOrCreateCollectionByName(collections, trimmed);
+  if (!id) return null;
+  const col = collections[id];
+  // Sentuh updatedAt supaya kumpulan baru ini langsung naik ke paling
+  // atas dropdown (diurutkan terbaru-dulu, lihat renderCollectionSelect()
+  // di js/presentation-studio.js) -- sama seperti kumpulan yang baru
+  // ditambahi item lewat jalur lama.
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return id;
+}
+
 // Nama lama dipertahankan (dipakai handleAddToCollection() di js/app.js
 // & tombol "➕ Daftar" cepat di js/presentation-studio.js) -- sekarang
 // tinggal pembungkus tipis addItemToCollection().
@@ -204,8 +232,18 @@ function addKidungToCollection(username, name, kidungItem) {
     buku: kidungItem.buku || "Kidung",
     kidungNo: String(kidungItem.kidungNo),
     title: kidungItem.title || "",
+    ikon: kidungItem.ikon || "",
     bait: Array.isArray(kidungItem.bait) ? kidungItem.bait.map((b) => ({ noBait: b.noBait, teks: b.teks })) : [],
     koorTeks: kidungItem.koorTeks || null,
+    // BARU (4 Sep 2026) -- ikut disimpan supaya kidung yang ditambahkan ke
+    // Kumpulan Ayat tetap membawa baris kecil "Pengarang Birama (N Bait)"
+    // saat nanti ditayangkan lagi dari Kumpulan Ayat (lihat kidungSubLine()
+    // di js/presentation-studio.js). Item Kumpulan Ayat LAMA (disimpan
+    // sebelum kolom ini ada) otomatis jatuh ke "" / 0 -- baris kecilnya
+    // sekadar tidak muncul, tidak ada error apa pun.
+    pengarang: kidungItem.pengarang || "",
+    birama: kidungItem.birama || "",
+    jumlahBait: kidungItem.jumlahBait || 0,
   });
 }
 
