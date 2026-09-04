@@ -262,7 +262,14 @@ const Presentation = (() => {
     if (!data) return;
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) openWindow();
-    post({ type: "kidung", ref: data.ref || "", bait: data.bait || [], koorTeks: data.koorTeks || null });
+    // BARU (4 Sep 2026) -- pengarang/birama/jumlahBait diteruskan apa
+    // adanya ke present.html (kosong/0 kalau memang tidak ada) supaya
+    // baris kecil "Pengarang Birama (N Bait)" bisa disusun di sana, lihat
+    // showMain() kind "kidung" di present.html.
+    post({
+      type: "kidung", ref: data.ref || "", bait: data.bait || [], koorTeks: data.koorTeks || null,
+      pengarang: data.pengarang || "", birama: data.birama || "", jumlahBait: data.jumlahBait || 0,
+    });
     flashSendFeedback();
   }
 
