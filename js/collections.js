@@ -307,6 +307,36 @@ function removeItemFromCollection(username, id, index) {
   return true;
 }
 
+// BARU (4 Sep 2026, permintaan operator) -- kidung yang ditambahkan lewat
+// "➕ Semua" (addAllBtn, lihat wireKidungTab() di js/presentation-studio.js)
+// tersimpan sebagai BANYAK item TERPISAH di kumpulan (1 item per bait/
+// slide -- supaya bisa ditayangkan & dilangkahi 1 bait per 1 bait lewat
+// panah/clicker, sama seperti ayat Alkitab biasa, lihat renderSlides() &
+// sendGenericItemLive() di js/presentation-studio.js). Konsekuensinya:
+// menghapus 1 kidung yang isinya mis. 10 bait berarti menekan "Hapus" 10
+// KALI SATU PER SATU (laporan operator: "sampai pusing, terlalu banyak").
+// Fungsi ini menghapus SEMUA item kidung yang buku & nomornya SAMA dalam
+// 1 kumpulan sekaligus lewat SATU panggilan -- dipakai tombol baru
+// "🗑️ Hapus Semua Bait Kidung Ini" (lihat js/presentation-studio.js
+// renderCollectionList() & js/app.js buildCollectionItemRow()).
+// Mengembalikan JUMLAH item yang terhapus (0 kalau tidak ada yang cocok /
+// kumpulan tidak ditemukan) -- dipakai pemanggil utk pesan konfirmasi.
+function removeKidungGroupFromCollection(username, id, buku, kidungNo) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !Array.isArray(col.items)) return 0;
+  const before = col.items.length;
+  col.items = col.items.filter((it) => !(it && it.type === "kidung" && it.buku === buku && String(it.kidungNo) === String(kidungNo)));
+  const removed = before - col.items.length;
+  if (removed > 0) {
+    _migrateCollection(col);
+    col.updatedAt = new Date().toISOString();
+    saveCollections(username, collections);
+    _pushCollectionRemote(username, id, col);
+  }
+  return removed;
+}
+
 function moveItemInCollection(username, id, index, direction) {
   const collections = loadCollections(username);
   const col = collections[id];
