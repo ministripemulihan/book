@@ -283,7 +283,15 @@ const Presentation = (() => {
   // footnote/timer/pointer/pen) supaya "kirim ulang konten terakhir"
   // saat Layar 2 dibuka ulang tetap berupa konten utama (verse/text/
   // black/logo), bukan overlay sesaat.
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control"];
+  // PERBAIKAN (4 Sep 2026, audit roadmap Bagian 4): "sc_control"
+  // (Play/Pause SoundCloud dari Studio) HARUS ikut masuk daftar ini,
+  // sama seperti "yt_control" -- kalau tidak, tiap klik tombol
+  // ▶️/⏸️ SoundCloud akan MENIMPA `lastPayload` (yang seharusnya
+  // tetap berisi {type:"soundcloud", trackUrl:...}) dengan payload
+  // kontrolnya sendiri, sehingga "kirim ulang konten terakhir" saat
+  // Layar 2 dibuka ulang jadi salah (mengirim ulang perintah play/
+  // pause, bukan trek SoundCloud-nya).
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) {
@@ -665,6 +673,15 @@ const Presentation = (() => {
             detail: { currentTime: data.currentTime, duration: data.duration, state: data.state },
           }));
         } catch (e) {}
+        return;
+      }
+      // BARU (4 Sep 2026) -- status main/jeda SoundCloud (lihat
+      // reportScState() di present.html), diteruskan sebagai CustomEvent
+      // supaya tombol ▶️/⏸️ tab "🔗 Link" (js/presentation-studio.js) bisa
+      // menampilkan status yang sesungguhnya, termasuk kalau operator
+      // mengeklik langsung tombol bawaan di bilah SoundCloud sendiri.
+      if (data.type === "present_sc_state") {
+        try { window.dispatchEvent(new CustomEvent("ps-sc-state", { detail: { isPlaying: !!data.isPlaying } })); } catch (e) {}
         return;
       }
       if (data.type === "present_ready") {
