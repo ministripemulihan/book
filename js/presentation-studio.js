@@ -165,9 +165,33 @@ const PresentationStudio = (() => {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // BARU (4 Sep 2026 v2, permintaan operator) -- tampilkan/sembunyikan
+  // progress bar + kolom waktu LIVE (#psYtLiveBar, lihat wireYtControls())
+  // sesuai apakah yang SEDANG tayang video YouTube atau bukan, DAN reset
+  // tampilannya ke 00:00:00/durasi belum diketahui setiap kali video yang
+  // ditayangkan BERGANTI (embedUrl beda dari sebelumnya) -- supaya sisa
+  // posisi/durasi video LAMA tidak nyangkut kelihatan di video BARU
+  // sebelum laporan posisi pertamanya (present_yt_progress) tiba.
+  let lastYtEmbedUrlForLiveBar = null;
+  function syncYtLiveBarVisibility(payload) {
+    const wrap = el("psYtLiveBar");
+    if (!wrap) return;
+    if (payload && payload.type === "youtube") {
+      wrap.hidden = false;
+      if (payload.embedUrl && payload.embedUrl !== lastYtEmbedUrlForLiveBar) {
+        lastYtEmbedUrlForLiveBar = payload.embedUrl;
+        if (typeof window.resetYtLiveBar === "function") window.resetYtLiveBar();
+      }
+    } else {
+      wrap.hidden = true;
+      lastYtEmbedUrlForLiveBar = null;
+    }
+  }
+
   function renderStudioPreview(payload) {
     const box = el("psPreviewBox");
     if (!box) return;
+    syncYtLiveBarVisibility(payload);
     if (!payload || payload.type === "clear") {
       box.innerHTML = '<div class="present-preview-idle">Belum ada tayangan</div>';
       return;
@@ -250,7 +274,14 @@ const PresentationStudio = (() => {
     const box = el("psNextBox");
     const btn = el("psNextShowBtn");
     if (!slot) return;
-    slot.hidden = !isDualLive();
+    // PERBAIKAN (4 Sep 2026, permintaan operator) -- dulu kotak
+    // "Berikutnya" HANYA muncul di mode dual monitor. Sekarang tombol
+    // baru "👁️ Pratinjau" (Kidung & YouTube) bisa menaruh item ke sini
+    // walau Layar 2 belum/tidak dibuka terpisah (1 monitor) -- supaya
+    // "standby" itu tetap kelihatan & bisa ditekan "▶ Tayangkan"-nya,
+    // kotak ini SEKARANG juga ditampilkan kalau memang ada nextItem
+    // yang sedang menunggu, terlepas dari mode dual atau tidak.
+    slot.hidden = !isDualLive() && !nextItem;
     if (!box || !btn) return;
     if (!nextItem) {
       box.innerHTML = '<div class="present-preview-idle">Belum ada antrean</div>';
@@ -816,11 +847,27 @@ const PresentationStudio = (() => {
         row.innerHTML = `<span class="ps-verse-ref">Bait ${escapeHtml(String(label))}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span>
           <div class="ps-btn-row ps-kidung-slide-actions">
             <button type="button" class="chip-btn small" data-act="show">▶️ Tayangkan</button>
+            <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
             <button type="button" class="chip-btn small" data-act="add">➕ Daftar</button>
           </div>`;
+        // "▶️ Tayangkan" -- SELALU langsung live ke Layar 2 SEKARANG JUGA
+        // (perilaku LAMA, tidak diubah).
         row.querySelector('[data-act="show"]').addEventListener("click", () => {
           setActivePlaylist(genericItems, i, detailTitle ? detailTitle.textContent : "");
           sendGenericItemLive(genericItems[i]);
+        });
+        // BARU (4 Sep 2026, permintaan operator) -- "👁️ Pratinjau" TIDAK
+        // langsung tayang, cuma menaruh slide ini "standby" di kotak
+        // "Berikutnya" (stageNext(), lihat juga renderNextPreview() yang
+        // sekarang ikut menampilkan kotak itu walau bukan mode dual
+        // monitor) -- operator lihat dulu isinya, baru tekan "▶ Tayangkan"
+        // di kotak "Berikutnya" itu kalau memang sudah siap.
+        row.querySelector('[data-act="preview"]').addEventListener("click", () => {
+          const it = genericItems[i];
+          stageNext(genericItemRefText(it), genericItemBodyText(it), () => {
+            setActivePlaylist(genericItems, i, detailTitle ? detailTitle.textContent : "");
+            sendGenericItemLive(it);
+          });
         });
         row.querySelector('[data-act="add"]').addEventListener("click", async () => {
           await addSlideToCollection(genericItems[i]);
@@ -2363,7 +2410,7 @@ const PresentationStudio = (() => {
     return null;
   }
 
-  function buildYoutubeEmbedUrl(id) {
+  function buildYoutubeEmbedUrl(id, startSeconds) {
     // TANPA autoplay -- video dimuat dalam keadaan siap/pause, bukan
     // langsung jalan. "enablejsapi=1" wajib ada supaya tombol
     // Play/Pause/Mute di Studio bisa mengontrolnya lewat postMessage.
@@ -2372,7 +2419,15 @@ const PresentationStudio = (() => {
     // dihilangkan total -- itu aturan YouTube, bukan batasan aplikasi
     // ini). "playsinline=1" supaya tidak fullscreen paksa di beberapa
     // browser.
-    return `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1&modestbranding=1&iv_load_policy=3&playsinline=1`;
+    // BARU (4 Sep 2026, permintaan operator) -- `startSeconds` OPSIONAL,
+    // dipetakan ke parameter resmi YouTube "start" (detik, bulat) supaya
+    // video langsung mulai dari titik yang dipilih lewat progress bar
+    // "detik mulai" (lihat createYtSeekBar() di bawah), bukan dari awal.
+    // Kosong/0/undefined -> perilaku LAMA sama persis (mulai dari awal).
+    let url = `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1&modestbranding=1&iv_load_policy=3&playsinline=1`;
+    const secs = Math.round(startSeconds || 0);
+    if (secs > 0) url += `&start=${secs}`;
+    return url;
   }
 
   // BARU (28 Agu 2026) -- lihat catatan panjang di checkbox
@@ -2409,6 +2464,116 @@ const PresentationStudio = (() => {
     const m = Math.floor((secs % 3600) / 60);
     const s = String(secs % 60).padStart(2, "0");
     return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (4 Sep 2026, permintaan operator) -- format & baca-balik waktu
+  // "detik mulai" video, dukung sampai satuan HARI supaya rekaman/live
+  // streaming yang sangat panjang tetap bisa diberi titik mulai jauh ke
+  // tengah (mis. "2:23:23:29" = 2 hari, 23 jam, 23 menit, 29 detik).
+  // Dipakai bersama oleh createYtSeekBar() di bawah -- SATU fungsi yang
+  // sama dipakai baik untuk menampilkan label progress bar MAUPUN
+  // membaca ketikan operator lewat tombol "✏️", supaya keduanya selalu
+  // konsisten (D:HH:MM:SS, atau HH:MM:SS saja kalau kurang dari 1 hari).
+  // ------------------------------------------------------------
+  function formatSecondsToDHMS(totalSeconds) {
+    let s = Math.max(0, Math.round(totalSeconds || 0));
+    const days = Math.floor(s / 86400); s -= days * 86400;
+    const hours = Math.floor(s / 3600); s -= hours * 3600;
+    const mins = Math.floor(s / 60); s -= mins * 60;
+    const secs = s;
+    const hh = String(hours).padStart(2, "0");
+    const mm = String(mins).padStart(2, "0");
+    const ss = String(secs).padStart(2, "0");
+    return days > 0 ? `${days}:${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+  }
+  // Terima beberapa bentuk ketikan operator supaya tidak kaku: angka
+  // polos = detik langsung (mis. "90"), "MM:SS", "HH:MM:SS", atau
+  // "D:HH:MM:SS" (hari:jam:menit:detik, lihat formatSecondsToDHMS di
+  // atas). Balik `null` kalau memang tidak bisa dibaca sama sekali,
+  // supaya pemanggil (createYtSeekBar) bisa menolak dengan pesan jelas
+  // alih-alih diam-diam menganggapnya 0 detik.
+  function parseDHMSToSeconds(text) {
+    const s = String(text == null ? "" : text).trim();
+    if (!s) return null;
+    if (/^\d+$/.test(s)) return parseInt(s, 10);
+    const parts = s.split(":").map((p) => parseInt(p, 10));
+    if (!parts.length || parts.some((p) => isNaN(p) || p < 0)) return null;
+    let days = 0, hours = 0, mins = 0, secs = 0;
+    if (parts.length === 4) [days, hours, mins, secs] = parts;
+    else if (parts.length === 3) [hours, mins, secs] = parts;
+    else if (parts.length === 2) [mins, secs] = parts;
+    else if (parts.length === 1) [secs] = parts;
+    else return null;
+    return days * 86400 + hours * 3600 + mins * 60 + secs;
+  }
+
+  // Progress bar horizontal + tombol "✏️" untuk memilih detik MULAI
+  // pemutaran video -- SATU fungsi dipakai bersama oleh kotak tempel-
+  // link manual (psYtInput, lihat wireYoutubeTab()) & tiap baris
+  // Playlist Video dari Google Sheet (lihat wireYtPlaylistTab()),
+  // supaya perilakunya SELALU sama persis di keduanya (permintaan
+  // operator, 4 Sep 2026).
+  //
+  // Bawaan SELALU 00:00:00 (paling kiri/value=0). Ujung KANAN slider
+  // ("max") = durasi video KALAU SUDAH DIKETAHUI (lewat
+  // fetchYoutubeDuration()/kolom "Durasi" opsional di Sheet, lihat
+  // pemanggilnya) -- kalau belum diketahui, dipakai `fallbackMaxSeconds`
+  // (default 3 hari) supaya video/rekaman sangat panjang yang durasinya
+  // belum sempat diketahui TETAP bisa digeser jauh, bukan dibatasi
+  // sempit. Operator juga bisa ketik manual lewat tombol "✏️" (menerima
+  // format bebas, lihat parseDHMSToSeconds) -- ketikan yang melebihi
+  // slider TETAP diterima kalau durasi asli belum diketahui (durationSeconds
+  // masih 0), supaya tidak menghalangi kasus seperti "2:23:23:29" di
+  // atas.
+  function createYtSeekBar(opts) {
+    const options = opts || {};
+    const fallbackMax = options.fallbackMaxSeconds || 3 * 86400; // 3 hari
+    let durationSeconds = options.durationSeconds || 0;
+
+    const wrap = document.createElement("div");
+    wrap.className = "ps-yt-seek";
+    wrap.innerHTML = `
+      <input type="range" class="ps-yt-seek-range" min="0" max="${Math.round(durationSeconds > 0 ? durationSeconds : fallbackMax)}" value="0" step="1" title="Geser untuk memilih detik video mulai diputar (paling kiri = 00:00:00)" />
+      <span class="ps-yt-seek-time" data-role="time">00:00:00</span>
+      <button type="button" class="chip-btn small ps-yt-seek-edit" data-act="edittime" title="Ketik detik mulai secara manual (mis. 1:30, 01:02:30, atau 2:23:23:29 untuk 2 hari 23 jam 23 menit 29 detik)">✏️</button>
+    `;
+    const range = wrap.querySelector(".ps-yt-seek-range");
+    const timeLabel = wrap.querySelector('[data-role="time"]');
+    const editBtn = wrap.querySelector('[data-act="edittime"]');
+
+    function refreshLabel() { timeLabel.textContent = formatSecondsToDHMS(parseInt(range.value, 10) || 0); }
+    range.addEventListener("input", refreshLabel);
+    editBtn.addEventListener("click", () => {
+      const current = parseInt(range.value, 10) || 0;
+      const typed = prompt(
+        "Mulai video dari detik ke berapa?\nFormat bebas: detik saja (mis. 90), MM:SS, HH:MM:SS, atau D:HH:MM:SS (mis. 2:23:23:29 = 2 hari 23 jam 23 menit 29 detik).",
+        formatSecondsToDHMS(current)
+      );
+      if (typed == null) return; // dibatalkan
+      const secs = parseDHMSToSeconds(typed);
+      if (secs == null) { alert("Format waktu tidak dikenali."); return; }
+      const clamped = durationSeconds > 0 ? Math.min(secs, durationSeconds) : secs;
+      if (clamped > parseInt(range.max, 10)) range.max = String(clamped); // durasi belum diketahui -- lebarkan slider mengikuti ketikan
+      range.value = String(clamped);
+      refreshLabel();
+    });
+    refreshLabel();
+
+    return {
+      el: wrap,
+      getStartSeconds() { return parseInt(range.value, 10) || 0; },
+      // Dipanggil begitu durasi ASLI video sudah diketahui (fetchYoutubeDuration
+      // selesai / kolom Durasi Sheet terbaca) -- slider ikut disesuaikan
+      // batas kanannya supaya sungguh mewakili detik terakhir video.
+      setDurationSeconds(secs) {
+        if (!secs || secs <= 0) return;
+        durationSeconds = secs;
+        range.max = String(Math.round(secs));
+        if (parseInt(range.value, 10) > secs) { range.value = String(Math.round(secs)); refreshLabel(); }
+      },
+      reset() { range.value = "0"; refreshLabel(); },
+    };
   }
 
   // Judul + nama channel lewat oEmbed publik YouTube (tanpa API key).
@@ -2468,10 +2633,32 @@ const PresentationStudio = (() => {
   function wireYoutubeTab() {
     const input = el("psYtInput");
     const showBtn = el("psYtShowBtn");
+    const previewBtn = el("psYtPreviewBtn");
     const addBtn = el("psYtAddQueueBtn");
     const saveBtn = el("psYtSaveQueueBtn");
     const queueList = el("psYtQueueList");
     if (!input || !showBtn) return;
+
+    // BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
+    // mulai" untuk link yang ditempel di kotak ini, lihat
+    // createYtSeekBar() di atas. Durasi asli diisi otomatis begitu
+    // link valid ditempel (fetchYoutubeDuration(), lewat YouTube IFrame
+    // API) -- sebelum itu selesai, slider tetap bisa digeser dengan
+    // batas sementara (fallbackMaxSeconds).
+    const seekWrap = el("psYtSeekWrap");
+    const seekBar = createYtSeekBar({});
+    if (seekWrap) seekWrap.appendChild(seekBar.el);
+    let lastSeekId = null;
+    function refreshSeekForInput() {
+      const id = extractYoutubeId(input.value);
+      if (!id) { lastSeekId = null; return; }
+      if (id === lastSeekId) return; // link sama seperti sebelumnya -- tidak perlu muat ulang durasi/reset slider
+      lastSeekId = id;
+      seekBar.reset();
+      fetchYoutubeDuration(id).then((secs) => { if (secs) seekBar.setDurationSeconds(secs); });
+    }
+    input.addEventListener("change", refreshSeekForInput);
+    input.addEventListener("blur", refreshSeekForInput);
 
     // BARU (28 Agu 2026) -- checkbox "🔊 Pratinjau ikut bersuara", lihat
     // ytPreviewSoundMode/toStudioPreviewEmbedUrl()/sendYtCommand() di
@@ -2523,22 +2710,43 @@ const PresentationStudio = (() => {
     function doShow() {
       const id = extractYoutubeId(input.value);
       if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
-      const embedUrl = buildYoutubeEmbedUrl(id);
+      const embedUrl = buildYoutubeEmbedUrl(id, seekBar.getStartSeconds());
       const bgMode = el("psYtBgMode") && el("psYtBgMode").checked;
       if (bgMode) {
         // Mode "Latar suara saja": video TIDAK menggantikan tampilan
         // ayat/pengumuman yang sedang tayang -- diputar TERSEMBUNYI di
         // #ytBg (lihat present.html), cuma suaranya yang terdengar.
-        // Tidak lewat stageOrSend (itu untuk konten utama 1-layar-penuh);
-        // audio latar langsung dikirim, terlepas dari mode 1/dual monitor.
+        // Audio latar langsung dikirim, terlepas dari mode 1/dual monitor
+        // (tidak ada konsep "pratinjau" untuk audio latar).
         rawPost({ type: "yt_bg", embedUrl });
         setYtBgStatus(`🎧 Latar: ${id} (tekan ▶ Play di bawah untuk mulai)`);
         return;
       }
-      const doSend = () => { rawPost({ type: "youtube", embedUrl }); renderStudioPreview({ type: "youtube", embedUrl }); };
-      stageOrSend(`▶️ YouTube: ${id}`, embedUrl, doSend);
+      // PERBAIKAN (4 Sep 2026, permintaan operator) -- "▶️ Tampilkan"
+      // SEKARANG SELALU langsung live ke Layar 2 SAAT ITU JUGA, TIDAK
+      // lagi lewat stageOrSend() (dulu, di mode dual monitor, video malah
+      // diantre dulu ke kotak "Berikutnya" & operator harus klik 2x --
+      // laporan operator 4 Sep 2026, gara-gara sebelumnya baru saja
+      // memakai tab Kidung yang mode dual-nya sama). Yang mau diantre
+      // dulu ("standby"), sekarang pakai tombol baru "👁️ Pratinjau" di
+      // sebelahnya (doPreview() di bawah).
+      rawPost({ type: "youtube", embedUrl });
+      renderStudioPreview({ type: "youtube", embedUrl });
+    }
+    // BARU (4 Sep 2026) -- "👁️ Pratinjau": menaruh video ini "standby"
+    // di kotak "Berikutnya" (stageNext()) tanpa langsung tayang ke Layar
+    // 2, sama seperti tombol serupa di tab Kidung.
+    function doPreview() {
+      const id = extractYoutubeId(input.value);
+      if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
+      const embedUrl = buildYoutubeEmbedUrl(id, seekBar.getStartSeconds());
+      stageNext(`▶️ YouTube: ${id}`, embedUrl, () => {
+        rawPost({ type: "youtube", embedUrl });
+        renderStudioPreview({ type: "youtube", embedUrl });
+      });
     }
     showBtn.addEventListener("click", doShow);
+    if (previewBtn) previewBtn.addEventListener("click", doPreview);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doShow(); } });
 
     function setYtBgStatus(text) {
@@ -2729,6 +2937,32 @@ const PresentationStudio = (() => {
       return s === "1" || s === "true" || s === "ya" || s === "yes" || s === "x" || s === "v" || s === "✓";
     }
 
+    // BARU (4 Sep 2026, permintaan operator) -- kolom OPSIONAL "Durasi"
+    // (menit) & "Tanggal" (upload) di Sheet, dipakai kalau operator mau
+    // urutkan daftar berdasarkan itu (lihat sortVideos() di bawah).
+    // Kolom ini TIDAK WAJIB ada -- kalau memang belum diisi di Sheet,
+    // videonya cukup jatuh ke null & otomatis ditaruh paling bawah saat
+    // diurutkan berdasarkan durasi/tanggal (lihat sortVideos()), TIDAK
+    // hilang dari daftar sama sekali.
+    function parseDurationToMinutes(v) {
+      const s = String(v == null ? "" : v).trim();
+      if (!s) return null;
+      if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s); // "12" / "7.5" -> langsung dianggap menit
+      const parts = s.split(":").map((p) => parseInt(p, 10));
+      if (!parts.length || parts.some((p) => isNaN(p))) return null;
+      let seconds;
+      if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]; // jam:menit:detik
+      else if (parts.length === 2) seconds = parts[0] * 60 + parts[1]; // menit:detik
+      else return null;
+      return seconds / 60;
+    }
+    function parseUploadDate(v) {
+      const s = String(v == null ? "" : v).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
     function parseSheetCsv(text) {
       // PERBAIKAN: parseCSV() (js/csv.js) SUDAH mengembalikan array
       // OBJEK per baris (kunci = nama kolom huruf kecil, mis.
@@ -2750,14 +2984,57 @@ const PresentationStudio = (() => {
           url, videoId: id,
           embedUrl: buildYoutubeEmbedUrl(id),
           cats,
+          // BARU (4 Sep 2026) -- lihat catatan parseDurationToMinutes/
+          // parseUploadDate di atas.
+          durationMinutes: parseDurationToMinutes(rec.durasi || rec.menit || rec.duration || rec["durasi (menit)"]),
+          uploadDate: parseUploadDate(rec.tanggal || rec.upload || rec["upload date"] || rec.date || rec["tanggal upload"]),
         });
       });
-      return out;
+      return out; // urutan APA ADANYA seperti baris di Sheet (atas -> bawah)
+    }
+
+    // BARU (4 Sep 2026, permintaan operator) -- cari judul & urutkan
+    // daftar. `activeSort` disimpan juga ke localStorage (mirip pola
+    // SHEET_KEY di atas) supaya pilihan operator tidak balik ke bawaan
+    // tiap buka Studio lagi. Bawaan "terbaru": video yang BARU
+    // ditambahkan operator ke Sheet (baris PALING BAWAH di Sheet, cara
+    // wajar menambah baris baru) tampil PALING ATAS di daftar -- cukup
+    // membalik urutan baris Sheet apa adanya, tidak perlu kolom
+    // tambahan apa pun supaya bekerja.
+    const SORT_KEY = "bible_app_yt_playlist_sort_v1";
+    let activeSort = localStorage.getItem(SORT_KEY) || "terbaru";
+    let searchQuery = "";
+
+    function sortVideos(list) {
+      const arr = list.slice();
+      const byTitle = (a, b) => (a.title || "").localeCompare((b.title || ""), "id", { sensitivity: "base" });
+      const byChannel = (a, b) => (a.channel || "").localeCompare((b.channel || ""), "id", { sensitivity: "base" });
+      switch (activeSort) {
+        case "judul_az": arr.sort(byTitle); break;
+        case "judul_za": arr.sort((a, b) => byTitle(b, a)); break;
+        case "channel_az": arr.sort(byChannel); break;
+        case "channel_za": arr.sort((a, b) => byChannel(b, a)); break;
+        // Video tanpa kolom Durasi (null) SELALU ditaruh paling bawah,
+        // apa pun arah urutannya (dianggap "data tidak diketahui", bukan
+        // "0 menit" -- supaya tidak melompat ke atas kalau diurutkan
+        // dari yang terpendek).
+        case "durasi_desc": arr.sort((a, b) => (b.durationMinutes ?? -1) - (a.durationMinutes ?? -1)); break;
+        case "durasi_asc": arr.sort((a, b) => (a.durationMinutes ?? Infinity) - (b.durationMinutes ?? Infinity)); break;
+        // Sama halnya untuk tanggal upload yang belum diisi.
+        case "tanggal_desc": arr.sort((a, b) => (b.uploadDate ? b.uploadDate.getTime() : -Infinity) - (a.uploadDate ? a.uploadDate.getTime() : -Infinity)); break;
+        case "tanggal_asc": arr.sort((a, b) => (a.uploadDate ? a.uploadDate.getTime() : Infinity) - (b.uploadDate ? b.uploadDate.getTime() : Infinity)); break;
+        case "terbaru":
+        default:
+          arr.reverse(); break;
+      }
+      return arr;
     }
 
     function filteredVideos() {
-      if (activeFilter === "all") return allVideos;
-      return allVideos.filter((v) => v.cats[activeFilter]);
+      let list = activeFilter === "all" ? allVideos : allVideos.filter((v) => v.cats[activeFilter]);
+      const q = searchQuery.trim().toLowerCase();
+      if (q) list = list.filter((v) => (v.title || "").toLowerCase().includes(q));
+      return sortVideos(list);
     }
 
     function renderFilters() {
@@ -2788,15 +3065,35 @@ const PresentationStudio = (() => {
           </div>
           <div class="ps-file-actions">
             <button type="button" class="chip-btn small primary" data-act="show">▶️ Tampilkan</button>
+            <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
             <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
           </div>`;
+        // BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
+        // mulai" per video, sama persis mekanismenya dengan kotak tempel-
+        // link manual di atas (createYtSeekBar()). Kalau kolom opsional
+        // "Durasi" sudah diisi di Sheet, dipakai langsung sebagai batas
+        // kanan slider -- kalau belum, dipakai batas sementara (3 hari)
+        // supaya rekaman/live streaming sangat panjang tetap bisa digeser
+        // jauh (operator juga bisa ketik manual lewat tombol "✏️").
+        const seek = createYtSeekBar({ durationSeconds: v.durationMinutes ? v.durationMinutes * 60 : 0 });
+        row.appendChild(seek.el);
+        // "▶️ Tampilkan" -- SELALU langsung live ke Layar 2 SEKARANG JUGA
+        // (dulu lewat stageOrSend(), sehingga di mode dual monitor malah
+        // diantre dulu & perlu klik 2x -- laporan operator 4 Sep 2026).
+        // Yang mau diantre dulu ("standby"), pakai "👁️ Pratinjau" di bawah.
         row.querySelector('[data-act="show"]').addEventListener("click", () => {
+          const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
           const queue = videos.map((q) => ({ embedUrl: q.embedUrl }));
-          const doSend = () => {
-            rawPost({ type: "youtube", embedUrl: v.embedUrl, queue, queueIndex: i });
-            renderStudioPreview({ type: "youtube", embedUrl: v.embedUrl });
-          };
-          stageOrSend(v.title, v.title, doSend);
+          rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
+          renderStudioPreview({ type: "youtube", embedUrl });
+        });
+        row.querySelector('[data-act="preview"]').addEventListener("click", () => {
+          const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
+          const queue = videos.map((q) => ({ embedUrl: q.embedUrl }));
+          stageNext(v.title, v.title, () => {
+            rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
+            renderStudioPreview({ type: "youtube", embedUrl });
+          });
         });
         row.querySelector('[data-act="addcol"]').addEventListener("click", async (e) => {
           const btn = e.currentTarget;
@@ -2877,6 +3174,16 @@ const PresentationStudio = (() => {
         renderList();
       });
     });
+    // BARU (4 Sep 2026, permintaan operator) -- cari judul & pilih urutan.
+    const searchInput = el("psYtPlaylistSearch");
+    const sortSelect = el("psYtPlaylistSort");
+    if (sortSelect) sortSelect.value = activeSort;
+    if (searchInput) searchInput.addEventListener("input", () => { searchQuery = searchInput.value; renderList(); });
+    if (sortSelect) sortSelect.addEventListener("change", () => {
+      activeSort = sortSelect.value;
+      localStorage.setItem(SORT_KEY, activeSort);
+      renderList();
+    });
     renderFilters();
     if (urlInput.value.trim()) loadSheet(); // sudah pernah disimpan sebelumnya -- langsung muat
   }
@@ -2907,8 +3214,8 @@ const PresentationStudio = (() => {
     let repeatMode = localStorage.getItem(REPEAT_KEY) || "off";
     if (!REPEAT_LABELS[repeatMode]) repeatMode = "off";
 
-    function sendYtCommand(action) {
-      rawPost({ type: "yt_control", action }); // -> Layar 2 (present.html) -- SATU-SATUNYA yang boleh bersuara
+    function sendYtCommand(action, arg) {
+      rawPost({ type: "yt_control", action, arg }); // -> Layar 2 (present.html) -- SATU-SATUNYA yang boleh bersuara
       const previewFrame = el("psYtPreviewFrame"); // -> pratinjau mini di Studio (SENGAJA selalu bisu)
       if (previewFrame && previewFrame.contentWindow) {
         // PERBAIKAN (laporan operator 28 Agu 2026, "suara jadi dobel saat
@@ -2937,11 +3244,18 @@ const PresentationStudio = (() => {
         //   dalam mode itu, mute/unmute BOLEH ikut diteruskan lagi,
         //   karena memang itu maksudnya (operator sadar & sengaja minta
         //   pratinjau bersuara).
+        //   BARU (4 Sep 2026 v2) -- "seek" (lompat detik) DITAMBAHKAN ke
+        //   KEDUA peta (bukan cuma mode ytPreviewSoundMode) -- beda dari
+        //   mute/unmute, melompat detik TIDAK memicu suara apa pun di
+        //   pratinjau mini ini (tetap bisu, cuma posisinya yang ikut
+        //   berpindah secara visual supaya tetap terlihat sinkron dengan
+        //   Layar 2), jadi aman selalu diteruskan.
         const cmdMap = ytPreviewSoundMode
-          ? { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute" }
-          : { play: "playVideo", pause: "pauseVideo", stop: "stopVideo" };
+          ? { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo" }
+          : { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", seek: "seekTo" };
         const cmd = cmdMap[action];
-        if (cmd) previewFrame.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+        const args = action === "seek" ? [arg || 0, true] : [];
+        if (cmd) previewFrame.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args }), "*");
       }
     }
 
@@ -2951,9 +3265,120 @@ const PresentationStudio = (() => {
       repeatBtn.classList.toggle("active", repeatMode !== "off");
     }
 
-    if (playBtn) playBtn.addEventListener("click", () => sendYtCommand("play"));
+    // ------------------------------------------------------------
+    // BARU (4 Sep 2026 v2, permintaan operator) -- progress bar + kolom
+    // waktu LIVE (#psYtLiveBar) yang mengikuti video YouTube yang SUNGGUH
+    // sedang tayang di Layar 2 -- BEDA dari createYtSeekBar() (itu cuma
+    // menyiapkan detik MULAI, SEBELUM "Tampilkan"/"Pratinjau" ditekan).
+    //
+    // Posisi & durasi ASLI dilaporkan balik oleh present.html lewat
+    // postMessage "present_yt_progress" (diteruskan js/presentation.js
+    // sebagai CustomEvent "ps-yt-progress", lihat listener di bawah) --
+    // jadi Studio TIDAK perlu memuat player YouTube-nya sendiri lagi cuma
+    // untuk membaca posisi.
+    //
+    // Kolom waktu (#psYtLiveTimeInput) BISA DIKETIK MANUAL: begitu ▶️ Play
+    // ditekan, isi kolom itu dibaca -- kalau formatnya valid (detik polos,
+    // MM:SS, HH:MM:SS, atau D:HH:MM:SS, lihat parseDHMSToSeconds()), video
+    // LANGSUNG dilompat (seekTo) ke detik itu SEBELUM diputar, baik di
+    // Layar 2 (present.html) MAUPUN pratinjau mini Studio (sendYtCommand()
+    // di atas sudah meneruskan "seek" ke keduanya). Kalau operator BELUM
+    // sempat mengetik apa pun (kolom masih menampilkan posisi TERAKHIR
+    // yang dilaporkan live -- mis. tempat video dijeda), melompat ke detik
+    // yang SAMA itu tidak berpengaruh apa pun -- efeknya sama seperti
+    // sekadar melanjutkan (resume) dari situ, jadi 1 logika ini cukup
+    // untuk 2 kebutuhan (lompat ke titik pilihan ATAU lanjutkan dari jeda).
+    //
+    // Selagi operator SEDANG mengetik (fokus di kolom) atau SEDANG
+    // menggeser slider, laporan posisi live yang masuk TIDAK menimpa
+    // ketikan/geseran itu (`liveEditing`/`liveDragging`) -- baru dibaca
+    // lagi normal begitu selesai (blur / lepas geser).
+    // ------------------------------------------------------------
+    const liveRange = el("psYtLiveRange");
+    const liveTimeInput = el("psYtLiveTimeInput");
+    const liveDurationLabel = el("psYtLiveDuration");
+    let liveDurationSeconds = 0;
+    let liveEditing = false;
+    let liveDragging = false;
+
+    function refreshLiveDurationLabel() {
+      if (liveDurationLabel) liveDurationLabel.textContent = liveDurationSeconds > 0 ? formatSecondsToDHMS(liveDurationSeconds) : "--:--:--";
+    }
+    function resetYtLiveBar() {
+      liveDurationSeconds = 0;
+      if (liveRange) { liveRange.value = "0"; liveRange.max = "0"; }
+      if (liveTimeInput) liveTimeInput.value = "00:00:00";
+      refreshLiveDurationLabel();
+    }
+    resetYtLiveBar();
+    // Dipanggil syncYtLiveBarVisibility() (renderStudioPreview(), atas)
+    // tiap kali video BARU ditayangkan (embedUrl beda dari sebelumnya).
+    window.resetYtLiveBar = resetYtLiveBar;
+
+    window.addEventListener("ps-yt-progress", (e) => {
+      const d = (e && e.detail) || {};
+      if (typeof d.duration === "number" && d.duration > 0 && Math.round(d.duration) !== liveDurationSeconds) {
+        liveDurationSeconds = Math.round(d.duration);
+        if (liveRange) liveRange.max = String(liveDurationSeconds);
+        refreshLiveDurationLabel();
+      }
+      if (typeof d.currentTime === "number" && !liveEditing && !liveDragging) {
+        const secs = Math.max(0, Math.round(d.currentTime));
+        if (liveRange) liveRange.value = String(secs);
+        if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(secs);
+      }
+    });
+
+    if (liveTimeInput) {
+      // Selagi kolom ini difokus, JANGAN ditimpa laporan posisi live --
+      // operator sedang menulis detik tujuan sendiri.
+      liveTimeInput.addEventListener("focus", () => { liveEditing = true; });
+      liveTimeInput.addEventListener("blur", () => { liveEditing = false; });
+      // Enter = langsung sama seperti menekan ▶️ Play (lompat + main).
+      liveTimeInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); liveTimeInput.blur(); if (playBtn) playBtn.click(); }
+      });
+    }
+    if (liveRange) {
+      const startDrag = () => { liveDragging = true; };
+      liveRange.addEventListener("mousedown", startDrag);
+      liveRange.addEventListener("touchstart", startDrag);
+      liveRange.addEventListener("input", () => {
+        if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(parseInt(liveRange.value, 10) || 0);
+      });
+      const commitDrag = () => {
+        liveDragging = false;
+        sendYtCommand("seek", parseInt(liveRange.value, 10) || 0);
+      };
+      liveRange.addEventListener("change", commitDrag);
+      liveRange.addEventListener("mouseup", commitDrag);
+      liveRange.addEventListener("touchend", commitDrag);
+    }
+
+    if (playBtn) playBtn.addEventListener("click", () => {
+      // BARU (4 Sep 2026 v2) -- baca kolom waktu LIVE dulu: kalau isinya
+      // format waktu yang valid, lompat (seek) ke situ SEBELUM main --
+      // kosong/format tidak dikenali = perilaku LAMA (main/lanjut apa
+      // adanya dari posisi sekarang, tanpa melompat).
+      const typed = liveTimeInput ? liveTimeInput.value : "";
+      const secs = parseDHMSToSeconds(typed);
+      if (secs != null) {
+        sendYtCommand("seek", secs);
+        if (liveRange) liveRange.value = String(secs);
+      }
+      sendYtCommand("play");
+    });
     if (pauseBtn) pauseBtn.addEventListener("click", () => sendYtCommand("pause"));
-    if (stopBtn) stopBtn.addEventListener("click", () => sendYtCommand("stop"));
+    if (stopBtn) stopBtn.addEventListener("click", () => {
+      sendYtCommand("stop");
+      // "Stop" (beda dari Pause) mengembalikan video ke keadaan belum-
+      // main -- kolom waktu & slider ikut disamakan ke 00:00:00 supaya
+      // tidak menampilkan posisi lama yang sudah tidak berlaku, TANPA
+      // ikut menghapus durasi yang sudah diketahui (video yang sama,
+      // cuma diulang dari awal).
+      if (liveRange) liveRange.value = "0";
+      if (liveTimeInput) liveTimeInput.value = "00:00:00";
+    });
     if (muteBtn) muteBtn.addEventListener("click", () => {
       muted = !muted;
       sendYtCommand(muted ? "mute" : "unmute");
