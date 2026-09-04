@@ -3470,7 +3470,11 @@ const PresentationStudio = (() => {
     if (el("psFontSelect")) el("psFontSelect").value = theme.font;
     if (el("psBgColor")) el("psBgColor").value = theme.bgColor;
     if (el("psFontScale")) el("psFontScale").value = String(Math.round(theme.scale * 100));
+    // BARU (4 Sep 2026) -- pulihkan juga angka % yang ditampilkan di
+    // samping slider Ukuran Teks/Spasi Baris saat panel dibuka ulang.
+    if (el("psFontScaleValue")) el("psFontScaleValue").textContent = Math.round(theme.scale * 100) + "%";
     if (el("psLineHeight")) el("psLineHeight").value = String(Math.round(theme.lineHeight * 100));
+    if (el("psLineHeightValue")) el("psLineHeightValue").textContent = Math.round(theme.lineHeight * 100) + "%";
     // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
     // layar), lihat catatan --p-content-scale di present.html.
     if (el("psContentScale")) el("psContentScale").value = String(Math.round((theme.contentScale || 1) * 100));
@@ -3577,6 +3581,7 @@ const PresentationStudio = (() => {
     if (el("psFontBold")) el("psFontBold").addEventListener("change", () => saveAndSendTheme({ bold: el("psFontBold").checked }));
     function applyScale() {
       const pct = Number(el("psFontScale").value);
+      if (el("psFontScaleValue")) el("psFontScaleValue").textContent = pct + "%"; // BARU (4 Sep 2026)
       saveAndSendTheme({ scale: pct / 100 });
     }
     if (el("psFontScale")) el("psFontScale").addEventListener("input", applyScale);
@@ -3597,10 +3602,13 @@ const PresentationStudio = (() => {
     // sendiri-sendiri (font besar+spasi rapat, atau sebaliknya).
     function applyLineHeight() {
       const pct = Number(el("psLineHeight").value);
+      if (el("psLineHeightValue")) el("psLineHeightValue").textContent = pct + "%"; // BARU (4 Sep 2026)
       saveAndSendTheme({ lineHeight: pct / 100 });
     }
     if (el("psLineHeight")) el("psLineHeight").addEventListener("input", applyLineHeight);
-    if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(90, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
+    // BARU (4 Sep 2026) -- batas bawah ikut diturunkan ke 60 (lihat catatan
+    // di input range-nya sendiri di index.html).
+    if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(60, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
     if (el("psLineHeightInc")) el("psLineHeightInc").addEventListener("click", () => { el("psLineHeight").value = Math.min(250, Number(el("psLineHeight").value) + 10); applyLineHeight(); });
 
     // BARU (28 Agu 2026) -- "Ukuran Konten": lebar kotak teks/jarak
