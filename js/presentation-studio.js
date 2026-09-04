@@ -1,5 +1,5 @@
 // ============================================================
-//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS, 
+//  STUDIO PRESENTASI (Mode 2 Layar) — layout 3 kolom ala OBS,
 //  KHUSUS laptop/komputer (layar lebar). Menggantikan panel kecil
 //  lama yang "turun terus ke bawah" di menu ⋮ untuk kasus 2 layar --
 //  panel lama (js/presentation.js) tetap dipakai apa adanya untuk
@@ -4140,10 +4140,28 @@ const PresentationStudio = (() => {
       studio.style.setProperty("--ps-preview-box-h", Math.max(90, clamped - LABEL_OVERHEAD) + "px");
       try { localStorage.setItem(STORAGE_KEY, String(clamped)); } catch (e) {}
     }
+    // PERBAIKAN (4 Sep 2026, permintaan operator): dulu kalau BELUM
+    // PERNAH diseret sama sekali (localStorage kosong -- pemakaian
+    // pertama, atau browser/perangkat baru), tidak ada apply() yang
+    // dipanggil sama sekali -- --ps-preview-row-h & --ps-preview-box-h
+    // dibiarkan kosong, jatuh ke nilai bawaan CSS (minmax(140px,14vh)
+    // untuk tinggi BARIS, tapi 156px TETAP untuk tinggi KOTAK di
+    // dalamnya) -- di banyak layar 14vh lebih PENDEK dari 156px+label,
+    // jadi kotak "Berikutnya"/"Tayang" ikut TERPOTONG separuh sejak
+    // awal, padahal splitter-nya sendiri sebenarnya sudah bisa
+    // diseret kalau operator tahu harus menyeretnya dulu. Sekarang
+    // SELALU dipanggil apply() sejak awal -- pakai ukuran tersimpan
+    // kalau ada, atau ukuran bawaan yang wajar (cukup untuk kotak
+    // 16:9 utuh tanpa terpotong) kalau belum pernah diseret sama
+    // sekali -- supaya kotak selalu tampil UTUH sejak pertama kali
+    // dibuka, splitter cuma untuk memperbesar/memperkecil dari situ.
+    const DEFAULT_ROW = 260;
     try {
       const saved = Number(localStorage.getItem(STORAGE_KEY));
-      if (saved) apply(saved);
-    } catch (e) {}
+      apply(saved || DEFAULT_ROW);
+    } catch (e) {
+      apply(DEFAULT_ROW);
+    }
     let dragging = false, startY = 0, startRow = 0;
     function currentRowH() {
       const panel = el("psPreviewPanel");
