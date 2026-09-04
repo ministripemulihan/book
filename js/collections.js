@@ -218,6 +218,38 @@ function addAnnouncementToCollection(username, name, text, title) {
   return addItemToCollection(username, name, { type: "announcement", text: trimmed, title: title || "" });
 }
 
+// BARU (4 Sep 2026) -- item Canva (roadmap ROADMAP-ai-presentation.md
+// Bagian 3, tab "🔗 Link" Studio Presentasi). `embedUrl` SUDAH dalam
+// bentuk resmi Canva "...view?embed" (dinormalisasi oleh
+// normalizeCanvaLink() di js/presentation-studio.js SEBELUM disimpan --
+// bukan link mentah apa pun yang ditempel operator) -- supaya kalau
+// nanti item ini dibuka lagi dari Kumpulan Ayat, iframe-nya langsung
+// jalan tanpa perlu menormalisasi ulang. `title` opsional, sekadar
+// label tampilan di daftar Kumpulan Ayat (Canva tidak mengirim judul
+// desainnya lewat link biasa).
+function addCanvaToCollection(username, name, canvaItem) {
+  if (!canvaItem || !canvaItem.embedUrl) return null;
+  return addItemToCollection(username, name, {
+    type: "canva",
+    embedUrl: canvaItem.embedUrl,
+    title: canvaItem.title || "",
+  });
+}
+
+// BARU (4 Sep 2026) -- item SoundCloud (roadmap Bagian 4). `trackUrl`
+// disimpan APA ADANYA (link biasa soundcloud.com/... atau on.soundcloud.com/...,
+// TIDAK perlu dinormalisasi seperti Canva -- widget SoundCloud menerima
+// link biasa langsung lewat parameter ?url=). `title` opsional, sekadar
+// label tampilan.
+function addSoundCloudToCollection(username, name, scItem) {
+  if (!scItem || !scItem.trackUrl) return null;
+  return addItemToCollection(username, name, {
+    type: "soundcloud",
+    trackUrl: scItem.trackUrl,
+    title: scItem.title || "",
+  });
+}
+
 // `kidungItem`: { buku, kidungNo, title, bait: [{noBait,teks}], koorTeks }
 // -- 1 panggilan = 1 SLIDE ditambahkan (lihat catatan bentuk item di
 // atas). Dipanggil per-slide dari tab Kidung Studio Presentasi
