@@ -955,7 +955,7 @@
           <!-- BARU (4 Sep 2026, permintaan operator) -- cari judul + urutkan
                daftar, lihat wireYtPlaylistTab() (js/presentation-studio.js). -->
           <div class="ps-yt-row">
-            <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Cari judul video..." />
+            <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Cari judul video atau nama channel..." />
           </div>
           <div class="ps-btn-row" id="psYtPlaylistFilters">
             <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
@@ -971,12 +971,12 @@
             <option value="terbaru">🆕 Terbaru ditambahkan (bawaan -- baris paling bawah di Sheet tampil paling atas)</option>
             <option value="judul_az">Judul A-Z</option>
             <option value="judul_za">Judul Z-A</option>
-            <option value="durasi_desc">Durasi: terpanjang -&gt; terpendek</option>
-            <option value="durasi_asc">Durasi: terpendek -&gt; terpanjang</option>
-            <option value="tanggal_desc">Tanggal upload: terbaru -&gt; terlama</option>
-            <option value="tanggal_asc">Tanggal upload: terlama -&gt; terbaru</option>
             <option value="channel_az">Nama Channel A-Z</option>
             <option value="channel_za">Nama Channel Z-A</option>
+            <option value="durasi_desc">Durasi (menit): 9-0 (terpanjang -&gt; terpendek)</option>
+            <option value="durasi_asc">Durasi (menit): 0-9 (terpendek -&gt; terpanjang)</option>
+            <option value="tanggal_desc">Tanggal upload: terbaru -&gt; terlama</option>
+            <option value="tanggal_asc">Tanggal upload: terlama -&gt; terbaru</option>
           </select>
           <p class="announcement-compose-hint">Urutkan "Durasi" &amp; "Tanggal upload" butuh kolom TAMBAHAN opsional di Sheet: <b>Durasi</b> (angka menit, mis. "12" atau "7.5", atau format jam:menit:detik mis. "1:02:30") &amp; <b>Tanggal</b> (mis. "2026-08-30"). Video yang belum diisi kolom itu otomatis ditaruh paling bawah, bukan hilang.</p>
           <div id="psYtPlaylistList" class="ps-file-list"><p class="present-saved-empty">Belum ada video dimuat -- tempel link Google Sheet lalu tekan "🔄 Muat Ulang".</p></div>
