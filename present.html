@@ -20,6 +20,11 @@
        bersama 🎥 Kamera/Gambar Latar), >1 melebarkan (teks memakai
        hampir seluruh lebar layar). Lihat applyTheme() -> contentScale. */
     --p-content-scale: 1;
+    /* BARU (4 Sep 2026) -- toggle "Tebal" (Bold) untuk tulisan Layar 2,
+       lihat applyTheme() di skrip bawah & checkbox #psFontBold di Studio
+       (js/presentation-studio.js). 400 = bawaan lama (tidak berubah sama
+       sekali kalau operator tidak pernah menyentuh toggle ini). */
+    --p-font-weight: 400;
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -102,7 +107,24 @@
   #ref::before, #ref::after {
     content: "—"; opacity: 0.55; margin: 0 0.6em; font-weight: 400;
   }
+  /* BARU (4 Sep 2026) -- baris kecil kedua ("Witness Lee B 4/4 (7 Bait)")
+     di bawah judul kidung -- sengaja TIDAK pakai huruf besar semua/garis
+     "—" seperti #ref di atas (supaya terasa sebagai keterangan kecil,
+     bukan judul kedua), warna sedikit lebih redup dari warna tulisan
+     utama tapi tetap ikut var(--p-ink) tema supaya kontrasnya selalu
+     terjaga di tema apa pun (Terang/Sepia/Putih/Krem dst). */
+  #refSub {
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: var(--p-font-weight, 500);
+    color: var(--p-cam-ink, var(--p-ink));
+    opacity: 0.75;
+    font-size: calc(clamp(14px, 1.6vw, 20px) * var(--p-scale));
+    margin-top: clamp(-10px, -1.6vh, -4px);
+    margin-bottom: clamp(14px, 2.4vh, 34px);
+    text-shadow: var(--p-outline-shadow, none);
+  }
   #text {
+    font-weight: var(--p-font-weight, 400);
     font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
     /* BARU (28 Agu 2026) -- dulu terkunci "1.35" tetap, sekarang bisa
        diatur dari Studio (slider "Spasi Baris", lihat --p-line-height
@@ -333,6 +355,12 @@
 
   <div id="stage">
     <div id="ref" hidden></div>
+    <!-- BARU (4 Sep 2026) -- baris kecil kedua di bawah judul kidung
+         (mis. "Witness Lee B 4/4 (7 Bait)"), lihat CSS #refSub & showMain()
+         kind "kidung" di skrip bawah. HANYA dipakai untuk slide Kidung --
+         tetap `hidden` (kosong) untuk semua jenis tayangan lain (ayat,
+         teks bebas, dst), sama sekali tidak mengubah tampilannya. -->
+    <div id="refSub" hidden></div>
     <div id="text"></div>
     <img id="logoView" hidden />
     <img id="slideView" hidden />
@@ -376,6 +404,7 @@
 <script>
   const stageEl = document.getElementById("stage");
   const refEl = document.getElementById("ref");
+  const refSubEl = document.getElementById("refSub"); // BARU (4 Sep 2026)
   const textEl = document.getElementById("text");
   const idleEl = document.getElementById("idle");
   const logoEl = document.getElementById("logoView");
@@ -814,6 +843,12 @@
     if (theme.lineHeight) root.setProperty("--p-line-height", theme.lineHeight);
     // BARU (28 Agu 2026) -- lihat catatan --p-content-scale di <style> di atas.
     if (theme.contentScale) root.setProperty("--p-content-scale", theme.contentScale);
+    // BARU (4 Sep 2026) -- toggle "Tebal" (Bold): beda dari properti lain
+    // di atas (yang pakai `if (theme.x)`, dilewati kalau falsy/kosong),
+    // ini BOOLEAN -- harus dicek `typeof ... === "boolean"` supaya nilai
+    // `false` (mati) tetap diterapkan, bukan ikut terlewati begitu saja
+    // seperti string/angka kosong.
+    if (typeof theme.bold === "boolean") root.setProperty("--p-font-weight", theme.bold ? "700" : "400");
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -867,6 +902,11 @@
     if (kind !== "youtube" && !ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // stop video saat pindah ke konten lain
     stageEl.classList.remove("fade-in");
     void stageEl.offsetWidth;
+    // BARU (4 Sep 2026) -- #refSub HANYA dipakai untuk kind "kidung" (lihat
+    // di bawah) -- disembunyikan lebih dulu di sini untuk SEMUA jenis
+    // tayangan lain supaya tidak ada sisa baris kecil kidung sebelumnya
+    // nyangkut saat berpindah ke ayat/teks/dst.
+    if (kind !== "kidung") { refSubEl.hidden = true; refSubEl.textContent = ""; }
     if (kind === "verse") {
       refEl.hidden = false;
       refEl.textContent = data.ref || "";
@@ -923,6 +963,18 @@
       // supaya jemaat langsung tahu bagian mana yang koor.
       refEl.hidden = !data.ref;
       refEl.textContent = data.ref || "";
+      // BARU (4 Sep 2026) -- baris kecil kedua "Pengarang Birama (N Bait)"
+      // (mis. "Witness Lee B 4/4 (7 Bait)", contoh mockup yang diminta
+      // operator) -- disusun dari 3 field terpisah yang dikirim
+      // Presentation.sendKidung() (js/presentation.js), bagian yang
+      // kosong (mis. birama belum diisi di Sheet) otomatis dilewati
+      // supaya tidak ada spasi ganda/baris aneh.
+      let kidungSub = "";
+      if (data.pengarang && String(data.pengarang).trim()) kidungSub += String(data.pengarang).trim();
+      if (data.birama && String(data.birama).trim()) kidungSub += (kidungSub ? " " : "") + String(data.birama).trim();
+      if (data.jumlahBait) kidungSub += (kidungSub ? " " : "") + "(" + data.jumlahBait + " Bait)";
+      refSubEl.hidden = !kidungSub;
+      refSubEl.textContent = kidungSub;
       const escKidung = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       const baitHtml = (data.bait || [])
         .map((b) => `<div class="kidung-bait-line">${escKidung((b.noBait ? b.noBait + ". " : "") + (b.teks || "")).replace(/\n/g, "<br>")}</div>`)
@@ -939,6 +991,7 @@
     if (!data) return;
     if (data.type === "clear") {
       refEl.hidden = true; refEl.textContent = "";
+      refSubEl.hidden = true; refSubEl.textContent = ""; // BARU (4 Sep 2026)
       textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
       if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
       stopTimer(true);
