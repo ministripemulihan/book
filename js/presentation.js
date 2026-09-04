@@ -653,6 +653,20 @@ const Presentation = (() => {
         try { window.dispatchEvent(new CustomEvent("ps-camera-status", { detail: { on: data.on, error: data.error || null } })); } catch (e) {}
         return;
       }
+      // BARU (4 Sep 2026 v2) -- posisi & durasi video YouTube utama yang
+      // SUNGGUH sedang tayang di Layar 2 (lihat reportYtProgress() di
+      // present.html), diteruskan sebagai CustomEvent supaya progress bar +
+      // kolom waktu LIVE di js/presentation-studio.js (#psYtLiveBar,
+      // wireYtControls()) bisa memperbaruinya -- pola sama persis dengan
+      // "ps-camera-status" di atas.
+      if (data.type === "present_yt_progress") {
+        try {
+          window.dispatchEvent(new CustomEvent("ps-yt-progress", {
+            detail: { currentTime: data.currentTime, duration: data.duration, state: data.state },
+          }));
+        } catch (e) {}
+        return;
+      }
       if (data.type === "present_ready") {
         winReady = true;
         updateStatusUi();
