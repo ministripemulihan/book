@@ -113,6 +113,12 @@ const PresentationStudio = (() => {
     emas:   { bg: "#1a1206", ink: "#e9c977" },
     biru:   { bg: "#0b1730", ink: "#ffffff" },
     sepia:  { bg: "#f4e8d0", ink: "#3a2c17" },
+    // BARU (4 Sep 2026, permintaan operator) -- 2 tema baru:
+    // "Putih" (latar putih bersih, tulisan biru tegas) & "Krem" (latar
+    // kuning krem lembut, tulisan biru muda) -- beda dari "Terang"
+    // (tulisan hitam) & "Sepia" (tulisan coklat) yang sudah ada.
+    putih:  { bg: "#ffffff", ink: "#173f91" },
+    krem:   { bg: "#fdf1cf", ink: "#2f6fb3" },
   };
 
   let msgColor = "#ffffff";
@@ -210,9 +216,15 @@ const PresentationStudio = (() => {
       // yang tampil di Layar 2 (lihat #kidungStage di present.html):
       // bait apa adanya + baris koor disorot kuning kalau ada.
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
+      // BARU (4 Sep 2026) -- baris kecil kedua (pengarang + birama +
+      // jumlah bait), sama persis susunannya dengan yang dibangun di
+      // present.html (showMain() kind "kidung") supaya pratinjau Studio
+      // benar-benar mencerminkan apa yang tayang di Layar 2.
+      const subText = kidungSubLine(payload.pengarang, payload.birama, payload.jumlahBait);
+      const subHtml = subText ? `<div class="present-preview-ref" style="font-size:0.65em; opacity:0.8; text-transform:none; letter-spacing:normal;">${escapeHtml(subText)}</div>` : "";
       const baitHtml = (payload.bait || []).map((b) => `<div class="present-preview-text">${escapeHtml((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`).join("");
       const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:#ffd84a; font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtml(payload.koorTeks)}</div>` : "";
-      box.innerHTML = `${refHtml}${baitHtml}${koorHtml}`;
+      box.innerHTML = `${refHtml}${subHtml}${baitHtml}${koorHtml}`;
     }
   }
 
@@ -573,6 +585,22 @@ const PresentationStudio = (() => {
     return typeof collectionItemBodyText === "function" ? collectionItemBodyText(it) : "";
   }
 
+  // BARU (4 Sep 2026) -- susun baris kecil "Pengarang Birama (N Bait)" di
+  // bawah judul kidung (mis. "Witness Lee B 4/4 (7 Bait)", meniru mockup
+  // yang diminta operator) -- dipakai baik oleh pratinjau Studio
+  // (renderStudioPreview) MAUPUN dikirim ke Layar 2 lewat sendKidungSlide()
+  // di bawah (present.html menyusun ulang dari field pengarang/birama/
+  // jumlahBait, tapi kita pakai fungsi yang SAMA di sini supaya
+  // pratinjau selalu 1:1 sama persis). Bagian yang kosong (mis. birama
+  // belum diisi di Sheet) otomatis dilewati, tidak ada spasi ganda aneh.
+  function kidungSubLine(pengarang, birama, jumlahBait) {
+    let s = "";
+    if (pengarang && String(pengarang).trim()) s += String(pengarang).trim();
+    if (birama && String(birama).trim()) s += (s ? " " : "") + String(birama).trim();
+    if (jumlahBait) s += (s ? " " : "") + "(" + jumlahBait + " Bait)";
+    return s;
+  }
+
   // Kirim 1 item generik ke Layar 2 SEKARANG JUGA (live langsung, TIDAK
   // lewat antrean "Berikutnya" -- lihat stageOrSend() di atas, yang
   // TETAP dipakai apa adanya oleh Ayat Cepat/File/YouTube, tidak
@@ -636,7 +664,14 @@ const PresentationStudio = (() => {
 
   function sendKidungSlide(it) {
     if (typeof Presentation === "undefined" || !Presentation.sendKidung) return;
-    const payload = { ref: genericItemRefText(it), bait: it.bait || [], koorTeks: it.koorTeks || null };
+    // BARU (4 Sep 2026) -- pengarang/birama/jumlahBait diteruskan apa
+    // adanya (kosong kalau memang tidak ada di item, mis. item lama dari
+    // Kumpulan Ayat yang disimpan sebelum kolom ini ada) -- present.html
+    // sendiri yang menyusun baris kecilnya & melewati bagian yang kosong.
+    const payload = {
+      ref: genericItemRefText(it), bait: it.bait || [], koorTeks: it.koorTeks || null,
+      pengarang: it.pengarang || "", birama: it.birama || "", jumlahBait: it.jumlahBait || 0,
+    };
     Presentation.sendKidung(payload);
     renderStudioPreview(Object.assign({ type: "kidung" }, payload));
   }
@@ -760,6 +795,16 @@ const PresentationStudio = (() => {
         ikon: currentMeta.ikon || "",
         bait: s.baits,
         koorTeks: s.koorTeks,
+        // BARU (4 Sep 2026) -- pengarang/birama/jumlahBait ikut disimpan di
+        // sini (sudah tersedia di currentMeta lewat getKidungList(), lihat
+        // js/kidung.js) supaya bisa ditampilkan sebagai baris kecil kedua
+        // ("Witness Lee B 4/4 (7 Bait)") di bawah judul kidung di Layar 2 --
+        // lihat sendKidungSlide() di bawah & showMain() kind "kidung" di
+        // present.html. Kosong ("") kalau memang belum diisi di Sheet,
+        // supaya tidak ada baris aneh nempel (present.html melewatinya).
+        pengarang: currentMeta.pengarang || "",
+        birama: currentMeta.birama || "",
+        jumlahBait: currentMeta.jumlahBait || 0,
       }));
       slideListWrap.innerHTML = "";
       currentSlides.forEach((slide, i) => {
@@ -3388,7 +3433,7 @@ const PresentationStudio = (() => {
     }
   }
 
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1 };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -3429,8 +3474,11 @@ const PresentationStudio = (() => {
     // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
     // layar), lihat catatan --p-content-scale di present.html.
     if (el("psContentScale")) el("psContentScale").value = String(Math.round((theme.contentScale || 1) * 100));
+    // BARU (4 Sep 2026) -- pulihkan status centang "Tulisan Tebal" saat
+    // panel Studio dibuka ulang/dimuat ulang.
+    if (el("psFontBold")) el("psFontBold").checked = !!theme.bold;
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold } });
   }
 
   function saveAndSendTheme(partial) {
@@ -3440,7 +3488,7 @@ const PresentationStudio = (() => {
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -3525,6 +3573,8 @@ const PresentationStudio = (() => {
     });
     if (el("psFontSelect")) el("psFontSelect").addEventListener("change", () => saveAndSendTheme({ font: el("psFontSelect").value }));
     if (el("psBgColor")) el("psBgColor").addEventListener("input", () => saveAndSendTheme({ bgColor: el("psBgColor").value }));
+    // BARU (4 Sep 2026) -- toggle "Tulisan Tebal" (Layar 2).
+    if (el("psFontBold")) el("psFontBold").addEventListener("change", () => saveAndSendTheme({ bold: el("psFontBold").checked }));
     function applyScale() {
       const pct = Number(el("psFontScale").value);
       saveAndSendTheme({ scale: pct / 100 });
