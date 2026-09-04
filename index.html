@@ -859,6 +859,8 @@
               <option value="1">1 bait / layar (tanpa koor)</option>
               <option value="2+koor">2 bait / layar + koor</option>
               <option value="3+koor">3 bait / layar + koor</option>
+              <!-- BARU (4 Sep 2026, permintaan operator) -->
+              <option value="4+koor">4 bait / layar + koor</option>
               <option value="koor">Koor saja</option>
             </select>
             <div id="psKidungSlideList" class="ps-verse-list"></div>
@@ -1174,6 +1176,8 @@
             <button type="button" id="psFontDec" class="chip-btn small">A-</button>
             <input type="range" id="psFontScale" min="60" max="160" value="100" style="flex:1;" />
             <button type="button" id="psFontInc" class="chip-btn small">A+</button>
+            <!-- BARU (4 Sep 2026, permintaan operator) -->
+            <span id="psFontScaleValue" class="ps-pen-size-value">100%</span>
           </div>
           <!-- BARU (28 Agu 2026) -- "Spasi Baris" (jarak antar baris di
                Layar 2), dipisah dari "Ukuran Teks" -- lihat --p-line-height
@@ -1184,8 +1188,14 @@
           <div class="ps-field-label">Spasi Baris</div>
           <div class="ps-btn-row">
             <button type="button" id="psLineHeightDec" class="chip-btn small" title="Rapatkan spasi baris">≡-</button>
-            <input type="range" id="psLineHeight" min="90" max="250" value="135" style="flex:1;" />
+            <!-- BARU (4 Sep 2026, permintaan operator) -- batas bawah
+                 diturunkan dari 90% ke 60% supaya jarak antar bait Kidung
+                 (yang ikut mengecil/membesar bersama slider ini, lihat
+                 .kidung-bait-line/.kidung-line-gap di present.html) bisa
+                 dirapatkan lebih jauh lagi kalau memang terasa kebesaran. -->
+            <input type="range" id="psLineHeight" min="60" max="250" value="135" style="flex:1;" />
             <button type="button" id="psLineHeightInc" class="chip-btn small" title="Renggangkan spasi baris">≡+</button>
+            <span id="psLineHeightValue" class="ps-pen-size-value">135%</span>
           </div>
           <!-- BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak
                teks/jarak tepi di Layar 2) -- lihat applyContentScale()
