@@ -367,6 +367,7 @@ function splitKidungIntoSlides(baits, mode, groupSizes) {
     const n = mode === "1" || mode === "1+koor" ? 1
       : mode === "2+koor" ? 2
       : mode === "3+koor" ? 3
+      : mode === "4+koor" ? 4
       : 1;
     sizes = [];
     let remaining = baits.length;
