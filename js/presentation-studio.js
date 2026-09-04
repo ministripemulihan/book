@@ -176,6 +176,7 @@ const PresentationStudio = (() => {
   function syncYtLiveBarVisibility(payload) {
     const wrap = el("psYtLiveBar");
     if (!wrap) return;
+    const wasHidden = wrap.hidden;
     if (payload && payload.type === "youtube") {
       wrap.hidden = false;
       if (payload.embedUrl && payload.embedUrl !== lastYtEmbedUrlForLiveBar) {
@@ -185,6 +186,16 @@ const PresentationStudio = (() => {
     } else {
       wrap.hidden = true;
       lastYtEmbedUrlForLiveBar = null;
+    }
+    // BARU (4 Sep 2026, permintaan operator) -- lihat catatan panjang di
+    // window.refreshPreviewSplitterSpacing() (wirePreviewResize(), bawah
+    // file ini): begitu livebar berganti tampil/sembunyi, kotak
+    // Berikutnya/Tayang perlu langsung menyesuaikan tinggi supaya tidak
+    // kepotong. requestAnimationFrame supaya diukur SETELAH `wrap.hidden`
+    // di atas benar-benar diterapkan browser (getBoundingClientRect
+    // livebar butuh itu sudah ter-render).
+    if (wasHidden !== wrap.hidden && typeof window.refreshPreviewSplitterSpacing === "function") {
+      requestAnimationFrame(() => window.refreshPreviewSplitterSpacing());
     }
   }
 
@@ -467,6 +478,23 @@ const PresentationStudio = (() => {
     }
     const reorderBtn = el("psCollectionReorderToggle");
     const reorderOn = !!(reorderBtn && reorderBtn.classList.contains("active"));
+    // BARU (4 Sep 2026, permintaan operator) -- lihat catatan panjang di
+    // removeKidungGroupFromCollection() (js/collections.js): kidung yang
+    // ditambahkan lewat "➕ Semua" tersimpan sebagai BANYAK item terpisah
+    // (1 per bait). Di sini dihitung dulu, per kidung (kunci buku+no),
+    // berapa banyak item bait-nya & di index berapa kemunculan PERTAMA-nya
+    // -- supaya tombol "🗑️ Hapus N Bait" cuma muncul SEKALI per kidung
+    // (di baris pertamanya), bukan di setiap baris bait (yang akan
+    // berulang/membingungkan).
+    const kidungGroupCount = {};
+    const kidungGroupFirstIdx = {};
+    items.forEach((it, i) => {
+      if (it && it.type === "kidung") {
+        const key = (it.buku || "") + "|" + it.kidungNo;
+        kidungGroupCount[key] = (kidungGroupCount[key] || 0) + 1;
+        if (!(key in kidungGroupFirstIdx)) kidungGroupFirstIdx[key] = i;
+      }
+    });
     wrap.innerHTML = "";
     items.forEach((it, i) => {
       const ref = genericItemRefText(it);
@@ -474,8 +502,16 @@ const PresentationStudio = (() => {
       const row = document.createElement("div");
       row.className = "ps-verse-row";
       row.dataset.playlistIdx = String(i);
+      const isKidung = it && it.type === "kidung";
+      const kKey = isKidung ? (it.buku || "") + "|" + it.kidungNo : null;
+      const groupN = isKidung ? kidungGroupCount[kKey] : 0;
+      const showGroupDelete = isKidung && groupN > 1 && kidungGroupFirstIdx[kKey] === i;
       row.innerHTML =
         `<div class="ps-verse-row-body"><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
+        `<div class="ps-verse-row-del">
+           ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
+           <button type="button" class="chip-btn small danger" data-del="one" title="Hapus item ini saja dari kumpulan">🗑️ Hapus Item Ini</button>
+         </div>` +
         (reorderOn
           ? `<div class="ps-verse-row-reorder">
               <button type="button" class="chip-btn small" data-mv="top" title="Ke paling awal"${i === 0 ? " disabled" : ""}>⏮️</button>
@@ -488,6 +524,29 @@ const PresentationStudio = (() => {
         setActivePlaylist(items, i, col.name);
         sendGenericItemLive(items[i]);
       });
+      // "🗑️ Hapus Item Ini" -- hapus 1 item (1 bait, kalau kidung) saja.
+      row.querySelector('[data-del="one"]').addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!confirm(`Hapus "${ref}" dari kumpulan "${col.name}"?`)) return;
+        if (removeItemFromCollection(username, sel.value, i)) {
+          activePlaylist = null;
+          renderCollectionSelect();
+        }
+      });
+      // "🗑️ Hapus N Bait Kidung Ini" -- hapus SEMUA bait kidung yang sama
+      // sekaligus (permintaan operator: dulu harus hapus satu-satu).
+      const groupBtn = row.querySelector('[data-del="group"]');
+      if (groupBtn) {
+        groupBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!confirm(`Hapus SEMUA ${groupN} bait kidung "${it.title || ("No. " + it.kidungNo)}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+          const removed = removeKidungGroupFromCollection(username, sel.value, it.buku, it.kidungNo);
+          if (removed > 0) {
+            activePlaylist = null;
+            renderCollectionSelect();
+          }
+        });
+      }
       if (reorderOn) {
         row.querySelectorAll("[data-mv]").forEach((btn) => {
           btn.addEventListener("click", (e) => {
@@ -4074,7 +4133,7 @@ const PresentationStudio = (() => {
     const studio = el("presentStudio");
     if (!handle || !studio) return;
     const STORAGE_KEY = "bible_app_studio_preview_row_h_v1";
-    const LABEL_OVERHEAD = 60; // tinggi label "Berikutnya/Tayang" + padding panel
+    const LABEL_OVERHEAD_FALLBACK = 60; // dipakai kalau pengukuran nyata gagal (elemen belum ada di DOM)
     const MIN_ROW = 150;
     // PERMINTAAN OPERATOR (28 Agu 2026, direvisi lagi hari yang sama, lalu
     // direvisi SEKALI LAGI di hari yang sama juga -- lihat mockup yang
@@ -4102,6 +4161,40 @@ const PresentationStudio = (() => {
     // sebesar mungkin, memenuhi lebar ATAU tinggi yang tersedia, mana
     // yang lebih dulu habis) TANPA PERNAH membuat kotaknya penyok --
     // bentuknya selalu identik dengan Layar 2 (present.html) sungguhan.
+    // BARU (4 Sep 2026, permintaan operator) -- laporan: "saat tampilkan
+    // YouTube, kotaknya turun tapi splitter tidak turun, jadi kotak
+    // Berikutnya/Tayang kepotong separuh". Sebabnya: begitu video
+    // YouTube tayang, progress bar + kolom waktu LIVE (#psYtLiveBar,
+    // lihat syncYtLiveBarVisibility() & wireYtControls()) MUNCUL sebagai
+    // baris TAMBAHAN di atas kotak Berikutnya/Tayang -- satu induk yang
+    // sama (#psPreviewPanel) dengan tinggi TOTAL tetap (--ps-preview-
+    // row-h). Dulu ruang untuk baris tambahan itu tidak pernah
+    // diperhitungkan (LABEL_OVERHEAD selalu 60px tetap, cuma cukup utk
+    // label "Berikutnya/Tayang" + padding panel) -- begitu livebar
+    // muncul, dia "mencuri" ruang dari kotak tanpa kotak/splitter ikut
+    // menyesuaikan, sehingga kotak (--ps-preview-box-h, tetap dihitung
+    // pakai overhead lama yang lebih kecil) jadi lebih tinggi dari sisa
+    // ruang yang sungguh ada & terlihat kepotong.
+    // Perbaikan: overhead sekarang DIUKUR NYATA dari DOM (padding panel +
+    // tinggi label + tinggi livebar KALAU sedang tampil), bukan angka
+    // tetap -- otomatis ikut bertambah saat livebar muncul & berkurang
+    // lagi saat disembunyikan (dipanggil ulang lewat
+    // window.refreshPreviewSplitterSpacing(), dipanggil dari
+    // syncYtLiveBarVisibility() tiap kali livebar berganti tampil/sembunyi).
+    function currentOverhead() {
+      const panel = el("psPreviewPanel");
+      const head = panel ? panel.querySelector(".ps-preview-panel-head") : null;
+      if (!panel || !head) return LABEL_OVERHEAD_FALLBACK;
+      let h = 0;
+      try {
+        const cs = getComputedStyle(panel);
+        h += (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      } catch (e) {}
+      h += head.getBoundingClientRect().height;
+      const liveBar = el("psYtLiveBar");
+      if (liveBar && !liveBar.hidden) h += liveBar.getBoundingClientRect().height + 6;
+      return h > 0 ? Math.round(h) + 6 : LABEL_OVERHEAD_FALLBACK;
+    }
     function currentRatio() {
       const raw = getComputedStyle(document.documentElement).getPropertyValue("--ps-preview-ratio");
       const m = raw && raw.match(/([\d.]+)\s*\/\s*([\d.]+)/);
@@ -4127,7 +4220,7 @@ const PresentationStudio = (() => {
       // sisanya dibagi 2 untuk 1 kotak (Berikutnya ATAU Tayang).
       const perSlotW = Math.max(60, (rowW - centerW - gap * 2) / 2);
       const boxH = perSlotW / currentRatio();
-      return Math.round(boxH + LABEL_OVERHEAD);
+      return Math.round(boxH + currentOverhead());
     }
     function maxRow() {
       const byHeight = Math.round(window.innerHeight * 0.92);
@@ -4137,9 +4230,14 @@ const PresentationStudio = (() => {
     function apply(rowPx) {
       const clamped = Math.max(MIN_ROW, Math.min(maxRow(), Math.round(rowPx)));
       studio.style.setProperty("--ps-preview-row-h", clamped + "px");
-      studio.style.setProperty("--ps-preview-box-h", Math.max(90, clamped - LABEL_OVERHEAD) + "px");
+      studio.style.setProperty("--ps-preview-box-h", Math.max(90, clamped - currentOverhead()) + "px");
       try { localStorage.setItem(STORAGE_KEY, String(clamped)); } catch (e) {}
     }
+    // Dipanggil syncYtLiveBarVisibility() (atas) tiap kali #psYtLiveBar
+    // berganti tampil/sembunyi, supaya kotak Berikutnya/Tayang LANGSUNG
+    // menyusut/membesar mengikuti ruang yang sungguh tersisa, tanpa
+    // perlu operator menyeret splitter sendiri atau me-resize jendela.
+    window.refreshPreviewSplitterSpacing = () => apply(currentRowH());
     // PERBAIKAN (4 Sep 2026, permintaan operator): dulu kalau BELUM
     // PERNAH diseret sama sekali (localStorage kosong -- pemakaian
     // pertama, atau browser/perangkat baru), tidak ada apply() yang
