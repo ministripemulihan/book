@@ -1,5 +1,5 @@
 // ============================================================
-//  MODE PRESENTASI 2 LAYAR (baru)
+//  MODE PRESENTASI 2 LAYAR (baru) 
 // ============================================================
 // Fitur:
 //  1. Toggle "1 Layar" (biasa, seperti sekarang) <-> "2 Layar" (menu ⋮ ->
