@@ -210,6 +210,12 @@ const PresentationStudio = (() => {
     if (payload.type === "black") { box.innerHTML = '<div class="present-preview-black">⬛ Layar Hitam</div>'; return; }
     if (payload.type === "logo") { box.innerHTML = '<div class="present-preview-idle">◆ Logo ditampilkan</div>'; return; }
     if (payload.type === "youtube") {
+      // BARU (4 Sep 2026 v3) -- setiap kali video BARU ditayangkan (baik
+      // ke Layar 2 maupun kotak pratinjau ini), tandai bahwa ▶️ Play
+      // BERIKUTNYA yang ditekan operator perlu "trik" mute->play->unmute
+      // otomatis (lihat wireYtControls()) supaya suara langsung terdengar
+      // dari 1x tekan saja -- lihat catatan panjang di sana kenapa perlu.
+      if (payload.embedUrl && typeof window.markYtNeedsSoundUnlock === "function") window.markYtNeedsSoundUnlock();
       // PERBAIKAN (laporan operator, 19 Agu 2026): kotak pratinjau ini
       // adalah iframe YouTube TERPISAH dari yang sungguh tayang di Layar 2
       // (present.html) -- 2 pemutar video yang berlainan sepenuhnya.
@@ -2509,11 +2515,20 @@ const PresentationStudio = (() => {
       // ini JUGA meneruskan play/pause/stop/mute/unmute ke pratinjau.
       return embedUrl;
     }
-    // Mode bawaan -- autoplay + bisu, supaya operator langsung lihat
-    // videonya "hidup" di layar kecil tanpa perlu menekan apa pun &
-    // tanpa dobel suara dengan Layar 2 sungguhan.
+    // PERBAIKAN (4 Sep 2026 v3, permintaan operator) -- dulu pratinjau
+    // mini ini langsung autoplay (bisu) begitu "▶️ Tampilkan" diklik,
+    // sehingga operator melihat video "sudah jalan" padahal Layar 2
+    // sungguhan masih diam menunggu ▶️ Play (mismatch yang membingung-
+    // kan). Sekarang "autoplay=1" DIHAPUS -- pratinjau ini cuma dimuat
+    // dalam keadaan siap/diam, PERSIS seperti Layar 2, sama-sama
+    // menunggu ▶️ Play ditekan. "mute=1" TETAP dipertahankan permanen
+    // di URL-nya (beda dari Layar 2) supaya pratinjau ini TIDAK PERNAH
+    // bersuara apa pun -- termasuk begitu nanti diputar lewat tombol
+    // ▶️ Play -- karena itu satu-satunya penjamin tidak ada dobel suara
+    // dengan Layar 2 sungguhan (lihat sendYtCommand(), yang sengaja
+    // tidak meneruskan mute/unmute ke pratinjau ini di mode bawaan).
     const sep = embedUrl.includes("?") ? "&" : "?";
-    return embedUrl + sep + "autoplay=1&mute=1";
+    return embedUrl + sep + "mute=1";
   }
 
   function formatYtDuration(totalSeconds) {
@@ -3272,6 +3287,31 @@ const PresentationStudio = (() => {
     const stopBtn = el("psYtStopBtn");
     const repeatBtn = el("psYtRepeatBtn");
     let muted = false;
+    // ------------------------------------------------------------
+    // BARU (4 Sep 2026 v3, permintaan operator) -- laporan: "saat tekan
+    // ▶️ Play pertama kali, suara tidak muncul, harus ⏹️ Stop lalu
+    // 🔇 Mute, 🔇 Bersuara (unmute), baru ▶️ Play lagi -- baru suaranya
+    // muncul". Sebabnya: begitu video BARU dimuat (src iframe YouTube
+    // diganti), iframe itu jadi dokumen yang SAMA SEKALI BARU di mata
+    // browser -- perintah "playVideo" yang dikirim lewat postMessage
+    // dari Studio TIDAK dihitung sebagai "interaksi pengguna langsung"
+    // di dalam iframe itu, jadi kebijakan browser (Chrome dkk) MENOLAK
+    // memutar video itu DENGAN SUARA di percobaan pertama (video bisu
+    // dibolehkan tanpa syarat apa pun, video bersuara yang BARU mulai
+    // butuh interaksi langsung). Setelah operator memaksa lewat
+    // Stop->Mute->Unmute->Play, di percobaan itu videonya SUDAH SEMPAT
+    // "hidup" (walau bisu) sehingga menyalakan suara belakangan (bukan
+    // memulai dari nol dengan suara) TIDAK kena aturan yang sama --
+    // makanya baru bekerja.
+    //
+    // PERBAIKAN: begitu ada video BARU (ditandai renderStudioPreview()
+    // lewat markYtNeedsSoundUnlock() di bawah), ▶️ Play SEKARANG
+    // otomatis melakukan urutan yang SAMA di baliknya SENDIRI (mute ->
+    // play -> tunggu videonya benar sudah main -> unmute) -- operator
+    // cukup 1x tekan ▶️ Play saja, video langsung main DAN bersuara,
+    // tanpa perlu 4 langkah manual lagi.
+    let needsSoundUnlock = false;
+    window.markYtNeedsSoundUnlock = () => { needsSoundUnlock = true; };
     const REPEAT_KEY = "bible_app_yt_repeat_mode_v1";
     const REPEAT_LABELS = { off: "🔁 Ulang: Mati", one: "🔂 Ulang: Satu Video", all: "🔁 Ulang: Semua" };
     let repeatMode = localStorage.getItem(REPEAT_KEY) || "off";
@@ -3429,7 +3469,36 @@ const PresentationStudio = (() => {
         sendYtCommand("seek", secs);
         if (liveRange) liveRange.value = String(secs);
       }
-      sendYtCommand("play");
+      // BARU (4 Sep 2026 v3) -- lihat catatan panjang "needsSoundUnlock"
+      // di atas. Kalau operator SENGAJA sudah menekan 🔇 Mute (muted
+      // true), jangan dipaksa bersuara -- cukup main bisu seperti biasa.
+      if (needsSoundUnlock && !muted) {
+        sendYtCommand("mute");
+        sendYtCommand("play");
+        let settled = false;
+        const finishUnlock = () => {
+          if (settled) return;
+          settled = true;
+          window.removeEventListener("ps-yt-progress", onProgress);
+          clearTimeout(fallbackTimer);
+          if (!muted) sendYtCommand("unmute"); // jaga-jaga kalau operator sempat menekan Mute selagi menunggu
+          needsSoundUnlock = false;
+        };
+        // Nyalakan suara TEPAT begitu player benar-benar mulai main
+        // (playerState 1) -- lebih andal daripada jeda waktu tetap,
+        // karena kecepatan koneksi/buffering tiap kali bisa beda.
+        const onProgress = (e) => {
+          const st = e && e.detail && e.detail.state;
+          if (st === 1) finishUnlock();
+        };
+        window.addEventListener("ps-yt-progress", onProgress);
+        // Jaga-jaga kalau laporan status di atas tidak pernah datang
+        // (mis. video gagal dimuat) -- tetap nyalakan suara setelah
+        // waktu wajar, supaya tidak diam bisu selamanya.
+        const fallbackTimer = setTimeout(finishUnlock, 1500);
+      } else {
+        sendYtCommand("play");
+      }
     });
     if (pauseBtn) pauseBtn.addEventListener("click", () => sendYtCommand("pause"));
     if (stopBtn) stopBtn.addEventListener("click", () => {
