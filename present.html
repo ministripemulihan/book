@@ -178,8 +178,18 @@
      koor" di tema apa pun (gelap/terang/sepia/dst -- lihat THEMES di
      js/presentation-studio.js), meniru mockup layar biru-kuning yang
      dicontohkan. */
-  .kidung-bait-line { margin: 0 auto clamp(10px, 1.6vh, 20px); }
-  .kidung-line-gap { display: block; height: clamp(6px, 1vh, 14px); }
+  .kidung-bait-line {
+    /* BARU (4 Sep 2026, permintaan operator) -- jarak antar BLOK bait
+       (dulu clamp() tetap, TIDAK ikut slider "Spasi Baris" sama sekali --
+       jadi kalau jarak ini terasa kebesaran, operator tidak py cara
+       mengecilkannya). Sekarang ikut skala var(--p-line-height) yang
+       sama dipakai slider itu (nilai bawaan 1.35 => rasio 1, tidak
+       berubah kalau slider belum disentuh sama sekali) -- geser slider
+       ke kiri (mis. 60%) merapatkan jarak antar bait JUGA, bukan cuma
+       spasi antar baris di dalam 1 bait yang panjang. */
+    margin: 0 auto calc(clamp(10px, 1.6vh, 20px) * var(--p-line-height, 1.35) / 1.35);
+  }
+  .kidung-line-gap { display: block; height: calc(clamp(6px, 1vh, 14px) * var(--p-line-height, 1.35) / 1.35); }
   .kidung-koor-line {
     color: var(--p-koor, #ffd84a);
     font-weight: 600;
