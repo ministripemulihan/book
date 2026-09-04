@@ -1063,8 +1063,14 @@
       // BARU (28 Agu 2026) -- "stop": ⏹️ Stop di Studio. "stopVideo" (beda
       // dari pauseVideo) membatalkan pemutaran & mengembalikan player ke
       // keadaan belum-main, bukan cuma menjeda di posisi terakhir.
-      const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute" }[data.action];
-      if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      // BARU (4 Sep 2026 v2) -- "seek": lompat ke detik `data.arg` (dikirim
+      // wireYtControls()/sendYtCommand() di js/presentation-studio.js, baik
+      // dari slider progress LIVE digeser, maupun dari kolom waktu yang
+      // diketik manual lalu ▶️ Play ditekan). `true` (allowSeekAhead) supaya
+      // tetap bisa lompat ke bagian yang belum sempat di-buffer.
+      const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo" }[data.action];
+      const args = data.action === "seek" ? [Number(data.arg) || 0, true] : [];
+      if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args }), "*");
       return;
     }
     // BARU (28 Agu 2026) -- 🔁 Ulang (Repeat) dari Studio: "off" (mati,
@@ -1185,11 +1191,38 @@
     const sep = embedUrl.includes("?") ? "&" : "?";
     return embedUrl + sep + "autoplay=1";
   }
+  // BARU (4 Sep 2026 v2, permintaan operator) -- laporkan balik posisi
+  // (detik berjalan) & durasi video YouTube utama yang SUNGGUH sedang
+  // tayang ke jendela utama (Studio Presentasi), supaya progress bar +
+  // kolom waktu LIVE di sana (#psYtLiveBar, lihat wireYtControls() di
+  // js/presentation-studio.js) ikut bergerak sesuai kenyataan -- baik
+  // selagi main (beberapa kali per detik) maupun selagi dijeda (posisi
+  // diam di detik terakhir). Ditahan (throttle) ke maksimal 5x/detik
+  // supaya tidak membanjiri postMessage; YouTube sendiri bisa mengirim
+  // "infoDelivery" jauh lebih sering dari itu.
+  let ytLastProgressPostAt = 0;
+  function reportYtProgress(info) {
+    if (!window.opener || typeof info.currentTime !== "number") return;
+    const now = Date.now();
+    if (now - ytLastProgressPostAt < 200) return;
+    ytLastProgressPostAt = now;
+    try {
+      window.opener.postMessage({
+        source: "bibleAppPresenter",
+        type: "present_yt_progress",
+        currentTime: info.currentTime,
+        duration: typeof info.duration === "number" ? info.duration : 0,
+        state: typeof info.playerState === "number" ? info.playerState : null,
+      }, location.origin);
+    } catch (err) { /* beda origin / opener tertutup -- diamkan */ }
+  }
   window.addEventListener("message", (e) => {
     if (e.source !== ytEl.contentWindow) return; // hanya pesan dari player YouTube utama
     let data;
     try { data = JSON.parse(e.data); } catch (err) { return; }
-    if (!data || data.event !== "infoDelivery" || !data.info || typeof data.info.playerState !== "number") return;
+    if (!data || data.event !== "infoDelivery" || !data.info) return;
+    reportYtProgress(data.info);
+    if (typeof data.info.playerState !== "number") return;
     const state = data.info.playerState;
     if (state === ytLastState) return;
     const prevState = ytLastState;
