@@ -839,7 +839,7 @@
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="kidung" hidden>
-          <p class="announcement-compose-hint">Cari kidung dari data yang sama dengan menu 🎵 Kidung biasa. Pilih mode tampilan slide, lalu "▶️ Tayangkan" langsung ke Layar 2, atau "➕ Daftar" untuk menyimpannya ke Kumpulan Ayat (kolom kiri) supaya bisa dipindah pakai panah kiri/kanan atau clicker/stylus presentasi saat acara berlangsung.</p>
+          <p class="announcement-compose-hint">Cari kidung dari data yang sama dengan menu 🎵 Kidung biasa. Pilih mode tampilan slide, lalu "▶️ Tayangkan" langsung ke Layar 2 SEKARANG JUGA, "👁️ Pratinjau" untuk menaruhnya dulu standby di kotak "Berikutnya" (dicek dulu isinya, baru ditekan "▶ Tayangkan" di kotak itu), atau "➕ Daftar" untuk menyimpannya ke Kumpulan Ayat (kolom kiri) supaya bisa dipindah pakai panah kiri/kanan atau clicker/stylus presentasi saat acara berlangsung.</p>
           <div class="kidung-book-toggle" id="psKidungBookToggle"></div>
           <div class="kidung-number-form">
             <input type="text" id="psKidungNoInput" class="kidung-number-input" placeholder="No. kidung, mis. 169" />
@@ -886,10 +886,17 @@
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="youtube" hidden>
-          <p class="announcement-compose-hint">Tempel link video YouTube. "▶️ Tampilkan" langsung memutar 1 video. Untuk beberapa video berurutan yang bisa dipindah pakai ◀ ▶ saat live (tersimpan di "🖼️ Media Tersimpan" kolom kiri), tambahkan ke daftar dulu lalu simpan. Khusus laptop/komputer (dual layar); tidak tersedia di HP.</p>
+          <p class="announcement-compose-hint">Tempel link video YouTube. "▶️ Tampilkan" SELALU langsung memutar video ini SEKARANG JUGA di Layar 2 (apa pun mode 1/dual monitornya). "👁️ Pratinjau" menaruhnya dulu standby di kotak "Berikutnya" (dual monitor) supaya bisa dicek dulu sebelum ditekan "▶ Tayangkan" di kotak itu. Geser progress bar di bawah (atau tombol ✏️) untuk memilih detik video mulai diputar. Untuk beberapa video berurutan yang bisa dipindah pakai ◀ ▶ saat live (tersimpan di "🖼️ Media Tersimpan" kolom kiri), tambahkan ke daftar dulu lalu simpan. Khusus laptop/komputer (dual layar); tidak tersedia di HP.</p>
           <div class="ps-yt-row">
             <input type="text" id="psYtInput" class="columns-lang-select" placeholder="https://www.youtube.com/watch?v=..." />
           </div>
+          <!-- BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
+               mulai" untuk video yang ditempel di atas, lihat
+               createYtSeekBar() di js/presentation-studio.js. Bawaan SELALU
+               00:00:00 (paling kiri); digeser ke kanan sampai maksimal =
+               durasi video (diambil otomatis lewat YouTube IFrame API
+               begitu link valid ditempel) untuk mulai dari detik terakhir. -->
+          <div id="psYtSeekWrap"></div>
           <label class="ps-yt-bg-toggle">
             <input type="checkbox" id="psYtBgMode" />
             Latar suara saja (video disembunyikan, ayat/pengumuman tetap tampil di Layar 2)
@@ -911,6 +918,7 @@
           </label>
           <div class="ps-btn-row">
             <button type="button" id="psYtShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psYtPreviewBtn" class="chip-btn small">👁️ Pratinjau</button>
             <button type="button" id="psYtAddQueueBtn" class="chip-btn small">➕ Tambah ke Daftar</button>
           </div>
           <div class="ps-yt-hint">Mendukung link youtube.com/watch, youtu.be, dan YouTube Shorts. Centang "Latar suara saja" untuk memutar lagu di belakang layar sambil tetap menampilkan ayat/pengumuman -- mis. video A tampil (boleh dibisukan lewat 🔇 Mute) sementara suara sebenarnya berasal dari video B yang diputar sebagai latar.</div>
@@ -935,7 +943,7 @@
 
           <hr class="ps-yt-sep" />
           <div class="ps-field-label">📺 Playlist Video (dari Google Sheet)</div>
-          <p class="announcement-compose-hint">Tempel link Google Sheet yang sudah "Publish to web" sebagai CSV (kolom: Title, Channel, URL, lalu Anak, Remaja, Pemuda, SPR, Injil, Bebas -- isi "1" di kolom kategori yang cocok, boleh lebih dari satu). Sheet ini tetap milik &amp; dikelola sendiri -- boleh terus diperbarui isinya kapan saja, aplikasi cuma membaca ulang isinya tiap ditekan "🔄 Muat Ulang".</p>
+          <p class="announcement-compose-hint">Tempel link Google Sheet yang sudah "Publish to web" sebagai CSV (kolom: Title, Channel, URL, lalu Anak, Remaja, Pemuda, SPR, Injil, Bebas -- isi "1" di kolom kategori yang cocok, boleh lebih dari satu; kolom opsional <b>Durasi</b> &amp; <b>Tanggal</b> di bawah bisa ditambah kalau mau pakai urutan berdasarkan itu). Sheet ini tetap milik &amp; dikelola sendiri -- boleh terus diperbarui isinya kapan saja, aplikasi cuma membaca ulang isinya tiap ditekan "🔄 Muat Ulang". Tiap video punya progress bar detik-mulai sendiri (geser atau tombol ✏️, bawaan 00:00:00 -- kalau kolom Durasi belum diisi, digeser sampai maksimal 3 hari untuk video/rekaman sangat panjang), plus "👁️ Pratinjau" (standby di kotak "Berikutnya") dan "▶️ Tampilkan" (SELALU langsung live SEKARANG JUGA).</p>
           <div class="ps-yt-row">
             <input type="text" id="psYtPlaylistSheetUrl" class="columns-lang-select" placeholder="Link Google Sheet (Publish to web -> CSV), atau link Sheet biasa" />
           </div>
@@ -944,6 +952,11 @@
             <button type="button" id="psYtPlaylistReloadBtn" class="chip-btn small primary">🔄 Muat Ulang</button>
           </div>
           <div class="ps-yt-hint" id="psYtPlaylistStatus">Belum ada link Google Sheet yang disimpan.</div>
+          <!-- BARU (4 Sep 2026, permintaan operator) -- cari judul + urutkan
+               daftar, lihat wireYtPlaylistTab() (js/presentation-studio.js). -->
+          <div class="ps-yt-row">
+            <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Cari judul video..." />
+          </div>
           <div class="ps-btn-row" id="psYtPlaylistFilters">
             <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
             <button type="button" class="chip-btn small" data-filter="anak">Anak</button>
@@ -953,6 +966,19 @@
             <button type="button" class="chip-btn small" data-filter="injil">Injil</button>
             <button type="button" class="chip-btn small" data-filter="bebas">Bebas</button>
           </div>
+          <div class="ps-field-label" style="margin-top:10px;">Urutkan</div>
+          <select id="psYtPlaylistSort" class="columns-lang-select">
+            <option value="terbaru">🆕 Terbaru ditambahkan (bawaan -- baris paling bawah di Sheet tampil paling atas)</option>
+            <option value="judul_az">Judul A-Z</option>
+            <option value="judul_za">Judul Z-A</option>
+            <option value="durasi_desc">Durasi: terpanjang -&gt; terpendek</option>
+            <option value="durasi_asc">Durasi: terpendek -&gt; terpanjang</option>
+            <option value="tanggal_desc">Tanggal upload: terbaru -&gt; terlama</option>
+            <option value="tanggal_asc">Tanggal upload: terlama -&gt; terbaru</option>
+            <option value="channel_az">Nama Channel A-Z</option>
+            <option value="channel_za">Nama Channel Z-A</option>
+          </select>
+          <p class="announcement-compose-hint">Urutkan "Durasi" &amp; "Tanggal upload" butuh kolom TAMBAHAN opsional di Sheet: <b>Durasi</b> (angka menit, mis. "12" atau "7.5", atau format jam:menit:detik mis. "1:02:30") &amp; <b>Tanggal</b> (mis. "2026-08-30"). Video yang belum diisi kolom itu otomatis ditaruh paling bawah, bukan hilang.</p>
           <div id="psYtPlaylistList" class="ps-file-list"><p class="present-saved-empty">Belum ada video dimuat -- tempel link Google Sheet lalu tekan "🔄 Muat Ulang".</p></div>
         </div>
       </div>
@@ -996,6 +1022,23 @@
             <button type="button" id="psYtStopBtn" class="chip-btn small" title="Hentikan video YouTube di Layar 2">⏹️ Stop</button>
             <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube di Layar 2">🔇 Mute</button>
             <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
+          </div>
+          <!-- BARU (4 Sep 2026 v2, permintaan operator) -- progress bar +
+               kolom waktu LIVE video YouTube yang SUNGGUH sedang tayang di
+               Layar 2 (beda dari progress bar "detik mulai" per-video di
+               tab ▶️ YouTube/Playlist -- itu cuma dipakai SEBELUM
+               "Tampilkan"/"Pratinjau" ditekan). Posisi geser slider ini
+               MENGIKUTI video asli (dilaporkan balik present.html lewat
+               "present_yt_progress"), dan kolom waktu di sebelahnya bisa
+               DIKETIK MANUAL -- tekan ▶️ Play untuk langsung
+               main/lompat dari detik yang diketik itu (lihat wireYtControls()
+               di js/presentation-studio.js). Tersembunyi otomatis kalau yang
+               sedang tayang BUKAN video YouTube (lihat renderStudioPreview()). -->
+          <div class="ps-yt-livebar" id="psYtLiveBar" hidden>
+            <input type="range" id="psYtLiveRange" class="ps-yt-seek-range" min="0" max="0" value="0" step="1" title="Geser untuk memindah posisi video YouTube yang SEDANG tayang di Layar 2" />
+            <input type="text" id="psYtLiveTimeInput" class="ps-yt-live-time-input" value="00:00:00" inputmode="numeric" title="Ketik detik/waktu (mis. 90, 1:30, 01:02:30, atau 2:23:23:29), lalu tekan ▶️ Play untuk mulai/lompat dari situ" />
+            <span class="ps-yt-live-sep">/</span>
+            <span id="psYtLiveDuration" class="ps-yt-live-duration">--:--:--</span>
           </div>
         </div>
         <!-- Tombol "Tayangkan" SEKARANG di TENGAH, di antara kotak
