@@ -958,6 +958,50 @@
     }
   }
 
+  // BARU (4 Sep 2026, v7) -- PERBAIKAN BUG nyata dilaporkan operator lewat
+  // screenshot: link pendek resmi SoundCloud (mis. "on.soundcloud.com/xxx")
+  // ditempel APA ADANYA ke "https://w.soundcloud.com/player/?url=..." dan
+  // widget-nya menolak dengan pesan "You have not provided a valid
+  // SoundCloud URL" -- ternyata endpoint widget publik (w.soundcloud.com)
+  // TIDAK menerima pola domain "on.soundcloud.com" sebagai parameter "url"
+  // walau endpoint API resmi lain (/resolve) sudah mendukungnya sejak 2023
+  // (2 sistem beda di sisi SoundCloud, bukan bug di kode ini).
+  // Perbaikan: sebelum membangun src widget, tanya dulu endpoint oEmbed
+  // publik SoundCloud (https://soundcloud.com/oembed) -- endpoint ini
+  // didokumentasikan resmi "menerima URL apa pun yang menunjuk ke
+  // track/set/user" dan mendukung CORS (bisa dipanggil `fetch()` langsung
+  // dari sini) -- hasilnya berupa kode <iframe> siap pakai yang SUDAH
+  // memakai link asli/kanonik (bukan link pendek), lalu kita ambil ulang
+  // parameter "url" dari situ untuk dipasang lagi ke widget dengan
+  // parameter tampilan kita sendiri (warna, auto_play, dst). Kalau
+  // permintaan oEmbed ini gagal (mis. jaringan mati/offline saat acara),
+  // FALLBACK ke cara lama (link ditempel apa adanya) supaya link
+  // "soundcloud.com/artis/judul" biasa yang SUDAH bekerja sebelumnya tetap
+  // jalan seperti biasa, tidak ikut rusak oleh perbaikan ini.
+  async function resolveSoundCloudSrc(trackUrl, autoplay) {
+    const paramsTail = "&auto_play=" + (autoplay === false ? "false" : "true") +
+      "&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+    try {
+      const oembedUrl = "https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl);
+      const res = await fetch(oembedUrl);
+      if (res.ok) {
+        const json = await res.json();
+        const html = (json && json.html) || "";
+        const srcMatch = /src="([^"]+)"/.exec(html);
+        if (srcMatch && srcMatch[1]) {
+          const urlParamMatch = /[?&]url=([^&]+)/.exec(srcMatch[1]);
+          if (urlParamMatch && urlParamMatch[1]) {
+            return "https://w.soundcloud.com/player/?url=" + urlParamMatch[1] + paramsTail;
+          }
+          return srcMatch[1]; // fallback: pakai src dari oEmbed apa adanya kalau pola "url=" tidak ketemu
+        }
+      }
+    } catch (err) {
+      // Jaringan gagal / oEmbed tidak bisa dihubungi -- lanjut ke fallback di bawah, JANGAN throw
+    }
+    return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + paramsTail;
+  }
+
   function showMain(kind, data) {
     stopTimer(false);
     stopStopwatch(false);
@@ -1046,11 +1090,11 @@
       // mengikat ke iframe yang isinya sudah benar.
       refEl.hidden = true; refEl.textContent = "";
       if (data.trackUrl) {
-        const src = "https://w.soundcloud.com/player/?url=" + encodeURIComponent(data.trackUrl) +
-          "&auto_play=" + (data.autoplay === false ? "false" : "true") +
-          "&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
-        scEl.src = src;
         scEl.hidden = false;
+        scEl.src = ""; // kosongkan dulu -- diisi async oleh resolveSoundCloudSrc() di bawah
+        resolveSoundCloudSrc(data.trackUrl, data.autoplay).then(function (src) {
+          scEl.src = src;
+        });
       }
     } else if (kind === "kidung") {
       // Slide Kidung (bait + koor snapshot, lihat Presentation.sendKidung()
