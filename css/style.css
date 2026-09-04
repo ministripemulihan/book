@@ -1,5 +1,5 @@
 /* ============================================================
-   TOKEN DESAIN 
+   TOKEN DESAIN
    Tema: "manuskrip & kuningan" — kertas hangat, tinta cokelat gelap,
    aksen hijau petrol (sampul kitab berjilid kain) dan kuningan pudar
    untuk nomor ayat. Serif "Literata" untuk teks bacaan (dirancang
@@ -2601,6 +2601,16 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-verse-row-reorder { display: flex; gap: 4px; margin-top: 6px; }
 .ps-verse-row-reorder .chip-btn { padding: 3px 7px; font-size: 12px; }
 .ps-verse-row-reorder .chip-btn:disabled { opacity: 0.3; cursor: default; }
+/* BARU (4 Sep 2026, permintaan operator) -- baris tombol hapus, SELALU
+   tampil (beda dari .ps-verse-row-reorder yang cuma tampil kalau
+   "✎ Atur Urutan" aktif) -- "🗑️" menghapus item ini saja, sedangkan
+   "🗑️ Hapus N Bait" (kalau ada -- HANYA muncul di baris kidung PERTAMA
+   dari tiap kidung yang py >1 bait tersimpan) menghapus SEMUA bait
+   kidung yang sama sekaligus dalam 1 klik. Lihat renderCollectionList()
+   di js/presentation-studio.js & removeKidungGroupFromCollection() di
+   js/collections.js. */
+.ps-verse-row-del { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.ps-verse-row-del .chip-btn { padding: 3px 7px; font-size: 12px; }
 .ps-collection-select-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ps-collection-select-row select { flex: 1; min-width: 0; }
 #psCollectionReorderToggle.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
