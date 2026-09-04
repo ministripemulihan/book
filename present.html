@@ -1,672 +1,516 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Layar 2 — Tampilan Presentasi</title>
-<style>
-  :root {
-    --p-bg: #05070c;
-    --p-ink: #f5f2e8;
-    --p-accent: #d8b45c;
-    --p-font: "Literata", Georgia, serif;
-    --p-scale: 1;
-    --p-koor: #ffd84a;
-    --p-line-height: 1.35;
-    /* BARU (28 Agu 2026) -- "Ukuran Konten" (tab Tampilan): mengalikan
-       lebar maksimum kotak teks (#text) & jarak tepi kotak (#stage
-       padding) -- 1 = bawaan lama (tidak berubah), <1 mempersempit
-       (lebih banyak ruang latar terlihat di tepi, cocok dipakai
-       bersama 🎥 Kamera/Gambar Latar), >1 melebarkan (teks memakai
-       hampir seluruh lebar layar). Lihat applyTheme() -> contentScale. */
-    --p-content-scale: 1;
-    /* BARU (4 Sep 2026) -- toggle "Tebal" (Bold) untuk tulisan Layar 2,
-       lihat applyTheme() di skrip bawah & checkbox #psFontBold di Studio
-       (js/presentation-studio.js). 400 = bawaan lama (tidak berubah sama
-       sekali kalau operator tidak pernah menyentuh toggle ini). */
-    --p-font-weight: 400;
-  }
-  html, body {
-    margin: 0; padding: 0; height: 100%;
-    background: var(--p-bg);
-    color: var(--p-ink);
-    font-family: var(--p-font);
-    overflow: hidden;
-  }
-  /* Vignette halus di tepi layar -- bikin layar proyektor terasa lebih
-     "dirancang" (broadcast-style) daripada sekadar warna polos rata. */
-  body::before {
-    content: "";
-    position: fixed; inset: 0; pointer-events: none; z-index: 1;
-    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.28) 100%);
-  }
-  /* BARU (28 Agu 2026) -- 🎥 Kamera Latar: video kamera hidup ditaruh
-     SEBAGAI ANAK <body> paling awal, position:fixed z-index:0 -- di
-     BAWAH #stage (z-index:2) & vignette di atas (z-index:1), tapi di
-     ATAS latar polos body (--p-bg), yang secara CSS selalu dilukis
-     paling dasar duluan apa pun z-index anak-anaknya -- jadi video ini
-     otomatis "mengintip" di balik ayat/kidung/pengumuman TANPA perlu
-     mengosongkan/mengubah background body sama sekali. Disembunyikan
-     total (atribut `hidden`) selama kamera belum diaktifkan operator --
-     TIDAK memuat/meminta izin kamera sama sekali sebelum itu (lihat
-     startCamera() di skrip bawah, dipanggil HANYA saat pesan "camera"
-     dengan on:true diterima dari Studio). */
-  #camBg, #imgBg {
-    position: fixed; inset: 0; z-index: 0;
-    width: 100vw; height: 100vh; object-fit: cover;
-    background: #000;
-    transition: opacity .35s ease;
-  }
-  /* BARU (28 Agu 2026) -- 🖼️ Latar Gambar: gambar latar yang diunggah
-     operator (tab "🎥 Kamera" -> "Sumber Latar" -> "Gambar"), lapisan
-     PERSIS SAMA seperti #camBg (di bawah #stage, di atas --p-bg polos)
-     tapi <img> biasa, bukan video -- keduanya TIDAK PERNAH aktif
-     bersamaan (Studio hanya mengirim satu sumber latar aktif dalam
-     satu waktu lewat "latarMode", lihat applyLatarSource() di bawah). */
-  /* Dim tipis merata di atas latar hidup/gambar (di BAWAH vignette
-     tepi, di ATAS latar) supaya tulisan (bahkan tanpa memilih gaya
-     Putih/Hitam Border sekalipun) tetap sedikit lebih kontras
-     terhadap latar yang warna/kecerahannya bisa berubah-ubah kapan
-     saja (mis. lampu ruangan berkedip, orang lewat di depan kamera).
-     Kelas "cam-active" dipertahankan namanya (dipakai sejak fitur
-     Kamera pertama dibuat) tapi sekarang dipicu oleh KAMERA ATAU
-     GAMBAR latar, mana pun yang aktif -- lihat updateLatarDimClass(). */
-  body.cam-active::after {
-    content: "";
-    position: fixed; inset: 0; z-index: 1; pointer-events: none;
-    background: rgba(0,0,0,0.18);
-  }
-  #stage {
-    position: relative; z-index: 2;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 5vh calc(6vw / var(--p-content-scale, 1));
-    box-sizing: border-box;
-    transition: background-color .3s ease, color .3s ease, padding .25s ease;
-  }
-  #ref {
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--p-cam-ink, var(--p-accent));
-    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale));
-    margin-bottom: clamp(14px, 2.4vh, 34px);
-    opacity: 0.92;
-    /* BARU (28 Agu 2026) -- lihat catatan panjang di #text di bawah:
-       warna & garis tepi ini hanya berubah saat 🎥 Kamera Latar aktif
-       (--p-cam-ink/--p-outline-shadow terisi), jatuh ke tampilan lama
-       (var(--p-accent), tanpa outline) selebihnya -- lihat
-       applyCamTextStyle() di skrip bawah. */
-    text-shadow: var(--p-outline-shadow, none);
-  }
-  #ref::before, #ref::after {
-    content: "—"; opacity: 0.55; margin: 0 0.6em; font-weight: 400;
-  }
-  /* BARU (4 Sep 2026) -- baris kecil kedua ("Witness Lee B 4/4 (7 Bait)")
-     di bawah judul kidung -- sengaja TIDAK pakai huruf besar semua/garis
-     "—" seperti #ref di atas (supaya terasa sebagai keterangan kecil,
-     bukan judul kedua), warna sedikit lebih redup dari warna tulisan
-     utama tapi tetap ikut var(--p-ink) tema supaya kontrasnya selalu
-     terjaga di tema apa pun (Terang/Sepia/Putih/Krem dst). */
-  #refSub {
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: var(--p-font-weight, 500);
-    color: var(--p-cam-ink, var(--p-ink));
-    opacity: 0.75;
-    font-size: calc(clamp(14px, 1.6vw, 20px) * var(--p-scale));
-    margin-top: clamp(-10px, -1.6vh, -4px);
-    margin-bottom: clamp(14px, 2.4vh, 34px);
-    text-shadow: var(--p-outline-shadow, none);
-  }
-  #text {
-    font-weight: var(--p-font-weight, 400);
-    font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
-    /* BARU (28 Agu 2026) -- dulu terkunci "1.35" tetap, sekarang bisa
-       diatur dari Studio (slider "Spasi Baris", lihat --p-line-height
-       di applyTheme()/js/presentation-studio.js) supaya teks panjang
-       (mis. hasil unggah file Word/.doc) bisa dirapatkan/direnggangkan
-       spasi antar barisnya tanpa mengubah ukuran hurufnya. */
-    line-height: var(--p-line-height, 1.35);
-    max-width: calc(1200px * var(--p-content-scale, 1));
-    white-space: pre-wrap;
-    /* BARU (28 Agu 2026) -- 🎥 Kamera Latar: --p-cam-ink & --p-outline-shadow
-       cuma TERISI saat kamera aktif (diset lewat applyCamTextStyle() di
-       bawah) -- kalau tidak, var() jatuh ke nilai lama (var(--p-ink),
-       tanpa outline) persis seperti sebelum fitur ini ada, jadi TIDAK
-       mengubah tampilan sama sekali kalau kamera tidak dipakai. */
-    color: var(--p-cam-ink, var(--p-ink));
-    text-shadow: var(--p-outline-shadow, none), 0 2px 18px rgba(0,0,0,0.5);
-  }
-  #idle {
-    font-family: "Inter", Arial, sans-serif;
-    color: #6b7280;
-    font-size: clamp(16px, 2vw, 22px);
-  }
-  /* Blok tumpuk saat beberapa versi/terjemahan ditampilkan sekaligus
-     (checklist versi di Studio Presentasi). Ukuran font otomatis lebih
-     kecil supaya semua versi tetap muat 1 layar tanpa scroll. */
-  .verse-version-block {
-    display: block;
-    margin: 0 auto clamp(18px, 2.6vh, 30px);
-    font-size: calc(clamp(20px, 3vw, 42px) * var(--p-scale));
-  }
-  .verse-version-block:last-child { margin-bottom: 0; }
-  .verse-version-tag {
-    display: inline-block;
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: 700;
-    font-size: 0.42em;
-    letter-spacing: 0.06em;
-    color: var(--p-accent);
-    background: color-mix(in srgb, var(--p-accent) 16%, transparent);
-    border: 1px solid color-mix(in srgb, var(--p-accent) 45%, transparent);
-    border-radius: 6px;
-    padding: 0.15em 0.55em;
-    margin-right: 0.5em;
-    vertical-align: middle;
-    transform: translateY(-0.15em);
-  }
-  #stage.fade-in #text, #stage.fade-in #ref { animation: fadeUp .5s ease both; }
-  /* Slide Kidung (Presentation.sendKidung()) -- bait polos memakai warna
-     tulisan tema biasa (var(--p-ink)), koor DISOROT kuning tetap (TIDAK
-     ikut var(--p-ink)/tema) supaya selalu jelas kelihatan "ini bagian
-     koor" di tema apa pun (gelap/terang/sepia/dst -- lihat THEMES di
-     js/presentation-studio.js), meniru mockup layar biru-kuning yang
-     dicontohkan. */
-  .kidung-bait-line {
-    /* BARU (4 Sep 2026, permintaan operator) -- jarak antar BLOK bait
-       (dulu clamp() tetap, TIDAK ikut slider "Spasi Baris" sama sekali --
-       jadi kalau jarak ini terasa kebesaran, operator tidak py cara
-       mengecilkannya). Sekarang ikut skala var(--p-line-height) yang
-       sama dipakai slider itu (nilai bawaan 1.35 => rasio 1, tidak
-       berubah kalau slider belum disentuh sama sekali) -- geser slider
-       ke kiri (mis. 60%) merapatkan jarak antar bait JUGA, bukan cuma
-       spasi antar baris di dalam 1 bait yang panjang. */
-    margin: 0 auto calc(clamp(10px, 1.6vh, 20px) * var(--p-line-height, 1.35) / 1.35);
-  }
-  .kidung-line-gap { display: block; height: calc(clamp(6px, 1vh, 14px) * var(--p-line-height, 1.35) / 1.35); }
-  .kidung-koor-line {
-    color: var(--p-koor, #ffd84a);
-    font-weight: 600;
-  }
-  .kidung-koor-label {
-    display: inline-block;
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: 700;
-    font-size: 0.5em;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    margin-bottom: 0.3em;
-  }
-  @keyframes fadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
+// ============================================================
+//  MODE PRESENTASI 2 LAYAR (baru)
+// ============================================================
+// Fitur:
+//  1. Toggle "1 Layar" (biasa, seperti sekarang) <-> "2 Layar" (menu ⋮ ->
+//     panel "🖥️ Mode Presentasi"). Saat diaktifkan, membuka jendela BARU
+//     (present.html) yang isinya bisa dikendalikan dari jendela utama.
+//     Jendela utama TETAP bebas mencari/membaca seperti biasa -- kirim ke
+//     Layar 2 hanya terjadi saat tombol kirim ditekan (bukan otomatis
+//     tiap pindah ayat), supaya bisa "menyiapkan" tayangan berikutnya
+//     tanpa mengganggu apa yang sedang tampil di layar proyektor.
+//  2. Tombol "📤" kecil di tiap ayat (muncul HANYA saat mode 2 Layar
+//     aktif, di sebelah tombol salin 📋) -- kirim ayat itu ke Layar 2.
+//  3. Kotak "Tulisan Bebas" di panel Mode Presentasi -- ketik apa saja,
+//     kirim ke Layar 2, dan bisa DISIMPAN untuk dipakai lagi kapan saja
+//     (disimpan lokal di perangkat ini, localStorage).
+//  4. Kotak pratinjau (preview) di jendela utama yang mencerminkan persis
+//     apa yang sedang tampil di Layar 2, supaya operator tidak perlu
+//     bolak-balik lihat proyektor.
+//
+// Khusus pengguna yang SUDAH LOGIN (bukan Mode Tamu) -- lihat
+// refreshGuestGate(), dipanggil dari applyGuestModeUi() di js/app.js.
+// ============================================================
 
-  #logoView { max-width: 60vw; max-height: 60vh; object-fit: contain; }
-  /* Slide dari File tab (gambar/pptx/pdf yang sudah dikonversi
-     per-slide) -- tampil penuh 1 layar, beda dari #logoView yang
-     sengaja dibatasi kecil di tengah. */
-  #slideView { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
-  /* Video YouTube -- penuh 1 layar, sama seperti #slideView. */
-  /* PERBAIKAN (4 Sep 2026, permintaan operator): dulu iframe ini BISA
-     diklik langsung (kontrol bawaan YouTube-nya sendiri, termasuk
-     segitiga ▶️ besar di tengah) -- operator yang mengklik segitiga
-     itu langsung membuat video tayang ke jemaat SEBELUM operator siap,
-     tanpa lewat alur ▶️ Play resmi di Studio (yang seharusnya jadi
-     SATU-SATUNYA cara memulai). Sekarang iframe ini dibuat
-     pointer-events:none (sama seperti pola yang sudah dipakai untuk
-     iframe pratinjau mini di Studio, lihat toStudioPreviewEmbedUrl() &
-     renderStudioPreview() di js/presentation-studio.js) -- video tetap
-     tampil penuh 1 layar seperti biasa, tapi TIDAK BISA disentuh
-     langsung: klik/sentuh di mana pun pada video ini tidak berbuah
-     apa-apa, satu-satunya cara main/jeda/lompat tetap lewat
-     ▶️/⏸️/🔇/progress bar di Studio (dikirim lewat postMessage, lihat
-     "yt_control" di bawah). Lapisan #activateOverlay (klik sekali utk
-     aktifkan suara) TIDAK terpengaruh -- dia berada DI ATAS #ytView
-     (z-index lebih tinggi) & baru hilang SETELAH diklik, jadi urutan
-     klik pertama tetap berhasil mendaratkan klik ke overlay itu (atau
-     ke halaman di belakangnya), bukan ke video. */
-  #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; pointer-events: none; }
-  /* BARU (4 Sep 2026) -- embed Canva ("🤖 AI Presentation" roadmap,
-     Bagian 3). BEDA dari #ytView: Canva TIDAK punya API kontrol
-     jarak-jauh resmi (tidak ada play/pause/seek lewat postMessage
-     seperti YouTube IFrame API) -- satu-satunya cara maju/mundur
-     slide-nya adalah klik langsung di iframe ini sendiri (tombol
-     bawaan Canva, atau panah keyboard saat jendela ini fokus).
-     Karena itu #canvaView SENGAJA TIDAK diberi pointer-events:none
-     (beda dari #ytView) -- operator harus bisa mengklik langsung ke
-     dalamnya untuk menggerakkan slide Canva. */
-  #canvaView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; background: #05070c; }
-  /* BARU (4 Sep 2026) -- embed SoundCloud (roadmap Bagian 4). Widget
-     SoundCloud dirancang sebagai bilah pemutar (bukan penuh 1 layar) --
-     ditaruh di bagian bawah layar supaya ayat/pengumuman/kidung yang
-     sedang tayang (di belakangnya, lewat #text/#ref) tetap bisa dibaca
-     penuh sementara audio jalan (mirip semangat "Latar Suara Saja" di
-     tab YouTube), TAPI beda dari Audio Latar YouTube: di sini widget-nya
-     memang dimaksudkan untuk TERLIHAT (progress bar & tombol bawaan
-     SoundCloud), bukan disembunyikan. Kontrol Play/Pause dari Studio
-     tetap jalan lewat SC Widget API (lihat "sc_control" & SC.Widget di
-     skrip bawah) walau widget bawaan ini kelihatan -- operator boleh
-     pakai salah satu (tombol Studio ATAU klik langsung di bilah ini,
-     keduanya sinkron karena sama-sama lewat 1 objek SC.Widget). */
-  #scView { width: 100vw; height: 166px; position: fixed; left: 0; right: 0; bottom: 0; border: none; }
-  /* Audio Latar YouTube ("Latar suara saja" di Studio) -- video ASLI
-     tetap dimuat & diputar (supaya suaranya jalan), tapi disembunyikan
-     SECARA VISUAL (opacity:0, bukan display:none/hidden -- display:none
-     pada sebagian browser ikut menghentikan audionya). pointer-events:
-     none supaya tidak menghalangi klik/Penunjuk di ayat yang tampil di
-     atasnya. z-index di bawah #stage supaya ayat/pengumuman tetap yang
-     "aktif" terlihat (meski secara visual video ini memang tidak kelihatan
-     sama sekali karena opacity 0). */
-  #ytBg { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; opacity: 0; pointer-events: none; z-index: 0; }
+const Presentation = (() => {
+  const MODE_KEY = "bible_app_present_mode_v1"; // "1" | "2"
+  const SAVED_KEY = "bible_app_present_saved_texts_v1";
+  const WIN_NAME = "bibleAppPresentWindow2";
+  // Ukuran/rasio Layar 2 yang dipilih di Studio Presentasi (16:9 / 4:3 +
+  // resolusi detail, lihat js/presentation-studio.js: SCREEN_RES_KEY).
+  // Dibaca langsung dari localStorage (bukan lewat referensi ke modul
+  // PresentationStudio) supaya file ini tetap bisa dipakai sendirian
+  // (mis. panel ⋮ biasa di HP, yang tidak memuat Studio sama sekali).
+  const SCREEN_RES_KEY = "bible_app_studio_screen_res_v1";
+  const DEFAULT_SCREEN_W = 1280;
+  const DEFAULT_SCREEN_H = 720;
 
-  /* ---- Warta (atas) & FootNote (bawah): ticker 1 baris ----
-     Warna latar ticker sengaja TETAP hitam solid (bukan ikut var(--p-bg))
-     supaya tulisan putihnya selalu kontras tinggi apa pun tema latar
-     panggung yang sedang aktif. */
-  .ticker-bar {
-    position: fixed; left: 0; right: 0; z-index: 20;
-    background: rgba(10,10,14,0.82);
-    backdrop-filter: blur(2px);
-    color: #fff;
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: 600;
-    font-size: clamp(15px, 1.6vw, 24px);
-    padding: 12px 0;
-    overflow: hidden;
-    white-space: nowrap;
-    animation: fadeUp .3s ease both;
-  }
-  #wartaBar { top: 0; box-shadow: 0 6px 18px rgba(0,0,0,0.25); border-bottom: 1px solid rgba(216,180,92,0.35); }
-  #footBar { bottom: 0; box-shadow: 0 -6px 18px rgba(0,0,0,0.25); border-top: 1px solid rgba(216,180,92,0.35); }
-  .ticker-bar .ticker-inner {
-    display: inline-block;
-    padding-left: 100%;
-  }
-  .ticker-bar.scrolling .ticker-inner {
-    animation: tickerScroll linear infinite;
-  }
-  .ticker-bar.static { white-space: normal; text-align: center; padding: 10px 4vw; }
-  @keyframes tickerScroll {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-100%); }
-  }
+  let winRef = null;
+  let lastPayload = null; // { type: "verse"|"text"|"clear", ref, text }
+  let pollTimer = null;
+  // Layar 2 (present.html) butuh waktu untuk memuat skripnya sendiri
+  // setelah window.open() -- kirim pesan SEBELUM itu selesai membuat
+  // pesan hilang begitu saja (contoh nyata: timer "Mulai"/"X" tidak
+  // pernah sampai kalau Layar 2 baru saja dibuka). winReady jadi true
+  // hanya setelah present.html mengabari "present_ready"; sebelum itu,
+  // semua pesan ditahan dulu di msgQueue lalu dikirim berurutan begitu
+  // siap -- jadi tidak ada perintah timer/warta/dll yang hilang.
+  let winReady = false;
+  let msgQueue = [];
 
-  /* ---- Timer ----
-     PENTING: jangan taruh `display:flex` langsung di #timerWrap. Selector
-     ID (#timerWrap) punya spesifisitas LEBIH TINGGI daripada selector
-     atribut bawaan browser `[hidden]{display:none}`, jadi kalau
-     `display:flex` ditulis langsung di sini, atribut hidden yang
-     dipasang/dilepas lewat JS (timerWrap.hidden = true/false) tidak
-     pernah benar-benar menyembunyikannya -- ini penyebab timer bisa
-     "nyangkut" tetap kelihatan menimpa ayat berikutnya, atau terlihat
-     tidak konsisten. Solusi: default-kan ke display:none, baru
-     `:not([hidden])` yang menaikkan ke flex -- jadi atribut hidden
-     TETAP jadi sumber kebenaran satu-satunya. */
-  #timerWrap { display: none; align-items: center; justify-content: center; gap: 6vw; }
-  #timerWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
-  #timerRing {
-    width: min(32vh, 30vw); height: min(32vh, 30vw);
-    filter: drop-shadow(0 4px 24px rgba(0,0,0,0.35));
-  }
-  #timerRing circle { fill: none; stroke-width: 7; }
-  #timerRingBg { stroke: color-mix(in srgb, var(--p-ink) 16%, transparent); }
-  #timerRingFg { stroke: var(--p-accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear, stroke .3s ease; }
-  #timerRingFg.done { stroke: #d9463a; }
-  #timerTime {
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: 700;
-    fill: var(--p-ink);
-    font-size: 15px;
-  }
-  #timerLabel {
-    font-family: "Inter", Arial, sans-serif;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    font-size: calc(clamp(22px, 3.6vw, 46px) * var(--p-scale));
-  }
-  #timerTime.done-text { fill: #d9463a; }
-
-  /* ---- Stopwatch (BARU 27 Agu 2026) -- hitung MAJU dari 0, tanpa
-     cincin progres (tidak ada "target" yang bisa diisi persentasenya
-     seperti Timer mundur di atas). Pola display:none/:not([hidden])
-     SAMA seperti #timerWrap di atas (alasannya sama persis, lihat
-     komentar panjangnya). ---- */
-  #stopwatchWrap { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1.4vh; }
-  #stopwatchWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
-  #stopwatchLabel {
-    font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.01em;
-    font-size: calc(clamp(20px, 3.2vw, 42px) * var(--p-scale)); color: var(--p-ink); text-align: center;
-  }
-  #stopwatchTime {
-    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
-    font-size: calc(clamp(56px, 12vw, 160px) * var(--p-scale)); color: var(--p-accent);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* ---- Pointer (Penunjuk) ---- */
-  #pointerDot {
-    position: fixed; width: 22px; height: 22px; border-radius: 50%;
-    pointer-events: none; z-index: 50; display: none;
-    box-shadow: 0 0 14px 4px currentColor;
-    transform: translate(-50%, -50%);
-  }
-  /* ---- Pen (coret-coret) ---- */
-  #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
-
-  /* ---- 🔍 Kaca Pembesar (BARU 27 Agu 2026) -- lihat showMagnify()/
-     hideMagnify() di bawah & wirePointerPen() di js/presentation-studio.js.
-     Cuma aktif untuk file yang ditayangkan sebagai gambar (PDF/gambar/
-     Word/PPT, tipe "slide" -- #slideView), disembunyikan otomatis kalau
-     bukan gambar yang sedang tayang. ---- */
-  #magnifierLens {
-    position: fixed; width: 220px; height: 220px; border-radius: 50%;
-    border: 4px solid rgba(255,255,255,.85); box-shadow: 0 6px 28px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.25);
-    pointer-events: none; z-index: 55; display: none; background-repeat: no-repeat; background-color: #111;
-  }
-  #magnifierBadge {
-    position: fixed; z-index: 56; display: none; pointer-events: none;
-    background: rgba(0,0,0,.7); color: #fff; font-family: "Inter", Arial, sans-serif; font-weight: 700;
-    font-size: 13px; padding: 4px 11px; border-radius: 999px; transform: translate(-50%, -100%);
-    white-space: nowrap;
-  }
-
-  /* ---- Lapisan "aktifkan kontrol suara" (lihat komentar HTML-nya) ---- */
-  #activateOverlay {
-    position: fixed; inset: 0; z-index: 90;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(5, 7, 12, 0.86);
-    padding: 24px; box-sizing: border-box;
-  }
-  #activateOverlay.hidden-activated { display: none; }
-  #activateBtn {
-    font-family: "Inter", Arial, sans-serif; font-weight: 700; font-size: clamp(14px, 2vw, 20px);
-    color: #1a1206; background: #d8b45c; border: none; border-radius: 12px;
-    padding: 18px 26px; cursor: pointer; max-width: 620px; line-height: 1.4;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  }
-  #activateBtn:hover { background: #e6c374; }
-
-  /* Label "Layar 2 — Mode Presentasi" DIHAPUS (bukan cuma dipudarkan) --
-     operator minta tayangan Layar 2 bersih 100%, sama persis dengan apa
-     yang diproyeksikan ke jemaat, tanpa watermark/teks tambahan apa pun. */
-</style>
-</head>
-<body>
-  <!-- BARU (28 Agu 2026) -- lihat catatan panjang #camBg di <style> di
-       atas. hidden secara default; muncul otomatis begitu operator
-       menekan "🎥 Aktifkan Kamera" di tab "🎥 Kamera" Studio Presentasi. -->
-  <video id="camBg" hidden autoplay playsinline muted></video>
-  <!-- BARU (28 Agu 2026) -- lihat catatan #imgBg di <style> di atas. -->
-  <img id="imgBg" hidden />
-  <div id="wartaBar" class="ticker-bar" hidden><span class="ticker-inner" id="wartaText"></span></div>
-
-  <div id="stage">
-    <div id="ref" hidden></div>
-    <!-- BARU (4 Sep 2026) -- baris kecil kedua di bawah judul kidung
-         (mis. "Witness Lee B 4/4 (7 Bait)"), lihat CSS #refSub & showMain()
-         kind "kidung" di skrip bawah. HANYA dipakai untuk slide Kidung --
-         tetap `hidden` (kosong) untuk semua jenis tayangan lain (ayat,
-         teks bebas, dst), sama sekali tidak mengubah tampilannya. -->
-    <div id="refSub" hidden></div>
-    <div id="text"></div>
-    <img id="logoView" hidden />
-    <img id="slideView" hidden />
-    <iframe id="ytView" hidden allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
-    <iframe id="ytBg" allow="autoplay; encrypted-media" frameborder="0" tabindex="-1"></iframe>
-    <!-- BARU (4 Sep 2026) -- lihat catatan CSS #canvaView & #scView di
-         atas, dan showMain() kind "canva"/"soundcloud" di skrip bawah. -->
-    <iframe id="canvaView" hidden allow="fullscreen" allowfullscreen frameborder="0"></iframe>
-    <iframe id="scView" hidden allow="autoplay" frameborder="0"></iframe>
-    <div id="timerWrap" hidden>
-      <svg id="timerRing" viewBox="0 0 100 100">
-        <circle id="timerRingBg" cx="50" cy="50" r="44"></circle>
-        <circle id="timerRingFg" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"></circle>
-        <text id="timerTime" x="50" y="55" text-anchor="middle">00:00</text>
-      </svg>
-      <div id="timerLabel"></div>
-    </div>
-    <!-- BARU (27 Agu 2026) -- lihat catatan CSS #stopwatchWrap di atas. -->
-    <div id="stopwatchWrap" hidden>
-      <div id="stopwatchLabel"></div>
-      <div id="stopwatchTime">00:00</div>
-    </div>
-    <div id="idle">Menunggu tayangan dari layar utama…</div>
-  </div>
-
-  <div id="footBar" class="ticker-bar" hidden><span class="ticker-inner" id="footText"></span></div>
-
-  <canvas id="penCanvas"></canvas>
-  <div id="pointerDot"></div>
-  <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
-  <div id="magnifierLens"></div>
-  <div id="magnifierBadge"></div>
-
-  <!-- Lapisan "aktifkan kontrol suara" -- browser (Chrome dkk) TIDAK
-       mengizinkan jendela ini diputar/dibunyikan lewat perintah dari
-       jendela lain (Studio di Monitor 1) SEBELUM jendela ini sendiri
-       pernah menerima 1 klik asli dari operator. Klik SEKALI di sini
-       saat pertama buka Layar 2 -- setelah itu tombol Play/Pause/Mute
-       dari Studio akan langsung bekerja tanpa perlu klik apa pun lagi
-       di layar ini. -->
-  <div id="activateOverlay">
-    <button type="button" id="activateBtn">🔊 Klik sekali untuk aktifkan kontrol Play/Pause/Suara dari Monitor 1</button>
-  </div>
-
-  <!-- BARU (4 Sep 2026) -- SDK resmi SoundCloud untuk kontrol Play/Pause
-       dari luar iframe (roadmap ROADMAP-ai-presentation.md Bagian 4).
-       Kalau perangkat Layar 2 sedang OFFLINE saat pertama dibuka, skrip
-       ini gagal termuat -- window.SC di skrip bawah TETAP dicek ada/
-       tidak sebelum dipakai (lihat sc_control), jadi tayangan lain
-       (ayat/kidung/dst) tidak ikut error, cuma kontrol SoundCloud yang
-       tidak akan merespons sampai koneksi & jendela ini dimuat ulang. -->
-  <script src="https://w.soundcloud.com/player/api.js"></script>
-
-<script>
-  const stageEl = document.getElementById("stage");
-  const refEl = document.getElementById("ref");
-  const refSubEl = document.getElementById("refSub"); // BARU (4 Sep 2026)
-  const textEl = document.getElementById("text");
-  const idleEl = document.getElementById("idle");
-  const logoEl = document.getElementById("logoView");
-  const slideEl = document.getElementById("slideView");
-  const ytEl = document.getElementById("ytView");
-  const canvaEl = document.getElementById("canvaView"); // BARU (4 Sep 2026)
-  const scEl = document.getElementById("scView"); // BARU (4 Sep 2026)
-  let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
-  const ytBgEl = document.getElementById("ytBg");
-  // BARU (28 Agu 2026) -- Repeat One/Repeat All + daftar putar (playlist)
-  // untuk video YouTube utama (#ytView), lihat wireYtControls() &
-  // wireYtPlaylistTab() di js/presentation-studio.js, dan handler
-  // "yt_repeat"/"yt_queue" di bawah. ytRepeatMode: "off" | "one" | "all".
-  // ytQueue: [{embedUrl,...}, ...] -- dipakai "Ulang: Semua" untuk tahu
-  // video berikutnya begitu video yang sedang tayang selesai.
-  let ytRepeatMode = "off";
-  let ytQueue = [];
-  let ytQueueIndex = 0;
-  let ytLastState = null; // state terakhir yang dilaporkan player (lihat infoDelivery di bawah)
-  // BARU (28 Agu 2026) -- lihat wireCamera()/applyCamera-nya di bawah.
-  const camBgEl = document.getElementById("camBg");
-  const imgBgEl = document.getElementById("imgBg"); // BARU (28 Agu 2026) -- lihat applyBgImagePayload() di bawah.
-  const timerWrap = document.getElementById("timerWrap");
-  const timerTimeEl = document.getElementById("timerTime");
-  const timerLabelEl = document.getElementById("timerLabel");
-  const timerRingFg = document.getElementById("timerRingFg");
-  // BARU (27 Agu 2026) -- lihat showStopwatch()/tickStopwatch() di bawah.
-  const stopwatchWrap = document.getElementById("stopwatchWrap");
-  const stopwatchTimeEl = document.getElementById("stopwatchTime");
-  const stopwatchLabelEl = document.getElementById("stopwatchLabel");
-  const wartaBar = document.getElementById("wartaBar");
-  const wartaText = document.getElementById("wartaText");
-  const footBar = document.getElementById("footBar");
-  const footText = document.getElementById("footText");
-  const pointerDot = document.getElementById("pointerDot");
-  const magnifierLens = document.getElementById("magnifierLens");
-  const magnifierBadge = document.getElementById("magnifierBadge");
-  const penCanvas = document.getElementById("penCanvas");
-  const penCtx = penCanvas.getContext("2d");
-  penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
-
-  // ------------------------------------------------------------
-  // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar. Posisi kursor (`x`,`y`, 0..1
-  // relatif ke SELURUH jendela, sama seperti Penunjuk di atas) dipetakan
-  // dulu ke posisi RELATIF terhadap gambar #slideView (yang mungkin
-  // tidak memenuhi seluruh layar -- object-fit:contain bisa menyisakan
-  // ruang kosong di kiri-kanan/atas-bawah) sebelum dipakai menghitung
-  // `background-position` lensa, supaya titik yang diperbesar benar-
-  // benar pas dengan yang ditunjuk operator di kotak pratinjau Studio,
-  // bukan geser karena ruang kosong tadi. Kalau bukan gambar yang
-  // sedang tayang (`slideEl.hidden`), lensa disembunyikan -- kaca
-  // pembesar memang cuma untuk file yang diunggah (PDF/gambar/Word/PPT),
-  // bukan untuk teks ayat/Kidung.
-  // ------------------------------------------------------------
-  function hideMagnify() {
-    magnifierLens.style.display = "none";
-    magnifierBadge.style.display = "none";
-  }
-  function showMagnify(xFrac, yFrac, percent) {
-    if (!slideEl || slideEl.hidden || !slideEl.src) { hideMagnify(); return; }
-    const rect = slideEl.getBoundingClientRect();
-    if (!rect.width || !rect.height) { hideMagnify(); return; }
-    const px = xFrac * window.innerWidth;
-    const py = yFrac * window.innerHeight;
-    let ix = (px - rect.left) / rect.width;
-    let iy = (py - rect.top) / rect.height;
-    ix = Math.min(1, Math.max(0, ix));
-    iy = Math.min(1, Math.max(0, iy));
-    const lensSize = magnifierLens.offsetWidth || 220;
-    const zoom = Math.max(0.1, (Number(percent) || 100) / 100); // 10% s.d. 10000% -> faktor 0.1 s.d. 100
-    const bgW = rect.width * zoom;
-    const bgH = rect.height * zoom;
-    magnifierLens.style.display = "block";
-    magnifierLens.style.left = px + "px";
-    magnifierLens.style.top = py + "px";
-    magnifierLens.style.transform = "translate(-50%, -50%)";
-    magnifierLens.style.backgroundImage = `url("${slideEl.src}")`;
-    magnifierLens.style.backgroundSize = `${bgW}px ${bgH}px`;
-    magnifierLens.style.backgroundPosition = `${-(ix * bgW - lensSize / 2)}px ${-(iy * bgH - lensSize / 2)}px`;
-    magnifierBadge.style.display = "block";
-    magnifierBadge.style.left = px + "px";
-    magnifierBadge.style.top = (py - lensSize / 2 - 10) + "px";
-    magnifierBadge.textContent = "🔍 " + Math.round(percent) + "%";
-  }
-
-  // Sekali diklik, browser akan menganggap operator sudah "berinteraksi"
-  // dengan halaman/domain ini -- setelah itu perintah Play/Pause/Mute
-  // yang dikirim dari Studio (jendela lain) lewat postMessage akan
-  // benar-benar jalan (sebelum diklik, kebijakan autoplay Chrome dkk
-  // memblokir suara/putar yang dipicu dari jendela LAIN, bukan dari
-  // klik asli di halaman ini sendiri).
-  const activateOverlay = document.getElementById("activateOverlay");
-  function hideActivateOverlay() {
-    if (activateOverlay) activateOverlay.classList.add("hidden-activated");
-  }
-  if (document.getElementById("activateBtn")) {
-    document.getElementById("activateBtn").addEventListener("click", hideActivateOverlay);
-  }
-  // Klik di mana pun di halaman ini (bukan cuma tombolnya) juga otomatis
-  // menghitung sebagai "sudah aktif", supaya tidak keliru operator kalau
-  // ternyata menekan area lain dulu.
-  document.addEventListener("click", hideActivateOverlay, { once: true });
-
-  const RING_LEN = 2 * Math.PI * 44;
-  timerRingFg.style.strokeDasharray = String(RING_LEN);
-
-  let timerState = null; // { totalSeconds, endAt, label, bell }
-  let timerInterval = null;
-  let audioCtx = null;
-
-  function fmtMMSS(totalSec) {
-    const s = Math.max(0, Math.round(totalSec));
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
-  }
-
-  function beep() {
-    try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = "sine"; o.frequency.value = 880;
-      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.35, audioCtx.currentTime + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.9);
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(); o.stop(audioCtx.currentTime + 0.9);
-    } catch (e) {}
-  }
-
-  function tickTimer() {
-    if (!timerState) return;
-    const remain = (timerState.endAt - Date.now()) / 1000;
-    const remainClamped = Math.max(0, remain);
-    timerTimeEl.textContent = fmtMMSS(remainClamped);
-    const frac = timerState.totalSeconds > 0 ? remainClamped / timerState.totalSeconds : 0;
-    timerRingFg.style.strokeDashoffset = String(RING_LEN * (1 - frac));
-    const isDone = remain <= 0;
-    timerRingFg.classList.toggle("done", isDone);
-    timerTimeEl.classList.toggle("done-text", isDone);
-    if (isDone && !timerState._rang) {
-      timerState._rang = true;
-      if (timerState.bell) beep();
-      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  function sendToWindow(payload) {
+    if (!winRef || winRef.closed) return;
+    if (winReady) {
+      winRef.postMessage({ source: "bibleAppPresenter", payload }, location.origin);
+    } else {
+      msgQueue.push(payload);
     }
   }
 
-  function stopStopwatch(showIdle) {
-    if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
-    stopwatchState = null;
-    stopwatchWrap.hidden = true;
-    if (showIdle) idleEl.hidden = false;
+  function flushQueue() {
+    if (!winRef || winRef.closed) { msgQueue = []; return; }
+    while (msgQueue.length) {
+      winRef.postMessage({ source: "bibleAppPresenter", payload: msgQueue.shift() }, location.origin);
+    }
   }
 
-  function showTimer(data) {
-    stopTimer(false);
-    stopStopwatch(false); // BARU -- Timer & Stopwatch berbagi ruang tengah yang sama, tidak boleh berbarengan
-    hideMagnify(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
-    timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, _rang: false };
-    timerLabelEl.textContent = timerState.label;
-    timerWrap.hidden = false;
-    idleEl.hidden = true;
-    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
-    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // hentikan video kalau timer ditayangkan menimpanya
-    tickTimer();
-    timerInterval = setInterval(tickTimer, 250);
+  function isTwoScreenMode() {
+    return localStorage.getItem(MODE_KEY) === "2";
   }
-  function stopTimer(showIdle) {
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    timerState = null;
-    timerWrap.hidden = true;
-    if (showIdle) idleEl.hidden = false;
+
+  function el(id) {
+    return document.getElementById(id);
   }
 
   // ------------------------------------------------------------
-  // BARU (27 Agu 2026) -- ⏱️ Stopwatch (hitung MAJU dari 0, dikendalikan
-  // dari Layar 1/Controller lewat #psStopwatchStartBtn dkk di
-  // js/presentation-studio.js & #presentStopwatchStartBtn dkk di
-  // js/presentation.js -- lihat komentar panjang di kedua file itu).
-  // Pola SAMA seperti Timer (hitung mundur) di atas -- BEDANYA cuma di
-  // arah hitungannya & tidak ada cincin progres (tidak ada "target").
-  //   - `baseStartAt` = kapan (epoch ms) stopwatch ini SEHARUSNYA mulai
-  //     dari 0 kalau berjalan TERUS TANPA JEDA -- dihitung ulang di sisi
-  //     Controller tiap kali "▶️ Mulai" ditekan (baik pertama kali
-  //     maupun melanjutkan dari jeda): `Date.now() - sudahBerjalanMs`.
-  //     Elapsed SEKARANG = `Date.now() - baseStartAt`, cukup 1 angka
-  //     ini untuk tetap akurat lewat postMessage tanpa perlu kirim
-  //     "centang" tiap detik.
-  //   - `action:"stop"` (jeda): TIDAK mengirim elapsed apa pun -- Layar 2
-  //     cukup BERHENTI meng-update tampilan (nilai TERAKHIR yang sempat
-  //     dihitung otomatis tetap terlihat, beku di situ) sampai
-  //     "start" berikutnya datang.
-  //   - `action:"reset"`: sembunyikan & kembali ke 00:00.
+  // Ukuran jendela Layar 2 -- dibaca dari resolusi tersimpan (Studio
+  // Presentasi), lalu diskalakan turun (menjaga rasio) supaya tidak
+  // pernah melebihi area layar yang tersedia di perangkat operator.
   // ------------------------------------------------------------
-  let stopwatchState = null; // { baseStartAt, label }
-  let stopwatchInterval = null;
-  function fmtStopwatch(totalSec) {
+  function getStoredScreenSize() {
+    let w = DEFAULT_SCREEN_W, h = DEFAULT_SCREEN_H;
+    try {
+      const raw = localStorage.getItem(SCREEN_RES_KEY);
+      if (raw) {
+        const r = JSON.parse(raw);
+        if (r && Number(r.w) > 0 && Number(r.h) > 0) { w = Number(r.w); h = Number(r.h); }
+      }
+    } catch (e) {}
+    return { w, h };
+  }
+
+  function clampToScreen(w, h) {
+    const maxW = Math.max(320, (window.screen.availWidth || 1280) - 60);
+    const maxH = Math.max(240, (window.screen.availHeight || 800) - 80);
+    const scale = Math.min(1, maxW / w, maxH / h);
+    return { width: Math.round(w * scale), height: Math.round(h * scale) };
+  }
+
+  function getDesiredWindowSize() {
+    const { w, h } = getStoredScreenSize();
+    return clampToScreen(w, h);
+  }
+
+  // Bentuk (rasio) kotak pratinjau ("#presentPreviewBox" di panel ⋮ biasa
+  // dan "#psPreviewBoxWrap" di Studio Presentasi) dikunci lewat CSS var
+  // ini, diperbarui otomatis begitu Layar 2 melaporkan ukurannya yang
+  // SUNGGUH aktif (lihat "present_geometry" di present.html) -- jadi
+  // preview SELALU sama bentuk dengan Layar 2 sesungguhnya, tanpa
+  // operator perlu memilih resolusi apa pun secara manual.
+  //
+  // PERBAIKAN (28 Agu 2026, laporan operator): rasio kotak (bentuknya)
+  // sudah lama akurat, TAPI ukuran huruf di dalamnya TERNYATA masih
+  // bisa meleset dari Layar 2 sungguhan -- inilah sebab kotak pratinjau
+  // sering terlihat "kepotong"/perlu discroll padahal isi yang SAMA
+  // muat sempurna tanpa terpotong di Layar 2 asli. Penyebabnya: rumus
+  // #ref/#text di present.html memakai `clamp(min, N vw/vh, MAKS px)`
+  // -- di layar/proyektor lebar (>~1200px, umum utk Layar 2), bagian
+  // "N vw/vh"-nya SERING keburu lebih besar dari batas atas (mis. 68px
+  // utk #text), jadi yang sungguh dipakai Layar 2 ya batas atas itu,
+  // BUKAN proporsi murni N%. Kotak pratinjau Studio jauh lebih kecil
+  // dari Layar 2, jadi versi cqw/cqh-nya (lihat css/style.css) nyaris
+  // TIDAK PERNAH mentok ke batas atas yang sama -- akibatnya kotak
+  // pratinjau memakai huruf RELATIF LEBIH BESAR (dibanding lebarnya
+  // sendiri) daripada Layar 2 sungguhan, sehingga baris kalimat patah
+  // lebih banyak & makan lebih banyak ruang vertikal -> terlihat
+  // "kepotong"/perlu discroll di pratinjau walau Layar 2 asli baik-baik
+  // saja. Perbaikannya: setiap kali ukuran Layar 2 yang SUNGGUH aktif
+  // diketahui, hitung ULANG persentase yang SUNGGUH DIPAKAI di sana
+  // (setelah kena batas atas px, kalau kena) lalu simpan sebagai
+  // variabel CSS baru (--ps-*-pct) -- css/style.css memakai variabel
+  // ini (bukan lagi angka clamp tetap) supaya proporsi hurufnya SELALU
+  // sama persis dengan yang SUNGGUH dipakai Layar 2 saat itu, apa pun
+  // ukuran kotak pratinjau/Layar 2-nya.
+  function effectivePct(minPx, vPct, maxPx, dimensionPx) {
+    const raw = (vPct / 100) * dimensionPx;
+    const used = Math.min(maxPx, Math.max(minPx, raw));
+    return (used / dimensionPx) * 100;
+  }
+  function applyPreviewRatio(w, h) {
+    if (!(w > 0) || !(h > 0)) return;
+    document.documentElement.style.setProperty("--ps-preview-ratio", `${w} / ${h}`);
+    // Beri tahu Studio (js/presentation-studio.js) supaya splitter pratinjau
+    // menghitung ULANG batas atasnya -- rasio Layar 2 yang baru bisa
+    // membuat lebar/tinggi maksimum kotak "Berikutnya"/"Tayang" berubah
+    // (lihat wirePreviewResize()/maxRowByWidth()), jadi ukuran yang sedang
+    // dipakai perlu disesuaikan lagi supaya tidak jadi penyok.
+    try { window.dispatchEvent(new CustomEvent("ps-preview-ratio-changed")); } catch (e) {}
+    const root = document.documentElement.style;
+    root.setProperty("--ps-text-pct", effectivePct(28, 4.6, 68, w).toFixed(3));
+    root.setProperty("--ps-ref-pct", effectivePct(16, 2.4, 30, w).toFixed(3));
+    root.setProperty("--ps-ref-margin-pct", effectivePct(14, 2.4, 34, h).toFixed(3));
+    // Simpan sebagai "ukuran terakhir yang diketahui" supaya lain kali
+    // Layar 2 dibuka, ukurannya melanjutkan dari yang terakhir dipakai
+    // (bukan selalu balik ke ukuran bawaan 1280×720).
+    try { localStorage.setItem(SCREEN_RES_KEY, JSON.stringify({ w, h })); } catch (e) {}
+  }
+
+  // ------------------------------------------------------------
+  // Buka / tutup Layar 2
+  // ------------------------------------------------------------
+  function openWindow() {
+    if (winRef && !winRef.closed) {
+      winRef.focus();
+      return;
+    }
+    winReady = false;
+    msgQueue = [];
+    const { width, height } = getDesiredWindowSize();
+    winRef = window.open(
+      "present.html",
+      WIN_NAME,
+      `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`
+    );
+    startPolling();
+  }
+
+  // Ubah ukuran Layar 2 yang SEDANG terbuka supaya langsung menyesuaikan
+  // begitu operator mengganti pilihan resolusi di Studio -- tanpa perlu
+  // menutup & membuka ulang jendelanya. Beberapa browser membatasi
+  // resizeTo() untuk jendela yang tidak dibuka lewat skrip; karena
+  // Layar 2 selalu dibuka lewat window.open() di atas, ini pada
+  // umumnya berhasil, tapi tetap dibungkus try/catch untuk jaga-jaga.
+  function resizeWindow(w, h) {
+    if (!winRef || winRef.closed) return;
+    const { width, height } = clampToScreen(w, h);
+    try { winRef.resizeTo(width, height); } catch (e) {}
+  }
+
+  function closeWindow() {
+    stopPolling();
+    if (winRef && !winRef.closed) {
+      try { winRef.close(); } catch (e) {}
+    }
+    winRef = null;
+    winReady = false;
+    msgQueue = [];
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(() => {
+      if (winRef && winRef.closed) {
+        winRef = null;
+        winReady = false;
+        msgQueue = [];
+        updateStatusUi();
+      }
+    }, 1000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // ------------------------------------------------------------
+  // Kirim konten ke Layar 2 + perbarui pratinjau di jendela utama
+  // ------------------------------------------------------------
+  function post(payload) {
+    lastPayload = payload;
+    renderPreview(payload);
+    sendToWindow(payload);
+  }
+
+  function sendVerse(v, bookLabel) {
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) openWindow();
+    const ref = `${bookLabel || v.bookName || ""} ${v.chapter}:${v.verse}`.trim();
+    post({ type: "verse", ref, text: v.text });
+    flashSendFeedback();
+  }
+
+  // Sama seperti sendVerse(), tapi untuk beberapa versi/terjemahan
+  // sekaligus (checklist versi di Studio Presentasi) -- `versions` adalah
+  // [{ code, label, text }, ...]. present.html menyusunnya sebagai
+  // beberapa blok bertumpuk, masing-masing dengan label singkat versi
+  // (mis. "ITB", "ENG-RCV") di depan teksnya, mirip 1 pasal berbahasa
+  // ganda di aplikasi Alkitab pada umumnya.
+  function sendVerseMulti(ref, versions) {
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) openWindow();
+    post({ type: "verse", ref, texts: versions });
+    flashSendFeedback();
+  }
+
+  function sendFreeText(text) {
+    if (!text || !text.trim()) return;
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) openWindow();
+    post({ type: "text", text: text.trim() });
+    flashSendFeedback();
+  }
+
+  // Kirim 1 slide Kidung (bait + koor milik slide itu) ke Layar 2 --
+  // dipakai js/presentation-studio.js (tab "🎵 Kidung / Hymn" & item
+  // kumpulan bertipe "kidung", lihat sendGenericItemLive()/sendKidungSlide()
+  // di sana). `data`: { ref, bait: [{noBait,teks}], koorTeks }. Dikirim
+  // sebagai payload BARU ("kidung", bukan "text" polos) supaya
+  // present.html bisa menyorot baris koornya warna kuning terpisah dari
+  // bait, meniru tampilan mockup (lihat #kidungKoor di present.html) --
+  // kalau cuma digabung jadi 1 blok teks polos, pembedaan warna itu
+  // tidak mungkin dilakukan.
+  function sendKidung(data) {
+    if (!data) return;
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) openWindow();
+    // BARU (4 Sep 2026) -- pengarang/birama/jumlahBait diteruskan apa
+    // adanya ke present.html (kosong/0 kalau memang tidak ada) supaya
+    // baris kecil "Pengarang Birama (N Bait)" bisa disusun di sana, lihat
+    // showMain() kind "kidung" di present.html.
+    post({
+      type: "kidung", ref: data.ref || "", bait: data.bait || [], koorTeks: data.koorTeks || null,
+      pengarang: data.pengarang || "", birama: data.birama || "", jumlahBait: data.jumlahBait || 0,
+    });
+    flashSendFeedback();
+  }
+
+  function clearScreen() {
+    post({ type: "clear" });
+  }
+
+  // Kirim payload APA SAJA ke Layar 2 (dipakai js/presentation-studio.js
+  // untuk tipe baru: theme/warta/footnote/timer/black/logo/pointer/pen).
+  // Tidak menimpa `lastPayload` untuk tipe "overlay" (theme/warta/
+  // footnote/timer/pointer/pen) supaya "kirim ulang konten terakhir"
+  // saat Layar 2 dibuka ulang tetap berupa konten utama (verse/text/
+  // black/logo), bukan overlay sesaat.
+  // PERBAIKAN (4 Sep 2026, audit roadmap Bagian 4): "sc_control"
+  // (Play/Pause SoundCloud dari Studio) HARUS ikut masuk daftar ini,
+  // sama seperti "yt_control" -- kalau tidak, tiap klik tombol
+  // ▶️/⏸️ SoundCloud akan MENIMPA `lastPayload` (yang seharusnya
+  // tetap berisi {type:"soundcloud", trackUrl:...}) dengan payload
+  // kontrolnya sendiri, sehingga "kirim ulang konten terakhir" saat
+  // Layar 2 dibuka ulang jadi salah (mengirim ulang perintah play/
+  // pause, bukan trek SoundCloud-nya).
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control"];
+  function postRaw(payload) {
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) {
+      // Overlay (pointer/pen/tick timer) tidak perlu memaksa buka jendela
+      // baru berkali-kali; hanya buka untuk aksi yang jelas disengaja.
+      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote") {
+        openWindow();
+      } else {
+        return;
+      }
+    }
+    if (OVERLAY_TYPES.indexOf(payload.type) === -1) {
+      lastPayload = payload;
+      renderPreview(payload);
+    }
+    sendToWindow(payload);
+  }
+
+  function flashSendFeedback() {
+    const status = el("presentStatusText");
+    if (!status) return;
+    const old = status.textContent;
+    status.textContent = "✅ Terkirim ke Layar 2";
+    setTimeout(() => { updateStatusUi(); }, 1200);
+  }
+
+  // ------------------------------------------------------------
+  // Pratinjau (mini) di jendela utama -- mencerminkan Layar 2
+  // ------------------------------------------------------------
+  function renderPreview(payload) {
+    const box = el("presentPreviewBox");
+    if (!box) return;
+    if (!payload || payload.type === "clear") {
+      box.innerHTML = '<div class="present-preview-idle">Belum ada tayangan</div>';
+      return;
+    }
+    if (payload.type === "slide") {
+      box.innerHTML = payload.imageUrl
+        ? `<img src="${payload.imageUrl}" style="max-width:100%; max-height:100%; object-fit:contain; display:block;" />`
+        : '<div class="present-preview-idle">🖼️ Slide</div>';
+      return;
+    }
+    const refHtml = payload.type === "verse" && payload.ref
+      ? `<div class="present-preview-ref">${escapeHtmlLocal(payload.ref)}</div>` : "";
+    if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
+      const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtmlLocal(t.label || "")}</span> ${escapeHtmlLocal(t.text || "")}</div>`).join("");
+      box.innerHTML = `${refHtml}${versionsHtml}`;
+      return;
+    }
+    if (payload.type === "kidung") {
+      // Pratinjau mini di panel ⋮ biasa (bukan Studio -- Studio punya
+      // pratinjaunya sendiri, lihat renderStudioPreview() di
+      // js/presentation-studio.js, dengan penanganan "kidung" yang sama).
+      const kRefHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtmlLocal(payload.ref)}</div>` : "";
+      const baitHtml = (payload.bait || []).map((b) => `<div class="present-preview-text">${escapeHtmlLocal((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`).join("");
+      const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:var(--ps-preview-koor, #ffd84a); font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtmlLocal(payload.koorTeks)}</div>` : "";
+      box.innerHTML = `${kRefHtml}${baitHtml}${koorHtml}`;
+      return;
+    }
+    box.innerHTML = `${refHtml}<div class="present-preview-text">${escapeHtmlLocal(payload.text || "")}</div>`;
+  }
+
+  function escapeHtmlLocal(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ------------------------------------------------------------
+  // Simpan & tarik kembali tulisan bebas
+  // ------------------------------------------------------------
+  function loadSavedTexts() {
+    try { return JSON.parse(localStorage.getItem(SAVED_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function storeSavedTexts(list) {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(list));
+  }
+  function saveCurrentText() {
+    const ta = el("presentFreeText");
+    if (!ta || !ta.value.trim()) return;
+    const list = loadSavedTexts();
+    list.unshift({ id: "pt_" + Date.now().toString(36), text: ta.value.trim(), savedAt: new Date().toISOString() });
+    storeSavedTexts(list.slice(0, 100)); // batasi 100 biar tidak menumpuk
+    renderSavedList();
+  }
+  function deleteSavedText(id) {
+    storeSavedTexts(loadSavedTexts().filter((it) => it.id !== id));
+    renderSavedList();
+  }
+  function renderSavedList() {
+    const wrap = el("presentSavedList");
+    if (!wrap) return;
+    const list = loadSavedTexts();
+    if (!list.length) {
+      wrap.innerHTML = '<p class="present-saved-empty">Belum ada tulisan yang disimpan.</p>';
+      return;
+    }
+    wrap.innerHTML = "";
+    list.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "present-saved-row";
+      const preview = item.text.length > 60 ? item.text.slice(0, 60) + "…" : item.text;
+      row.innerHTML = `
+        <span class="present-saved-text" title="${escapeHtmlLocal(item.text)}">${escapeHtmlLocal(preview)}</span>
+        <span class="present-saved-actions">
+          <button type="button" class="chip-btn small" data-act="send">📤 Kirim</button>
+          <button type="button" class="chip-btn small" data-act="load">✏️ Muat</button>
+          <button type="button" class="chip-btn small danger" data-act="del">🗑️</button>
+        </span>`;
+      row.querySelector('[data-act="send"]').addEventListener("click", () => sendFreeText(item.text));
+      row.querySelector('[data-act="load"]').addEventListener("click", () => {
+        if (el("presentFreeText")) el("presentFreeText").value = item.text;
+      });
+      row.querySelector('[data-act="del"]').addEventListener("click", () => deleteSavedText(item.id));
+      wrap.appendChild(row);
+    });
+  }
+
+  // ------------------------------------------------------------
+  // Pengumuman & Timer sederhana -- versi ringkas dari kontrol yang
+  // sama di Studio Presentasi (js/presentation-studio.js), supaya
+  // tetap bisa dipakai dari panel ⋮ biasa (HP / layar sempit) tanpa
+  // wajib buka Studio (yang khusus laptop/komputer, layar ≥1100px).
+  // Payload yang dikirim SAMA PERSIS formatnya dengan punya Studio
+  // (type "text" utk pengumuman, type "timer" utk timer) supaya
+  // present.html tidak perlu logic tambahan sama sekali.
+  // ------------------------------------------------------------
+  let simpleTimerTotal = 0;
+  let simpleTimerEndAt = null;
+  let simpleTimerInterval = null;
+
+  function fmtMMSSLocal(totalSec) {
+    const s = Math.max(0, Math.round(totalSec));
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function wireAnnouncementSimple() {
+    if (el("presentAnnClearBtn")) {
+      el("presentAnnClearBtn").addEventListener("click", () => {
+        if (el("presentAnnTitle")) el("presentAnnTitle").value = "";
+        if (el("presentAnnBody")) el("presentAnnBody").value = "";
+      });
+    }
+    if (el("presentAnnShowBtn")) {
+      el("presentAnnShowBtn").addEventListener("click", () => {
+        const title = (el("presentAnnTitle") && el("presentAnnTitle").value.trim()) || "";
+        const body = (el("presentAnnBody") && el("presentAnnBody").value.trim()) || "";
+        if (!title && !body) return;
+        const full = title ? `${title}\n\n${body}` : body;
+        sendFreeText(full);
+      });
+    }
+  }
+
+  function wireTimerSimple() {
+    const presetBtns = Array.from(document.querySelectorAll("[data-present-timer-preset]"));
+    function setDisplay(sec) {
+      simpleTimerTotal = sec;
+      const disp = el("presentTimerDisplay");
+      if (disp) {
+        disp.textContent = fmtMMSSLocal(sec);
+        disp.classList.remove("done");
+        disp.classList.toggle("ps-timer-idle", sec > 0);
+      }
+    }
+    function markActivePreset(activeBtn) {
+      presetBtns.forEach((b) => b.classList.toggle("active", b === activeBtn));
+    }
+    presetBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setDisplay(Number(btn.dataset.presentTimerPreset));
+        markActivePreset(btn);
+      });
+    });
+    function applyCustom() {
+      const v = Number(el("presentTimerCustom") && el("presentTimerCustom").value);
+      if (v > 0) { setDisplay(v); markActivePreset(null); }
+    }
+    if (el("presentTimerCustomBtn")) el("presentTimerCustomBtn").addEventListener("click", applyCustom);
+    if (el("presentTimerCustom")) el("presentTimerCustom").addEventListener("keydown", (e) => { if (e.key === "Enter") applyCustom(); });
+
+    function stopDisplayLoop() {
+      if (simpleTimerInterval) { clearInterval(simpleTimerInterval); simpleTimerInterval = null; }
+    }
+    function startTimer() {
+      if (!(simpleTimerTotal > 0)) return;
+      stopDisplayLoop();
+      simpleTimerEndAt = Date.now() + simpleTimerTotal * 1000;
+      const label = (el("presentTimerLabel") && el("presentTimerLabel").value.trim()) || "Sesi Bagi Nikmat";
+      const bell = !!(el("presentTimerBell") && el("presentTimerBell").checked);
+      postRaw({ type: "timer", action: "start", label, totalSeconds: simpleTimerTotal, endAt: simpleTimerEndAt, bell });
+      const disp = el("presentTimerDisplay");
+      if (disp) disp.classList.remove("ps-timer-idle");
+      simpleTimerInterval = setInterval(() => {
+        const remain = (simpleTimerEndAt - Date.now()) / 1000;
+        if (disp) { disp.textContent = fmtMMSSLocal(remain); disp.classList.toggle("done", remain <= 0); }
+        if (remain <= 0) stopDisplayLoop();
+      }, 250);
+    }
+    function stopTimer() {
+      stopDisplayLoop();
+      postRaw({ type: "timer", action: "stop" });
+      const disp = el("presentTimerDisplay");
+      if (disp) { disp.textContent = "00:00"; disp.classList.remove("done"); disp.classList.add("ps-timer-idle"); }
+    }
+    if (el("presentTimerStartBtn")) el("presentTimerStartBtn").addEventListener("click", startTimer);
+    if (el("presentTimerStopBtn")) el("presentTimerStopBtn").addEventListener("click", stopTimer);
+  }
+
+  // ------------------------------------------------------------
+  // BARU (27 Agu 2026) -- ⏱️ Stopwatch, versi panel sederhana (HP / layar
+  // sempit) -- pola & payload SAMA PERSIS dengan versi Studio
+  // (wireStopwatch() di js/presentation-studio.js), lihat komentar
+  // panjang di sana untuk arti `baseStartAt`/`action`.
+  // ------------------------------------------------------------
+  let simpleSwBaseStartAt = null;
+  let simpleSwAccumulatedMs = 0;
+  let simpleSwRunning = false;
+  let simpleSwInterval = null;
+
+  function fmtStopwatchLocal(totalSec) {
     const s = Math.max(0, Math.floor(totalSec));
     const hh = Math.floor(s / 3600);
     const mm = Math.floor((s % 3600) / 60);
@@ -674,823 +518,201 @@
     const pad2 = (n) => String(n).padStart(2, "0");
     return hh > 0 ? `${hh}:${pad2(mm)}:${pad2(ss)}` : `${pad2(mm)}:${pad2(ss)}`;
   }
-  function tickStopwatch() {
-    if (!stopwatchState) return;
-    const elapsed = (Date.now() - stopwatchState.baseStartAt) / 1000;
-    stopwatchTimeEl.textContent = fmtStopwatch(elapsed);
-  }
-  function showStopwatch(data) {
-    stopTimer(false); // Timer & Stopwatch tidak boleh berbarengan (lihat catatan di atas)
-    hideMagnify();
-    stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
-    stopwatchLabelEl.textContent = stopwatchState.label;
-    stopwatchWrap.hidden = false;
-    idleEl.hidden = true;
-    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
-    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
-    tickStopwatch();
-    if (stopwatchInterval) clearInterval(stopwatchInterval);
-    stopwatchInterval = setInterval(tickStopwatch, 250);
-  }
-  function pauseStopwatchDisplay() {
-    // "Jeda" -- BEDA dari stopStopwatch(): overlay & label TETAP tampil,
-    // cuma centangnya berhenti (angka terakhir tetap beku di layar),
-    // supaya operator/jemaat masih bisa melihat berapa lama sesi
-    // berjalan sejauh ini walau sedang dijeda.
-    if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
+
+  function wireStopwatchSimple() {
+    const disp = el("presentStopwatchDisplay");
+    function tick() {
+      if (!simpleSwRunning || simpleSwBaseStartAt == null) return;
+      if (disp) disp.textContent = fmtStopwatchLocal((Date.now() - simpleSwBaseStartAt) / 1000);
+    }
+    function start() {
+      if (simpleSwRunning) return;
+      simpleSwBaseStartAt = Date.now() - simpleSwAccumulatedMs;
+      simpleSwRunning = true;
+      const label = (el("presentStopwatchLabel") && el("presentStopwatchLabel").value.trim()) || "";
+      postRaw({ type: "stopwatch", action: "start", label, baseStartAt: simpleSwBaseStartAt });
+      if (simpleSwInterval) clearInterval(simpleSwInterval);
+      simpleSwInterval = setInterval(tick, 250);
+      tick();
+    }
+    function pause() {
+      if (!simpleSwRunning) return;
+      simpleSwRunning = false;
+      simpleSwAccumulatedMs = Date.now() - simpleSwBaseStartAt;
+      if (simpleSwInterval) { clearInterval(simpleSwInterval); simpleSwInterval = null; }
+      postRaw({ type: "stopwatch", action: "stop" });
+    }
+    function reset() {
+      simpleSwRunning = false;
+      simpleSwBaseStartAt = null;
+      simpleSwAccumulatedMs = 0;
+      if (simpleSwInterval) { clearInterval(simpleSwInterval); simpleSwInterval = null; }
+      if (disp) disp.textContent = "00:00";
+      postRaw({ type: "stopwatch", action: "reset" });
+    }
+    if (el("presentStopwatchStartBtn")) el("presentStopwatchStartBtn").addEventListener("click", start);
+    if (el("presentStopwatchStopBtn")) el("presentStopwatchStopBtn").addEventListener("click", pause);
+    if (el("presentStopwatchResetBtn")) el("presentStopwatchResetBtn").addEventListener("click", reset);
   }
 
-  function koorColorForBg(hex) {
-    const h = String(hex || "").replace("#", "");
-    if (h.length !== 6) return "#ffd84a";
-    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
-    const luma = 0.299 * r + 0.587 * g + 0.114 * b; // 0 (gelap) - 255 (terang)
-    return luma > 170 ? "#8a6d00" : "#ffd84a";
-  }
   // ------------------------------------------------------------
-  // BARU (28 Agu 2026) -- 🎥 KAMERA LATAR. Menyalakan kamera PERANGKAT
-  // YANG MEMBUKA JENDELA INI (laptop/HP yang tersambung ke proyektor)
-  // sebagai latar belakang hidup di belakang ayat/kidung/pengumuman --
-  // lihat tab "🎥 Kamera" di Studio (js/presentation-studio.js,
-  // wireCamera()) untuk kontrolnya. Izin kamera browser (getUserMedia)
-  // SENGAJA diminta di SINI (jendela Layar 2), bukan di jendela Studio,
-  // supaya kameranya benar-benar yang terpasang & menghadap ke arah
-  // yang dipakai di lokasi acara -- bukan kamera laptop operator yang
-  // sedang mengetik di jendela lain.
-  //
-  // Teks (#ref/#text) diberi GARIS TEPI (outline) memakai teknik
-  // "text-shadow melingkar" (buildOutlineShadow() -- beberapa lapis
-  // text-shadow kecil ke segala arah membentuk garis tepi) -- dipilih
-  // ketimbang properti `-webkit-text-stroke` karena text-shadow
-  // didukung SEMUA browser tanpa perlu prefiks & tidak berisiko garis
-  // tepinya "memakan" isi huruf (masalah umum -webkit-text-stroke kalau
-  // urutan lukis stroke-di-atas-fill tidak didukung `paint-order` di
-  // browser tertentu). --p-outline-shadow & --p-cam-ink adalah CSS
-  // custom property yang HANYA diisi selama kamera aktif (lihat
-  // applyCamTextStyle() di bawah) -- kosong/tidak diset = var() di
-  // #ref/#text (lihat <style> di atas) otomatis jatuh ke tampilan lama
-  // (warna tema biasa, tanpa outline), jadi TIDAK mengubah tampilan
-  // sama sekali selama fitur ini tidak dipakai.
+  // UI: toggle 1/2 Layar + wiring tombol panel
   // ------------------------------------------------------------
-  let camStream = null;
-  let camActive = false;
-  let camFacing = null;
-  let camMirror = false;
-  // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (lihat catatan #imgBg di
-  // <style> & applyBgImagePayload() di bawah).
-  let imgBgActive = false;
+  // Tombol "🖥️ Buka Layar 2" cuma relevan untuk laptop/komputer yang
+  // punya monitor kedua sungguhan -- di HP tidak ada gunanya (tidak ada
+  // layar kedua untuk dibuka) dan cuma memenuhi layar kecil. Pakai
+  // ambang lebar yang sama dengan Studio Presentasi (1100px, lihat
+  // DESKTOP_MIN_WIDTH di js/presentation-studio.js) supaya konsisten.
+  function isDesktopScreen_() { return window.innerWidth >= 1100; }
 
-  function buildOutlineShadow(color, widthPx) {
-    const w = Math.max(0.5, Number(widthPx) || 3);
-    const STEPS = 16; // cukup rapat supaya garis tepinya terlihat mulus melingkar, bukan segi-N kasar
-    const parts = [];
-    for (let i = 0; i < STEPS; i++) {
-      const angle = (i / STEPS) * Math.PI * 2;
-      parts.push(`${(Math.cos(angle) * w).toFixed(2)}px ${(Math.sin(angle) * w).toFixed(2)}px 0 ${color}`);
-    }
-    return parts.join(", ");
-  }
-
-  // `mode`: "white-black" (tulisan putih, border hitam -- cocok utk
-  // latar yang cenderung TERANG) | "black-white" (tulisan hitam,
-  // border putih -- cocok utk latar yang cenderung GELAP) | "custom"
-  // (BARU 28 Agu 2026 -- warna tulisan & border BEBAS dipilih operator
-  // lewat color picker, dioper lewat `ink`/`outline`, bukan cuma 2
-  // pilihan hitam/putih) | "none"/kosong (matikan, kembali ke
-  // tampilan tema biasa). Dipakai baik untuk 🎥 Kamera maupun 🖼️
-  // Gambar Latar -- keduanya sama-sama butuh tulisan yang tetap
-  // terbaca di atas latar yang tidak polos.
-  function applyCamTextStyle(mode, widthPx, ink, outline) {
-    const root = document.documentElement.style;
-    if (!mode || mode === "none") {
-      root.removeProperty("--p-outline-shadow");
-      root.removeProperty("--p-cam-ink");
-      return;
-    }
-    let outlineColor, fillColor;
-    if (mode === "custom") {
-      fillColor = ink || "#ffffff";
-      outlineColor = outline || "#000000";
-    } else {
-      outlineColor = mode === "black-white" ? "#ffffff" : "#000000";
-      fillColor = mode === "black-white" ? "#000000" : "#ffffff";
-    }
-    root.setProperty("--p-outline-shadow", buildOutlineShadow(outlineColor, widthPx));
-    root.setProperty("--p-cam-ink", fillColor);
-  }
-
-  // Latar (kamera ATAU gambar) cuma masuk akal di BELAKANG teks (ayat/
-  // teks bebas/kidung) -- disembunyikan (opacity 0, stream/gambar
-  // TETAP terpasang, tidak dimatikan/dibuang) begitu tayangan pindah
-  // ke Hitam/Logo/Slide/YouTube, yang masing-masing sudah punya
-  // kontennya sendiri & tidak butuh (atau malah terganggu oleh) latar
-  // di baliknya. Muncul lagi otomatis begitu kembali ke ayat/teks/
-  // kidung -- operator tidak perlu menyalakan-matikan latar manual
-  // tiap ganti jenis tayangan.
-  function setCamVisibleForKind(kind) {
-    if (!camActive && !imgBgActive) return;
-    const show = kind === "verse" || kind === "text" || kind === "kidung";
-    if (camActive) camBgEl.style.opacity = show ? "1" : "0";
-    if (imgBgActive) imgBgEl.style.opacity = show ? "1" : "0";
-  }
-
-  // BARU (28 Agu 2026) -- 🖼️ Latar Gambar: kebalikan dari #camBg tidak
-  // perlu izin browser (getUserMedia) sama sekali -- cukup pasang
-  // `src` gambar (data-URL, dikirim apa adanya dari Studio, sama pola
-  // seperti "slide" di showMain()) begitu diterima. Kamera & Gambar
-  // Latar SALING MENIADAKAN (satu aktif, yang lain otomatis mati) --
-  // Studio yang menjaga aturan ini (lihat applyLatarSource() di
-  // js/presentation-studio.js), di sini cukup taati apa yang dikirim.
-  function applyBgImagePayload(data) {
-    if (data.on && data.url) {
-      imgBgEl.src = data.url;
-      imgBgEl.hidden = false;
-      imgBgEl.style.opacity = "1";
-      imgBgActive = true;
-      if (camActive) stopCamera(); // pastikan tidak dua-duanya aktif sekaligus
-    } else {
-      imgBgActive = false;
-      imgBgEl.style.opacity = "0";
-      imgBgEl.hidden = true;
-    }
-    updateLatarDimClass();
-  }
-
-  function reportCameraStatus(on, error) {
-    if (!window.opener) return;
-    try {
-      window.opener.postMessage({ source: "bibleAppPresenter", type: "present_camera_status", on, error: error || null }, location.origin);
-    } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
-  }
-
-  // BARU (28 Agu 2026) -- dipanggil di beberapa tempat (startCamera,
-  // stopCamera, applyBgImagePayload) -- satu tempat untuk menjaga
-  // kelas "cam-active" (dim overlay) menyala kalau SALAH SATU dari
-  // kamera/gambar latar aktif, mati kalau dua-duanya mati.
-  function updateLatarDimClass() {
-    document.body.classList.toggle("cam-active", camActive || imgBgActive);
-  }
-
-  async function startCamera(facingMode, mirror) {
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Browser ini tidak mendukung akses kamera.");
-      }
-      if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
-      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode || "user" }, audio: false });
-      // Kamera & Gambar Latar saling meniadakan (lihat catatan
-      // applyBgImagePayload()) -- menyalakan kamera otomatis mematikan
-      // gambar latar kalau sedang aktif.
-      if (imgBgActive) { imgBgActive = false; imgBgEl.hidden = true; imgBgEl.style.opacity = "0"; }
-      camBgEl.srcObject = camStream;
-      camActive = true;
-      camFacing = facingMode || "user";
-      camMirror = !!mirror;
-      camBgEl.style.transform = camMirror ? "scaleX(-1)" : "none";
-      camBgEl.style.opacity = "1";
-      camBgEl.hidden = false;
-      updateLatarDimClass();
-      reportCameraStatus(true, null);
-    } catch (e) {
-      camActive = false;
-      camBgEl.hidden = true;
-      updateLatarDimClass();
-      // Pesan error asli browser (mis. "Permission denied", "Requested
-      // device not found") diteruskan apa adanya ke Studio supaya
-      // operator tahu persis kenapa (izin ditolak / tidak ada kamera /
-      // dsb), bukan cuma "gagal" tanpa keterangan.
-      reportCameraStatus(false, String((e && e.message) || e));
-    }
-  }
-
-  function stopCamera() {
-    if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; }
-    camActive = false;
-    camBgEl.hidden = true;
-    camBgEl.srcObject = null;
-    updateLatarDimClass();
-    reportCameraStatus(false, null);
-  }
-
-  // Dipanggil dari render() saat menerima payload {type:"camera", ...}.
-  // Stream kamera HANYA dinyalakan ulang (startCamera) kalau memang
-  // belum aktif atau arah kameranya (`facingMode`) berubah -- supaya
-  // pengaturan lain (gaya tulisan dsb, sekarang dikirim terpisah lewat
-  // {type:"latartext"}) TIDAK memicu video berkedip/diminta ulang
-  // izinnya setiap kali.
-  function applyCameraPayload(data) {
-    if (data.on) {
-      const needsRestart = !camActive || camFacing !== (data.facingMode || "user");
-      if (needsRestart) {
-        startCamera(data.facingMode, data.mirror);
-      } else if (camMirror !== !!data.mirror) {
-        camMirror = !!data.mirror;
-        camBgEl.style.transform = camMirror ? "scaleX(-1)" : "none";
-      }
-    } else if (camActive) {
-      stopCamera();
-    }
-  }
-
-  function applyTheme(theme) {
-    if (!theme) return;
-    const root = document.documentElement.style;
-    if (theme.font) root.setProperty("--p-font", theme.font);
-    if (theme.bgColor) {
-      root.setProperty("--p-bg", theme.bgColor);
-      root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
-    }
-    // Perbaikan utama: dulu warna tulisan (--p-ink) TIDAK PERNAH ikut
-    // berubah saat ganti tema -- jadi tema latar terang (Terang/Klasik
-    // Sepia) membuat tulisan (krem-terang bawaan) nyaris tak kelihatan
-    // di atas latar yang juga terang. Sekarang ink dikirim & diterapkan
-    // bersamaan dengan bgColor supaya kontrasnya selalu terjaga.
-    if (theme.ink) root.setProperty("--p-ink", theme.ink);
-    if (theme.scale) root.setProperty("--p-scale", theme.scale);
-    if (theme.lineHeight) root.setProperty("--p-line-height", theme.lineHeight);
-    // BARU (28 Agu 2026) -- lihat catatan --p-content-scale di <style> di atas.
-    if (theme.contentScale) root.setProperty("--p-content-scale", theme.contentScale);
-    // BARU (4 Sep 2026) -- toggle "Tebal" (Bold): beda dari properti lain
-    // di atas (yang pakai `if (theme.x)`, dilewati kalau falsy/kosong),
-    // ini BOOLEAN -- harus dicek `typeof ... === "boolean"` supaya nilai
-    // `false` (mati) tetap diterapkan, bukan ikut terlewati begitu saja
-    // seperti string/angka kosong.
-    if (typeof theme.bold === "boolean") root.setProperty("--p-font-weight", theme.bold ? "700" : "400");
-  }
-
-  function applyTicker(barEl, textEl2, data) {
-    if (!data.show || !data.text) { barEl.hidden = true; return; }
-    barEl.hidden = false;
-    textEl2.textContent = data.text + "     ";
-    // PERBAIKAN (laporan operator 28 Agu 2026) -- SEBELUMNYA scroll/diam
-    // ditebak SENDIRI dari panjang teks (>40 karakter = geser, kalau
-    // tidak = selalu diam di tengah) -- checkbox "▶️ Berjalan" di Studio
-    // (js/presentation-studio.js, wireMessage()) sama sekali tidak
-    // berpengaruh. SEKARANG: kalau Studio secara EKSPLISIT mengirim
-    // `data.scroll` (true/false, sesuai centang checkbox itu), itu yang
-    // dipakai apa adanya -- pesan PENDEK sekalipun (mis. "sekarang
-    // waktunya jalan") akan tetap bergeser kanan->kiri kalau operator
-    // memang mencentang "Berjalan". Auto-tebak dari panjang teks HANYA
-    // dipakai sebagai fallback kalau `data.scroll` tidak dikirim sama
-    // sekali (`undefined` -- untuk jaga-jaga kalau ada pemanggil lain di
-    // masa depan yang belum mengirim field ini).
-    const scrolling = typeof data.scroll === "boolean" ? data.scroll : (data.text.length > 40);
-    barEl.classList.toggle("scrolling", scrolling);
-    barEl.classList.toggle("static", !scrolling);
-    // Warna teks -- SEBELUMNYA `msgColor` di Studio tersimpan tapi tidak
-    // pernah dikirim sama sekali, jadi pilihan warna di palet "Warna
-    // Teks" tidak berpengaruh apa pun (selalu putih bawaan CSS). Sekarang
-    // dipakai kalau dikirim, jatuh balik ke putih kalau tidak ada.
-    barEl.style.color = data.color || "#ffffff";
-    if (scrolling) {
-      // Lama teks bergeser 1 KALI PUTARAN PENUH (dari tepi kanan sampai
-      // hilang total di kiri, lihat @keyframes tickerScroll) -- makin
-      // panjang teksnya, makin lama durasinya (supaya kecepatan geser
-      // per-hurufnya terasa konsisten, bukan tambah cepat kalau teksnya
-      // panjang), minimal 8 detik supaya pesan PENDEK pun sempat terbaca
-      // jelas & tidak melesat lewat terlalu cepat ("sesuai tulisan" --
-      // ukuran/kecepatan menyesuaikan panjang tulisannya, bukan angka
-      // tetap).
-      const secs = Math.max(8, data.text.length / 8);
-      textEl2.parentElement.style.animationDuration = secs + "s";
-    } else {
-      textEl2.parentElement.style.animationDuration = "";
-    }
-  }
-
-  // BARU (4 Sep 2026, v7) -- PERBAIKAN BUG nyata dilaporkan operator lewat
-  // screenshot: link pendek resmi SoundCloud (mis. "on.soundcloud.com/xxx")
-  // ditempel APA ADANYA ke "https://w.soundcloud.com/player/?url=..." dan
-  // widget-nya menolak dengan pesan "You have not provided a valid
-  // SoundCloud URL" -- ternyata endpoint widget publik (w.soundcloud.com)
-  // TIDAK menerima pola domain "on.soundcloud.com" sebagai parameter "url"
-  // walau endpoint API resmi lain (/resolve) sudah mendukungnya sejak 2023
-  // (2 sistem beda di sisi SoundCloud, bukan bug di kode ini).
-  // Perbaikan: sebelum membangun src widget, tanya dulu endpoint oEmbed
-  // publik SoundCloud (https://soundcloud.com/oembed) -- endpoint ini
-  // didokumentasikan resmi "menerima URL apa pun yang menunjuk ke
-  // track/set/user" dan mendukung CORS (bisa dipanggil `fetch()` langsung
-  // dari sini) -- hasilnya berupa kode <iframe> siap pakai yang SUDAH
-  // memakai link asli/kanonik (bukan link pendek), lalu kita ambil ulang
-  // parameter "url" dari situ untuk dipasang lagi ke widget dengan
-  // parameter tampilan kita sendiri (warna, auto_play, dst). Kalau
-  // permintaan oEmbed ini gagal (mis. jaringan mati/offline saat acara),
-  // FALLBACK ke cara lama (link ditempel apa adanya) supaya link
-  // "soundcloud.com/artis/judul" biasa yang SUDAH bekerja sebelumnya tetap
-  // jalan seperti biasa, tidak ikut rusak oleh perbaikan ini.
-  async function resolveSoundCloudSrc(trackUrl, autoplay) {
-    const paramsTail = "&auto_play=" + (autoplay === false ? "false" : "true") +
-      "&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
-    try {
-      const oembedUrl = "https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl);
-      const res = await fetch(oembedUrl);
-      if (res.ok) {
-        const json = await res.json();
-        const html = (json && json.html) || "";
-        const srcMatch = /src="([^"]+)"/.exec(html);
-        if (srcMatch && srcMatch[1]) {
-          const urlParamMatch = /[?&]url=([^&]+)/.exec(srcMatch[1]);
-          if (urlParamMatch && urlParamMatch[1]) {
-            return "https://w.soundcloud.com/player/?url=" + urlParamMatch[1] + paramsTail;
-          }
-          return srcMatch[1]; // fallback: pakai src dari oEmbed apa adanya kalau pola "url=" tidak ketemu
-        }
-      }
-    } catch (err) {
-      // Jaringan gagal / oEmbed tidak bisa dihubungi -- lanjut ke fallback di bawah, JANGAN throw
-    }
-    return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + paramsTail;
-  }
-
-  function showMain(kind, data) {
-    stopTimer(false);
-    stopStopwatch(false);
-    hideMagnify(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
-    setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
-    idleEl.hidden = true;
-    logoEl.hidden = true;
-    slideEl.hidden = true;
-    if (kind !== "youtube" && !ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // stop video saat pindah ke konten lain
-    // BARU (4 Sep 2026) -- Canva & SoundCloud dihentikan/disembunyikan
-    // juga saat berpindah ke jenis tayangan lain, pola sama seperti
-    // #ytView di atas.
-    if (kind !== "canva" && !canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
-    if (kind !== "soundcloud" && !scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
-    stageEl.classList.remove("fade-in");
-    void stageEl.offsetWidth;
-    // BARU (4 Sep 2026) -- #refSub HANYA dipakai untuk kind "kidung" (lihat
-    // di bawah) -- disembunyikan lebih dulu di sini untuk SEMUA jenis
-    // tayangan lain supaya tidak ada sisa baris kecil kidung sebelumnya
-    // nyangkut saat berpindah ke ayat/teks/dst.
-    if (kind !== "kidung") { refSubEl.hidden = true; refSubEl.textContent = ""; }
-    if (kind === "verse") {
-      refEl.hidden = false;
-      refEl.textContent = data.ref || "";
-      if (Array.isArray(data.texts) && data.texts.length) {
-        // Beberapa versi/terjemahan sekaligus (checklist versi di Studio
-        // Presentasi) -- tampil bertumpuk, tiap blok dengan label singkat
-        // versinya (mis. "ITB", "ENG-RCV") di depan teksnya.
-        textEl.innerHTML = data.texts.map((t) => {
-          const label = (t.label || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-          const body = (t.text || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-          return `<div class="verse-version-block"><span class="verse-version-tag">${label}</span>${body}</div>`;
-        }).join("");
+  function updateStatusUi() {
+    document.body.classList.toggle("present-mode-on", isTwoScreenMode());
+    const status = el("presentStatusText");
+    if (status) {
+      if (!isTwoScreenMode()) {
+        status.textContent = "Mode 1 Layar aktif.";
+      } else if (winRef && !winRef.closed) {
+        status.textContent = "🟢 Layar 2 terbuka.";
       } else {
-        textEl.textContent = data.text || "";
+        status.textContent = "⚪ Layar 2 belum dibuka — tekan tombol di bawah.";
       }
-    } else if (kind === "text") {
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = data.text || "";
-    } else if (kind === "black") {
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
-    } else if (kind === "logo") {
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
-      if (data.logoUrl) { logoEl.src = data.logoUrl; logoEl.hidden = false; }
-    } else if (kind === "slide") {
-      // Gambar penuh 1 layar -- hasil konversi File tab (gambar
-      // langsung, atau per-slide dari pptx/pdf yang sudah diubah jadi
-      // gambar saat diunggah).
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
-      if (data.imageUrl) { slideEl.src = data.imageUrl; slideEl.hidden = false; }
-    } else if (kind === "youtube") {
-      // Video YouTube penuh 1 layar (tab "▶️ YouTube" di Studio Presentasi).
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
-      if (data.embedUrl) {
-        ytEl.src = data.embedUrl;
-        ytEl.hidden = false;
-        // BARU (28 Agu 2026) -- daftar putar utk "Ulang: Semua" (Repeat
-        // All). Kalau pengirim tidak menyertakan queue (mis. 1 video
-        // tunggal dari tab File/kotak "Tampilkan"), anggap saja daftarnya
-        // 1 video ini sendiri supaya "Ulang: Satu" tetap bekerja normal.
-        ytQueue = Array.isArray(data.queue) && data.queue.length ? data.queue : [{ embedUrl: data.embedUrl }];
-        ytQueueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : 0;
-        ytLastState = null;
-      }
-    } else if (kind === "canva") {
-      // BARU (4 Sep 2026) -- Presentasi Canva penuh 1 layar (roadmap
-      // Bagian 3). embedUrl SUDAH dinormalisasi ke pola resmi Canva
-      // "...view?embed" oleh Studio (normalizeCanvaLink() di js/
-      // presentation-studio.js) sebelum sampai di sini -- lihat catatan
-      // penting di CSS #canvaView atas: TIDAK ada kontrol jarak-jauh,
-      // operator klik langsung di layar ini untuk maju/mundur slide.
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
-      if (data.embedUrl) { canvaEl.src = data.embedUrl; canvaEl.hidden = false; }
-    } else if (kind === "soundcloud") {
-      // BARU (4 Sep 2026) -- Audio SoundCloud (roadmap Bagian 4). Widget
-      // resmi (w.soundcloud.com/player) dimuat sebagai bilah pemutar di
-      // bawah layar (lihat CSS #scView) -- ayat/pengumuman/kidung yang
-      // sedang tayang di #text/#ref TETAP terlihat penuh di atasnya,
-      // audio jalan di bilah bawah. SC.Widget baru dibuat SETELAH iframe
-      // ini benar memuat (event "load" di bawah), supaya SDK bisa
-      // mengikat ke iframe yang isinya sudah benar.
-      refEl.hidden = true; refEl.textContent = "";
-      if (data.trackUrl) {
-        scEl.hidden = false;
-        scEl.src = ""; // kosongkan dulu -- diisi async oleh resolveSoundCloudSrc() di bawah
-        resolveSoundCloudSrc(data.trackUrl, data.autoplay).then(function (src) {
-          scEl.src = src;
-        });
-      }
-    } else if (kind === "kidung") {
-      // Slide Kidung (bait + koor snapshot, lihat Presentation.sendKidung()
-      // di js/presentation.js & tab "🎵 Kidung / Hymn" di js/presentation-
-      // studio.js) -- ditampilkan seperti mockup: judul kidung sebagai
-      // referensi kecil di atas, tiap bait 1 baris/blok, lalu koor (kalau
-      // ada) DISOROT warna kuning terpisah dari warna teks bait biasa,
-      // supaya jemaat langsung tahu bagian mana yang koor.
-      refEl.hidden = !data.ref;
-      refEl.textContent = data.ref || "";
-      // BARU (4 Sep 2026) -- baris kecil kedua "Pengarang Birama (N Bait)"
-      // (mis. "Witness Lee B 4/4 (7 Bait)", contoh mockup yang diminta
-      // operator) -- disusun dari 3 field terpisah yang dikirim
-      // Presentation.sendKidung() (js/presentation.js), bagian yang
-      // kosong (mis. birama belum diisi di Sheet) otomatis dilewati
-      // supaya tidak ada spasi ganda/baris aneh.
-      let kidungSub = "";
-      if (data.pengarang && String(data.pengarang).trim()) kidungSub += String(data.pengarang).trim();
-      if (data.birama && String(data.birama).trim()) kidungSub += (kidungSub ? " " : "") + String(data.birama).trim();
-      if (data.jumlahBait) kidungSub += (kidungSub ? " " : "") + "(" + data.jumlahBait + " Bait)";
-      refSubEl.hidden = !kidungSub;
-      refSubEl.textContent = kidungSub;
-      const escKidung = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-      const baitHtml = (data.bait || [])
-        .map((b) => `<div class="kidung-bait-line">${escKidung((b.noBait ? b.noBait + ". " : "") + (b.teks || "")).replace(/\n/g, "<br>")}</div>`)
-        .join('<div class="kidung-line-gap">&nbsp;</div>');
-      const koorHtml = data.koorTeks
-        ? `<div class="kidung-line-gap">&nbsp;</div><div class="kidung-koor-line"><span class="kidung-koor-label">Koor:</span><br>${escKidung(data.koorTeks).replace(/\n/g, "<br>")}</div>`
-        : "";
-      textEl.innerHTML = baitHtml + koorHtml;
     }
-    stageEl.classList.add("fade-in");
+    if (el("presentModeToggle")) el("presentModeToggle").checked = isTwoScreenMode();
+    if (el("presentOpenWindowBtn")) el("presentOpenWindowBtn").hidden = !isTwoScreenMode() || !isDesktopScreen_();
+    if (el("presentControlsBody")) el("presentControlsBody").hidden = !isTwoScreenMode();
   }
 
-  function render(data) {
-    if (!data) return;
-    if (data.type === "clear") {
-      refEl.hidden = true; refEl.textContent = "";
-      refSubEl.hidden = true; refSubEl.textContent = ""; // BARU (4 Sep 2026)
-      textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
-      if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
-      if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; } // BARU (4 Sep 2026)
-      if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; } // BARU (4 Sep 2026)
-      stopTimer(true);
-      stopStopwatch(true);
-      hideMagnify();
-      setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
-      return;
+  window.addEventListener("resize", () => { if (el("presentOpenWindowBtn")) updateStatusUi(); });
+
+
+  function setMode(twoScreen) {
+    localStorage.setItem(MODE_KEY, twoScreen ? "2" : "1");
+    if (twoScreen) {
+      openWindow();
+    } else {
+      closeWindow();
     }
-    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung" || data.type === "canva" || data.type === "soundcloud") {
-      showMain(data.type, data);
-      return;
+    updateStatusUi();
+  }
+
+  // Disembunyikan total untuk Mode Tamu (fitur ini butuh login) --
+  // dipanggil dari applyGuestModeUi() di js/app.js tiap status login berubah.
+  function refreshGuestGate() {
+    const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
+    const row = el("presentModeRow");
+    if (row) row.hidden = isGuestNow;
+    // Jalan pintas header (🎛️, lihat index.html & PresentationStudio.init())
+    // -- disembunyikan juga untuk Mode Tamu, sama seperti presentModeRow.
+    const headerBtn = el("headerStudioBtn");
+    if (headerBtn) headerBtn.hidden = isGuestNow;
+    if (isGuestNow && isTwoScreenMode()) {
+      // Kalau entah bagaimana sempat aktif lalu masuk sebagai tamu, matikan.
+      setMode(false);
     }
-    if (data.type === "timer") {
-      if (data.action === "stop") { stopTimer(true); }
-      else { showTimer(data); }
-      return;
+  }
+
+  function initUi() {
+    updateStatusUi();
+    renderSavedList();
+    renderPreview(lastPayload);
+    wireAnnouncementSimple();
+    wireTimerSimple();
+    wireStopwatchSimple();
+
+    if (el("presentModeToggle")) {
+      el("presentModeToggle").addEventListener("change", (e) => setMode(e.target.checked));
     }
-    if (data.type === "stopwatch") {
-      // BARU (27 Agu 2026) -- lihat catatan panjang di showStopwatch() di
-      // atas untuk arti tiap `action`.
-      if (data.action === "start") showStopwatch(data);
-      else if (data.action === "stop") pauseStopwatchDisplay();
-      else if (data.action === "reset") stopStopwatch(true);
-      return;
+    if (el("presentOpenWindowBtn")) {
+      el("presentOpenWindowBtn").addEventListener("click", () => openWindow());
     }
-    if (data.type === "theme") { applyTheme(data.theme); return; }
-    if (data.type === "camera") { applyCameraPayload(data); return; }
-    // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (upload), lihat applyBgImagePayload().
-    if (data.type === "bgimage") { applyBgImagePayload(data); return; }
-    // BARU (28 Agu 2026) -- gaya tulisan (warna tulisan/border) saat
-    // 🎥 Kamera ATAU 🖼️ Gambar Latar aktif -- dipisah dari payload
-    // "camera"/"bgimage" itu sendiri supaya menggeser slider border/
-    // ganti warna TIDAK memicu ulang stream kamera atau kirim ulang
-    // gambar (yang bisa berukuran besar sebagai data-URL).
-    if (data.type === "latartext") { applyCamTextStyle(data.mode, data.widthPx, data.ink, data.outline); return; }
-    if (data.type === "warta") { applyTicker(wartaBar, wartaText, data); return; }
-    if (data.type === "footnote") { applyTicker(footBar, footText, data); return; }
-    if (data.type === "pointer") {
-      if (!data.on) { pointerDot.style.display = "none"; return; }
-      pointerDot.style.display = "block";
-      pointerDot.style.color = data.color || "#ff3b30";
-      pointerDot.style.background = data.color || "#ff3b30";
-      pointerDot.style.left = (data.x * window.innerWidth) + "px";
-      pointerDot.style.top = (data.y * window.innerHeight) + "px";
-      return;
+    if (el("presentClearBtn")) {
+      el("presentClearBtn").addEventListener("click", () => clearScreen());
     }
-    if (data.type === "magnify") {
-      if (!data.on) { hideMagnify(); return; }
-      showMagnify(data.x, data.y, data.percent || 100);
-      return;
+    if (el("presentSendFreeTextBtn")) {
+      el("presentSendFreeTextBtn").addEventListener("click", () => {
+        const ta = el("presentFreeText");
+        sendFreeText(ta ? ta.value : "");
+      });
     }
-    if (data.type === "yt_control") {
-      // Kontrol Play/Pause/Mute dari tombol di Studio Presentasi -- dikirim
-      // lewat postMessage standar YouTube IFrame Player API. Butuh embedUrl
-      // yang sudah berisi "enablejsapi=1" (lihat wireYoutubeTab() di
-      // js/presentation-studio.js) supaya player mau menerima perintah ini.
-      // Kalau belum ada video yang tayang, abaikan saja (tidak error).
-      if (ytEl.hidden || !ytEl.src || !ytEl.contentWindow) return;
-      // BARU (28 Agu 2026) -- "stop": ⏹️ Stop di Studio. "stopVideo" (beda
-      // dari pauseVideo) membatalkan pemutaran & mengembalikan player ke
-      // keadaan belum-main, bukan cuma menjeda di posisi terakhir.
-      // BARU (4 Sep 2026 v2) -- "seek": lompat ke detik `data.arg` (dikirim
-      // wireYtControls()/sendYtCommand() di js/presentation-studio.js, baik
-      // dari slider progress LIVE digeser, maupun dari kolom waktu yang
-      // diketik manual lalu ▶️ Play ditekan). `true` (allowSeekAhead) supaya
-      // tetap bisa lompat ke bagian yang belum sempat di-buffer.
-      const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo" }[data.action];
-      const args = data.action === "seek" ? [Number(data.arg) || 0, true] : [];
-      if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args }), "*");
-      return;
+    if (el("presentSaveFreeTextBtn")) {
+      el("presentSaveFreeTextBtn").addEventListener("click", () => saveCurrentText());
     }
-    // BARU (4 Sep 2026) -- Kontrol Play/Pause/Toggle SoundCloud dari
-    // Studio (roadmap Bagian 4). BEDA dari "yt_control": tidak dikirim
-    // lewat postMessage manual (SoundCloud Widget API tidak dirancang
-    // begitu) -- dipakai objek `scWidget` (SC.Widget resmi, dibuat saat
-    // #scView selesai memuat, lihat event "load" di bawah). Kalau widget
-    // belum siap (mis. baru saja src diganti & belum sempat "load", atau
-    // SDK api.js gagal termuat karena OFFLINE), perintah ini diam-diam
-    // diabaikan -- TIDAK error, operator cukup tunggu sebentar/coba lagi.
-    // TIDAK ADA "seek 2x speed" di sini -- Widget API resmi SoundCloud
-    // memang tidak punya setPlaybackRate() (beda dari YouTube), lihat
-    // ROADMAP-ai-presentation.md Bagian 4 untuk penjelasan lengkapnya.
-    if (data.type === "sc_control") {
-      if (!scWidget) return;
-      if (data.action === "play") scWidget.play();
-      else if (data.action === "pause") scWidget.pause();
-      else if (data.action === "toggle") scWidget.toggle();
-      return;
-    }
-    // BARU (28 Agu 2026) -- 🔁 Ulang (Repeat) dari Studio: "off" (mati,
-    // baku) | "one" (ulang video ini terus) | "all" (lanjut ke video
-    // berikutnya di ytQueue, lalu kembali ke awal daftar). Lihat
-    // listener "message" dari ytEl.contentWindow di bawah untuk logika
-    // saat video BENAR-BENAR selesai (ended).
-    if (data.type === "yt_repeat") {
-      ytRepeatMode = data.mode === "one" || data.mode === "all" ? data.mode : "off";
-      return;
-    }
-    // BARU (28 Agu 2026) -- daftar putar (playlist) terkini dikirim ulang
-    // dari Studio (mis. saat filter Playlist Video berubah) TANPA ikut
-    // mengganti video yang sedang tayang -- cukup perbarui apa yang akan
-    // diputar berikutnya kalau "Ulang: Semua" aktif & video ini selesai.
-    if (data.type === "yt_queue") {
-      ytQueue = Array.isArray(data.queue) && data.queue.length ? data.queue : [];
-      ytQueueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : 0;
-      return;
-    }
-    // ------------------------------------------------------------
-    // Audio Latar YouTube ("Latar suara saja" di tab ▶️ YouTube Studio) --
-    // JALUR TERPISAH dari #ytView/showMain() di atas: sengaja TIDAK
-    // menyentuh ref/text/stage sama sekali, supaya ayat/pengumuman yang
-    // sedang tayang tetap terlihat & tetap bisa diganti-ganti normal
-    // SAMBIL video ini terus main sebagai suara latar (lihat CSS #ytBg --
-    // opacity:0, bukan display:none, supaya audionya tidak ikut berhenti).
-    // ------------------------------------------------------------
-    if (data.type === "yt_bg") {
-      if (data.embedUrl) ytBgEl.src = data.embedUrl;
-      return;
-    }
-    if (data.type === "yt_bg_control") {
-      if (!ytBgEl.src || !ytBgEl.contentWindow) return;
-      const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[data.action];
-      if (cmd) ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
-      return;
-    }
-    if (data.type === "yt_bg_clear") {
-      ytBgEl.src = "";
-      return;
-    }
-    if (data.type === "pen") {
-      if (data.clear) {
-        penStrokeHistory = [];
-        penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
-        penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
-        penCanvas.style.display = "none";
+
+    // Begitu Layar 2 memberi tahu sudah siap (script di present.html),
+    // kirim ulang konten TERAKHIR (kalau ada) supaya operator tidak perlu
+    // menekan kirim lagi kalau Layar 2 sempat dimuat ulang / baru dibuka.
+    window.addEventListener("message", (e) => {
+      if (e.origin !== location.origin) return;
+      const data = e.data || {};
+      if (data.source !== "bibleAppPresenter") return;
+      if (data.type === "present_geometry") {
+        applyPreviewRatio(data.width, data.height);
         return;
       }
-      penCanvas.style.display = "block";
-      if (data.stroke && data.stroke.length > 1) {
-        // Simpan koordinat ASLI (pecahan 0..1, bukan px) supaya bisa
-        // digambar ulang secara akurat kalau jendela di-resize/di-split --
-        // sebelumnya canvas cuma di-resize (otomatis menghapus isi) lalu
-        // cuma segmen BARU yang digambar, jadi coretan lama hilang/
-        // terlihat terpotong saat jendela ditarik-ubah ukurannya.
-        // BARU (27 Agu 2026) -- ukuran coretan dikirim dari Studio lewat
-        // `data.size` (px), disimpan juga di riwayat supaya redraw saat
-        // resize tetap setebal aslinya (bukan selalu 4px seperti dulu).
-        penStrokeHistory.push({ pts: data.stroke, color: data.color || "#ff3b30", size: data.size || 4 });
-        if (penCanvas.width !== window.innerWidth || penCanvas.height !== window.innerHeight) {
-          redrawAllPenStrokes();
-        } else {
-          drawPenSegment(data.stroke, data.color || "#ff3b30", data.size || 4);
-        }
+      // BARU (28 Agu 2026) -- 🎥 Kamera Latar: Layar 2 (present.html)
+      // melaporkan hasil nyata menyalakan/mematikan kamera (berhasil,
+      // atau gagal + pesan errornya -- mis. izin ditolak / tidak ada
+      // kamera) lewat pesan ini. Diteruskan sebagai CustomEvent di
+      // window supaya js/presentation-studio.js (tab "🎥 Kamera") bisa
+      // memperbarui status/tombolnya TANPA file ini perlu tahu apa-apa
+      // soal markup tab tersebut -- pola sama persis dengan
+      // "ps-preview-ratio-changed" di atas untuk present_geometry.
+      if (data.type === "present_camera_status") {
+        try { window.dispatchEvent(new CustomEvent("ps-camera-status", { detail: { on: data.on, error: data.error || null } })); } catch (e) {}
+        return;
       }
-      return;
-    }
-  }
-
-  // Riwayat semua segmen coretan Pen (koordinat pecahan 0..1) supaya bisa
-  // digambar ulang penuh & akurat tiap kali ukuran jendela berubah.
-  let penStrokeHistory = [];
-  function drawPenSegment(stroke, color, size) {
-    penCtx.strokeStyle = color;
-    penCtx.lineWidth = size || 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
-    penCtx.beginPath();
-    stroke.forEach((pt, i) => {
-      const x = pt.x * penCanvas.width, y = pt.y * penCanvas.height;
-      if (i === 0) penCtx.moveTo(x, y); else penCtx.lineTo(x, y);
+      // BARU (4 Sep 2026 v2) -- posisi & durasi video YouTube utama yang
+      // SUNGGUH sedang tayang di Layar 2 (lihat reportYtProgress() di
+      // present.html), diteruskan sebagai CustomEvent supaya progress bar +
+      // kolom waktu LIVE di js/presentation-studio.js (#psYtLiveBar,
+      // wireYtControls()) bisa memperbaruinya -- pola sama persis dengan
+      // "ps-camera-status" di atas.
+      if (data.type === "present_yt_progress") {
+        try {
+          window.dispatchEvent(new CustomEvent("ps-yt-progress", {
+            detail: { currentTime: data.currentTime, duration: data.duration, state: data.state },
+          }));
+        } catch (e) {}
+        return;
+      }
+      // BARU (4 Sep 2026) -- status main/jeda SoundCloud (lihat
+      // reportScState() di present.html), diteruskan sebagai CustomEvent
+      // supaya tombol ▶️/⏸️ tab "🔗 Link" (js/presentation-studio.js) bisa
+      // menampilkan status yang sesungguhnya, termasuk kalau operator
+      // mengeklik langsung tombol bawaan di bilah SoundCloud sendiri.
+      if (data.type === "present_sc_state") {
+        try { window.dispatchEvent(new CustomEvent("ps-sc-state", { detail: { isPlaying: !!data.isPlaying } })); } catch (e) {}
+        return;
+      }
+      if (data.type === "present_ready") {
+        winReady = true;
+        updateStatusUi();
+        // Kirim dulu semua pesan yang tertahan (mis. perintah timer
+        // "Mulai"/"Stop" yang terkirim SEBELUM Layar 2 selesai dimuat --
+        // itu penyebab timer "tidak jalan" / "tidak hilang saat X").
+        flushQueue();
+        if (lastPayload) post(lastPayload);
+      }
     });
-    penCtx.stroke();
-  }
-  function redrawAllPenStrokes() {
-    penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
-    penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
-    penStrokeHistory.forEach((s) => drawPenSegment(s.pts, s.color, s.size));
   }
 
-  window.addEventListener("message", (e) => {
-    if (e.origin !== location.origin) return;
-    const data = e.data || {};
-    if (data.source !== "bibleAppPresenter") return;
-    render(data.payload);
-  });
-
-  // BARU (28 Agu 2026) -- deteksi video YouTube utama (#ytView) SELESAI
-  // (ended) lewat "raw" postMessage bawaan pemutar YouTube sendiri
-  // (bukan lewat API resmi YT.Player, supaya tidak perlu memuat skrip
-  // tambahan  cuma untuk 1 layar ini) -- lihat "enablejsapi=1" di
-  // buildYoutubeEmbedUrl() (js/presentation-studio.js). Player
-  // otomatis mengirim { event:"infoDelivery", info:{ playerState } }
-  // setelah kita kirim { event:"listening" } sekali ke dalamnya;
-  // playerState 0 = video berakhir. Berdasar itu, "Ulang: Satu Video"
-  // mengulang video yang sama dari awal, "Ulang: Semua" lanjut ke video
-  // berikut di ytQueue (berputar balik ke awal daftar di akhir).
-  ytEl.addEventListener("load", () => {
-    if (!ytEl.src || !ytEl.contentWindow) return;
-    ytLastState = null;
-    const sendListening = () => {
-      if (!ytEl.contentWindow) return;
-      try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "ytView" }), "*"); } catch (e) {}
-    };
-    sendListening();
-    // PERBAIKAN (4 Sep 2026, permintaan operator) -- laporan: "▶️ Play
-    // pertama kali kadang tidak terasa, progress bar diam/tidak bisa
-    // digeser, sampai ditekan ⏸️ Pause lalu ▶️ Play lagi baru jalan".
-    // Sebabnya: handshake "listening" di atas dikirim TEPAT saat
-    // event "load" iframe luar ini menyala -- itu cuma berarti
-    // DOKUMEN HTML pembungkus pemutar YouTube sudah selesai dimuat,
-    // BUKAN berarti skrip pemutar YouTube DI DALAMNYA sudah benar-benar
-    // siap mendengarkan pesan. Kalau "listening" tiba SEBELUM pemutar
-    // siap, pesan itu terbuang percuma -- akibatnya perintah "playVideo"
-    // pertama & laporan posisi/durasi (infoDelivery, dipakai progress
-    // bar #psYtLiveBar di Studio) telat/tidak pernah datang, sampai
-    // interaksi ke-2 (Pause -> Play) "membangunkannya". Perbaikan:
-    // ulangi kiriman "listening" beberapa kali di detik-detik pertama
-    // (bukan cuma sekali) -- aman diulang (idempotent, pemutar cuma
-    // mencatat pengirim mana yang mendengarkan), jadi salah satu
-    // percobaan pasti sampai setelah pemutar sungguh siap.
-    [250, 600, 1200, 2000].forEach((ms) => setTimeout(sendListening, ms));
-  });
-
-  // BARU (4 Sep 2026) -- SC.Widget resmi (SDK dimuat di <head>, lihat
-  // <script src="https://w.soundcloud.com/player/api.js">) dipasang
-  // SETELAH #scView selesai memuat src barunya -- supaya SDK mengikat
-  // ke iframe yang isinya sudah benar (trek yang baru ditempel, bukan
-  // trek sebelumnya). Kalau SDK belum sempat termuat (mis. koneksi
-  // lambat saat Layar 2 baru dibuka), `window.SC` belum ada -- di sini
-  // diperiksa dulu, TIDAK error, cuma kontrol Play/Pause dari Studio
-  // belum akan merespons sampai giliran berikut src berganti lagi.
-  scEl.addEventListener("load", () => {
-    if (!scEl.src || typeof window.SC === "undefined" || !window.SC.Widget) { scWidget = null; return; }
+  function init() {
+    initUi();
+    refreshGuestGate();
+    // Terapkan proporsi huruf pratinjau dari ukuran Layar 2 TERAKHIR
+    // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak
+    // "Berikutnya"/"Tayang" langsung memakai proporsi yang benar sedari
+    // pertama kali Studio dibuka, tanpa menunggu Layar 2 benar-benar
+    // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry".
     try {
-      scWidget = SC.Widget(scEl);
-      scWidget.bind(SC.Widget.Events.PLAY, () => reportScState(true));
-      scWidget.bind(SC.Widget.Events.PAUSE, () => reportScState(false));
-      scWidget.bind(SC.Widget.Events.FINISH, () => reportScState(false));
-    } catch (e) { scWidget = null; }
-  });
-  // Lapor balik status main/jeda SoundCloud ke jendela utama (Studio) --
-  // dipakai supaya tombol ▶️/⏸️ di tab "🔗 Link" bisa menunjukkan status
-  // yang BENAR (mis. kalau operator mengeklik langsung tombol bawaan di
-  // bilah SoundCloud sendiri, bukan lewat tombol Studio), sama semangat
-  // seperti reportYtProgress() di atas untuk YouTube.
-  function reportScState(isPlaying) {
-    if (!window.opener) return;
-    try {
-      window.opener.postMessage({
-        source: "bibleAppPresenter",
-        payload: { type: "present_sc_state", isPlaying },
-      }, location.origin);
+      const { w, h } = getStoredScreenSize();
+      applyPreviewRatio(w, h);
     } catch (e) {}
+    // Kalau mode 2 Layar tersimpan dari kunjungan sebelumnya, jangan
+    // otomatis membuka jendela baru sendiri (browser akan memblokir
+    // popup yang tidak berasal dari aksi klik pengguna) -- cukup
+    // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  function ytSendCommand(func, args) {
-    if (!ytEl.contentWindow) return;
-    try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func, args: args || [] }), "*"); } catch (e) {}
-  }
-  function appendAutoplay(embedUrl) {
-    const sep = embedUrl.includes("?") ? "&" : "?";
-    return embedUrl + sep + "autoplay=1";
-  }
-  // BARU (4 Sep 2026 v2, permintaan operator) -- laporkan balik posisi
-  // (detik berjalan) & durasi video YouTube utama yang SUNGGUH sedang
-  // tayang ke jendela utama (Studio Presentasi), supaya progress bar +
-  // kolom waktu LIVE di sana (#psYtLiveBar, lihat wireYtControls() di
-  // js/presentation-studio.js) ikut bergerak sesuai kenyataan -- baik
-  // selagi main (beberapa kali per detik) maupun selagi dijeda (posisi
-  // diam di detik terakhir). Ditahan (throttle) ke maksimal 5x/detik
-  // supaya tidak membanjiri postMessage; YouTube sendiri bisa mengirim
-  // "infoDelivery" jauh lebih sering dari itu.
-  let ytLastProgressPostAt = 0;
-  function reportYtProgress(info) {
-    if (!window.opener || typeof info.currentTime !== "number") return;
-    const now = Date.now();
-    if (now - ytLastProgressPostAt < 200) return;
-    ytLastProgressPostAt = now;
-    try {
-      window.opener.postMessage({
-        source: "bibleAppPresenter",
-        type: "present_yt_progress",
-        currentTime: info.currentTime,
-        duration: typeof info.duration === "number" ? info.duration : 0,
-        state: typeof info.playerState === "number" ? info.playerState : null,
-      }, location.origin);
-    } catch (err) { /* beda origin / opener tertutup -- diamkan */ }
-  }
-  window.addEventListener("message", (e) => {
-    if (e.source !== ytEl.contentWindow) return; // hanya pesan dari player YouTube utama
-    let data;
-    try { data = JSON.parse(e.data); } catch (err) { return; }
-    if (!data || data.event !== "infoDelivery" || !data.info) return;
-    reportYtProgress(data.info);
-    if (typeof data.info.playerState !== "number") return;
-    const state = data.info.playerState;
-    if (state === ytLastState) return;
-    const prevState = ytLastState;
-    ytLastState = state;
-    if (state === 0 && prevState !== null) { // 0 = berakhir (ended)
-      if (ytRepeatMode === "one") {
-        ytSendCommand("seekTo", [0, true]);
-        ytSendCommand("playVideo");
-      } else if (ytRepeatMode === "all" && ytQueue.length > 1) {
-        ytQueueIndex = (ytQueueIndex + 1) % ytQueue.length;
-        const next = ytQueue[ytQueueIndex];
-        if (next && next.embedUrl) { ytEl.src = appendAutoplay(next.embedUrl); }
-      } else if (ytRepeatMode === "all" && ytQueue.length === 1) {
-        // Cuma 1 video di daftar -- "Ulang: Semua" berarti sama seperti
-        // "Ulang: Satu" untuk kasus ini.
-        ytSendCommand("seekTo", [0, true]);
-        ytSendCommand("playVideo");
-      }
-    }
-  });
-
-  // Beri tahu jendela utama bahwa Layar 2 sudah siap menerima konten --
-  // jendela utama akan mengirim ulang konten TERAKHIR begitu pesan ini
-  // diterima (lihat js/presentation.js & js/presentation-studio.js).
-  if (window.opener) {
-    try {
-      window.opener.postMessage({ source: "bibleAppPresenter", type: "present_ready" }, location.origin);
-    } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
-  }
-
-  // ------------------------------------------------------------
-  // Laporkan bentuk (rasio) jendela Layar 2 yang SUNGGUH aktif ke
-  // jendela utama -- dipakai untuk mengunci bentuk kotak pratinjau
-  // (#psPreviewBoxWrap di Studio Presentasi / #presentPreviewBox di
-  // panel ⋮ biasa) supaya SELALU sama persis dengan Layar 2 yang
-  // sesungguhnya, apa pun ukurannya (termasuk kalau operator
-  // menggeser-ubah ukuran jendelanya secara manual, atau proyektor
-  // punya resolusi yang tidak standar). Ini menggantikan pendekatan
-  // "pilih resolusi manual" sebelumnya -- sekarang otomatis mengikuti
-  // kenyataan, jadi posisi Penunjuk/Pen & titik patah baris teks juga
-  // ikut akurat tanpa operator perlu mengatur apa pun.
-  // ------------------------------------------------------------
-  function reportGeometry() {
-    if (!window.opener) return;
-    try {
-      window.opener.postMessage({
-        source: "bibleAppPresenter",
-        type: "present_geometry",
-        width: window.innerWidth,
-        height: window.innerHeight,
-      }, location.origin);
-    } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
-  }
-  reportGeometry();
-  let geomResizeTimer = null;
-  window.addEventListener("resize", () => {
-    if (geomResizeTimer) clearTimeout(geomResizeTimer);
-    geomResizeTimer = setTimeout(() => {
-      reportGeometry();
-      if (penStrokeHistory.length) redrawAllPenStrokes();
-    }, 120);
-  });
-</script>
-</body>
-</html>
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow };
+})();
