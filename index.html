@@ -720,7 +720,23 @@
                  sebaliknya. -->
             <button type="button" id="psCollectionReorderToggle" class="chip-btn small" title="Tampilkan tombol atur urutan di tiap item">✎ Atur Urutan</button>
             <button type="button" id="psCollectionShareBtn" class="chip-btn small" title="Bagikan salinan kumpulan yang sedang dipilih ke pengguna lain">🔗 Bagikan</button>
+            <!-- BARU (4 Sep 2026 v3, permintaan operator) -- hapus SELURUH
+                 kumpulan (bukan cuma 1 item) langsung dari sini, tidak
+                 perlu pindah ke panel "📚 Kumpulan Ayat" biasa. Lihat
+                 wireCollectionDeleteAllButton() di js/presentation-
+                 studio.js -- pakai dialog konfirmasi kustom (BUKAN
+                 confirm() bawaan browser) supaya tombol "Tidak, Batalkan"
+                 yang jadi pilihan default (fokus awal), bukan "Ya, Hapus". -->
+            <button type="button" id="psCollectionDeleteAllBtn" class="chip-btn small danger" title="Hapus SELURUH kumpulan ini (semua item di dalamnya, tidak bisa dibatalkan)">🗑️ Hapus Master</button>
           </div>
+          <!-- BARU (4 Sep 2026 v3, permintaan operator) -- jumlah total
+               item/slide yang sudah dibuat/dimasukkan ke kumpulan yang
+               sedang dipilih (ayat, kidung/bait, pengumuman, teks, file/
+               slide -- SEMUA jenis dihitung jadi 1 angka), diperbarui oleh
+               renderCollectionList() (js/presentation-studio.js) tiap kali
+               daftar berubah -- supaya operator tidak perlu buka dropdown
+               dulu cuma untuk lihat angkanya. -->
+          <p id="psCollectionCount" class="ps-collection-count"></p>
           <div id="psCollectionList" class="ps-verse-list"></div>
         </div>
 
@@ -815,6 +831,8 @@
           <button type="button" class="ps-tab" data-ps-mid-tab="kidung">🎵 Kidung / Hymn</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="file">🖼️ File</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="youtube">▶️ YouTube</button>
+          <button type="button" class="ps-tab" data-ps-mid-tab="link">🔗 Link</button>
+          <button type="button" class="ps-tab" data-ps-mid-tab="ai">🤖 AI Presentation</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-mid-panel="alkitab">
@@ -980,6 +998,71 @@
           </select>
           <p class="announcement-compose-hint">Urutkan "Durasi" &amp; "Tanggal upload" butuh kolom TAMBAHAN opsional di Sheet: <b>Durasi</b> (angka menit, mis. "12" atau "7.5", atau format jam:menit:detik mis. "1:02:30") &amp; <b>Tanggal</b> (mis. "2026-08-30"). Video yang belum diisi kolom itu otomatis ditaruh paling bawah, bukan hilang.</p>
           <div id="psYtPlaylistList" class="ps-file-list"><p class="present-saved-empty">Belum ada video dimuat -- tempel link Google Sheet lalu tekan "🔄 Muat Ulang".</p></div>
+        </div>
+
+        <!-- BARU (4 Sep 2026) -- tab "🔗 Link": Canva & SoundCloud, lihat
+             ROADMAP-ai-presentation.md Bagian 3 & 4, dan wireLinkTab()
+             di js/presentation-studio.js. -->
+        <div class="ps-tab-panel" data-ps-mid-panel="link" hidden>
+          <div class="ps-field-label">🖼️ Canva (tampil sebagai presentasi)</div>
+          <p class="announcement-compose-hint">Canva HANYA mengizinkan link "Bagikan → Sematkan (Embed)" untuk tampil di sini (link biasa "canva.link/..." sering diblokir Canva sendiri). Di desain Canva: Bagikan → Sematkan (Embed) → salin link itu (berakhiran "view?embed") → tempel di sini. <b>PENTING:</b> Canva tidak punya tombol kontrol jarak-jauh (beda dari YouTube) -- untuk maju/mundur slide, operator perlu klik LANGSUNG di Layar 2 (atau panah keyboard saat jendela itu fokus).</p>
+          <div class="ps-yt-row">
+            <input type="text" id="psCanvaInput" class="columns-lang-select" placeholder="https://www.canva.com/design/XXXX/xxxx/view?embed" />
+          </div>
+          <div class="ps-yt-hint" id="psCanvaStatus"></div>
+          <div class="ps-btn-row">
+            <button type="button" id="psCanvaShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psCanvaSaveBtn" class="chip-btn small">➕ Simpan ke Kumpulan Ayat</button>
+          </div>
+
+          <hr class="ps-yt-sep" />
+          <div class="ps-field-label">🎧 SoundCloud (Play/Pause)</div>
+          <p class="announcement-compose-hint">Tempel link trek/playlist SoundCloud (mis. "soundcloud.com/..." atau "on.soundcloud.com/..."). Play/Pause &amp; masuk Kumpulan Ayat bisa. <b>Kecepatan 2x TIDAK tersedia</b> untuk link SoundCloud -- SoundCloud tidak menyediakan kontrol kecepatan lewat Widget API resminya (beda dari YouTube). Kalau memang perlu putar 2x kecepatan, file audio itu perlu diunggah sendiri lewat tab "🖼️ File" (fitur unggah audio native belum tersedia -- lihat ROADMAP-ai-presentation.md).</p>
+          <div class="ps-yt-row">
+            <input type="text" id="psScInput" class="columns-lang-select" placeholder="https://soundcloud.com/... atau https://on.soundcloud.com/..." />
+          </div>
+          <div class="ps-btn-row">
+            <button type="button" id="psScShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psScSaveBtn" class="chip-btn small">➕ Simpan ke Kumpulan Ayat</button>
+          </div>
+          <div class="ps-btn-row">
+            <button type="button" id="psScPlayBtn" class="chip-btn small">▶ Play</button>
+            <button type="button" id="psScPauseBtn" class="chip-btn small">⏸ Pause</button>
+          </div>
+          <div class="ps-yt-hint" id="psScStatus">Belum ada audio SoundCloud yang diputar.</div>
+        </div>
+
+        <!-- BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation": ketik
+             banyak ayat/kidung/pengumuman sekaligus dipisah koma, lalu
+             pratinjau & tayang berurutan / simpan ke Kumpulan Ayat.
+             Lihat ROADMAP-ai-presentation.md Bagian 2, parseAiPresentation()
+             & wireAiPresentationTab() di js/presentation-studio.js.
+             PERBAIKAN (4 Sep 2026 v5): notasi "SA" (lagu Sidang Anak)
+             SEKARANG didukung lewat jembatan window.KidungAnak
+             (js/kidung-anak.js, getBaitsForPresentation()) -- lihat
+             Bagian 6 ROADMAP-ai-presentation.md untuk detailnya &
+             batasan yang masih ada (pembagian bait otomatis, bukan
+             dari kolom noBait Sheet seperti K/S/T). -->
+        <div class="ps-tab-panel" data-ps-mid-panel="ai" hidden>
+          <div class="ps-field-label">🤖 AI Presentation (ketik banyak sekaligus)</div>
+          <p class="announcement-compose-hint">
+            Ketik ayat/kidung/pengumuman dipisah <b>koma (,)</b>, lalu tekan
+            "🔎 Pratinjau". Contoh:
+            <code>matius 11:28, K24, markus 16:16, pengumuman sidang pemuda tanggal 5 September 2026 ada di jalan kusuma bangsa 62, S120</code>.
+            Notasi: <b>K24</b> = Kidung No.24, <b>S120</b> = Suplemen No.120,
+            <b>SA120</b> = lagu Sidang Anak No.120,
+            <b>T12</b> = Tambahan No.12 (bagian "Tambahan" di buku Kidung).
+            Ayat pakai bahasa yang sedang aktif di aplikasi.
+          </p>
+          <textarea id="psAiInput" class="ps-ai-textarea" rows="4" placeholder="matius 11:28, K24, markus 16:16, pengumuman ..., S120"></textarea>
+          <div class="ps-btn-row">
+            <button type="button" id="psAiPreviewBtn" class="chip-btn primary">🔎 Pratinjau</button>
+          </div>
+          <div id="psAiPreviewList" class="ps-file-list"><p class="present-saved-empty">Belum ada pratinjau -- ketik di atas lalu tekan "🔎 Pratinjau".</p></div>
+          <div class="ps-btn-row">
+            <button type="button" id="psAiSaveAllBtn" class="chip-btn small">➕ Simpan Semua ke Kumpulan Ayat</button>
+          </div>
+          <div class="ps-yt-hint" id="psAiStatus"></div>
         </div>
       </div>
 
@@ -1372,9 +1455,9 @@
   <script src="js/kidung.js?v=20260822a"></script>
   <script src="js/kidung-ui.js?v=20260827a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
-  <script src="js/kidung-anak.js?v=20260829a"></script>
+  <script src="js/kidung-anak.js?v=20260904a"></script>
   <script src="js/presentation.js?v=20260828a"></script>
-  <script src="js/presentation-studio.js?v=20260828a"></script>
+  <script src="js/presentation-studio.js?v=20260904a"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260827b"></script>
