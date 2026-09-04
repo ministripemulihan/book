@@ -1048,6 +1048,9 @@
             <button type="button" class="ps-theme-swatch" data-theme="emas" style="background:#1a1206; color:#e9c977;">Emas</button>
             <button type="button" class="ps-theme-swatch" data-theme="biru" style="background:#0b1730; color:#ffffff;">Biru Malam</button>
             <button type="button" class="ps-theme-swatch" data-theme="sepia" style="background:#f4e8d0; color:#3a2c17;">Sepia</button>
+            <!-- BARU (4 Sep 2026, permintaan operator) -->
+            <button type="button" class="ps-theme-swatch" data-theme="putih" style="background:#ffffff; color:#173f91; border:1px solid #d8d8d8;">Putih</button>
+            <button type="button" class="ps-theme-swatch" data-theme="krem" style="background:#fdf1cf; color:#2f6fb3;">Krem</button>
           </div>
         </div>
 
@@ -1156,6 +1159,14 @@
             <option value="'Comic Sans MS', 'Comic Sans', cursive">Comic Sans</option>
             <option value="'Arial Black', Arial, sans-serif">Arial Black</option>
           </select>
+          <!-- BARU (4 Sep 2026, permintaan operator) -- toggle "Tebal"
+               (Bold) khusus tulisan Layar 2 (present.html), terpisah dari
+               pilihan Huruf di atas -- lihat wireTheme()/psFontBold di
+               js/presentation-studio.js & --p-font-weight di present.html. -->
+          <label class="ps-field-label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="psFontBold" />
+            🅱️ Tulisan Tebal (Layar 2)
+          </label>
           <div class="ps-field-label">Warna latar</div>
           <input type="color" id="psBgColor" value="#05070c" class="ps-color-input" />
           <div class="ps-field-label">Ukuran Teks</div>
