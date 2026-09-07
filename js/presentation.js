@@ -738,7 +738,7 @@ const Presentation = (() => {
         winReady = true;
         updateStatusUi();
         // Kirim dulu semua pesan yang tertahan (mis. perintah timer
-        // "Mulai"/"Stop" yang terkirim SEBELUM Layar 2 selesai dimuat --
+        // "Mulai"/"Stop" yang terkirim SEBELUM Layar 2 selesai dimuat -- 
         // itu penyebab timer "tidak jalan" / "tidak hilang saat X").
         flushQueue();
         if (lastPayload) post(lastPayload);
