@@ -1054,6 +1054,17 @@ input { font-family: inherit; }
 .icon-btn:hover { background: var(--rule); }
 
 .brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+/* BARU (7 Sep 2026, permintaan operator) -- lihat catatan panjang di
+   HTML #netOfflineBadge (index.html) & skrip pemantauan online/offline
+   di dekat pendaftaran Service Worker. */
+.net-offline-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+  padding: 3px 8px; border-radius: 999px;
+  background: #d9463a; color: #fff; white-space: nowrap;
+  animation: netOfflinePulse 2s ease-in-out infinite;
+}
+@keyframes netOfflinePulse { 50% { opacity: .7; } }
 .brand-mark { color: var(--petrol); font-size: 20px; }
 .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
 
@@ -1163,6 +1174,13 @@ input { font-family: inherit; }
   border: 1px solid var(--rule);
 }
 .more-menu-section-title { font-size: 12px; font-weight: 600; color: var(--brass); margin-bottom: 8px; }
+/* BARU (7 Sep 2026) -- daftar centang bahasa unduhan Alkitab
+   (#bibleLangFilterList, lihat wireBibleLangFilterUi() di js/app.js). */
+.more-menu-checkbox-list { display: flex; flex-direction: column; gap: 4px; }
+.more-menu-checkbox-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13.5px; color: var(--ink); cursor: pointer; padding: 4px 2px;
+}
 .columns-btn-group { display: flex; gap: 6px; margin-bottom: 6px; }
 /* BARU (6 Sep 2026) -- grup tombol "Arah" (#columnDirectionBtnGroup)
    sekarang berisi 3 tombol (dulu 2) sejak versi "🔗 Bebas + Sync"
@@ -2867,6 +2885,21 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .ps-color-chip.active { border-color: var(--brass); }
 .ps-color-input { width: 100%; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer; }
+/* BARU (7 Sep 2026 v3, permintaan operator) -- progress bar 1 putaran
+   💬 Pesan mode "➡️ Berjalan" (lihat #psMsgSpeedProgress & wireMessage(),
+   js/presentation-studio.js) -- SEKADAR simulasi lokal di Studio (bukan
+   pantauan sungguhan dari Layar 2), disinkronkan dari saat pesan mulai/
+   diganti dikirim, dengan durasi yang SAMA PERSIS dengan rumus yang
+   dipakai present.html (lihat applyTicker()), supaya operator tahu
+   kira-kira sudah sampai mana 1 putarannya & kapan mengulang dari awal. */
+.ps-scroll-progress-track {
+  margin-top: 6px; height: 6px; border-radius: 999px; overflow: hidden;
+  background: rgba(120,100,60,0.18);
+}
+.ps-scroll-progress-fill {
+  height: 100%; width: 0%; border-radius: 999px; background: var(--brass);
+  transition: width 0.1s linear;
+}
 
 /* BARU (27 Agu 2026) -- slider ukuran Pen/Penunjuk, lihat index.html
    (#psPenSizeSlider) & wirePointerPen() di js/presentation-studio.js. */
