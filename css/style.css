@@ -467,6 +467,49 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .collection-title-row h2 { margin: 0; }
 .collection-title-row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* ------------------------------------------------------------
+   BARU (6 Sep 2026) -- Panel "📖 Life-Study / Pelajaran Hayat"
+   (js/lifestudy.js). Reuse .chip-btn/.toggle-switch/.collection-title-row
+   yang sudah ada supaya konsisten dgn panel lain, ini cuma tambahan
+   khusus buat daftar 66 kitab + kontrolnya.
+   ------------------------------------------------------------ */
+.lifestudy-panel { padding: 4px 0 40px; }
+.lifestudy-intro { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 14px; }
+.lifestudy-intro a { color: var(--petrol); }
+.lifestudy-mode-toggle { margin-bottom: 4px; }
+.lifestudy-mode-hint, .lifestudy-note-warn {
+  font-size: 12px; color: var(--ink-soft); margin: 2px 0 14px; font-style: italic;
+}
+.lifestudy-note-warn { color: var(--brass); }
+.lifestudy-section-title {
+  font-family: var(--font-display); font-size: 18px; margin: 22px 0 10px;
+  padding-bottom: 6px; border-bottom: 2px solid var(--rule);
+}
+.lifestudy-book-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; padding: 10px 4px; border-bottom: 1px dashed var(--rule);
+}
+.lifestudy-book-row:last-child { border-bottom: none; }
+/* BARU (6 Sep 2026) -- kedip singkat saat baris ini digulir-tuju dari
+   tombol "📖 Pelajaran Hayat" di halaman baca (openLifeStudyForBook(),
+   js/lifestudy.js), supaya operator langsung tahu baris mana yang
+   dimaksud di antara 66 baris. */
+.lifestudy-row-highlight { background: var(--brass-soft); border-radius: 8px; transition: background 1.8s ease; }
+.lifestudy-book-info { display: flex; flex-direction: column; gap: 2px; min-width: 160px; }
+.lifestudy-book-name { font-weight: 700; }
+.lifestudy-book-total { font-size: 12px; color: var(--ink-soft); }
+.lifestudy-book-progress { font-size: 12px; color: var(--petrol); font-weight: 600; }
+.lifestudy-book-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.lifestudy-msg-input {
+  width: 64px; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 8px;
+  font-size: 13px; text-align: center; background: var(--paper); color: var(--ink);
+}
+@media (max-width: 520px) {
+  .lifestudy-book-row { flex-direction: column; align-items: flex-start; }
+  .lifestudy-book-controls { width: 100%; }
+  .lifestudy-msg-input { flex: 1; }
+}
+
 /* ============================================================
    DIALOG KECIL GENERIK -- dipakai a.l. oleh pemilihan/penggantian
    nama Kumpulan Ayat (menggantikan prompt() lama yang cuma kotak
@@ -527,11 +570,42 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .collection-fs-ref { font-family: var(--font-ui); font-weight: 700; color: var(--brass); font-size: 16px; }
 .collection-fs-text { font-family: var(--font-body); font-weight: var(--font-body-weight, 400); line-height: 1.6; }
 /* Baris koor kidung di Mode Layar Penuh (js/app.js: collectionItemBodyHtml())
-   -- kuning, meniru tampilan koor di Layar 2 Studio Presentasi (lihat
-   #kidungKoor di present.html) supaya konsisten dipakai dengan/tanpa
-   monitor kedua. */
-.collection-fs-koor { color: #ffd84a; font-weight: 600; }
+   -- label "Koor:" kuning, meniru warna label koor di Layar 2 Studio
+   Presentasi (lihat #kidungKoor di present.html), TAPI (lihat catatan v9 di
+   bawah) isi koornya sendiri sengaja TIDAK ikut kuning lagi. */
+/* PERMINTAAN OPERATOR (5 Sep 2026, v9): dipecah jadi 2 -- dulu .collection-fs-koor
+   sendirian mewarnai SELURUH blok (label "Koor:" + isinya) kuning. Sekarang
+   HANYA label ".collection-fs-koor-label" yang kuning; isi koornya sendiri
+   (".collection-fs-koor-body") kembali memakai var(--ink) -- warna teks
+   dasar yang sama dengan bait di atasnya, ikut tema yang sedang aktif. */
+.collection-fs-koor { }
+.collection-fs-koor-label { color: #ffd84a; font-weight: 700; }
+.collection-fs-koor-body { color: var(--ink); font-weight: inherit; }
 .collection-fs-gap { display: block; height: 4px; }
+/* Panel kecil pemilih tema DI DALAM Mode Layar Penuh Kumpulan Ayat (tombol
+   "🎨 Tema" di collection-fs-font-row, lihat openCollectionFullscreen() di
+   js/app.js) -- dipakai supaya operator bisa ganti tema tanpa perlu keluar
+   dulu dari mode layar penuh. Memakai ulang grid ".theme-picker" &
+   ".theme-swatch" yang sudah ada (baris ~141 & ~151 di berkas ini). */
+.collection-fs-theme-panel {
+  width: 100%; max-width: 320px; margin: -8px 0 18px; padding: 10px 12px;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px;
+}
+/* BARU (5 Sep 2026, permintaan operator) -- kotak embed Canva/SoundCloud/
+   YouTube di Mode Layar Penuh 1-layar Kumpulan Ayat (lihat
+   buildCollectionFsEmbed() di js/app.js, dipanggil dari
+   openCollectionFullscreen()). Dipakai TANPA Studio Presentasi/monitor
+   kedua -- cocok dibuka langsung lewat HP. */
+.collection-fs-embed-wrap { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.collection-fs-embed-iframe {
+  width: 100%; aspect-ratio: 16 / 9; border: none; border-radius: 10px;
+  background: #05070c; max-height: 70vh;
+}
+.collection-fs-embed-iframe-audio { aspect-ratio: auto; height: 166px; background: transparent; }
+.collection-fs-embed-image { max-width: 100%; max-height: 70vh; border-radius: 10px; }
+.collection-fs-embed-loading { color: var(--ink-soft); font-size: 14px; padding: 40px 0; }
+.collection-fs-embed-openlink { font-size: 13px; color: var(--brass); text-decoration: none; }
+.collection-fs-embed-openlink:hover { text-decoration: underline; }
 .collection-fs-note {
   max-width: 640px; padding: 14px 18px; background: var(--paper-raised);
   border-left: 3px solid var(--brass); border-radius: 8px; text-align: left;
@@ -1089,6 +1163,12 @@ input { font-family: inherit; }
 }
 .more-menu-section-title { font-size: 12px; font-weight: 600; color: var(--brass); margin-bottom: 8px; }
 .columns-btn-group { display: flex; gap: 6px; margin-bottom: 6px; }
+/* BARU (6 Sep 2026) -- grup tombol "Arah" (#columnDirectionBtnGroup)
+   sekarang berisi 3 tombol (dulu 2) sejak versi "🔗 Bebas + Sync"
+   ditambahkan -- boleh pindah baris di layar sempit supaya labelnya
+   tidak terpotong/meluber ke samping. */
+#columnDirectionBtnGroup { flex-wrap: wrap; }
+#columnDirectionBtnGroup .columns-btn { min-width: 96px; }
 .columns-btn {
   flex: 1; background: var(--paper); border: 1px solid var(--rule);
   border-radius: 8px; padding: 7px 4px; font-size: 12px; color: var(--ink);
@@ -1736,15 +1816,6 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .reader-columns[data-cols="1"] { grid-template-columns: minmax(0, 1fr); }
 .reader-columns[data-cols="2"] { grid-template-columns: repeat(2, minmax(280px, 1fr)); }
 .reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(260px, 1fr)); }
-/* Arah "menyamping" DENGAN penyelarasan baris: dirender lewat
-   renderColumnsGridAligned() sebagai grid asli (header + sel per ayat
-   langsung jadi child grid, bukan dibungkus div per kolom), supaya tinggi
-   tiap baris grid otomatis mengikuti kolom yang teksnya paling panjang —
-   hasilnya ayat 1/2/3/dst selalu sejajar tingginya di semua kolom. */
-.reader-columns-grid { align-items: stretch; }
-.reader-columns-grid .reader-grid-cell { min-width: 0; }
-.reader-columns-grid .reader-grid-cell .verse-block { height: 100%; }
-.reader-columns-grid .reader-grid-cell-empty { color: var(--ink-soft); font-size: 12px; font-style: italic; padding: 10px 0; }
 /* Arah "atas-bawah" (stacked) — satu kolom lebar penuh per bahasa,
    ditumpuk vertikal, dipisah garis, bukannya berdampingan. */
 .reader-columns[data-direction="stacked"] { grid-template-columns: minmax(0, 1fr) !important; }
@@ -1761,9 +1832,110 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
 }
 .reader-column .reader-verses { margin-top: 0; }
+
+/* (Dikembalikan 6 Sep 2026, permintaan operator) -- CSS untuk versi LAMA
+   direction:"side" (renderColumnsGridAligned(), js/app.js): 1 grid asli,
+   header & sel ayat jadi CHILD GRID LANGSUNG, tinggi tiap baris grid
+   otomatis mengikuti kolom yang teksnya paling panjang -- ayat 1/2/3/dst
+   SELALU sejajar tingginya di semua kolom, TANPA kotak scroll terpisah
+   & TANPA tombol Sync (karena memang selalu sejajar, tidak perlu). */
+.reader-columns-grid { align-items: stretch; }
+.reader-columns-grid .reader-grid-cell { min-width: 0; }
+.reader-columns-grid .reader-grid-cell .verse-block { height: 100%; }
+.reader-columns-grid .reader-grid-cell-empty { color: var(--ink-soft); font-size: 12px; font-style: italic; padding: 10px 0; }
 @media (max-width: 859px) {
-  .reader-columns[data-cols="2"] { grid-template-columns: repeat(2, minmax(240px, 82vw)); }
-  .reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(220px, 80vw)); }
+  /* Perbaikan lama (masih berlaku, TIDAK diubah oleh penambahan mode
+     "side-panes" BARU): supaya versi grid LAMA ini pun tetap muat 2/3
+     kolom sekaligus di layar HP tanpa digeser ke samping. */
+  .reader-columns[data-cols="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; overflow-x: hidden; }
+  .reader-columns[data-cols="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; overflow-x: hidden; }
+  /* JAGA-JAGA (6 Sep 2026) -- min-width:0 WAJIB di tiap sel grid supaya
+     boleh menyusut lebih kecil dari lebar "alami" isinya (perilaku
+     default grid/flex adalah TIDAK mau menyusut di bawah min-content,
+     yang untuk deretan tombol/badge bisa memaksa sel jadi lebih lebar
+     dari jatah kolomnya sendiri, walau grid-template-columns sudah
+     benar) -- ini pengaman tambahan supaya benar-benar TIDAK ADA celah
+     yang bisa bikin geser ke samping muncul lagi di kolom sempit. */
+  .reader-columns-grid .reader-grid-cell,
+  .reader-columns-grid .reader-grid-cell .verse-block,
+  .reader-columns-grid .reader-grid-cell .verse-text-wrap { min-width: 0; }
+  .reader-columns-grid[data-cols="2"] .reader-column-head.grid-head,
+  .reader-columns-grid[data-cols="3"] .reader-column-head.grid-head {
+    font-size: 10px; letter-spacing: 0.02em; white-space: normal; line-height: 1.25;
+    background: var(--paper-raised); border: 1px solid var(--rule);
+    border-radius: 6px; padding: 4px 4px; margin-bottom: 6px;
+  }
+  .reader-columns-grid .reader-grid-cell .verse-block { padding: 4px 2px; }
+  /* Baris tombol "Salin Ayat/Salin Catatan/Kumpulan/Baca dari sini" DI
+     DALAM kolom sempit: kecilkan lagi & pastikan boleh pindah baris
+     (flex-wrap sudah ada di .inline-note-actions, ini cuma memperkecil
+     supaya lebih banyak yang muat per baris sebelum pindah baris). */
+  .reader-columns-grid .inline-note-actions .chip-btn.small,
+  .reader-columns-panes .inline-note-actions .chip-btn.small {
+    padding: 4px 6px; font-size: 10.5px;
+  }
+}
+
+/* ------------------------------------------------------------
+   BARU (6 Sep 2026, permintaan operator) -- arah "Menyamping" (>1
+   bahasa) SEKARANG dirender renderColumnsIndependentPanes() (js/app.js)
+   sebagai PANEL SENDIRI per kolom, masing-masing bisa di-scroll
+   independen + tombol "🔗 Sync" di kepalanya -- GANTIKAN
+   renderColumnsGridAligned() lama (1 grid raksasa dengan tinggi baris
+   dipaksa sama rata mengikuti kolom paling panjang -- dibuang total,
+   TIDAK ada pemanggil lain yang tertinggal). Berlaku SAMA persis di HP
+   maupun komputer, untuk 2 MAUPUN 3 kolom (mockup yang diminta).
+   ------------------------------------------------------------ */
+.reader-columns.reader-columns-panes {
+  display: flex; gap: 10px; align-items: stretch; overflow-x: hidden;
+  height: 68vh; /* lihat catatan kenapa tinggi eksplisit dibutuhkan, di bawah */
+}
+.reader-col-pane {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden;
+  background: var(--paper);
+}
+.reader-col-pane-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 8px 10px; background: var(--paper-raised); border-bottom: 1px solid var(--rule);
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--brass);
+  flex-wrap: wrap;
+}
+.reader-col-pane-title { overflow-wrap: anywhere; }
+.reader-col-sync-toggle {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: none;
+  letter-spacing: 0; color: var(--ink-soft); font-weight: 600; cursor: pointer; flex-shrink: 0;
+}
+/* Toggle "Sync" dipakai ULANG dari .toggle-switch/.toggle-slider yang
+   sudah ada di app ini (dipakai jg di Timer Studio Presentasi dst) --
+   cuma dikecilkan sedikit supaya pas di kepala kolom yang sempit. */
+.reader-col-sync-switch { width: 30px; height: 18px; }
+.reader-col-sync-switch .toggle-slider::before { width: 14px; height: 14px; }
+.reader-col-sync-switch input:checked + .toggle-slider::before { transform: translateX(12px); }
+.reader-col-pane-body {
+  flex: 1; overflow-y: auto; padding: 10px 10px 16px; -webkit-overflow-scrolling: touch;
+  min-width: 0; /* jaga-jaga (6 Sep 2026): lihat catatan panjang di media query HP di bawah */
+}
+.reader-col-pane-body .verse-block,
+.reader-col-pane-body .verse-text-wrap { min-width: 0; }
+.reader-col-pane-body .verse-block { padding: 6px 4px; }
+.reader-col-pane-body .reader-grid-cell-empty {
+  color: var(--ink-soft); font-size: 12px; font-style: italic; padding: 10px 0;
+}
+@media (max-width: 859px) {
+  /* Tinggi panel: PERLU dibatasi eksplisit di sini (bukan cuma
+     "setinggi isinya") supaya overflow-y:auto di .reader-col-pane-body
+     punya sesuatu yang bisa dipotong -- kalau tidak, div akan selalu
+     setinggi kontennya sendiri dan scrollbar internnya tidak pernah
+     muncul. Dipakai persentase tinggi LAYAR (bukan hitungan piksel pas
+     dari tinggi header dll, yang gampang berubah/rapuh tiap ada
+     perubahan UI lain) -- halaman secara keseluruhan MASIH bisa
+     digulir normal seperti biasa kalau perlu melihat bagian di atas/
+     bawah kotak kolom ini. */
+  .reader-columns.reader-columns-panes { height: 62vh; gap: 6px; }
+  .reader-col-pane-head { padding: 6px 6px; font-size: 10px; }
+  .reader-col-sync-toggle { font-size: 10px; }
 }
 
 /* Arah "atas-bawah" (stacked) untuk >1 bahasa: dikelompokkan PER AYAT
@@ -2614,6 +2786,10 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-collection-select-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ps-collection-select-row select { flex: 1; min-width: 0; }
 #psCollectionReorderToggle.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
+/* BARU (4 Sep 2026 v3) -- jumlah item total kumpulan yang sedang
+   dipilih (#psCollectionCount), lihat renderCollectionList() di
+   js/presentation-studio.js. */
+.ps-collection-count { margin: 8px 0 0; font-size: 12px; color: var(--ink-soft); font-family: var(--font-ui); }
 /* Item yang sedang "aktif" di playlist yang dikendalikan panah kiri/
    kanan papan ketik atau clicker/stylus presentasi (lihat activePlaylist
    & wirePlaylistKeyNav() di js/presentation-studio.js) -- baik daftar
@@ -2700,8 +2876,53 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   font-variant-numeric: tabular-nums; color: var(--brass-soft);
 }
 .ps-timer-display.done { color: #e35b4b; }
-.ps-timer-display.ps-timer-idle { color: var(--ps-muted); }
+/* BARU (6 Sep 2026, permintaan operator) -- gantikan .ps-timer-idle lama:
+   dipakai KHUSUS untuk status "standby" (sebelum pernah ditekan Mulai,
+   ATAU setelah "🔁 Ulang" ditekan) -- SENGAJA dibuat berkedip supaya
+   jelas kelihatan BEDA dari status "dijeda" (yang tetap diam/beku, tidak
+   berkedip, supaya angka terakhirnya gampang dibaca operator) MAUPUN
+   status "selesai" (.done, merah solid, juga tidak berkedip). Dipakai
+   BERSAMA (bukan menggantikan) #psTimerDisplay/#psStopwatchDisplay yang
+   sudah ada -- kedua kotak ini sama-sama memakai class .ps-timer-display,
+   jadi 1 aturan CSS ini otomatis berlaku untuk Timer MAUPUN Stopwatch
+   sekaligus, lihat wireTimer()/wireStopwatch() (js/presentation-studio.js).
+*/
+.ps-timer-display.ps-timer-standby { color: var(--ps-muted); animation: psTimerBlink 1.3s ease-in-out infinite; }
+@keyframes psTimerBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.32; } }
+/* Batasi animasi berkedip untuk orang yang memilih "kurangi gerakan" di
+   pengaturan OS/browser-nya (aksesibilitas) -- statis saja, tidak berbahaya
+   kalau dilewati. */
+@media (prefers-reduced-motion: reduce) {
+  .ps-timer-display.ps-timer-standby { animation: none; opacity: 0.6; }
+}
 .ps-timer-box .chip-btn.active { background: var(--brass-soft); color: #1a1206; border-color: var(--brass-soft); }
+
+/* BARU (6 Sep 2026, permintaan operator) -- tombol "▶️ Mulai"/"▶️ Lanjut"
+   dibuat SENGAJA lebih besar dari tombol chip biasa (lihat
+   .ps-timer-controls di bawah) supaya gampang diklik operator yang
+   buru-buru saat acara berlangsung -- ini SATU-SATUNYA tombol yang selalu
+   tampil sendirian saat status "standby"/"dijeda" (lihat renderTimerUi_()/
+   renderStopwatchUi_(), js/presentation-studio.js), jadi ukurannya yang
+   besar tidak bikin sesak baris tombol lain.
+*/
+.ps-timer-btn-big {
+  font-size: 17px; font-weight: 800; padding: 16px 20px; width: 100%;
+  border-radius: 12px; letter-spacing: 0.01em;
+}
+.ps-timer-controls { display: flex; gap: 8px; align-items: stretch; }
+.ps-timer-controls .chip-btn:not(.ps-timer-btn-big) { flex: 1; }
+/* BARU -- daftar "🚩 Penanda" (lap) Stopwatch, operator-side saja (TIDAK
+   ikut dikirim ke Layar 2 -- lihat catatan panjang di addStopwatchLap_(),
+   js/presentation-studio.js, kenapa ini sengaja tetap lokal). */
+.ps-stopwatch-laps {
+  margin-top: 8px; max-height: 110px; overflow-y: auto; font-size: 12px;
+  font-variant-numeric: tabular-nums; color: var(--ps-ink-soft);
+}
+.ps-stopwatch-laps-row {
+  display: flex; justify-content: space-between; gap: 8px; padding: 3px 2px;
+  border-bottom: 1px dashed var(--ps-border);
+}
+.ps-stopwatch-laps-row:last-child { border-bottom: none; }
 
 .ps-quick-preview { max-height: 220px; overflow-y: auto; margin-top: 8px; font-size: 14.5px; line-height: 1.5; color: var(--ps-ink-soft); }
 .ps-quick-preview-row { padding: 4px 0; border-bottom: 1px solid var(--ps-col-border); }
@@ -2800,6 +3021,14 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-yt-row { display: flex; gap: 8px; margin-top: 8px; }
 .ps-yt-row input { flex: 1 1 auto; }
 .ps-yt-hint { font-size: 11px; color: var(--ps-muted); margin-top: 6px; }
+
+/* BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation" (kotak ketik banyak
+   ayat/kidung/pengumuman sekaligus, lihat ROADMAP-ai-presentation.md
+   Bagian 2). Meniru gaya textarea Pengumuman (.announcement-compose
+   textarea) supaya konsisten dengan kotak teks lain di Studio. */
+.ps-ai-textarea { width: 100%; resize: vertical; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px; font-family: var(--font-ui); background: var(--paper); color: var(--ink); font-size: 13px; }
+.ps-ai-row-warning { border-color: #b3552c; }
+.ps-ai-row-warning .ps-verse-ref { color: #d98b53; }
 .ps-yt-sep { border: none; border-top: 1px solid var(--ps-col-border); margin: 16px 0; }
 
 /* BARU (28 Agu 2026) -- "📺 Playlist Video (dari Google Sheet)", lihat
