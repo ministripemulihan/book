@@ -165,7 +165,7 @@ const PresentationStudio = (() => {
     // Layar 2 + status buka/tutup, sekaligus mengisi kotak pratinjau
     // milik Studio (#psPreviewBox) di sini.
     if (typeof Presentation === "undefined") return;
-    if (payload.type === "text") Presentation.sendFreeText(payload.text);
+    if (payload.type === "text") Presentation.sendFreeText(payload.text, payload.align);
     else if (payload.type === "clear") Presentation.clearScreen();
     else Presentation.postRaw ? Presentation.postRaw(payload) : rawPost(payload);
     renderStudioPreview(payload);
@@ -1600,6 +1600,11 @@ const PresentationStudio = (() => {
   // sebagai teks bebas (disimpan lewat mekanisme "Tulisan Bebas" yang
   // sudah ada di js/presentation.js supaya muncul juga di daftar itu).
   // ------------------------------------------------------------
+  // BARU (7 Sep 2026, permintaan operator) -- rata teks pengumuman
+  // dipertahankan di sini (bukan cuma dibaca sekali dari tombol), supaya
+  // sisa fungsi (mis. renderStudioPreview di tempat lain) bisa ikut
+  // memakainya kalau perlu di kemudian hari. "center" = bawaan lama.
+  let psAnnAlign_ = "center";
   function wireAnnouncement() {
     if (el("psAnnClearBtn")) {
       el("psAnnClearBtn").addEventListener("click", () => {
@@ -1618,7 +1623,75 @@ const PresentationStudio = (() => {
         // Ayat sederhana yang bisa dikirim ulang kapan saja.
         if (el("presentFreeText")) el("presentFreeText").value = full;
         if (el("presentSaveFreeTextBtn")) el("presentSaveFreeTextBtn").click();
-        post({ type: "text", text: full });
+        // BARU (7 Sep 2026) -- ikut kirim rata teks yang sedang dipilih
+        // (lihat tombol data-ann-align & applyTheme-nya di present.html,
+        // kind "text").
+        post({ type: "text", text: full, align: psAnnAlign_ });
+      });
+    }
+    // ---- Rata teks (kiri/tengah/kanan/justify) ----
+    const alignBtns = Array.from(document.querySelectorAll("[data-ann-align]"));
+    alignBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        psAnnAlign_ = btn.dataset.annAlign;
+        alignBtns.forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
+    // ---- Grid ikon siap-pakai: buka/tutup + sisip di posisi kursor ----
+    // Menyisipkan lewat document.execCommand("insertText") KALAU tersedia
+    // (mempertahankan riwayat undo/redo bawaan textarea, mis. Ctrl+Z),
+    // jatuh ke potong-tempel manual value kalau tidak didukung browser.
+    // Fokus textarea SENGAJA dikembalikan & posisi kursor dipindah ke
+    // SESUDAH ikon yang baru disisipkan supaya klik ikon berturut-turut
+    // menyisip berurutan (bukan semua menumpuk di posisi yang sama).
+    if (el("psAnnIconToggleBtn") && el("psAnnIconGrid")) {
+      el("psAnnIconToggleBtn").addEventListener("click", () => {
+        el("psAnnIconGrid").hidden = !el("psAnnIconGrid").hidden;
+      });
+    }
+    document.querySelectorAll(".ps-ann-icon-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const body = el("psAnnBody");
+        if (!body) return;
+        const icon = btn.dataset.icon;
+        body.focus();
+        const start = body.selectionStart ?? body.value.length;
+        const end = body.selectionEnd ?? body.value.length;
+        if (document.execCommand && document.execCommand("insertText", false, icon)) {
+          // berhasil lewat execCommand -- undo/redo bawaan tetap jalan
+        } else {
+          body.value = body.value.slice(0, start) + icon + body.value.slice(end);
+          const pos = start + icon.length;
+          body.setSelectionRange(pos, pos);
+        }
+      });
+    });
+    // ---- Salin judul+isi ke clipboard ----
+    if (el("psAnnCopyBtn")) {
+      el("psAnnCopyBtn").addEventListener("click", async () => {
+        const title = (el("psAnnTitle") && el("psAnnTitle").value.trim()) || "";
+        const body = (el("psAnnBody") && el("psAnnBody").value.trim()) || "";
+        const full = title ? `${title}\n\n${body}` : body;
+        if (!full) return;
+        const btn = el("psAnnCopyBtn");
+        const original = btn.textContent;
+        try {
+          await navigator.clipboard.writeText(full);
+          btn.textContent = "✅ Tersalin";
+        } catch (e) {
+          // Fallback kalau Clipboard API diblokir (mis. bukan HTTPS/izin
+          // ditolak) -- textarea sementara + execCommand("copy") lama.
+          const tmp = document.createElement("textarea");
+          tmp.value = full;
+          tmp.style.position = "fixed";
+          tmp.style.opacity = "0";
+          document.body.appendChild(tmp);
+          tmp.select();
+          try { document.execCommand("copy"); btn.textContent = "✅ Tersalin"; }
+          catch (e2) { btn.textContent = "⚠️ Gagal salin"; }
+          document.body.removeChild(tmp);
+        }
+        setTimeout(() => { btn.textContent = original; }, 1500);
       });
     }
   }
@@ -2227,6 +2300,28 @@ const PresentationStudio = (() => {
     // (#psTimerDisplay) tiap kali diubah, pola SAMA seperti
     // setTimerCustomSeconds()/syncTimerLabelPreview() utk mode "duration".
     if (el("psTimerClockTarget")) el("psTimerClockTarget").addEventListener("input", syncTimerClockPreview_);
+    // BARU (7 Sep 2026, permintaan operator) -- warna angka Jam Target.
+    // 4 tombol cepat + "Ikut Tema" (data-timerclock-color="") berbagi 1
+    // sumber kebenaran dengan pemilih warna bebas (psTimerClockColorCustom)
+    // -- pilih salah satu tombol MENGISI pemilih warna bebas juga (supaya
+    // kalau operator lanjut buka pemilih warna, mulainya dari warna yang
+    // barusan dipilih, bukan warna lama), dan sebaliknya mengetik warna
+    // bebas MENGHAPUS status "active" tombol cepat (tidak ada satu pun
+    // yang persis cocok lagi). Dikirim ke Layar 2 lewat theme.timerClockColor
+    // (lihat applyTheme(), present.html) -- "" berarti kembali ke warna
+    // aksen tema seperti sebelumnya (bawaan lama, tidak ada perubahan).
+    const timerClockColorBtns = Array.from(document.querySelectorAll("[data-timerclock-color]"));
+    function setTimerClockColor_(color) {
+      saveAndSendTheme({ timerClockColor: color });
+      timerClockColorBtns.forEach((b) => b.classList.toggle("active", b.dataset.timerclockColor === color));
+      if (color && el("psTimerClockColorCustom")) el("psTimerClockColorCustom").value = color;
+    }
+    timerClockColorBtns.forEach((btn) => {
+      btn.addEventListener("click", () => setTimerClockColor_(btn.dataset.timerclockColor));
+    });
+    if (el("psTimerClockColorCustom")) {
+      el("psTimerClockColorCustom").addEventListener("input", () => setTimerClockColor_(el("psTimerClockColorCustom").value));
+    }
     // psTimerStartBtn SEKARANG dipakai 2 fungsi (lihat renderTimerUi_()):
     // "▶️ Mulai" saat standby, "▶️ Lanjut" saat dijeda -- BARU (7 Sep
     // 2026) ditambah cabang mode "clock" (startTimerClock_(), TIDAK
@@ -5206,7 +5301,7 @@ const PresentationStudio = (() => {
   // (0.5x-10x) daripada `scale` karena kebutuhannya beda (angka besar
   // untuk dilihat dari jauh saat permainan/aktivitas, bukan untuk
   // kenyamanan baca ayat).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1 };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "" };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
