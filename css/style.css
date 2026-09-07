@@ -499,7 +499,7 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .lifestudy-book-name { font-weight: 700; }
 .lifestudy-book-total { font-size: 12px; color: var(--ink-soft); }
 .lifestudy-book-progress { font-size: 12px; color: var(--petrol); font-weight: 600; }
-.lifestudy-book-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.lifestudy-book-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; } /* BARU (7 Sep 2026) -- wrap ditambah karena SEKARANG ada 4 kontrol (input + 3 tombol: Buka/ID/Tandai), supaya tidak terpotong di layar sempit */
 .lifestudy-msg-input {
   width: 64px; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 8px;
   font-size: 13px; text-align: center; background: var(--paper); color: var(--ink);
