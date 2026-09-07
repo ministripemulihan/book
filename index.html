@@ -766,11 +766,36 @@
         </div>
 
         <div class="ps-tab-panel" data-ps-left-panel="pesan" hidden>
-          <textarea id="psMsgText" class="columns-lang-select" rows="4" placeholder="Tulis pesan berjalan…" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
-          <label class="more-menu-toggle" for="psMsgRunning" style="margin-top:8px;">
-            <span>▶️ Berjalan (geser kanan → kiri, marquee)</span>
-            <span class="toggle-switch"><input type="checkbox" id="psMsgRunning" checked /><span class="toggle-slider"></span></span>
-          </label>
+          <textarea id="psMsgText" class="columns-lang-select" rows="4" placeholder="Tulis pesan…" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          <!-- BARU (7 Sep 2026 v2, permintaan operator) -- SEBELUMNYA cuma
+               checkbox ON/OFF "Berjalan" (marquee). Sekarang 3 MODE
+               tampil, posisi tetap TIDAK berubah untuk semuanya, cuma
+               caranya menarik perhatian yang beda:
+                 "Diam"      -- teks diam total (bawaan, paling mudah dibaca)
+                 "Berjalan"  -- teks bergeser kanan->kiri (marquee lama)
+                 "Berdenyut" -- teks diam DI TEMPAT tapi ukurannya
+                                membesar/mengecil berulang (100% <-> 150%)
+                                -- lihat pilihan kecepatan & applyTicker()
+                                di present.html. -->
+          <div class="ps-field-label" style="margin-top:8px;">Mode tampil</div>
+          <div class="ps-btn-row" id="psMsgModeRow">
+            <button type="button" class="chip-btn small active" data-mode="static">⏸️ Diam</button>
+            <button type="button" class="chip-btn small" data-mode="scroll">➡️ Berjalan</button>
+            <button type="button" class="chip-btn small" data-mode="pulse">💓 Berdenyut</button>
+          </div>
+          <p class="announcement-compose-hint" style="margin:4px 0 0;">"Diam" = tetap di tempat, tidak bergerak. "Berjalan" = geser kanan → kiri (marquee). "Berdenyut" = tetap di tempat, tapi ukurannya membesar-mengecil berulang (100% ↔ 150%) supaya menarik perhatian, sampai pesan ditutup/diganti.</p>
+          <div id="psMsgPulseOptions" hidden style="margin-top:8px;">
+            <div class="ps-field-label">Kecepatan denyut (1 putaran)</div>
+            <div class="ps-btn-row" id="psMsgPulseSpeedRow">
+              <button type="button" class="chip-btn small" data-pulse-s="1">1 detik</button>
+              <button type="button" class="chip-btn small active" data-pulse-s="2">2 detik</button>
+              <button type="button" class="chip-btn small" data-pulse-s="3">3 detik</button>
+            </div>
+            <div class="ps-timer-custom-row" style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+              <input type="number" id="psMsgPulseCustom" min="0.3" max="10" step="0.1" placeholder="Custom (detik)" style="flex:1; min-width:0;" class="columns-lang-select" />
+              <button type="button" id="psMsgPulseCustomBtn" class="chip-btn small">Pakai</button>
+            </div>
+          </div>
           <div class="ps-field-label">Warna teks</div>
           <div class="ps-color-row" id="psMsgColorRow">
             <button type="button" class="ps-color-chip active" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
@@ -781,6 +806,60 @@
             <button type="button" class="ps-color-chip" data-color="#e74c3c" style="background:#e74c3c" title="Merah"></button>
             <button type="button" class="ps-color-chip" data-color="#f5b7d0" style="background:#f5b7d0" title="Merah muda pastel"></button>
           </div>
+          <!-- BARU (7 Sep 2026, permintaan operator) -- kontur/stroke tebal
+               di sekeliling huruf, supaya warna apa pun (termasuk Merah)
+               tetap kelihatan jelas di latar apa pun. Lebar stroke bisa
+               diatur; warna stroke terpisah dari warna isi hurufnya. -->
+          <label class="more-menu-toggle" for="psMsgStroke" style="margin-top:10px;">
+            <span>✏️ Stroke/Kontur di Sekeliling Huruf</span>
+            <span class="toggle-switch"><input type="checkbox" id="psMsgStroke" /><span class="toggle-slider"></span></span>
+          </label>
+          <div id="psMsgStrokeOptions" hidden style="margin-top:8px;">
+            <div class="ps-field-label">Warna stroke</div>
+            <div class="ps-color-row" id="psMsgStrokeColorRow">
+              <button type="button" class="ps-color-chip active" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+              <button type="button" class="ps-color-chip" data-color="#111111" style="background:#111111" title="Hitam"></button>
+              <button type="button" class="ps-color-chip" data-color="#e74c3c" style="background:#e74c3c" title="Merah"></button>
+            </div>
+            <div class="ps-field-label" style="margin-top:8px;">Tebal stroke</div>
+            <div class="ps-btn-row" id="psMsgStrokeWidthRow">
+              <button type="button" class="chip-btn small" data-stroke-w="1">Tipis</button>
+              <button type="button" class="chip-btn small active" data-stroke-w="2">Sedang</button>
+              <button type="button" class="chip-btn small" data-stroke-w="4">Tebal</button>
+            </div>
+          </div>
+          <!-- BARU (7 Sep 2026 v2, permintaan operator) -- checklist border
+               di sekeliling LATAR/BACKGROUND bar pesan (beda dari stroke
+               huruf di atas, yang mengontur teksnya sendiri). Dibuat
+               checklist (pilih salah satu warna, atau "Tanpa") supaya
+               operator bisa cepat ganti-ganti sesuai kebutuhan acara
+               (mis. Merah untuk peringatan, Putih/Biru untuk pengumuman
+               biasa) tanpa perlu border sama sekali kalau tidak perlu. -->
+          <div class="ps-field-label" style="margin-top:10px;">Border latar pesan</div>
+          <div class="ps-btn-row" id="psMsgBorderRow">
+            <button type="button" class="chip-btn small active" data-border="">Tanpa</button>
+            <button type="button" class="chip-btn small" data-border="#e74c3c">🔴 Merah</button>
+            <button type="button" class="chip-btn small" data-border="#ffffff">⚪ Putih</button>
+            <button type="button" class="chip-btn small" data-border="#3aa0ff">🔵 Biru</button>
+          </div>
+          <div id="psMsgBorderWidthWrap" hidden style="margin-top:8px;">
+            <div class="ps-field-label">Tebal border</div>
+            <div class="ps-btn-row" id="psMsgBorderWidthRow">
+              <button type="button" class="chip-btn small" data-border-w="2">Tipis</button>
+              <button type="button" class="chip-btn small active" data-border-w="4">Sedang</button>
+              <button type="button" class="chip-btn small" data-border-w="7">Tebal</button>
+            </div>
+          </div>
+          <!-- BARU (7 Sep 2026, permintaan operator) -- pilihan jenis huruf
+               (font) untuk pesan ini, terpisah dari font ayat/kidung utama. -->
+          <div class="ps-field-label" style="margin-top:10px;">Jenis huruf (font)</div>
+          <select id="psMsgFont" class="columns-lang-select">
+            <option value="'Inter', Arial, sans-serif" selected>Standar (Inter)</option>
+            <option value="Georgia, 'Times New Roman', serif">Klasik (Serif)</option>
+            <option value="'Courier New', monospace">Mesin Tik (Monospace)</option>
+            <option value="'Brush Script MT', cursive">Tulisan Tangan (Cursive)</option>
+            <option value="Impact, 'Arial Narrow', sans-serif">Tegas/Poster (Impact)</option>
+          </select>
           <div class="ps-field-label">Posisi</div>
           <div class="ps-btn-row" id="psMsgPosRow">
             <button type="button" class="chip-btn small active" data-pos="top">⬆️ Atas</button>
@@ -788,20 +867,53 @@
             <button type="button" class="chip-btn small" data-pos="bottom">⬇️ Bawah</button>
           </div>
           <button type="button" id="psMsgToggleBtn" class="chip-btn primary" style="margin-top:10px; width:100%;">▶️ Tayangkan</button>
+
         </div>
 
         <!-- ---- Timer (selalu tampil di bawah tab kiri) ---- -->
         <div class="ps-timer-box">
           <div class="ps-field-label">⏱️ Timer</div>
-          <input type="text" id="psTimerLabel" class="columns-lang-select" value="Sesi Bagi Nikmat" placeholder="Teks timer" />
-          <div class="ps-btn-row">
-            <button type="button" class="chip-btn small" data-timer-preset="180">3 menit</button>
-            <button type="button" class="chip-btn small" data-timer-preset="120">2 menit</button>
-            <button type="button" class="chip-btn small" data-timer-preset="60">1 menit</button>
+          <!-- BARU (7 Sep 2026, permintaan operator) -- pilih MODE Timer:
+               "Durasi" (hitung mundur dari sekian menit/detik, SEPERTI
+               SEBELUMNYA, tampil dengan cincin di Layar 2) atau
+               "Jam Target" (hitung mundur ke satu titik JAM DINDING
+               tertentu, mis. "countdown sampai jam 19:00" -- tampil
+               SENGAJA beda: angka besar polos di tengah panggung agak
+               ke bawah, TANPA cincin, cocok ditumpuk di atas 🖼️ Latar
+               Gambar). Lihat catatan panjang timerMode_/startTimerClock_()
+               (js/presentation-studio.js) & showTimerClock() (present.html).
+               Ganti mode HANYA bisa saat status "standby" (belum
+               berjalan) -- lihat setTimerMode_(). -->
+          <div class="ps-btn-row" id="psTimerModeRow">
+            <button type="button" class="chip-btn small active" data-timer-mode="duration">⏱️ Durasi</button>
+            <button type="button" class="chip-btn small" data-timer-mode="clock">🎯 Jam Target</button>
           </div>
-          <div class="ps-btn-row">
-            <input type="number" id="psTimerCustom" class="columns-lang-select" placeholder="Custom (detik)" min="1" style="width:110px;" />
-            <button type="button" id="psTimerCustomBtn" class="chip-btn small">Pakai</button>
+          <div id="psTimerLabelRow">
+            <input type="text" id="psTimerLabel" class="columns-lang-select" value="Sesi Bagi Nikmat" placeholder="Teks timer" />
+          </div>
+          <div id="psTimerDurationFields">
+            <div class="ps-btn-row">
+              <button type="button" class="chip-btn small" data-timer-preset="180">3 menit</button>
+              <button type="button" class="chip-btn small" data-timer-preset="120">2 menit</button>
+              <button type="button" class="chip-btn small" data-timer-preset="60">1 menit</button>
+            </div>
+            <div class="ps-btn-row">
+              <input type="number" id="psTimerCustom" class="columns-lang-select" placeholder="Custom (detik)" min="1" style="width:110px;" />
+              <button type="button" id="psTimerCustomBtn" class="chip-btn small">Pakai</button>
+            </div>
+          </div>
+          <!-- BARU (7 Sep 2026) -- "Jam Target": <input type="time"> bawaan
+               browser (format 24 jam, jam:menit), SELALU dianggap HARI INI
+               -- kalau ternyata jamnya sudah lewat dari sekarang, "▶️ Mulai"
+               menolak & memberi tanda (lihat startTimerClock_()). Teks
+               tambahan (caption) di sini TERPISAH dari "Teks timer" di
+               atas (yang cuma dipakai mode Durasi) supaya tidak
+               tertukar -- opsional, boleh dikosongkan. -->
+          <div id="psTimerClockFields" hidden>
+            <div class="ps-field-label">Jam target (hari ini)</div>
+            <input type="time" id="psTimerClockTarget" class="columns-lang-select" />
+            <div class="ps-field-label" style="margin-top:6px;">Teks tambahan di atas countdown (opsional)</div>
+            <input type="text" id="psTimerClockCaption" class="columns-lang-select" placeholder="mis. Ibadah dimulai dalam" />
           </div>
           <div class="ps-timer-label-preview" id="psTimerLabelPreview">Sesi Bagi Nikmat</div>
           <div class="ps-timer-display" id="psTimerDisplay">00:00</div>
