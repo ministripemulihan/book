@@ -222,6 +222,23 @@
     margin-bottom: 0.3em;
   }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
+  /* BARU (7 Sep 2026) -- KHUSUS untuk elemen yang posisinya sendiri
+     SUDAH diatur lewat `transform` (mis. #timerClockWrap & varian
+     tc-pos-*-nya, lihat catatan panjang di rule itu) -- "fadeUp" di
+     ATAS TIDAK BOLEH dipakai untuk elemen semacam itu: keyframe
+     "to { transform:none; }"-nya, digabung `animation-fill-mode:both`,
+     MENIMPA/MENGHAPUS transform apa pun yang sudah diberi elemen itu
+     lewat CSS biasa (animasi SELALU menang atas rule non-animasi untuk
+     properti yang sama) -- begitu animasi ini berjalan (setiap kali
+     elemen berpindah dari `hidden` ke tampil), transform:translate(-50%,
+     -50%)" (dan sejenisnya di tc-pos-top/bottom/left/right) ikut
+     KETIMPA jadi `none` PERMANEN setelah animasi selesai, sehingga
+     kotaknya nempel di titik 50%/50% APA ADANYA (cuma sudut kiri-atas
+     kotak yang di tengah, bukan kotaknya) -- persis akar masalah
+     "Jam Target tidak tepat di tengah" yang dilaporkan operator. Ganti
+     dengan animasi INI (cuma opacity, tidak menyentuh transform sama
+     sekali) untuk elemen semacam itu. */
+  @keyframes fadeInOnly { from { opacity:0; } to { opacity:1; } }
 
   #logoView { max-width: 60vw; max-height: 60vh; object-fit: contain; }
   /* Slide dari File tab (gambar/pptx/pdf yang sudah dikonversi
@@ -435,7 +452,28 @@
     flex-direction: column; align-items: center; justify-content: center;
     gap: 1.4vh; z-index: 3; text-align: center; max-width: 92vw;
   }
-  #timerClockWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
+  #timerClockWrap:not([hidden]) {
+    display: flex;
+    /* PERBAIKAN (7 Sep 2026, laporan operator "Jam Target tidak tepat di
+       tengah") -- SEBELUMNYA "animation: fadeUp .4s ease both;" (SAMA
+       seperti #timerWrap/#stopwatchWrap di atas). BEDANYA: #timerWrap &
+       #stopwatchWrap TIDAK butuh `transform` sama sekali untuk posisinya
+       (dipusatkan lewat flex align-items/justify-content biasa di
+       #stage), sedangkan kotak INI (#timerClockWrap) posisinya sendiri
+       ditentukan lewat `transform: translate(...)` (lihat rule di atas &
+       varian .tc-pos-top/bottom/left/right). "fadeUp" keyframe "to"-nya
+       eksplisit set `transform:none` -- karena animasi SELALU menang
+       atas rule non-animasi untuk properti yang sama, ini MENIMPA/
+       MENGHAPUS translate(-50%,-50%) yang sedianya memusatkan kotak,
+       jadi kotaknya nempel di titik acuan 50%/50% APA ADANYA (cuma
+       sudut kiri-atas kotak yang tepat di tengah layar, bukan tengah
+       kotaknya) -- makin lebar kotaknya (caption+angka jam panjang),
+       makin kelihatan "melenceng ke kanan-bawah". "fadeInOnly" di atas
+       cuma menganimasikan opacity, TIDAK PERNAH menyentuh transform,
+       jadi translate(-50%,-50%)/tc-pos-* di atas tetap utuh sepanjang
+       & sesudah animasi. */
+    animation: fadeInOnly .4s ease both;
+  }
   #timerClockCaption {
     font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.01em;
     font-size: calc(clamp(20px, 3.2vw, 42px) * var(--p-scale));
@@ -1480,8 +1518,24 @@
     // String kosong/"" berarti "ikuti warna aksen tema seperti biasa" --
     // makanya dicek `theme.timerClockColor` (truthy check yang sama
     // seperti properti lain di atas), bukan present/absent.
+    // PERBAIKAN (7 Sep 2026, akar masalah lain di balik "Jam Target
+    // tidak tepat di tengah") -- `root` di atas (`const root =
+    // document.documentElement.style`) SUDAH LANGSUNG jadi objek style-
+    // nya sendiri, BUKAN elemen -- jadi `root.style.removeProperty(...)`
+    // di bawah ini SALAH (mencoba baca `.style` dari sebuah objek style,
+    // yang tidak punya properti `.style`), dan MELEMPAR ERROR setiap
+    // kali operator memakai warna "Ikut Tema" (bawaan/default -- paling
+    // sering dipakai!) untuk "WARNA ANGKA COUNTDOWN". Karena JavaScript
+    // menghentikan SISA fungsi begitu error terjadi, SEMUA kode
+    // sesudahnya di applyTheme() ikut batal jalan tiap kali ini
+    // ke-trigger -- termasuk PERSIS bagian yang memasang kelas
+    // tc-pos-* (posisi Jam Target: Atas/Bawah/Kiri/Kanan/pojok) & yang
+    // menghitung ulang ukuran otomatis (fitTimerClockNumber_()) supaya
+    // angka tidak tumpah keluar kotak -- keduanya jadi tidak pernah
+    // benar-benar berjalan selama warna masih "Ikut Tema" (bawaan).
+    // Perbaikannya cukup buang `.style` yang salah taruh ini.
     if (theme.timerClockColor) root.setProperty("--p-timerclock-color", theme.timerClockColor);
-    else root.style.removeProperty("--p-timerclock-color");
+    else root.removeProperty("--p-timerclock-color");
     // BARU (7 Sep 2026, permintaan operator) -- posisi siap-pakai Jam
     // Target di layar (lihat catatan panjang CSS .tc-pos-* di atas).
     // Buang SEMUA kelas tc-pos-* lama dulu (regex) baru pasang yang baru
