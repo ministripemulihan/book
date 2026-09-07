@@ -415,16 +415,22 @@
   /* ---- BARU (7 Sep 2026, permintaan operator) -- 🎯 Countdown ke Jam
      Target: BEDA dari #timerWrap (cincin) di atas -- SENGAJA tanpa
      cincin, cuma teks polos (caption opsional + angka JAM:MENIT:DETIK
-     besar), diposisikan ABSOLUTE di tengah panggung tapi agak ke BAWAH
-     dari titik tengah (top:60%, bukan 50%) sesuai permintaan supaya
-     nyaman ditumpuk di atas 🖼️ Latar Gambar (foto/gambar) tanpa
-     menutupi bagian atas gambar. #stage sudah `position:relative` (lihat
-     CSS #stage di atas) jadi absolute di sini terhitung relatif ke
-     panggung itu, BUKAN ke seluruh jendela browser. Pola display:none/
-     :not([hidden]) SAMA seperti #timerWrap (alasannya sama persis --
-     lihat catatan panjang di situ). */
+     besar), diposisikan ABSOLUTE PERSIS di tengah panggung (top:50%,
+     left:50%). #stage sudah `position:relative` (lihat CSS #stage di
+     atas) jadi absolute di sini terhitung relatif ke panggung itu,
+     BUKAN ke seluruh jendela browser. Pola display:none/:not([hidden])
+     SAMA seperti #timerWrap (alasannya sama persis -- lihat catatan
+     panjang di situ).
+     DIPERBAIKI (7 Sep 2026, laporan operator) -- sebelumnya top:60%
+     (sengaja digeser turun dari permintaan lain, supaya tidak menutupi
+     bagian atas 🖼️ Latar Gambar). Itu justru bikin kotak ini TIDAK
+     pernah pas di tengah secara tinggi seperti yang diminta sekarang --
+     dikembalikan ke top:50% (tengah persis). Kalau nanti perlu digeser
+     lagi khusus saat Latar Gambar aktif, sebaiknya lewat rule terpisah
+     (mis. body.cam-active #timerClockWrap { top: 60%; }), bukan menimpa
+     nilai default di sini lagi. */
   #timerClockWrap {
-    display: none; position: absolute; left: 50%; top: 60%;
+    display: none; position: absolute; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
     flex-direction: column; align-items: center; justify-content: center;
     gap: 1.4vh; z-index: 3; text-align: center; max-width: 92vw;
@@ -432,7 +438,17 @@
   #timerClockWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
   #timerClockCaption {
     font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.01em;
-    font-size: calc(clamp(20px, 3.2vw, 42px) * var(--p-scale)); color: var(--p-ink);
+    font-size: calc(clamp(20px, 3.2vw, 42px) * var(--p-scale));
+    /* DIPERBAIKI (7 Sep 2026, laporan operator) -- sebelumnya SELALU
+       var(--p-ink) (warna tulisan tema umum), jadi kalau operator pilih
+       warna khusus "Putih" dkk. di "WARNA ANGKA COUNTDOWN", cuma angka
+       jam yang berubah putih sedangkan caption di atasnya tetap warna
+       ink tema (mis. krem/emas) -- terlihat "belum putih semua" persis
+       seperti dilaporkan. Sekarang caption ikut --p-timerclock-color
+       yang sama dengan angka jam kalau operator memilihnya, dan cuma
+       jatuh ke var(--p-ink) seperti sebelumnya saat "Ikut Tema" (nilai
+       kosong). */
+    color: var(--p-timerclock-color, var(--p-ink));
   }
   #timerClockCaption[hidden] { display: none; }
   #timerClockTime {
@@ -454,6 +470,35 @@
   }
   #timerClockTime.done-text { color: #d9463a; } /* sudah 00:00:00 -- diam, warna merah menandakan sudah tercapai */
   #timerClockWrap.ps-standby #timerClockTime { animation: pStandbyBlink 1.3s ease-in-out infinite; }
+
+  /* BARU (7 Sep 2026, laporan operator) -- ikon bendera gambar utk teks
+     Pengumuman/Teks Cepat. Lihat catatan panjang di flagifyAnnouncementText_()
+     (skrip bawah) untuk KENAPA ini perlu (emoji bendera 🇮🇩 dkk. jadi cuma
+     tulisan 2 huruf, mis. "ID", di Windows/Chrome -- font emoji Windows
+     tidak menggambar bendera sungguhan utk sebagian besar negara, beda
+     dari HP/Mac). Ukuran ikut ukuran huruf di sekitarnya (em) supaya
+     otomatis ikut membesar/mengecil bersama teks pengumuman (termasuk
+     ikut --p-scale lewat #text). */
+  .ann-flag-ico {
+    display: inline-block; width: 1.3em; height: 0.87em;
+    vertical-align: -0.12em; border-radius: 2px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+  }
+  .ann-flag-ico svg { display: block; width: 100%; height: 100%; }
+
+  /* BARU (7 Sep 2026, permintaan operator) -- judul Pengumuman ("Judul"
+     di panel 📢, dipisah dari isi lewat data.annTitle -- lihat showMain()
+     kind "text" di skrip bawah) ditampilkan lebih besar & tebal dari
+     isinya. em relatif ke font-size #text yang sedang berlaku, jadi
+     otomatis ikut membesar/mengecil bersama A-/A+ (--p-scale) & isi
+     pengumuman lainnya, cuma proporsinya saja yang dibuat lebih besar +
+     tebal supaya terasa seperti judul. */
+  .ann-title-line {
+    font-weight: 800;
+    font-size: 1.3em;
+    margin-bottom: 0.5em;
+  }
+  .ann-body-line { }
 
   /* ---- BARU (7 Sep 2026, permintaan operator) -- overlay "siap, belum
      mulai" (👁️ Tampilkan ke Layar 2, js/presentation-studio.js) & badge
@@ -1421,6 +1466,21 @@
     // seperti properti lain di atas), bukan present/absent.
     if (theme.timerClockColor) root.setProperty("--p-timerclock-color", theme.timerClockColor);
     else root.style.removeProperty("--p-timerclock-color");
+    // DIPERBAIKI (7 Sep 2026, laporan operator) -- akar masalah "Jam
+    // Target kepinggir kanan bawah" yang SEBENARNYA: fitTimerClockNumber_()
+    // (lihat catatan panjang di situ) cuma dipanggil ulang saat JUMLAH
+    // KARAKTER angkanya berubah, atau saat window di-resize -- TIDAK
+    // pernah dipanggil ulang saat operator membesarkan --p-scale (tombol
+    // A+/A- biasa) atau --p-timer-scale (slider ukuran Jam Target) SAAT
+    // countdown-nya SUDAH tayang. Akibatnya angka bisa membesar sampai
+    // melebihi lebar panggung tanpa faktor pengecilan otomatisnya ikut
+    // dihitung ulang -- persis kelihatan "tumpah"/menempel ke tepi kanan
+    // walau kotaknya sendiri tetap dipusatkan lewat left:50%+transform.
+    // Memaksa ukur ulang di sini (tiap kali tema/skala berubah, HANYA
+    // kalau Jam Target sedang aktif) menutup celah itu.
+    if ((theme.scale || theme.timerScale) && typeof timerClockState !== "undefined" && timerClockState) {
+      fitTimerClockNumber_();
+    }
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -1560,6 +1620,54 @@
     return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + paramsTail;
   }
 
+  // BARU (7 Sep 2026, laporan operator) -- 6 ikon "Bendera" di grid ikon
+  // Pengumuman (index.html, #psAnnIconGrid) MASIH disisipkan sebagai
+  // karakter emoji bendera biasa (🇮🇩 dkk., lihat wireAnnouncement() di
+  // js/presentation-studio.js) -- SENGAJA tidak diubah di sana, supaya
+  // "Salin" ke clipboard (mis. ditempel ke grup WhatsApp) tetap berupa
+  // teks bendera biasa yang lumrah dipakai orang di HP.
+  // AKAR MASALAH yang dilaporkan: KHUSUS di Layar 2 (present.html), yang
+  // biasanya dibuka di Chrome Windows, font emoji bawaan Windows (Segoe
+  // UI Emoji) tidak menggambar sebagian besar bendera negara sebagai
+  // gambar -- yang muncul cuma 2 huruf kode negaranya polos (mis. "ID"
+  // utk Indonesia, "US" utk Amerika), beda dari HP/Mac yang selalu
+  // menggambar bendera sungguhan. ini bukan bug di kode lama, tapi
+  // keterbatasan font emoji Windows itu sendiri.
+  // SOLUSI di sini: CUMA saat ditampilkan di Layar 2 (bukan saat
+  // disimpan/disalin), 6 karakter emoji bendera itu diganti gambar SVG
+  // kecil yang digambar manual (bukan file terpisah -- tetap sejalan
+  // dengan alasan awal "Emoji dipakai supaya tidak perlu aset tambahan",
+  // SVG teks ini juga tidak perlu file/unduhan apa pun) supaya tampilannya
+  // konsisten bendera sungguhan di layar mana pun. Kalau nanti mau
+  // menambah negara lain ke grid ikon, tambahkan juga SVG-nya di sini
+  // (kalau tidak ditambahkan, karakter emoji aslinya akan tetap dipakai
+  // sebagai fallback -- jadi tidak pernah rusak/hilang, cuma balik ke
+  // perilaku lama utk bendera yang belum py SVG).
+  const FLAG_ANN_SVGS_ = {
+    "🇮🇩": '<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="10" fill="#CE1126"/><rect y="10" width="30" height="10" fill="#fff"/></svg>',
+    "🇸🇬": '<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="10" fill="#EF3340"/><rect y="10" width="30" height="10" fill="#fff"/><circle cx="7" cy="5" r="4" fill="#fff"/><circle cx="8.6" cy="5" r="3.4" fill="#EF3340"/><g fill="#fff"><circle cx="11" cy="2.4" r="0.55"/><circle cx="13" cy="4" r="0.55"/><circle cx="12.4" cy="6.4" r="0.55"/><circle cx="9.8" cy="7.4" r="0.55"/><circle cx="8.4" cy="5.6" r="0.55"/></g></svg>',
+    "🇲🇾": '<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="20" fill="#fff"/><g fill="#CC0001"><rect y="0" width="30" height="1.43"/><rect y="2.86" width="30" height="1.43"/><rect y="5.71" width="30" height="1.43"/><rect y="8.57" width="30" height="1.43"/><rect y="11.43" width="30" height="1.43"/><rect y="14.29" width="30" height="1.43"/><rect y="17.14" width="30" height="1.43"/></g><rect width="14" height="10" fill="#010066"/><circle cx="7" cy="5" r="3.6" fill="#FC0"/><circle cx="8.4" cy="5" r="3" fill="#010066"/><circle cx="10.6" cy="5" r="1.3" fill="#FC0"/></svg>',
+    "🇹🇭": '<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="20" fill="#fff"/><rect width="30" height="3.33" fill="#A51931"/><rect width="30" height="3.33" y="16.67" fill="#A51931"/><rect width="30" height="6.67" y="6.67" fill="#2D2A4A"/></svg>',
+    "🇦🇺": '<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="20" fill="#00247D"/><path d="M0,0 L14,9.33 M14,0 L0,9.33" stroke="#fff" stroke-width="1.6"/><path d="M0,0 L14,9.33 M14,0 L0,9.33" stroke="#CF142B" stroke-width="0.6"/><rect x="5.6" width="2.8" height="9.33" fill="#fff"/><rect y="3.5" width="14" height="2.3" fill="#fff"/><rect x="6.2" width="1.6" height="9.33" fill="#CF142B"/><rect y="4" width="14" height="1.3" fill="#CF142B"/><circle cx="7" cy="14" r="1.6" fill="#fff"/><g fill="#fff"><circle cx="22" cy="4" r="1.1"/><circle cx="25.5" cy="8" r="1.3"/><circle cx="23.5" cy="12.5" r="1.1"/><circle cx="20" cy="14.5" r="0.9"/><circle cx="26" cy="15.5" r="0.7"/></g></svg>',
+    "🇺🇸": '<svg viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg"><rect width="30" height="20" fill="#fff"/><g fill="#B22234"><rect y="0" width="30" height="1.54"/><rect y="3.08" width="30" height="1.54"/><rect y="6.15" width="30" height="1.54"/><rect y="9.23" width="30" height="1.54"/><rect y="12.31" width="30" height="1.54"/><rect y="15.38" width="30" height="1.54"/><rect y="18.46" width="30" height="1.54"/></g><rect width="12" height="10.8" fill="#3C3B6E"/><g fill="#fff"><circle cx="2" cy="1.8" r="0.55"/><circle cx="5" cy="1.8" r="0.55"/><circle cx="8" cy="1.8" r="0.55"/><circle cx="11" cy="1.8" r="0.55"/><circle cx="3.5" cy="4" r="0.55"/><circle cx="6.5" cy="4" r="0.55"/><circle cx="9.5" cy="4" r="0.55"/><circle cx="2" cy="6.2" r="0.55"/><circle cx="5" cy="6.2" r="0.55"/><circle cx="8" cy="6.2" r="0.55"/><circle cx="11" cy="6.2" r="0.55"/><circle cx="3.5" cy="8.4" r="0.55"/><circle cx="6.5" cy="8.4" r="0.55"/><circle cx="9.5" cy="8.4" r="0.55"/></g></svg>',
+  };
+  const FLAG_ANN_TITLES_ = { "🇮🇩": "Indonesia", "🇸🇬": "Singapura", "🇲🇾": "Malaysia", "🇹🇭": "Thailand", "🇦🇺": "Australia", "🇺🇸": "Amerika" };
+  function flagifyAnnouncementText_(raw) {
+    // Escape dulu (sama seperti escKidung() di bawah) supaya teks bebas
+    // operator tidak bisa menyuntik HTML -- baru sesudah itu ganti
+    // pasangan karakter bendera dengan gambar SVG-nya. Escaping tidak
+    // menyentuh emoji (bukan salah satu dari & < > " '), jadi urutan ini
+    // aman.
+    const esc = String(raw || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    // Emoji bendera selalu berupa PASANGAN "regional indicator symbol"
+    // (2 code point, masing-masing surrogate pair \uD83C[\uDDE6-\uDDFF]).
+    return esc.replace(/(?:\uD83C[\uDDE6-\uDDFF]){2}/g, (m) => {
+      const svg = FLAG_ANN_SVGS_[m];
+      if (!svg) return m; // belum ada SVG-nya (mis. bendera baru ditambah ke grid) -- tampilkan emoji aslinya seperti sebelumnya, tidak pernah rusak
+      return `<span class="ann-flag-ico" title="${FLAG_ANN_TITLES_[m] || ""}">${svg}</span>`;
+    });
+  }
+
   function showMain(kind, data) {
     stopTimer(false);
     stopStopwatch(false);
@@ -1604,7 +1712,30 @@
       }
     } else if (kind === "text") {
       refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = data.text || "";
+      // DIPERBAIKI (7 Sep 2026, laporan operator) -- dulu textContent
+      // polos, jadi 6 ikon "Bendera" di grid Pengumuman (emoji 🇮🇩 dkk.)
+      // tampil sebagai tulisan 2 huruf ("ID" dst.) di Layar 2 kalau
+      // dibuka di Chrome Windows (lihat catatan panjang di
+      // flagifyAnnouncementText_() di atas). Sekarang lewat innerHTML
+      // dengan teks yang SUDAH di-escape lalu diganti gambar SVG khusus
+      // utk 6 bendera itu -- tetap aman dari suntikan HTML, \n tetap
+      // tampil sebagai baris baru seperti sebelumnya (CSS #text sudah
+      // white-space:pre-wrap).
+      // BARU (7 Sep 2026, permintaan operator) -- kalau pengirim
+      // menyertakan annTitle (lihat wireAnnouncement(), js/presentation-
+      // studio.js), judul ditampilkan di baris sendiri dengan gaya lebih
+      // besar & tebal (.ann-title-line) di atas isi pengumuman. Kalau
+      // TIDAK ada annTitle (mis. dikirim dari "Teks Cepat" atau dikirim
+      // ULANG dari daftar Kumpulan Ayat tersimpan yang cuma simpan teks
+      // gabungan polos), jatuh ke tampilan lama apa adanya -- tidak ada
+      // yang berubah untuk pemakaian itu.
+      if (data.annTitle) {
+        const titleHtml = flagifyAnnouncementText_(data.annTitle);
+        const bodyHtml = flagifyAnnouncementText_(data.annBody || "");
+        textEl.innerHTML = `<div class="ann-title-line">${titleHtml}</div>` + (bodyHtml ? `<div class="ann-body-line">${bodyHtml}</div>` : "");
+      } else {
+        textEl.innerHTML = flagifyAnnouncementText_(data.text || "");
+      }
       // BARU (7 Sep 2026, permintaan operator) -- rata teks Pengumuman:
       // "justify"/"left"/"right"/"center", dikirim dari tombol segmented
       // di panel 📢 Pengumuman (lihat wireAnnouncement(), js/presentation-
