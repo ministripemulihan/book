@@ -725,7 +725,7 @@ const Presentation = (() => {
         } catch (e) {}
         return;
       }
-      // BARU (4 Sep 2026) -- status main/jeda SoundCloud (lihat 
+      // BARU (4 Sep 2026) -- status main/jeda SoundCloud (lihat
       // reportScState() di present.html), diteruskan sebagai CustomEvent
       // supaya tombol ▶️/⏸️ tab "🔗 Link" (js/presentation-studio.js) bisa
       // menampilkan status yang sesungguhnya, termasuk kalau operator
