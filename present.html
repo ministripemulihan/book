@@ -32,6 +32,17 @@
        (index.html) untuk alasan kenapa dipisah. 1 = bawaan lama (tidak
        berubah), dipakai #timerRing & #stopwatchTime di bawah. */
     --p-timer-scale: 1;
+    /* BARU (7 Sep 2026, permintaan operator) -- lihat catatan panjang di
+       fitTimerClockNumber_() di skrip bawah: faktor koreksi OTOMATIS
+       (dihitung dari lebar layar sungguhan, BUKAN diatur manual) supaya
+       angka 🎯 Jam Target (#timerClockTime) tidak pernah tumpah keluar
+       kotak tengahnya sendiri -- itulah sebabnya sebelumnya terasa
+       "tidak persis di tengah" kalau --p-timer-scale/--p-scale dibesarkan
+       sampai teksnya lebih lebar dari layar: teks tumpah ke kanan
+       (karena tidak bisa dipenggal, angka jam tidak ada spasi), padahal
+       kotaknya sendiri sebetulnya sudah center lewat left:50%+translate.
+       1 = tidak mengecilkan sama sekali (nilai bawaan sebelum dihitung). */
+    --p-timerclock-fit: 1;
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -428,9 +439,18 @@
     font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
     /* Sama seperti #stopwatchTime -- pakai --p-timer-scale sendiri (lihat
        catatan panjang di CSS #stopwatchTime di bawah), supaya bisa
-       diperbesar sampai 10x TANPA ikut membesarkan ayat/teks lain. */
-    font-size: calc(clamp(56px, 13vw, 190px) * var(--p-timer-scale));
-    color: var(--p-accent); font-variant-numeric: tabular-nums;
+       diperbesar sampai 10x TANPA ikut membesarkan ayat/teks lain.
+       BARU (7 Sep 2026, permintaan operator): dikalikan JUGA dengan
+       --p-scale (Ukuran Teks / tombol A-/A+ biasa) supaya A-/A+ ikut
+       mengecilkan angka Jam Target kalau kepanjangan (mis. "01:00:10")
+       -- sebelumnya A-/A+ TIDAK berpengaruh sama sekali ke sini karena
+       cuma memutar --p-scale, sedangkan di sini cuma dengar --p-timer-
+       scale. Terakhir dikalikan --p-timerclock-fit (lihat :root & catatan
+       panjang fitTimerClockNumber_() di skrip bawah) sebagai JARING
+       PENGAMAN OTOMATIS terakhir supaya bagaimanapun kombinasi slider di
+       atas diatur, angka ini dijamin tetap muat & persis di tengah. */
+    font-size: calc(clamp(56px, 13vw, 190px) * var(--p-timer-scale) * var(--p-scale) * var(--p-timerclock-fit, 1));
+    color: var(--p-timerclock-color, var(--p-accent)); font-variant-numeric: tabular-nums;
   }
   #timerClockTime.done-text { color: #d9463a; } /* sudah 00:00:00 -- diam, warna merah menandakan sudah tercapai */
   #timerClockWrap.ps-standby #timerClockTime { animation: pStandbyBlink 1.3s ease-in-out infinite; }
@@ -986,6 +1006,35 @@
   // ------------------------------------------------------------
   let timerClockState = null; // { endAt, caption, bell, bellKey, _rang }
   let timerClockInterval = null;
+  // BARU (7 Sep 2026, permintaan operator) -- "kenapa Jam Target tidak
+  // persis di tengah". Akar masalahnya: #timerClockWrap SUDAH dipusatkan
+  // lewat left:50%+transform:translate(-50%,-50%) (lihat CSS), TAPI kalau
+  // angkanya (format tetap "JJ:MM:DD", tidak ada spasi jadi TIDAK BISA
+  // dipenggal ke baris baru) lebih LEBAR dari layar -- karena --p-timer-
+  // scale digeser besar, atau layar/jendela sempit -- teksnya tumpah ke
+  // luar kotak (ke kanan, karena text-align:center menahan sisi kiri)
+  // sehingga kelihatan "miring"/tidak center padahal titik tengah
+  // kotaknya sendiri sudah benar. fitTimerClockNumber_() mengukur lebar
+  // ASLI (scrollWidth) angka itu tiap kali berubah/layar berubah ukuran,
+  // lalu kalau lebih lebar dari ruang yang tersedia (92% lebar panggung,
+  // sama seperti max-width #timerClockWrap), --p-timerclock-fit dikecilkan
+  // sebanding supaya muat lagi -- dipasang di :root supaya juga ikut
+  // dibaca #timerClockTime (lihat font-size-nya di <style> atas).
+  function fitTimerClockNumber_() {
+    if (!timerClockTimeEl || timerClockWrap.hidden) return;
+    const root = document.documentElement.style;
+    root.setProperty("--p-timerclock-fit", "1"); // ukur dulu di ukuran "penuh" (tanpa koreksi lama nyangkut)
+    requestAnimationFrame(() => {
+      const stageW = stageEl.clientWidth || window.innerWidth;
+      const maxW = stageW * 0.92; // sama seperti max-width:92vw di CSS #timerClockWrap
+      const naturalW = timerClockTimeEl.scrollWidth;
+      if (naturalW > maxW && naturalW > 0) {
+        const factor = Math.max(0.15, maxW / naturalW);
+        root.setProperty("--p-timerclock-fit", factor.toFixed(3));
+      }
+    });
+  }
+  window.addEventListener("resize", () => { if (timerClockState) fitTimerClockNumber_(); });
   function fmtClockCountdown(totalSec) {
     const s = Math.max(0, Math.round(totalSec));
     const hh = Math.floor(s / 3600);
@@ -999,7 +1048,17 @@
     const remain = (timerClockState.endAt - Date.now()) / 1000;
     const remainClamped = Math.max(0, remain);
     const isDone = remain <= 0;
-    timerClockTimeEl.textContent = fmtClockCountdown(remainClamped);
+    const clockStr = fmtClockCountdown(remainClamped);
+    if (clockStr.length !== timerClockTimeEl.textContent.length) {
+      // Cuma hitung ulang lebar (fitTimerClockNumber_) kalau JUMLAH KARAKTER
+      // angkanya berubah (mis. jam target > 99 jam sehingga "JJ" jadi 3
+      // digit) -- di luar itu lebarnya praktis konstan (font-variant-
+      // numeric: tabular-nums), jadi tidak perlu diukur ulang tiap 250ms.
+      timerClockTimeEl.textContent = clockStr;
+      fitTimerClockNumber_();
+    } else {
+      timerClockTimeEl.textContent = clockStr;
+    }
     timerClockTimeEl.classList.toggle("done-text", isDone);
     if (isDone && !timerClockState._rang) {
       timerClockState._rang = true; // penanda supaya bel cuma bunyi SEKALI persis saat 00:00:00 tercapai
@@ -1022,6 +1081,7 @@
     refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // hentikan video kalau countdown ditayangkan menimpanya
     tickTimerClock();
+    fitTimerClockNumber_(); // ukur begitu pertama tayang (caption baru bisa saja mengubah lebar tersedia)
     if (timerClockInterval) clearInterval(timerClockInterval);
     timerClockInterval = setInterval(tickTimerClock, 250);
   }
@@ -1353,6 +1413,14 @@
     // BARU (6 Sep 2026) -- lihat catatan panjang --p-timer-scale di
     // <style> atas.
     if (theme.timerScale) root.setProperty("--p-timer-scale", theme.timerScale);
+    // BARU (7 Sep 2026, permintaan operator) -- warna khusus angka 🎯 Jam
+    // Target (terpisah dari --p-accent umum), lihat psTimerClockColor
+    // (index.html) & wireTimerClockColor() (js/presentation-studio.js).
+    // String kosong/"" berarti "ikuti warna aksen tema seperti biasa" --
+    // makanya dicek `theme.timerClockColor` (truthy check yang sama
+    // seperti properti lain di atas), bukan present/absent.
+    if (theme.timerClockColor) root.setProperty("--p-timerclock-color", theme.timerClockColor);
+    else root.style.removeProperty("--p-timerclock-color");
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -1514,6 +1582,11 @@
     // tayangan lain supaya tidak ada sisa baris kecil kidung sebelumnya
     // nyangkut saat berpindah ke ayat/teks/dst.
     if (kind !== "kidung") { refSubEl.hidden = true; refSubEl.textContent = ""; }
+    // Reset rata teks ke default (tengah) tiap ganti jenis tayangan --
+    // cuma kind "text" (Pengumuman/Teks Cepat) yang boleh menimpanya lagi
+    // di bawah lewat data.align, supaya rata kiri/kanan pengumuman lama
+    // tidak "nyangkut" kepakai saat pindah ke ayat/kidung berikutnya.
+    textEl.style.textAlign = "";
     if (kind === "verse") {
       refEl.hidden = false;
       refEl.textContent = data.ref || "";
@@ -1532,6 +1605,12 @@
     } else if (kind === "text") {
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = data.text || "";
+      // BARU (7 Sep 2026, permintaan operator) -- rata teks Pengumuman:
+      // "justify"/"left"/"right"/"center", dikirim dari tombol segmented
+      // di panel 📢 Pengumuman (lihat wireAnnouncement(), js/presentation-
+      // studio.js). Kosong/tidak dikirim = "center" (perilaku lama, tidak
+      // berubah untuk Teks Cepat/pesan lain yang belum diperbarui).
+      textEl.style.textAlign = data.align || "center";
     } else if (kind === "black") {
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = "";
