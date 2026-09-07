@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260827c" />
+<link rel="stylesheet" href="css/style.css?v=20260907a" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -257,6 +257,8 @@
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
       <button id="collectionsMenuBtn" class="more-menu-btn">📚 Kumpulan Ayat</button>
       <button id="kidungMenuBtn" class="more-menu-btn">🎵 Kidung</button>
+      <!-- BARU (6 Sep 2026) -- lihat js/lifestudy.js -->
+      <button id="lifeStudyMenuBtn" class="more-menu-btn">📖 Life-Study / Pelajaran Hayat</button>
       <!-- Tampil untuk semua orang yang login; isi lengkap (balas + umur) hanya untuk level gembala (lihat js/curhat.js) -->
       <button id="curhatBtn" class="more-menu-btn">💬 Curhat</button>
       <!-- Tampil hanya untuk level administrator/penatua/gembala distrik/gembala (lihat updateLevelGatedMenus() di js/app.js) -->
@@ -310,7 +312,8 @@
         <div id="columnDirectionRow" class="columns-lang-row" hidden>
           <label>Arah:</label>
           <div class="columns-btn-group" id="columnDirectionBtnGroup">
-            <button type="button" class="columns-btn" data-dir="side">↔️ Menyamping</button>
+            <button type="button" class="columns-btn" data-dir="side">↔️ Sejajar (Lama)</button>
+            <button type="button" class="columns-btn" data-dir="side-panes">🔗 Bebas + Sync</button>
             <button type="button" class="columns-btn" data-dir="stacked">↕️ Atas-bawah</button>
           </div>
         </div>
@@ -543,6 +546,8 @@
           <!-- panel catatan pribadi saya (semua ayat yang pernah dicatat) -->
           <div id="notesPanel" class="notes-panel" hidden></div>
           <div id="collectionsPanel" class="collections-panel" hidden></div>
+          <!-- BARU (6 Sep 2026) -- lihat js/lifestudy.js -->
+          <div id="lifeStudyPanel" class="lifestudy-panel" hidden></div>
           <div id="kidungPanel" class="kidung-panel" hidden></div>
 
           <!-- panel pantau pembacaan 7 hari (level gembala dst) -->
@@ -798,10 +803,20 @@
             <span>🔔 Bel saat selesai</span>
             <span class="toggle-switch"><input type="checkbox" id="psTimerBell" checked /><span class="toggle-slider"></span></span>
           </label>
-          <div class="ps-btn-row">
-            <button type="button" id="psTimerStartBtn" class="chip-btn small primary" title="Mulai">▶️ Mulai</button>
-            <button type="button" id="psTimerStopBtn" class="chip-btn small" title="Stop">⏹️ Stop</button>
-            <button type="button" id="psTimerCancelBtn" class="chip-btn small danger" title="Batal">✖️</button>
+          <!-- BARU (6 Sep 2026, permintaan operator) -- 3 tombol INI SAJA,
+               tapi yang KELIHATAN cuma sebagian sesuai status (standby/
+               berjalan/dijeda/selesai) -- lihat renderTimerUi_() &
+               wireTimer() (js/presentation-studio.js) untuk state machine-
+               nya. psTimerStartBtn dipakai DUA fungsi sekaligus (Mulai
+               SAAT standby, Lanjut SAAT dijeda -- teksnya berganti
+               sendiri), psTimerStopBtn jadi "Jeda" (cuma tampil saat
+               berjalan), psTimerCancelBtn (nama lama, sekarang jadi
+               "🔁 Ulang") kembali ke standby dari status
+               berjalan/dijeda/selesai. -->
+          <div class="ps-timer-controls" id="psTimerControls">
+            <button type="button" id="psTimerStartBtn" class="chip-btn primary ps-timer-btn-big" title="Mulai">▶️ Mulai</button>
+            <button type="button" id="psTimerStopBtn" class="chip-btn small" title="Jeda" hidden>⏸️ Jeda</button>
+            <button type="button" id="psTimerCancelBtn" class="chip-btn small" title="Ulang dari standby" hidden>🔁 Ulang</button>
           </div>
         </div>
 
@@ -816,11 +831,19 @@
           <input type="text" id="psStopwatchLabel" class="columns-lang-select" value="" placeholder="Judul di atas stopwatch (opsional)" style="width:100%; box-sizing:border-box;" />
           <div class="ps-timer-label-preview" id="psStopwatchLabelPreview"></div>
           <div class="ps-timer-display" id="psStopwatchDisplay">00:00</div>
-          <div class="ps-btn-row">
-            <button type="button" id="psStopwatchStartBtn" class="chip-btn small primary" title="Mulai">▶️ Mulai</button>
-            <button type="button" id="psStopwatchStopBtn" class="chip-btn small" title="Jeda">⏸️ Jeda</button>
-            <button type="button" id="psStopwatchResetBtn" class="chip-btn small danger" title="Ulang dari 0">🔄 Ulang</button>
+          <!-- BARU (6 Sep 2026, permintaan operator) -- pola state machine
+               SAMA persis dengan Timer di atas, cuma ditambah 1 tombol
+               "🚩 Penanda" (lap, khusus muncul saat berjalan -- lihat
+               addStopwatchLap_()) yang MENYALIN angka yang sedang tampil
+               ke daftar kecil di bawahnya (#psStopwatchLaps), operator-
+               side saja, TIDAK ikut tayang ke Layar 2. -->
+          <div class="ps-timer-controls" id="psStopwatchControls">
+            <button type="button" id="psStopwatchStartBtn" class="chip-btn primary ps-timer-btn-big" title="Mulai">▶️ Mulai</button>
+            <button type="button" id="psStopwatchLapBtn" class="chip-btn small" title="Catat angka sekarang" hidden>🚩 Penanda</button>
+            <button type="button" id="psStopwatchStopBtn" class="chip-btn small" title="Jeda" hidden>⏸️ Jeda</button>
+            <button type="button" id="psStopwatchResetBtn" class="chip-btn small" title="Ulang dari standby" hidden>🔁 Ulang</button>
           </div>
+          <div class="ps-stopwatch-laps" id="psStopwatchLaps"></div>
         </div>
       </div>
 
@@ -1300,7 +1323,14 @@
           <div class="ps-field-label">Ukuran Teks</div>
           <div class="ps-btn-row">
             <button type="button" id="psFontDec" class="chip-btn small">A-</button>
-            <input type="range" id="psFontScale" min="60" max="160" value="100" style="flex:1;" />
+            <!-- PERMINTAAN OPERATOR (6 Sep 2026): batas atas dinaikkan
+                 dari 160% jadi 480% (3x lipat) -- lihat catatan panjang di
+                 wireTheme() (js/presentation-studio.js) & --p-scale di
+                 present.html untuk kenapa angka ini aman dipakai (murni
+                 CSS scale, tidak ada batas keras selain estetika/terpotong
+                 di layar sempit -- operator sendiri yang menilai pas atau
+                 tidaknya lewat pratinjau Layar 2). -->
+            <input type="range" id="psFontScale" min="60" max="480" value="100" style="flex:1;" />
             <button type="button" id="psFontInc" class="chip-btn small">A+</button>
             <!-- BARU (4 Sep 2026, permintaan operator) -->
             <span id="psFontScaleValue" class="ps-pen-size-value">100%</span>
@@ -1336,6 +1366,25 @@
             <span id="psContentScaleValue" class="ps-pen-size-value">100%</span>
           </div>
           <div class="ps-pointer-hint">Mengatur seberapa lebar kotak teks memakai layar -- persempit supaya latar (Kamera/Gambar) lebih terlihat di tepi, atau lebarkan supaya teks memakai hampir seluruh layar.</div>
+          <!-- BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/
+               Stopwatch (Layar 2)": SENGAJA dipisah dari "Ukuran Teks" di
+               atas (yang untuk ayat/teks/pengumuman/kidung) -- angka
+               Timer/Stopwatch dipakai juga utk acara non-ibadah (mis.
+               permainan/game anak, lihat contoh "main balon" di komentar
+               wireTimer()) yang butuh angka JAUH lebih besar dari ukuran
+               wajar untuk membaca ayat, jadi rentangnya sengaja jauh lebih
+               lebar (sampai 1000% = 10x) daripada "Ukuran Teks" (480%) --
+               lihat --p-timer-scale di present.html & applyTimerScale()
+               (js/presentation-studio.js). TIDAK memengaruhi ukuran
+               ayat/teks/kidung sama sekali, sebaliknya juga begitu. -->
+          <div class="ps-field-label">Ukuran Timer/Stopwatch (Layar 2)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psTimerScaleDec" class="chip-btn small" title="Perkecil angka Timer/Stopwatch">A-</button>
+            <input type="range" id="psTimerScale" min="50" max="1000" value="100" step="10" style="flex:1;" />
+            <button type="button" id="psTimerScaleInc" class="chip-btn small" title="Perbesar angka Timer/Stopwatch">A+</button>
+            <span id="psTimerScaleValue" class="ps-pen-size-value">100%</span>
+          </div>
+          <div class="ps-pointer-hint">Khusus memperbesar/memperkecil angka ⏱️ Timer & Stopwatch di Layar 2 (tidak memengaruhi ukuran ayat/teks/kidung) -- bisa sampai 10x lebih besar, cocok untuk permainan/aktivitas yang perlu terlihat dari jauh.</div>
         </div>
 
         <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
@@ -1436,13 +1485,13 @@
   <script src="js/footnotes.js?v=20260826e"></script>
   <script src="js/csv.js?v=20260820b"></script>
   <script src="js/db.js?v=20260821b"></script>
-  <script src="js/sync.js?v=20260827a"></script>
+  <script src="js/sync.js?v=20260906a"></script>
   <!-- Sebelumnya HILANG dari index.html (filenya sendiri juga tidak ada di
        proyek) padahal disebut di banyak komentar -- lihat js/collections.js
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260827f"></script>
+  <script src="js/collections.js?v=20260905a"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -1454,15 +1503,17 @@
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260822a"></script>
   <script src="js/kidung-ui.js?v=20260827a"></script>
+  <!-- BARU (6 Sep 2026) -->
+  <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
   <script src="js/presentation.js?v=20260828a"></script>
-  <script src="js/presentation-studio.js?v=20260904a"></script>
+  <script src="js/presentation-studio.js?v=20260906a"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260827b"></script>
+  <script src="js/app.js?v=20260907a"></script>
   <script src="js/curhat.js?v=20260818b"></script>
-  <script src="js/aichat.js?v=20260818b"></script>
+  <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
   <script src="js/kidungversecheck.js?v=20260821a"></script>
 </body>
