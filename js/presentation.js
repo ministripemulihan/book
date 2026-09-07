@@ -1,7 +1,7 @@
 // ============================================================
 //  MODE PRESENTASI 2 LAYAR (baru)
 // ============================================================
-// Fitur: 
+// Fitur:
 //  1. Toggle "1 Layar" (biasa, seperti sekarang) <-> "2 Layar" (menu ⋮ ->
 //     panel "🖥️ Mode Presentasi"). Saat diaktifkan, membuka jendela BARU
 //     (present.html) yang isinya bisa dikendalikan dari jendela utama.
@@ -241,11 +241,19 @@ const Presentation = (() => {
     flashSendFeedback();
   }
 
-  function sendFreeText(text) {
+  function sendFreeText(text, align) {
     if (!text || !text.trim()) return;
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) openWindow();
-    post({ type: "text", text: text.trim() });
+    // BARU (7 Sep 2026, permintaan operator) -- `align` opsional (kiri/
+    // tengah/kanan/justify), dipakai panel 📢 Pengumuman (Studio
+    // Presentasi) untuk mengirim rata teks yang dipilih ke Layar 2 --
+    // lihat present.html (kind "text") yang membaca data.align. Tidak
+    // diisi = tetap "text" polos seperti sebelumnya (bawaan lama, dibaca
+    // sebagai "center" di sisi Layar 2).
+    const payload = { type: "text", text: text.trim() };
+    if (align) payload.align = align;
+    post(payload);
     flashSendFeedback();
   }
 
@@ -291,13 +299,23 @@ const Presentation = (() => {
   // kontrolnya sendiri, sehingga "kirim ulang konten terakhir" saat
   // Layar 2 dibuka ulang jadi salah (mengirim ulang perintah play/
   // pause, bukan trek SoundCloud-nya).
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control"];
+  // PERBAIKAN (7 Sep 2026, laporan operator "pesan posisi Tengah aneh") --
+  // "msgmid" (lapisan pesan posisi Tengah, lihat js/presentation-studio.js
+  // wireMessage()) SEBELUMNYA tidak ikut terdaftar di sini -- akibatnya
+  // postRaw() di bawah menganggapnya sebagai konten UTAMA biasa (bukan
+  // lapisan mengambang), lalu menimpa `lastPayload` dengan overlay pesan
+  // itu. Efeknya: begitu Layar 2 dibuka ulang / disegarkan, yang dikirim
+  // ulang sebagai "konten terakhir" adalah overlay pesan (kadang malah
+  // yang show:false dari hideAllMessageBars_()), bukan ayat/kidung/dst
+  // yang sesungguhnya sedang tayang. "warta" & "footnote" (Atas & Bawah)
+  // sudah benar terdaftar dari awal -- "msgmid" (Tengah) yang terlewat.
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) {
       // Overlay (pointer/pen/tick timer) tidak perlu memaksa buka jendela
       // baru berkali-kali; hanya buka untuk aksi yang jelas disengaja.
-      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote") {
+      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote" || payload.type === "msgmid") {
         openWindow();
       } else {
         return;
@@ -444,6 +462,32 @@ const Presentation = (() => {
     }
   }
 
+  // BARU (7 Sep 2026) -- 🔔 pemilih Suara Bel untuk panel sederhana (HP),
+  // pola & key localStorage SAMA PERSIS dengan versi Studio (lihat
+  // TIMER_BELL_CHOICE_KEY di js/presentation-studio.js) supaya pilihan
+  // operator ikut sama di kedua panel, tidak perlu dipilih ulang.
+  const TIMER_BELL_CHOICE_KEY_SIMPLE = "ps_timer_bell_choice_v1";
+
+  function getSelectedBellKeySimple_() {
+    const sel = el("presentTimerBellSelect");
+    if (sel && sel.value) return sel.value;
+    return (typeof CONFIG !== "undefined" && CONFIG.TIMER_BELL_DEFAULT_KEY) || "bell1";
+  }
+
+  function populateBellSelectSimple_() {
+    const sel = el("presentTimerBellSelect");
+    if (!sel) return;
+    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }];
+    let saved = "";
+    try { saved = localStorage.getItem(TIMER_BELL_CHOICE_KEY_SIMPLE) || ""; } catch (e) {}
+    const fallback = (typeof CONFIG !== "undefined" && CONFIG.TIMER_BELL_DEFAULT_KEY) || list[0].key;
+    sel.innerHTML = list.map((b) => `<option value="${escapeHtmlLocal(b.key)}">${escapeHtmlLocal(b.label)}</option>`).join("");
+    sel.value = list.some((b) => b.key === saved) ? saved : fallback;
+    sel.addEventListener("change", () => {
+      try { localStorage.setItem(TIMER_BELL_CHOICE_KEY_SIMPLE, sel.value); } catch (e) {}
+    });
+  }
+
   function wireTimerSimple() {
     const presetBtns = Array.from(document.querySelectorAll("[data-present-timer-preset]"));
     function setDisplay(sec) {
@@ -480,7 +524,8 @@ const Presentation = (() => {
       simpleTimerEndAt = Date.now() + simpleTimerTotal * 1000;
       const label = (el("presentTimerLabel") && el("presentTimerLabel").value.trim()) || "Sesi Bagi Nikmat";
       const bell = !!(el("presentTimerBell") && el("presentTimerBell").checked);
-      postRaw({ type: "timer", action: "start", label, totalSeconds: simpleTimerTotal, endAt: simpleTimerEndAt, bell });
+      const bellKey = getSelectedBellKeySimple_();
+      postRaw({ type: "timer", action: "start", label, totalSeconds: simpleTimerTotal, endAt: simpleTimerEndAt, bell, bellKey });
       const disp = el("presentTimerDisplay");
       if (disp) disp.classList.remove("ps-timer-idle");
       simpleTimerInterval = setInterval(() => {
@@ -497,6 +542,11 @@ const Presentation = (() => {
     }
     if (el("presentTimerStartBtn")) el("presentTimerStartBtn").addEventListener("click", startTimer);
     if (el("presentTimerStopBtn")) el("presentTimerStopBtn").addEventListener("click", stopTimer);
+    // BARU (7 Sep 2026) -- "🔇 Stop Bel": hentikan SUARA bel di Layar 2
+    // tanpa menghentikan timer-nya sendiri (beda dari presentTimerStopBtn
+    // di atas, yang menghentikan timer-nya).
+    if (el("presentTimerStopBellBtn")) el("presentTimerStopBellBtn").addEventListener("click", () => postRaw({ type: "timer", action: "stopBell" }));
+    populateBellSelectSimple_();
   }
 
   // ------------------------------------------------------------
