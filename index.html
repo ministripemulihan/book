@@ -469,9 +469,15 @@
             <span>🔔 Bel saat selesai</span>
             <span class="toggle-switch"><input type="checkbox" id="presentTimerBell" checked /><span class="toggle-slider"></span></span>
           </label>
+          <!-- BARU (7 Sep 2026) -- pilih suara bel (CONFIG.BELL_SOUNDS di
+               js/config.js), diisi otomatis oleh wireTimerSimple() di
+               js/presentation.js. Pilihan tersimpan per perangkat
+               (localStorage), tidak perlu dipilih ulang tiap buka app. -->
+          <select id="presentTimerBellSelect" class="columns-lang-select" style="margin-top:6px;"></select>
           <div class="ps-btn-row">
             <button type="button" id="presentTimerStartBtn" class="chip-btn small primary">▶️ Mulai</button>
             <button type="button" id="presentTimerStopBtn" class="chip-btn small">⏹️ Stop</button>
+            <button type="button" id="presentTimerStopBellBtn" class="chip-btn small" title="Hentikan suara bel tanpa menghentikan timer">🔇 Stop Bel</button>
           </div>
 
           <!-- BARU (27 Agu 2026) -- Stopwatch, versi HP/panel sederhana
@@ -803,6 +809,13 @@
             <span>🔔 Bel saat selesai</span>
             <span class="toggle-switch"><input type="checkbox" id="psTimerBell" checked /><span class="toggle-slider"></span></span>
           </label>
+          <!-- BARU (7 Sep 2026) -- pilih suara bel (CONFIG.BELL_SOUNDS di
+               js/config.js -- lihat komentar di sana untuk cara menambah
+               suara custom sendiri sampai 20 macam). Diisi otomatis oleh
+               populateBellSelect_() (js/presentation-studio.js). Pilihan
+               tersimpan per perangkat (localStorage). -->
+          <select id="psTimerBellSelect" class="columns-lang-select" style="margin-top:6px;"></select>
+          <button type="button" id="psTimerStopBellBtn" class="chip-btn small" style="margin-top:6px; width:100%;" title="Hentikan suara bel tanpa menghentikan timer">🔇 Stop Bel</button>
           <!-- BARU (6 Sep 2026, permintaan operator) -- 3 tombol INI SAJA,
                tapi yang KELIHATAN cuma sebagian sesuai status (standby/
                berjalan/dijeda/selesai) -- lihat renderTimerUi_() &
@@ -813,6 +826,13 @@
                berjalan), psTimerCancelBtn (nama lama, sekarang jadi
                "🔁 Ulang") kembali ke standby dari status
                berjalan/dijeda/selesai. -->
+          <!-- BARU (7 Sep 2026, permintaan operator) -- "👁️ Tampilkan ke
+               Layar 2": tayangkan status "siap, belum mulai" (angka
+               berkedip + badge "MULAI") ke Layar 2 SEBELUM "▶️ Mulai"
+               ditekan -- cuma tampil saat standby (durasi sudah dipilih),
+               lihat renderTimerUi_()/toggleTimerPreview_() di js/
+               presentation-studio.js. -->
+          <button type="button" id="psTimerPreviewBtn" class="chip-btn small" style="width:100%; margin-top:6px;" title="Tayangkan status siap (berkedip) ke Layar 2, sebelum Mulai">👁️ Tampilkan ke Layar 2</button>
           <div class="ps-timer-controls" id="psTimerControls">
             <button type="button" id="psTimerStartBtn" class="chip-btn primary ps-timer-btn-big" title="Mulai">▶️ Mulai</button>
             <button type="button" id="psTimerStopBtn" class="chip-btn small" title="Jeda" hidden>⏸️ Jeda</button>
@@ -837,6 +857,11 @@
                addStopwatchLap_()) yang MENYALIN angka yang sedang tampil
                ke daftar kecil di bawahnya (#psStopwatchLaps), operator-
                side saja, TIDAK ikut tayang ke Layar 2. -->
+          <!-- BARU (7 Sep 2026, permintaan operator) -- pola SAMA persis
+               dengan "👁️ Tampilkan ke Layar 2" milik Timer di atas, lihat
+               renderStopwatchUi_()/toggleStopwatchPreview_() di js/
+               presentation-studio.js. -->
+          <button type="button" id="psStopwatchPreviewBtn" class="chip-btn small" style="width:100%; margin-top:6px;" title="Tayangkan status siap (berkedip) ke Layar 2, sebelum Mulai">👁️ Tampilkan ke Layar 2</button>
           <div class="ps-timer-controls" id="psStopwatchControls">
             <button type="button" id="psStopwatchStartBtn" class="chip-btn primary ps-timer-btn-big" title="Mulai">▶️ Mulai</button>
             <button type="button" id="psStopwatchLapBtn" class="chip-btn small" title="Catat angka sekarang" hidden>🚩 Penanda</button>
@@ -1479,7 +1504,7 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20260822a"></script>
+  <script src="js/config.js?v=20260907a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260818b"></script>
   <script src="js/footnotes.js?v=20260826e"></script>
@@ -1507,8 +1532,8 @@
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
-  <script src="js/presentation.js?v=20260828a"></script>
-  <script src="js/presentation-studio.js?v=20260906a"></script>
+  <script src="js/presentation.js?v=20260907b"></script>
+  <script src="js/presentation-studio.js?v=20260907c"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260907a"></script>
