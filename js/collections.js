@@ -250,6 +250,34 @@ function addSoundCloudToCollection(username, name, scItem) {
   });
 }
 
+// BARU (5 Sep 2026) -- item YouTube PORTABEL, dipakai tombol "🔗 Tambah
+// Link" di panel Kumpulan Ayat BIASA (js/app.js, renderCollectionDetailInto())
+// supaya bisa ditambahkan LANGSUNG dari HP tanpa perlu Studio Presentasi
+// (yang disembunyikan total di layar sempit, lihat #presentStudioMobileHint
+// di index.html). SENGAJA dibuat type BARU ("youtube_link"), BEDA dari
+// video YouTube yang ditambahkan lewat tab "▶️ YouTube" Studio Presentasi
+// (addMediaToCollection(), type:"media") -- yang itu cuma menyimpan
+// REFERENSI ke Media Tersimpan (`mediaItemId`, lihat catatan panjang di
+// addMediaToCollection() di bawah): id itu dibuat ULANG secara ACAK di
+// SETIAP perangkat (_genMediaId(), lihat syncMediaFromDrive()), jadi kalau
+// kumpulan berisi item begitu dibuka di perangkat/akun LAIN, `mediaItemId`-
+// nya TIDAK akan pernah cocok -- videonya gagal tayang ("berkas tidak
+// ditemukan"), walau baris kumpulannya sendiri berhasil ikut tersalin.
+// Item "youtube_link" di sini TIDAK punya masalah itu: `embedUrl`
+// disimpan LANGSUNG di dalam item (persis seperti "canva"/"soundcloud" di
+// atas, bukan referensi) -- jadi otomatis ikut utuh & langsung bisa
+// tayang, baik disinkron ke perangkat lain akun yang sama MAUPUN
+// di-🔗Bagikan ke akun lain, tidak bergantung IndexedDB lokal sama sekali.
+function addYoutubeLinkToCollection(username, name, ytItem) {
+  if (!ytItem || !ytItem.embedUrl) return null;
+  return addItemToCollection(username, name, {
+    type: "youtube_link",
+    embedUrl: ytItem.embedUrl,
+    sourceUrl: ytItem.sourceUrl || "",
+    title: ytItem.title || "",
+  });
+}
+
 // `kidungItem`: { buku, kidungNo, title, bait: [{noBait,teks}], koorTeks }
 // -- 1 panggilan = 1 SLIDE ditambahkan (lihat catatan bentuk item di
 // atas). Dipanggil per-slide dari tab Kidung Studio Presentasi
@@ -477,6 +505,12 @@ function buildCollectionShareText(col) {
       lines.push(`${i + 1}. 📢 ${it.title ? it.title + " — " : ""}${it.text}`);
     } else if (it.type === "kidung") {
       lines.push(`${i + 1}. 🎵 Kidung No. ${it.kidungNo}${it.title ? " — " + it.title : ""}`);
+    } else if (it.type === "youtube_link") {
+      lines.push(`${i + 1}. ▶️ YouTube${it.title ? " — " + it.title : ""}${it.sourceUrl ? "\n" + it.sourceUrl : ""}`);
+    } else if (it.type === "canva") {
+      lines.push(`${i + 1}. 🖼️ Canva${it.title ? " — " + it.title : ""}`);
+    } else if (it.type === "soundcloud") {
+      lines.push(`${i + 1}. 🎧 SoundCloud${it.title ? " — " + it.title : ""}${it.trackUrl ? "\n" + it.trackUrl : ""}`);
     }
   });
   return lines.join("\n\n");
@@ -1030,6 +1064,19 @@ async function respondToMediaDeleteRequest(username, requestId, approve) {
     return { ok: false, error: "Sinkronisasi ke server belum aktif." };
   }
   return Sync.respondMediaDelete(username, requestId, approve);
+}
+
+// Buat/cabut link publik Drive untuk 1 file yang sudah tersinkron
+// (`item.driveFileId`) -- lihat catatan keamanan panjang di
+// setDriveFileSharingForUser_() (apps-script/Code.gs) & pemakaiannya di
+// renderMediaList() (js/presentation-studio.js). `makePublic:true` =
+// siapa saja yang punya link bisa buka LANGSUNG lewat browser tanpa
+// login ke aplikasi; `makePublic:false` = kembalikan jadi privat.
+async function setMediaPublicLink(username, fileId, makePublic) {
+  if (typeof Sync === "undefined" || !Sync.enabled()) {
+    return { ok: false, error: "Sinkronisasi ke server belum aktif." };
+  }
+  return Sync.setMediaPublicLink(username, fileId, makePublic);
 }
 
 // Nama item Media Tersimpan yang PALING BARU dipakai, sama pola seperti
