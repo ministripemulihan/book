@@ -285,6 +285,15 @@ const PresentationStudio = (() => {
       box.innerHTML = `<div class="present-preview-idle">🎧 SoundCloud${payload.title ? ": " + escapeHtml(payload.title) : ""} — putar di Layar 2</div>`;
       return;
     }
+    // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4).
+    // TIDAK dibuat pratinjau video hidup di kotak kecil ini (beda dari
+    // YouTube di atas) -- Blob-nya SUDAH dikirim ke Layar 2 lewat
+    // postMessage (lihat wireLocalVideoTab()), membuat pemutar KEDUA di
+    // sini cuma buang-buang memori untuk video yang sama persis.
+    if (payload.type === "localvideo") {
+      box.innerHTML = `<div class="present-preview-idle">🎬 Video Lokal${payload.name ? ": " + escapeHtml(payload.name) : ""} — tayang di Layar 2</div>`;
+      return;
+    }
     if (payload.type === "verse" || payload.type === "text") {
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
@@ -1727,6 +1736,143 @@ const PresentationStudio = (() => {
         setTimeout(() => { btn.textContent = original; }, 1500);
       });
     }
+    wireAnnouncementQuickPhrases_();
+    wireAnnouncementTemplates_();
+  }
+
+  // ------------------------------------------------------------
+  // BARU (7 Sep 2026, permintaan operator) -- baris cepat siap-pakai
+  // (mis. "✅ Bawa Buku") -- SAMA POLA dengan grid ikon (.ps-ann-icon-btn)
+  // di atas: menyisipkan 1 baris teks ke posisi kursor di psAnnBody, TIDAK
+  // menimpa isi yang sudah ada. Daftar tombolnya sendiri cukup diedit
+  // langsung di index.html (elemen [data-ann-quick]) -- tidak perlu
+  // disimpan/dihapus lewat UI karena ini cuma "potongan cepat", beda
+  // dari Template Pengumuman (wireAnnouncementTemplates_ di bawah) yang
+  // memang dirancang untuk ditambah/dihapus bebas oleh operator.
+  // ------------------------------------------------------------
+  function wireAnnouncementQuickPhrases_() {
+    document.querySelectorAll("[data-ann-quick]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const body = el("psAnnBody");
+        if (!body) return;
+        const line = btn.dataset.annQuick || "";
+        body.focus();
+        const start = body.selectionStart ?? body.value.length;
+        const end = body.selectionEnd ?? body.value.length;
+        // Selalu mulai di baris baru kalau kotak isi sudah ada teks
+        // sebelumnya & kursor tidak persis di awal baris kosong --
+        // supaya baris cepat tidak menyambung ke tengah baris lain.
+        const needsNewline = body.value.length > 0 && start > 0 && body.value[start - 1] !== "\n";
+        const insert = (needsNewline ? "\n" : "") + line;
+        if (document.execCommand && document.execCommand("insertText", false, insert)) {
+          // berhasil lewat execCommand -- undo/redo bawaan tetap jalan
+        } else {
+          body.value = body.value.slice(0, start) + insert + body.value.slice(end);
+          const pos = start + insert.length;
+          body.setSelectionRange(pos, pos);
+        }
+      });
+    });
+  }
+
+  // ------------------------------------------------------------
+  // BARU (7 Sep 2026 v2, permintaan operator: "mau di buat bisa dibuka
+  // di beda handphone") -- Template Pengumuman SEKARANG disimpan lewat
+  // mekanisme Kumpulan Ayat yang SUDAH ADA (js/collections.js + js/
+  // sync.js + apps-script/Code.gs) -- BUKAN localStorage terpisah lagi
+  // seperti versi sebelumnya. Semua template masuk ke 1 kumpulan
+  // bernama tetap ANN_TEMPLATE_COLLECTION_NAME di bawah. Karena
+  // Kumpulan Ayat memang SUDAH tersinkron ke Google Sheet per akun
+  // (Sync.pushCollection/pullCollections, lihat js/collections.js),
+  // template ini OTOMATIS ikut muncul di HP/laptop lain -- ASAL:
+  //   1) operator LOGIN dengan akun yang sama di kedua perangkat
+  //      (bukan mode Tamu -- lihat js/guest.js), dan
+  //   2) perangkat kedua sempat menekan sinkron ulang Kumpulan Ayat
+  //      (otomatis saat buka app kalau online, sama seperti kumpulan
+  //      ayat/kidung lain -- lihat refreshCollectionsFromRemote() di
+  //      js/collections.js).
+  // Kalau operator sedang mode Tamu, tetap tersimpan lokal saja di
+  // perangkat itu (localStorage biasa) -- SAMA seperti kumpulan lain
+  // saat Tamu -- baru ikut sinkron begitu login.
+  //
+  //  Item disimpan sebagai {type:"announcement", text, title, tplName}
+  //  -- `tplName` field TAMBAHAN (di luar 3 field standar item
+  //  pengumuman) khusus dipakai daftar ini sebagai label; kode LAIN
+  //  yang membaca kumpulan (mis. renderCollectionList di js/app.js)
+  //  otomatis mengabaikan field yang tidak dikenalnya, jadi aman.
+  // ------------------------------------------------------------
+  const ANN_TEMPLATE_COLLECTION_NAME = "🗂️ Template Pengumuman";
+
+  function _annTplUsername_() {
+    return typeof currentUser !== "undefined" ? currentUser : null;
+  }
+  function _annTplCollection_() {
+    const username = _annTplUsername_();
+    const collections = loadCollections(username);
+    const id = _findCollectionIdByName(collections, ANN_TEMPLATE_COLLECTION_NAME);
+    return { username, id, col: id ? collections[id] : null };
+  }
+  function escapeHtmlAnn_(s) {
+    return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function renderAnnTemplateList_() {
+    const wrap = el("psAnnTemplateList");
+    if (!wrap) return;
+    const { col } = _annTplCollection_();
+    const items = (col && col.items) ? col.items : [];
+    if (!items.length) {
+      wrap.innerHTML = '<p class="present-saved-empty">Belum ada template tersimpan. Ketik judul/isi di atas, beri nama, lalu tekan "💾 Simpan sebagai Template". Login supaya template ikut tersinkron ke HP/laptop lain.</p>';
+      return;
+    }
+    wrap.innerHTML = "";
+    items.forEach((tpl, index) => {
+      if (tpl.type !== "announcement") return; // jaga-jaga isi campuran kalau nama kumpulan kebetulan dipakai manual juga
+      const name = tpl.tplName || tpl.title || (tpl.text || "").slice(0, 30) || "Tanpa nama";
+      const row = document.createElement("div");
+      row.className = "present-saved-row";
+      const previewSrc = tpl.title ? `${tpl.title} — ${tpl.text}` : (tpl.text || "");
+      const preview = previewSrc.length > 60 ? previewSrc.slice(0, 60) + "…" : previewSrc;
+      row.innerHTML = `
+        <span class="present-saved-text" title="${escapeHtmlAnn_(previewSrc)}"><b>${escapeHtmlAnn_(name)}</b> -- ${escapeHtmlAnn_(preview)}</span>
+        <span class="present-saved-actions">
+          <button type="button" class="chip-btn small primary" data-act="send">📤 Tayangkan</button>
+          <button type="button" class="chip-btn small" data-act="load">✏️ Muat</button>
+          <button type="button" class="chip-btn small danger" data-act="del">🗑️</button>
+        </span>`;
+      row.querySelector('[data-act="load"]').addEventListener("click", () => {
+        if (el("psAnnTitle")) el("psAnnTitle").value = tpl.title || "";
+        if (el("psAnnBody")) el("psAnnBody").value = tpl.text || "";
+        if (el("psAnnTemplateName")) el("psAnnTemplateName").value = name;
+      });
+      row.querySelector('[data-act="send"]').addEventListener("click", () => {
+        const full = tpl.title ? `${tpl.title}\n\n${tpl.text}` : tpl.text;
+        post({ type: "text", text: full, align: psAnnAlign_, annTitle: tpl.title || "", annBody: tpl.text || "" });
+      });
+      row.querySelector('[data-act="del"]').addEventListener("click", () => {
+        if (!confirm(`Hapus template "${name}"?`)) return;
+        const { username, id } = _annTplCollection_();
+        if (id) removeItemFromCollection(username, id, index);
+        renderAnnTemplateList_();
+      });
+      wrap.appendChild(row);
+    });
+  }
+  function wireAnnouncementTemplates_() {
+    if (el("psAnnTemplateSaveBtn")) {
+      el("psAnnTemplateSaveBtn").addEventListener("click", () => {
+        const nameEl = el("psAnnTemplateName");
+        const title = (el("psAnnTitle") && el("psAnnTitle").value.trim()) || "";
+        const body = (el("psAnnBody") && el("psAnnBody").value.trim()) || "";
+        let name = (nameEl && nameEl.value.trim()) || "";
+        if (!title && !body) { alert("Isi judul atau isi pengumuman dulu sebelum disimpan sebagai template."); return; }
+        if (!name) name = title || body.slice(0, 30) || "Tanpa nama";
+        const username = _annTplUsername_();
+        addItemToCollection(username, ANN_TEMPLATE_COLLECTION_NAME, { type: "announcement", text: body, title, tplName: name });
+        if (nameEl) nameEl.value = "";
+        renderAnnTemplateList_();
+      });
+    }
+    renderAnnTemplateList_();
   }
 
   // ------------------------------------------------------------
@@ -4248,6 +4394,16 @@ const PresentationStudio = (() => {
     function doShow() {
       const id = extractYoutubeId(input.value);
       if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
+      // BARU (7 Sep 2026, permintaan operator) -- video YouTube TETAP
+      // butuh internet (videonya sendiri ada di server YouTube). Kalau
+      // Studio ini SEDANG offline, beri tahu operator SEKARANG JUGA
+      // (bukan cuma "diam" atau ketahuan belakangan di proyektor) --
+      // rawPost() di bawah TETAP dikirim supaya Layar 2 menampilkan
+      // pesan "Tidak ada koneksi internet" & otomatis memutar sendiri
+      // begitu koneksi kembali (lihat pendingOfflineYoutube_/present.html).
+      if (!navigator.onLine) {
+        alert("📡 Tidak ada koneksi internet di perangkat ini.\n\nVideo YouTube belum bisa diputar sekarang -- Layar 2 akan menampilkan pesan \"Tidak ada koneksi internet\" & OTOMATIS mulai memutar sendiri begitu koneksi kembali, tanpa perlu menekan \"Tampilkan\" ulang.");
+      }
       const embedUrl = buildYoutubeEmbedUrl(id, seekBar.getStartSeconds());
       const bgMode = el("psYtBgMode") && el("psYtBgMode").checked;
       if (bgMode) {
@@ -4277,6 +4433,7 @@ const PresentationStudio = (() => {
     function doPreview() {
       const id = extractYoutubeId(input.value);
       if (!id) { alert("Link YouTube tidak dikenali. Contoh yang didukung:\nhttps://www.youtube.com/watch?v=XXXXXXXXXXX\nhttps://youtu.be/XXXXXXXXXXX"); return; }
+      if (!navigator.onLine) { alert("📡 Tidak ada koneksi internet di perangkat ini -- video YouTube belum bisa dimuat sekarang."); return; }
       const embedUrl = buildYoutubeEmbedUrl(id, seekBar.getStartSeconds());
       stageNext(`▶️ YouTube: ${id}`, embedUrl, () => {
         rawPost({ type: "youtube", embedUrl });
@@ -4995,6 +5152,208 @@ const PresentationStudio = (() => {
     // ditampilkan langsung ikut mode Ulang yang sedang aktif tanpa
     // operator perlu menekan ulang tombol Ulang tiap ganti video.
     window.getYtRepeatMode = () => repeatMode;
+  }
+
+  // ============================================================
+  // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4),
+  // tab "🎬 Video Lokal" (tengah, sebelah "▶️ YouTube"). Lihat catatan
+  // panjang di HTML tab-nya (index.html) untuk gambaran umum. Detail
+  // teknis penting di sini:
+  //
+  // KENAPA "path" (alamat file) TIDAK dipakai langsung:
+  //   Browser (demi keamanan semua pengguna internet) SENGAJA TIDAK
+  //   mengizinkan halaman web membaca sembarang alamat file di komputer
+  //   (mis. "C:\Video\ibadah.mp4") begitu saja -- kalau boleh, sembarang
+  //   situs web bisa diam-diam membaca file pribadi siapa pun yang
+  //   membukanya. Jalan resmi yang paling dekat dengan "pakai path" itu
+  //   adalah File System Access API (showDirectoryPicker) di bawah --
+  //   operator MEMBERI IZIN SEKALI ke SATU folder tertentu, lalu browser
+  //   mengingat izin itu (tidak perlu pilih ulang tiap sesi) & aplikasi
+  //   bisa membaca file APA SAJA di folder itu secepat & seringan
+  //   membaca dari path asli -- BUKAN upload, videonya TIDAK PERNAH
+  //   disalin ke mana pun, cuma "dipinjam" langsung dari disk.
+  //
+  // KENAPA BUKAN "upload": begitu file dipilih (baik lewat folder atau
+  //   satu-satu), Studio TIDAK PERNAH mengirimnya ke server/internet --
+  //   Blob file itu dikirim LANGSUNG dari memori jendela Studio ke
+  //   memori jendela Layar 2 (present.html) lewat postMessage (sama
+  //   mekanisme yang dipakai gambar Latar/dsb, lihat showLocalVideo() di
+  //   present.html) -- makanya TIDAK ADA batas ukuran buatan dari kode,
+  //   & TIDAK butuh internet sama sekali.
+  //
+  // Folder handle (izin akses folder) disimpan ke IndexedDB terpisah
+  // (openLvHandleDb_() di bawah, BUKAN ikut skema LocalDB utama di js/
+  // db.js supaya tidak perlu menaikkan versi skema yang sudah ada --
+  // FileSystemDirectoryHandle sendiri BISA disimpan langsung ke
+  // IndexedDB modern, Chrome mengizinkannya) -- begitu Studio dibuka
+  // lagi lain kali, izin itu otomatis dicoba dipakai lagi tanpa perlu
+  // buka dialog folder ulang (kecuali browser memang minta konfirmasi
+  // ulang, tetap wajar & aman).
+  // ============================================================
+  function wireLocalVideoTab() {
+    const LV_DB_NAME = "bibleAppLocalVideoFolder_v1";
+    const LV_STORE = "handles";
+    const LV_KEY = "folder";
+    let lvFiles = []; // { name, kind: "handle"|"raw", fileHandle?, file? } -- daftar video yang sedang dikenal
+    let lvNowPlayingName = "";
+
+    function openLvHandleDb_() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(LV_DB_NAME, 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore(LV_STORE); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function saveLvFolderHandle_(handle) {
+      try {
+        const db = await openLvHandleDb_();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(LV_STORE, "readwrite");
+          tx.objectStore(LV_STORE).put(handle, LV_KEY);
+          tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+        });
+      } catch (e) { /* IndexedDB tidak mendukung simpan handle (browser lama) -- diam-diam lewati, folder cukup diulang manual tiap sesi */ }
+    }
+    async function loadLvFolderHandle_() {
+      try {
+        const db = await openLvHandleDb_();
+        return await new Promise((resolve) => {
+          const tx = db.transaction(LV_STORE, "readonly");
+          const req = tx.objectStore(LV_STORE).get(LV_KEY);
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => resolve(null);
+        });
+      } catch (e) { return null; }
+    }
+
+    function fmtBytes_(n) {
+      if (!n && n !== 0) return "";
+      const units = ["B", "KB", "MB", "GB"];
+      let i = 0, v = n;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return v.toFixed(v >= 10 || i === 0 ? 0 : 1) + " " + units[i];
+    }
+
+    function setFolderStatus_(text) { if (el("psLvFolderStatus")) el("psLvFolderStatus").textContent = text; }
+    function setNowPlaying_(name) {
+      lvNowPlayingName = name || "";
+      if (el("psLvNowPlaying")) el("psLvNowPlaying").textContent = name ? `🎬 ${name}` : "Belum ada video lokal yang tayang.";
+    }
+
+    async function refreshFolderList_(handle) {
+      lvFiles = [];
+      try {
+        for await (const [name, entry] of handle.entries()) {
+          if (entry.kind !== "file") continue;
+          if (!/\.(mp4|webm|mov|m4v)$/i.test(name)) continue;
+          lvFiles.push({ name, kind: "handle", fileHandle: entry });
+        }
+      } catch (e) {
+        setFolderStatus_("⚠️ Gagal membaca folder (izin mungkin dicabut) -- coba \"📂 Hubungkan Folder Video\" lagi.");
+        return;
+      }
+      lvFiles.sort((a, b) => a.name.localeCompare(b.name, "id"));
+      renderLvList_();
+    }
+
+    async function connectFolder_(promptIfNeeded) {
+      if (!window.showDirectoryPicker) {
+        setFolderStatus_("⚠️ Browser ini tidak mendukung \"Hubungkan Folder\" (fitur khusus Chrome/Edge terbaru di komputer). Pakai \"➕ Pilih File Video\" sebagai gantinya.");
+        return;
+      }
+      try {
+        const handle = await window.showDirectoryPicker({ id: "psLocalVideoFolder", mode: "read" });
+        await saveLvFolderHandle_(handle);
+        setFolderStatus_(`📂 Terhubung ke folder "${handle.name}" -- daftar video di bawah otomatis mengikuti isi folder ini.`);
+        await refreshFolderList_(handle);
+      } catch (e) {
+        if (e && e.name === "AbortError") return; // operator membatalkan dialog, tidak perlu pesan error
+        setFolderStatus_("⚠️ Gagal menghubungkan folder: " + (e && e.message ? e.message : e));
+      }
+    }
+
+    // Dipanggil SEKALI saat Studio dibuka -- coba pakai lagi folder yang
+    // pernah dihubungkan sebelumnya (kalau ada & izinnya masih berlaku)
+    // TANPA menampilkan dialog folder lagi, supaya operator tidak perlu
+    // pilih ulang tiap buka Studio (lihat catatan panjang di atas fungsi
+    // ini untuk kenapa ini dianggap "diingat", bukan "path" mentah).
+    async function tryAutoReconnect_() {
+      const handle = await loadLvFolderHandle_();
+      if (!handle) return;
+      try {
+        let perm = await handle.queryPermission({ mode: "read" });
+        if (perm !== "granted") perm = await handle.requestPermission({ mode: "read" });
+        if (perm !== "granted") {
+          setFolderStatus_(`📂 Folder "${handle.name}" pernah terhubung, tapi izinnya perlu dikonfirmasi ulang -- tekan "📂 Hubungkan Folder Video" untuk mengizinkan lagi.`);
+          return;
+        }
+        setFolderStatus_(`📂 Terhubung ke folder "${handle.name}" (diingat dari sesi sebelumnya) -- daftar video di bawah otomatis mengikuti isi folder ini.`);
+        await refreshFolderList_(handle);
+      } catch (e) { /* handle rusak/tidak valid lagi -- diam-diam biarkan, operator tinggal hubungkan ulang manual */ }
+    }
+
+    function renderLvList_() {
+      const box = el("psLvList");
+      if (!box) return;
+      const q = ((el("psLvSearch") && el("psLvSearch").value) || "").trim().toLowerCase();
+      const filtered = q ? lvFiles.filter((f) => f.name.toLowerCase().includes(q)) : lvFiles;
+      if (!filtered.length) {
+        box.innerHTML = `<p class="present-saved-empty">${lvFiles.length ? "Tidak ada video yang cocok dicari." : "Belum ada video -- hubungkan folder atau pilih file di atas."}</p>`;
+        return;
+      }
+      box.innerHTML = "";
+      filtered.forEach((f) => {
+        const row = document.createElement("div");
+        row.className = "ps-file-row";
+        row.innerHTML = `
+          <span class="ps-file-name" title="${escapeHtml(f.name)}">🎬 ${escapeHtml(f.name)}</span>
+          <span class="ps-file-actions">
+            <button type="button" class="chip-btn small" data-lv-act="show">▶️ Tampilkan</button>
+          </span>`;
+        row.querySelector('[data-lv-act="show"]').addEventListener("click", async () => {
+          const file = f.kind === "handle" ? await f.fileHandle.getFile() : f.file;
+          if (!file) return;
+          rawPost({ type: "localvideo", action: "play", blob: file, name: f.name });
+          renderStudioPreview({ type: "localvideo", name: f.name });
+          setNowPlaying_(f.name);
+        });
+        box.appendChild(row);
+      });
+    }
+
+    if (el("psLvConnectFolderBtn")) el("psLvConnectFolderBtn").addEventListener("click", () => connectFolder_(true));
+    if (el("psLvPickFilesBtn")) el("psLvPickFilesBtn").addEventListener("click", () => { if (el("psLvFileInput")) el("psLvFileInput").click(); });
+    if (el("psLvFileInput")) {
+      el("psLvFileInput").addEventListener("change", (e) => {
+        const picked = Array.from(e.target.files || []).filter((f) => /\.(mp4|webm|mov|m4v)$/i.test(f.name) || f.type.startsWith("video/"));
+        if (!picked.length) return;
+        // File yang dipilih manual DITAMBAHKAN ke daftar (bukan mengganti
+        // isi folder yang mungkin sudah terhubung), supaya keduanya bisa
+        // dipakai bersamaan kalau operator mau.
+        picked.forEach((file) => {
+          const existingIdx = lvFiles.findIndex((f) => f.kind === "raw" && f.name === file.name);
+          if (existingIdx !== -1) lvFiles[existingIdx] = { name: file.name, kind: "raw", file };
+          else lvFiles.push({ name: file.name, kind: "raw", file });
+        });
+        lvFiles.sort((a, b) => a.name.localeCompare(b.name, "id"));
+        renderLvList_();
+        e.target.value = ""; // supaya file yang SAMA bisa dipilih lagi lain kali kalau perlu
+      });
+    }
+    if (el("psLvSearch")) el("psLvSearch").addEventListener("input", renderLvList_);
+    if (el("psLvPlayBtn")) el("psLvPlayBtn").addEventListener("click", () => rawPost({ type: "localvideo_control", action: "play" }));
+    if (el("psLvPauseBtn")) el("psLvPauseBtn").addEventListener("click", () => rawPost({ type: "localvideo_control", action: "pause" }));
+    if (el("psLvStopBtn")) el("psLvStopBtn").addEventListener("click", () => { rawPost({ type: "localvideo", action: "stop" }); setNowPlaying_(""); });
+    let lvMuted_ = false;
+    if (el("psLvMuteBtn")) el("psLvMuteBtn").addEventListener("click", () => {
+      lvMuted_ = !lvMuted_;
+      rawPost({ type: "localvideo_control", action: lvMuted_ ? "mute" : "unmute" });
+      el("psLvMuteBtn").textContent = lvMuted_ ? "🔊 Bunyikan" : "🔇 Mute";
+      el("psLvMuteBtn").classList.toggle("active", lvMuted_);
+    });
+
+    tryAutoReconnect_(); // coba sambung ulang folder yang pernah dipakai, TANPA dialog (lihat catatan panjang di atas)
   }
 
   // ------------------------------------------------------------
@@ -5962,6 +6321,7 @@ const PresentationStudio = (() => {
     wireYoutubeTab();
     wireYtPlaylistTab();
     wireYtControls();
+    wireLocalVideoTab(); // BARU (7 Sep 2026) -- tab "🎬 Video Lokal" (MP4 offline, tanpa upload)
     wireKidungTab();
     wireLinkTab(); // BARU (4 Sep 2026) -- tab "🔗 Link" (Canva & SoundCloud)
     wireAiPresentationTab(); // BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation"
