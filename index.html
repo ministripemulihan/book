@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260907a" />
+<link rel="stylesheet" href="css/style.css?v=20260907b" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -820,13 +820,258 @@
             <button type="button" class="ps-ann-icon-btn" data-icon="🎂" title="Kue tart">🎂</button>
             <button type="button" class="ps-ann-icon-btn" data-icon="🎵" title="Musik">🎵</button>
             <button type="button" class="ps-ann-icon-btn" data-icon="🧊" title="Ice breaking">🧊</button>
-            <div class="ps-ann-icon-group-label">Bendera</div>
-            <button type="button" class="ps-ann-icon-btn" data-icon="🇮🇩" title="Indonesia">🇮🇩</button>
-            <button type="button" class="ps-ann-icon-btn" data-icon="🇸🇬" title="Singapura">🇸🇬</button>
-            <button type="button" class="ps-ann-icon-btn" data-icon="🇲🇾" title="Malaysia">🇲🇾</button>
-            <button type="button" class="ps-ann-icon-btn" data-icon="🇹🇭" title="Thailand">🇹🇭</button>
-            <button type="button" class="ps-ann-icon-btn" data-icon="🇦🇺" title="Australia">🇦🇺</button>
-            <button type="button" class="ps-ann-icon-btn" data-icon="🇺🇸" title="Amerika">🇺🇸</button>
+            <div class="ps-ann-icon-group-label">Bendera (250 negara — ketik di kotak cari kalau kepanjangan)</div>
+            <input type="text" id="psAnnFlagSearch" class="ps-ann-flag-search" placeholder="🔍 Cari negara… (mis. jepang, JP, korea)" />
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇩" title="Andorra (AD)">🇦🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇪" title="Uni Emirat Arab (AE)">🇦🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇫" title="Afghanistan (AF)">🇦🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇬" title="Antigua dan Barbuda (AG)">🇦🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇮" title="Anguilla (AI)">🇦🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇱" title="Albania (AL)">🇦🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇲" title="Armenia (AM)">🇦🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇴" title="Angola (AO)">🇦🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇶" title="Antarktika (AQ)">🇦🇶</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇷" title="Argentina (AR)">🇦🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇸" title="Samoa Amerika (AS)">🇦🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇹" title="Austria (AT)">🇦🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇺" title="Australia (AU)">🇦🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇼" title="Aruba (AW)">🇦🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇽" title="Kepulauan Aland (AX)">🇦🇽</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇦🇿" title="Azerbaijan (AZ)">🇦🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇦" title="Bosnia dan Herzegovina (BA)">🇧🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇧" title="Barbados (BB)">🇧🇧</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇩" title="Bangladesh (BD)">🇧🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇪" title="Belgia (BE)">🇧🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇫" title="Burkina Faso (BF)">🇧🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇬" title="Bulgaria (BG)">🇧🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇭" title="Bahrain (BH)">🇧🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇮" title="Burundi (BI)">🇧🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇯" title="Benin (BJ)">🇧🇯</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇱" title="Saint Barthelemy (BL)">🇧🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇲" title="Bermuda (BM)">🇧🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇳" title="Brunei Darussalam (BN)">🇧🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇴" title="Bolivia (BO)">🇧🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇶" title="Bonaire (BQ)">🇧🇶</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇷" title="Brasil (BR)">🇧🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇸" title="Bahama (BS)">🇧🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇹" title="Bhutan (BT)">🇧🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇻" title="Pulau Bouvet (BV)">🇧🇻</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇼" title="Botswana (BW)">🇧🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇾" title="Belarus (BY)">🇧🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇧🇿" title="Belize (BZ)">🇧🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇦" title="Kanada (CA)">🇨🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇨" title="Kepulauan Cocos (CC)">🇨🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇩" title="Kongo (Kinshasa) (CD)">🇨🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇫" title="Republik Afrika Tengah (CF)">🇨🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇬" title="Kongo (Brazzaville) (CG)">🇨🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇭" title="Swiss (CH)">🇨🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇮" title="Pantai Gading (CI)">🇨🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇰" title="Kepulauan Cook (CK)">🇨🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇱" title="Chili (CL)">🇨🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇲" title="Kamerun (CM)">🇨🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇳" title="Tiongkok (CN)">🇨🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇴" title="Kolombia (CO)">🇨🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇷" title="Kosta Rika (CR)">🇨🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇺" title="Kuba (CU)">🇨🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇻" title="Tanjung Verde (CV)">🇨🇻</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇼" title="Curacao (CW)">🇨🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇽" title="Pulau Christmas (CX)">🇨🇽</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇾" title="Siprus (CY)">🇨🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇨🇿" title="Ceko (CZ)">🇨🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇩🇪" title="Jerman (DE)">🇩🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇩🇯" title="Djibouti (DJ)">🇩🇯</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇩🇰" title="Denmark (DK)">🇩🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇩🇲" title="Dominika (DM)">🇩🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇩🇴" title="Republik Dominika (DO)">🇩🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇩🇿" title="Aljazair (DZ)">🇩🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇨" title="Ekuador (EC)">🇪🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇪" title="Estonia (EE)">🇪🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇬" title="Mesir (EG)">🇪🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇭" title="Sahara Barat (EH)">🇪🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇷" title="Eritrea (ER)">🇪🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇸" title="Spanyol (ES)">🇪🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇹" title="Etiopia (ET)">🇪🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇪🇺" title="Uni Eropa (EU)">🇪🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇫🇮" title="Finlandia (FI)">🇫🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇫🇯" title="Fiji (FJ)">🇫🇯</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇫🇰" title="Kepulauan Falkland (FK)">🇫🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇫🇲" title="Mikronesia (FM)">🇫🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇫🇴" title="Kepulauan Faroe (FO)">🇫🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇫🇷" title="Prancis (FR)">🇫🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇦" title="Gabon (GA)">🇬🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇧" title="Inggris Raya (GB)">🇬🇧</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇩" title="Grenada (GD)">🇬🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇪" title="Georgia (GE)">🇬🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇫" title="Guyana Prancis (GF)">🇬🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇬" title="Guernsey (GG)">🇬🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇭" title="Ghana (GH)">🇬🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇮" title="Gibraltar (GI)">🇬🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇱" title="Greenland (GL)">🇬🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇲" title="Gambia (GM)">🇬🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇳" title="Guinea (GN)">🇬🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇵" title="Guadeloupe (GP)">🇬🇵</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇶" title="Guinea Khatulistiwa (GQ)">🇬🇶</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇷" title="Yunani (GR)">🇬🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇸" title="Georgia Selatan (GS)">🇬🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇹" title="Guatemala (GT)">🇬🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇺" title="Guam (GU)">🇬🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇼" title="Guinea-Bissau (GW)">🇬🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇬🇾" title="Guyana (GY)">🇬🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇭🇰" title="Hong Kong (HK)">🇭🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇭🇲" title="Pulau Heard (HM)">🇭🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇭🇳" title="Honduras (HN)">🇭🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇭🇷" title="Kroasia (HR)">🇭🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇭🇹" title="Haiti (HT)">🇭🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇭🇺" title="Hungaria (HU)">🇭🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇩" title="Indonesia (ID)">🇮🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇪" title="Irlandia (IE)">🇮🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇱" title="Israel (IL)">🇮🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇲" title="Isle of Man (IM)">🇮🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇳" title="India (IN)">🇮🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇴" title="Teritori Samudra Hindia Britania (IO)">🇮🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇶" title="Irak (IQ)">🇮🇶</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇷" title="Iran (IR)">🇮🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇸" title="Islandia (IS)">🇮🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇮🇹" title="Italia (IT)">🇮🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇯🇪" title="Jersey (JE)">🇯🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇯🇲" title="Jamaika (JM)">🇯🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇯🇴" title="Yordania (JO)">🇯🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇯🇵" title="Jepang (JP)">🇯🇵</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇪" title="Kenya (KE)">🇰🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇬" title="Kirgistan (KG)">🇰🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇭" title="Kamboja (KH)">🇰🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇮" title="Kiribati (KI)">🇰🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇲" title="Komoro (KM)">🇰🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇳" title="Saint Kitts dan Nevis (KN)">🇰🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇵" title="Korea Utara (KP)">🇰🇵</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇷" title="Korea Selatan (KR)">🇰🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇼" title="Kuwait (KW)">🇰🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇾" title="Kepulauan Cayman (KY)">🇰🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇰🇿" title="Kazakhstan (KZ)">🇰🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇦" title="Laos (LA)">🇱🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇧" title="Lebanon (LB)">🇱🇧</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇨" title="Saint Lucia (LC)">🇱🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇮" title="Liechtenstein (LI)">🇱🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇰" title="Sri Lanka (LK)">🇱🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇷" title="Liberia (LR)">🇱🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇸" title="Lesotho (LS)">🇱🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇹" title="Lituania (LT)">🇱🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇺" title="Luksemburg (LU)">🇱🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇻" title="Latvia (LV)">🇱🇻</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇱🇾" title="Libya (LY)">🇱🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇦" title="Maroko (MA)">🇲🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇨" title="Monako (MC)">🇲🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇩" title="Moldova (MD)">🇲🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇪" title="Montenegro (ME)">🇲🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇫" title="Saint Martin (MF)">🇲🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇬" title="Madagaskar (MG)">🇲🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇭" title="Kepulauan Marshall (MH)">🇲🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇰" title="Makedonia Utara (MK)">🇲🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇱" title="Mali (ML)">🇲🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇲" title="Myanmar (MM)">🇲🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇳" title="Mongolia (MN)">🇲🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇴" title="Makau (MO)">🇲🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇵" title="Kepulauan Mariana Utara (MP)">🇲🇵</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇶" title="Martinik (MQ)">🇲🇶</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇷" title="Mauritania (MR)">🇲🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇸" title="Montserrat (MS)">🇲🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇹" title="Malta (MT)">🇲🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇺" title="Mauritius (MU)">🇲🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇻" title="Maladewa (MV)">🇲🇻</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇼" title="Malawi (MW)">🇲🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇽" title="Meksiko (MX)">🇲🇽</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇾" title="Malaysia (MY)">🇲🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇲🇿" title="Mozambik (MZ)">🇲🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇦" title="Namibia (NA)">🇳🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇨" title="Kaledonia Baru (NC)">🇳🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇪" title="Niger (NE)">🇳🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇫" title="Pulau Norfolk (NF)">🇳🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇬" title="Nigeria (NG)">🇳🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇮" title="Nikaragua (NI)">🇳🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇱" title="Belanda (NL)">🇳🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇴" title="Norwegia (NO)">🇳🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇵" title="Nepal (NP)">🇳🇵</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇷" title="Nauru (NR)">🇳🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇺" title="Niue (NU)">🇳🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇳🇿" title="Selandia Baru (NZ)">🇳🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇴🇲" title="Oman (OM)">🇴🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇦" title="Panama (PA)">🇵🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇪" title="Peru (PE)">🇵🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇫" title="Polinesia Prancis (PF)">🇵🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇬" title="Papua Nugini (PG)">🇵🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇭" title="Filipina (PH)">🇵🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇰" title="Pakistan (PK)">🇵🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇱" title="Polandia (PL)">🇵🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇲" title="Saint Pierre dan Miquelon (PM)">🇵🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇳" title="Kepulauan Pitcairn (PN)">🇵🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇷" title="Puerto Riko (PR)">🇵🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇸" title="Palestina (PS)">🇵🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇹" title="Portugal (PT)">🇵🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇼" title="Palau (PW)">🇵🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇵🇾" title="Paraguay (PY)">🇵🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇶🇦" title="Qatar (QA)">🇶🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇷🇪" title="Reunion (RE)">🇷🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇷🇴" title="Rumania (RO)">🇷🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇷🇸" title="Serbia (RS)">🇷🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇷🇺" title="Rusia (RU)">🇷🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇷🇼" title="Rwanda (RW)">🇷🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇦" title="Arab Saudi (SA)">🇸🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇧" title="Kepulauan Solomon (SB)">🇸🇧</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇨" title="Seychelles (SC)">🇸🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇩" title="Sudan (SD)">🇸🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇪" title="Swedia (SE)">🇸🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇬" title="Singapura (SG)">🇸🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇭" title="Saint Helena (SH)">🇸🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇮" title="Slovenia (SI)">🇸🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇯" title="Svalbard dan Jan Mayen (SJ)">🇸🇯</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇰" title="Slowakia (SK)">🇸🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇱" title="Sierra Leone (SL)">🇸🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇲" title="San Marino (SM)">🇸🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇳" title="Senegal (SN)">🇸🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇴" title="Somalia (SO)">🇸🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇷" title="Suriname (SR)">🇸🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇸" title="Sudan Selatan (SS)">🇸🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇹" title="Sao Tome dan Principe (ST)">🇸🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇻" title="El Salvador (SV)">🇸🇻</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇽" title="Sint Maarten (SX)">🇸🇽</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇾" title="Suriah (SY)">🇸🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇸🇿" title="Eswatini (SZ)">🇸🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇨" title="Kepulauan Turks dan Caicos (TC)">🇹🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇩" title="Chad (TD)">🇹🇩</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇫" title="Teritori Selatan Prancis (TF)">🇹🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇬" title="Togo (TG)">🇹🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇭" title="Thailand (TH)">🇹🇭</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇯" title="Tajikistan (TJ)">🇹🇯</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇰" title="Tokelau (TK)">🇹🇰</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇱" title="Timor Leste (TL)">🇹🇱</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇲" title="Turkmenistan (TM)">🇹🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇳" title="Tunisia (TN)">🇹🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇴" title="Tonga (TO)">🇹🇴</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇷" title="Turki (TR)">🇹🇷</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇹" title="Trinidad dan Tobago (TT)">🇹🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇻" title="Tuvalu (TV)">🇹🇻</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇼" title="Taiwan (TW)">🇹🇼</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇹🇿" title="Tanzania (TZ)">🇹🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇺🇦" title="Ukraina (UA)">🇺🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇺🇬" title="Uganda (UG)">🇺🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇺🇳" title="PBB (UN)">🇺🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇺🇸" title="Amerika Serikat (US)">🇺🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇺🇾" title="Uruguay (UY)">🇺🇾</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇺🇿" title="Uzbekistan (UZ)">🇺🇿</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇦" title="Vatikan (VA)">🇻🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇨" title="Saint Vincent dan Grenadines (VC)">🇻🇨</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇪" title="Venezuela (VE)">🇻🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇬" title="Kepulauan Virgin Britania (VG)">🇻🇬</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇮" title="Kepulauan Virgin AS (VI)">🇻🇮</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇳" title="Vietnam (VN)">🇻🇳</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇻🇺" title="Vanuatu (VU)">🇻🇺</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇼🇫" title="Wallis dan Futuna (WF)">🇼🇫</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇼🇸" title="Samoa (WS)">🇼🇸</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇾🇪" title="Yaman (YE)">🇾🇪</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇾🇹" title="Mayotte (YT)">🇾🇹</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇿🇦" title="Afrika Selatan (ZA)">🇿🇦</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇿🇲" title="Zambia (ZM)">🇿🇲</button>
+            <button type="button" class="ps-ann-icon-btn ps-flag-btn" data-icon="🇿🇼" title="Zimbabwe (ZW)">🇿🇼</button>
             <div class="ps-ann-icon-group-label">Hewan</div>
             <button type="button" class="ps-ann-icon-btn" data-icon="🐶" title="Anjing">🐶</button>
             <button type="button" class="ps-ann-icon-btn" data-icon="🐱" title="Kucing">🐱</button>
@@ -870,6 +1115,26 @@
             <button type="button" class="chip-btn small" data-mode="pulse">💓 Berdenyut</button>
           </div>
           <p class="announcement-compose-hint" style="margin:4px 0 0;">"Diam" = tetap di tempat, tidak bergerak. "Berjalan" = geser kanan → kiri (marquee). "Berdenyut" = tetap di tempat, tapi ukurannya membesar-mengecil berulang (100% ↔ 150%) supaya menarik perhatian, sampai pesan ditutup/diganti.</p>
+          <!-- BARU (7 Sep 2026 v3, permintaan operator "terlalu cepat") --
+               pilihan kecepatan KHUSUS mode "➡️ Berjalan" + info +
+               progress bar 1 putaran (disimulasikan LOKAL di Studio,
+               disinkronkan ke saat pesan mulai/berganti dikirim -- lihat
+               startScrollProgress_() di js/presentation-studio.js).
+               Formula lama (bagi 8, minimal 8 detik) SEKARANG naik jadi
+               minimal 12/18 detik ("Sedang"/"Lambat") supaya cukup lama
+               dibaca di layar proyektor yang jauh lebih lebar dari
+               jendela pratinjau Studio -- lihat catatan panjang di
+               applyTicker() (present.html). -->
+          <div id="psMsgSpeedOptions" hidden style="margin-top:8px;">
+            <div class="ps-field-label">Kecepatan berjalan</div>
+            <div class="ps-btn-row" id="psMsgSpeedRow">
+              <button type="button" class="chip-btn small" data-speed-s="18">🐢 Lambat</button>
+              <button type="button" class="chip-btn small active" data-speed-s="12">Sedang</button>
+              <button type="button" class="chip-btn small" data-speed-s="7">🐇 Cepat</button>
+            </div>
+            <div class="ps-pointer-hint" id="psMsgSpeedInfo">Lama 1 putaran penuh: ~12 detik.</div>
+            <div class="ps-scroll-progress-track"><div class="ps-scroll-progress-fill" id="psMsgSpeedProgress"></div></div>
+          </div>
           <div id="psMsgPulseOptions" hidden style="margin-top:8px;">
             <div class="ps-field-label">Kecepatan denyut (1 putaran)</div>
             <div class="ps-btn-row" id="psMsgPulseSpeedRow">
@@ -882,16 +1147,30 @@
               <button type="button" id="psMsgPulseCustomBtn" class="chip-btn small">Pakai</button>
             </div>
           </div>
+          <!-- BARU (7 Sep 2026 v3, permintaan operator) -- A+/A- KHUSUS
+               ukuran huruf 💬 Pesan (terpisah dari A+/A- ayat/kidung/
+               pengumuman biasa di tab "🎨 Tampilan") -- lihat
+               --p-msg-scale (present.html) & wireMessage() (js/
+               presentation-studio.js). -->
+          <div class="ps-field-label" style="margin-top:8px;">Ukuran huruf pesan</div>
+          <div class="ps-btn-row" style="align-items:center;">
+            <button type="button" id="psMsgScaleDec" class="chip-btn small" title="Perkecil huruf pesan">A-</button>
+            <span id="psMsgScaleValue" class="ps-pen-size-value">100%</span>
+            <button type="button" id="psMsgScaleInc" class="chip-btn small" title="Perbesar huruf pesan">A+</button>
+          </div>
           <div class="ps-field-label">Warna teks</div>
           <div class="ps-color-row" id="psMsgColorRow">
             <button type="button" class="ps-color-chip active" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
             <button type="button" class="ps-color-chip" data-color="#111111" style="background:#111111" title="Hitam"></button>
+            <button type="button" class="ps-color-chip" data-color="#e9c977" style="background:#e9c977" title="24K"></button>
             <button type="button" class="ps-color-chip" data-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
             <button type="button" class="ps-color-chip" data-color="#a8e6b0" style="background:#a8e6b0" title="Hijau pastel"></button>
             <button type="button" class="ps-color-chip" data-color="#a9d4f5" style="background:#a9d4f5" title="Biru pastel"></button>
             <button type="button" class="ps-color-chip" data-color="#e74c3c" style="background:#e74c3c" title="Merah"></button>
             <button type="button" class="ps-color-chip" data-color="#f5b7d0" style="background:#f5b7d0" title="Merah muda pastel"></button>
+            <input type="color" id="psMsgColorCustom" value="#ffffff" class="ps-color-input" title="Warna bebas" />
           </div>
+          <p class="announcement-compose-hint" style="margin:2px 0 0;">👆 Warna TULISAN (isi) pesan ini -- warna STROKE/kontur di sekelilingnya diatur terpisah tepat di bawah ini.</p>
           <!-- BARU (7 Sep 2026, permintaan operator) -- kontur/stroke tebal
                di sekeliling huruf, supaya warna apa pun (termasuk Merah)
                tetap kelihatan jelas di latar apa pun. Lebar stroke bisa
@@ -905,8 +1184,11 @@
             <div class="ps-color-row" id="psMsgStrokeColorRow">
               <button type="button" class="ps-color-chip active" data-color="#ffffff" style="background:#ffffff" title="Putih"></button>
               <button type="button" class="ps-color-chip" data-color="#111111" style="background:#111111" title="Hitam"></button>
+              <button type="button" class="ps-color-chip" data-color="#e9c977" style="background:#e9c977" title="24K"></button>
               <button type="button" class="ps-color-chip" data-color="#e74c3c" style="background:#e74c3c" title="Merah"></button>
+              <input type="color" id="psMsgStrokeColorCustom" value="#ffffff" class="ps-color-input" title="Warna bebas" />
             </div>
+            <p class="announcement-compose-hint" style="margin:2px 0 0;">👆 Warna STROKE/kontur (pinggiran) di sekeliling huruf -- minimal Putih/Hitam supaya kontras di latar apa pun, boleh warna lain juga.</p>
             <div class="ps-field-label" style="margin-top:8px;">Tebal stroke</div>
             <div class="ps-btn-row" id="psMsgStrokeWidthRow">
               <button type="button" class="chip-btn small" data-stroke-w="1">Tipis</button>
@@ -1015,6 +1297,45 @@
               <button type="button" class="chip-btn small" data-timerclock-color="#111111">⚫ Hitam</button>
               <button type="button" class="chip-btn small" data-timerclock-color="#ffe000">🟨 Kuning</button>
               <input type="color" id="psTimerClockColorCustom" value="#e9c977" title="Warna bebas" />
+            </div>
+            <!-- BARU (7 Sep 2026 v3, permintaan operator) -- WARNA STROKE
+                 (kontur pinggiran) angka Jam Target, TERPISAH dari warna
+                 isi angka di atas -- supaya tetap jelas kalau warna
+                 angka kebetulan mirip warna latar (mis. angka Kuning di
+                 atas latar krem). "Tanpa" = tidak ada kontur sama sekali
+                 (bawaan lama). Lihat --p-timerclock-stroke (present.html)
+                 & wireTimerClockColor() (js/presentation-studio.js). -->
+            <div class="ps-field-label" style="margin-top:6px;">Warna stroke angka</div>
+            <div class="ps-btn-row" id="psTimerClockStrokeRow">
+              <button type="button" class="chip-btn small active" data-timerclock-stroke="">Tanpa</button>
+              <button type="button" class="chip-btn small" data-timerclock-stroke="#ffffff">⚪ Putih</button>
+              <button type="button" class="chip-btn small" data-timerclock-stroke="#111111">⚫ Hitam</button>
+              <button type="button" class="chip-btn small" data-timerclock-stroke="#e9c977">🟡 24K</button>
+              <input type="color" id="psTimerClockStrokeCustom" value="#000000" title="Warna bebas" />
+            </div>
+            <div class="ps-btn-row" id="psTimerClockStrokeWidthRow" style="margin-top:4px;">
+              <button type="button" class="chip-btn small" data-timerclock-stroke-w="2">Tipis</button>
+              <button type="button" class="chip-btn small active" data-timerclock-stroke-w="3">Sedang</button>
+              <button type="button" class="chip-btn small" data-timerclock-stroke-w="5">Tebal</button>
+            </div>
+            <!-- BARU (7 Sep 2026, permintaan operator) -- 9 posisi siap-
+                 pakai untuk kotak Jam Target di Layar 2 (dipilih supaya
+                 lebih stabil/pasti daripada seret-bebas), mis. supaya
+                 tidak menutupi bagian tertentu dari 🖼️ Latar Gambar.
+                 "⏺️ Tengah" = bawaan (persis di tengah layar). Lihat
+                 wireTimerClockPosition_() (js/presentation-studio.js) &
+                 --p-timerclock-pos-* / .tc-pos-* (present.html). -->
+            <div class="ps-field-label" style="margin-top:6px;">Posisi di Layar</div>
+            <div class="ps-timerclock-pos-grid" id="psTimerClockPosGrid">
+              <button type="button" class="chip-btn small" data-timerclock-pos="top-left" title="Kiri Atas">↖️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="top" title="Atas Tengah">⬆️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="top-right" title="Kanan Atas">↗️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="left" title="Kiri Tengah">⬅️</button>
+              <button type="button" class="chip-btn small active" data-timerclock-pos="center" title="Tengah (bawaan)">⏺️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="right" title="Kanan Tengah">➡️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="bottom-left" title="Kiri Bawah">↙️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="bottom" title="Bawah Tengah">⬇️</button>
+              <button type="button" class="chip-btn small" data-timerclock-pos="bottom-right" title="Kanan Bawah">↘️</button>
             </div>
           </div>
           <div class="ps-timer-label-preview" id="psTimerLabelPreview">Sesi Bagi Nikmat</div>
@@ -1683,7 +2004,27 @@
           </div>
           <div class="ps-pointer-hint">Unggah 1 gambar lalu tekan "Pakai sebagai Latar" untuk menayangkannya di belakang ayat/kidung/pengumuman -- tidak perlu izin kamera, langsung tayang.</div>
 
-          <div class="ps-field-label" style="margin-top:20px;">Gaya tulisan saat Kamera/Gambar Latar aktif</div>
+          <!-- PERBAIKAN (7 Sep 2026 v4, permintaan operator "satu tempat
+               saja") -- panel ini SEBELUMNYA judulnya "Gaya tulisan saat
+               Kamera/Gambar Latar aktif", kesannya cuma berlaku selagi
+               Kamera/Gambar Latar dipakai -- padahal SECARA KODE (lihat
+               applyCamTextStyle(), present.html) warna+stroke di sini
+               SELALU berlaku untuk teks Ayat/Kidung/Pengumuman, dengan
+               ATAU TANPA Kamera/Gambar Latar aktif. Sekarang DIGABUNG di
+               1 tempat ini juga: Ukuran huruf (A-/A+) -- SEBELUMNYA
+               cuma ada di tab "🎨 Tampilan" & pojok kanan-atas, sekarang
+               ditambahkan di sini juga (3 tempat itu SATU sumber data
+               yang sama -- psFontScale -- ubah di mana saja, semuanya
+               ikut berubah, lihat applyScale()/js/presentation-studio.js). -->
+          <div class="ps-field-label" style="margin-top:20px;">🎨 Warna, Stroke & Ukuran Huruf -- Ayat/Kidung/Pengumuman</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Berlaku SELALU untuk tulisan Ayat Alkitab, Kidung, & Pengumuman -- baik Kamera/Gambar Latar sedang aktif atau tidak. (Pesan 💬 berjalan/diam/berdenyut punya warna, stroke, & ukuran huruf SENDIRI, terpisah -- diatur di tab "💬 Pesan".)</p>
+          <div class="ps-field-label" style="margin-top:10px;">Ukuran huruf</div>
+          <div class="ps-btn-row" style="align-items:center;">
+            <button type="button" id="psFontDecCam" class="chip-btn small" title="Perkecil huruf">A-</button>
+            <span id="psFontScaleValueCam" class="ps-pen-size-value">100%</span>
+            <button type="button" id="psFontIncCam" class="chip-btn small" title="Perbesar huruf">A+</button>
+          </div>
+          <div class="ps-field-label" style="margin-top:14px;">Warna tulisan & stroke (kontur)</div>
           <div class="ps-btn-row">
             <button type="button" class="chip-btn small active" data-ps-cam-text="white-black">⬜ Putih + Border Hitam</button>
             <button type="button" class="chip-btn small" data-ps-cam-text="black-white">⬛ Hitam + Border Putih</button>
@@ -1700,19 +2041,19 @@
               <input type="color" id="psCamInkColor" value="#ffffff" class="ps-color-input" />
             </div>
             <div style="flex:1;">
-              <div class="ps-pen-size-label" style="display:block; margin-bottom:4px;">Warna Border (bebas)</div>
+              <div class="ps-pen-size-label" style="display:block; margin-bottom:4px;">Warna Border/Stroke (bebas)</div>
               <input type="color" id="psCamOutlineColor" value="#000000" class="ps-color-input" />
             </div>
           </div>
 
-          <div class="ps-field-label" style="margin-top:14px;">Ketebalan Border</div>
+          <div class="ps-field-label" style="margin-top:14px;">Ketebalan Border/Stroke</div>
           <div class="ps-pen-size-row">
             <span class="ps-pen-size-label" title="Tipis">•</span>
             <input type="range" id="psCamOutlineSlider" min="1" max="8" step="1" value="3" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Tebal">●</span>
             <span id="psCamOutlineValue" class="ps-pen-size-value">3px</span>
           </div>
-          <div class="ps-pointer-hint">Latar (Kamera/Gambar) & gaya tulisan ini otomatis tersembunyi saat "⬛ Hitam" / "◆ Logo" / slide file / video YouTube sedang tayang -- muncul lagi otomatis saat kembali ke ayat/kidung/pengumuman. Ukuran huruf (A-/A+), spasi baris, dan lebar kotak teks diatur di tab "🎨 Tampilan".</div>
+          <div class="ps-pointer-hint">Latar (Kamera/Gambar) tetap otomatis tersembunyi saat "⬛ Hitam" / "◆ Logo" / slide file / video YouTube sedang tayang -- warna/stroke/ukuran huruf di atas TETAP berlaku (tidak ikut hilang). Spasi baris & lebar kotak teks masih di tab "🎨 Tampilan".</div>
         </div>
       </div>
     </div>
@@ -1747,7 +2088,7 @@
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
   <script src="js/presentation.js?v=20260907b"></script>
-  <script src="js/presentation-studio.js?v=20260907c"></script>
+  <script src="js/presentation-studio.js?v=20260907d"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260907a"></script>
