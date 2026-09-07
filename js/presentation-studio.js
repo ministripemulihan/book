@@ -124,6 +124,24 @@ const PresentationStudio = (() => {
   let msgColor = "#ffffff";
   let msgPos = "top";
   let msgRunning = false;
+  // BARU (7 Sep 2026, permintaan operator) -- stroke/kontur huruf & jenis
+  // font untuk tab "💬 Pesan", lihat wireMessage() di bawah.
+  let msgStrokeOn = false;
+  let msgStrokeColor = "#ffffff";
+  let msgStrokeWidth = 2;
+  let msgFont = "'Inter', Arial, sans-serif";
+  // BARU (7 Sep 2026 v2, permintaan operator) -- mode tampil pesan:
+  //   "static" -- diam total (bawaan)
+  //   "scroll" -- geser kanan->kiri (marquee lama, gantikan checkbox
+  //               "Berjalan" yang sebelumnya berdiri sendiri)
+  //   "pulse"  -- diam DI TEMPAT tapi ukurannya berdenyut 100% <-> 150%
+  //               berulang terus sampai pesan ditutup/diganti.
+  let msgMode = "static";
+  let msgPulseSeconds = 2;
+  // Border di sekeliling LATAR/BACKGROUND bar pesan (checklist warna) --
+  // "" berarti tanpa border sama sekali.
+  let msgBorderColor = "";
+  let msgBorderWidth = 4;
 
   // (BARU 6 Sep 2026 -- boolean timerRunning lama digantikan timerState_,
   // dideklarasikan sendiri di dekat fmtMMSS() di bawah, supaya berdekatan
@@ -1635,14 +1653,126 @@ const PresentationStudio = (() => {
       if (!msgRunning) return;
       const text = (el("psMsgText") && el("psMsgText").value.trim()) || "";
       if (!text) return;
-      const scroll = !!(el("psMsgRunning") && el("psMsgRunning").checked);
+      // "scroll" (lama, dipakai present.html) sekarang diturunkan dari
+      // msgMode supaya tetap kompatibel: mode "scroll" => scroll=true,
+      // mode "static"/"pulse" => scroll=false (keduanya diam di tempat,
+      // "pulse" membedakan dirinya lewat field `mode`/`pulseSeconds`
+      // terpisah di bawah, dibaca applyTicker() di present.html).
+      const scroll = msgMode === "scroll";
       const payloadType = msgPos === "top" ? "warta" : msgPos === "bottom" ? "footnote" : "msgmid";
       // Sembunyikan dulu SEMUA posisi (jaga-jaga kalau operator baru saja
       // memindah posisi selagi pesan tayang) supaya tidak ada 2 bar
       // nyangkut tampil bersamaan, baru tampilkan di posisi yang benar.
       hideAllMessageBars_();
-      rawPost({ type: payloadType, show: true, text, scroll, color: msgColor });
+      rawPost({
+        type: payloadType, show: true, text, scroll, color: msgColor,
+        // BARU (7 Sep 2026) -- font & stroke/kontur huruf, lihat
+        // applyTicker() di present.html.
+        fontFamily: msgFont,
+        stroke: msgStrokeOn ? msgStrokeColor : "",
+        strokeWidth: msgStrokeWidth,
+        // BARU (7 Sep 2026 v2) -- mode "pulse" (membesar 100%<->150%
+        // berulang, posisi tetap) & border latar bar pesan.
+        mode: msgMode,
+        pulseSeconds: msgPulseSeconds,
+        borderColor: msgBorderColor,
+        borderWidth: msgBorderWidth,
+      });
     }
+    // PERBAIKAN (7 Sep 2026, laporan operator "sudah ganti teks tapi tidak
+    // ikut berubah di Layar 2") -- SEBELUMNYA mengetik ulang teks pesan
+    // SAAT sedang tayang tidak pernah mengirim ulang apa pun (cuma tombol
+    // warna/posisi yang memanggil sendMessageNow_()) -- operator harus
+    // klik warna/posisi lagi (walau sudah benar) hanya supaya teks
+    // terbaru ikut terkirim. Sekarang tiap ketikan (debounce ringan)
+    // langsung ikut mengirim ulang, kalau pesan sedang tayang.
+    let msgInputDebounce_ = null;
+    if (el("psMsgText")) {
+      el("psMsgText").addEventListener("input", () => {
+        if (msgInputDebounce_) clearTimeout(msgInputDebounce_);
+        msgInputDebounce_ = setTimeout(sendMessageNow_, 250);
+      });
+    }
+    // BARU (7 Sep 2026 v2) -- baris "Mode tampil" (Diam/Berjalan/Berdenyut)
+    // menggantikan checkbox "Berjalan" tunggal yang lama. Klik salah satu
+    // langsung berubah live di Layar 2 kalau pesan sedang tayang, dan
+    // menampilkan/menyembunyikan opsi kecepatan denyut sesuai mode.
+    document.querySelectorAll("#psMsgModeRow [data-mode]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgModeRow [data-mode]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgMode = btn.dataset.mode;
+        if (el("psMsgPulseOptions")) el("psMsgPulseOptions").hidden = msgMode !== "pulse";
+        sendMessageNow_();
+      });
+    });
+    document.querySelectorAll("#psMsgPulseSpeedRow [data-pulse-s]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgPulseSpeedRow [data-pulse-s]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgPulseSeconds = Number(btn.dataset.pulseS) || 2;
+        if (el("psMsgPulseCustom")) el("psMsgPulseCustom").value = "";
+        sendMessageNow_();
+      });
+    });
+    if (el("psMsgPulseCustomBtn")) {
+      el("psMsgPulseCustomBtn").addEventListener("click", () => {
+        const v = Number(el("psMsgPulseCustom") && el("psMsgPulseCustom").value);
+        if (!v || v <= 0) return;
+        msgPulseSeconds = v;
+        document.querySelectorAll("#psMsgPulseSpeedRow [data-pulse-s]").forEach((b) => b.classList.remove("active"));
+        sendMessageNow_();
+      });
+    }
+    // BARU (7 Sep 2026 v2) -- checklist border latar bar pesan (Tanpa/
+    // Merah/Putih/Biru) -- 1 aktif pada satu waktu (dipilih lewat class
+    // "active", sama pola seperti Warna Teks/Posisi di atas).
+    document.querySelectorAll("#psMsgBorderRow [data-border]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgBorderRow [data-border]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgBorderColor = btn.dataset.border;
+        if (el("psMsgBorderWidthWrap")) el("psMsgBorderWidthWrap").hidden = !msgBorderColor;
+        sendMessageNow_();
+      });
+    });
+    document.querySelectorAll("#psMsgBorderWidthRow [data-border-w]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgBorderWidthRow [data-border-w]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgBorderWidth = Number(btn.dataset.borderW) || 4;
+        sendMessageNow_();
+      });
+    });
+    if (el("psMsgFont")) {
+      el("psMsgFont").addEventListener("change", () => {
+        msgFont = el("psMsgFont").value;
+        sendMessageNow_();
+      });
+    }
+    if (el("psMsgStroke")) {
+      el("psMsgStroke").addEventListener("change", () => {
+        msgStrokeOn = el("psMsgStroke").checked;
+        if (el("psMsgStrokeOptions")) el("psMsgStrokeOptions").hidden = !msgStrokeOn;
+        sendMessageNow_();
+      });
+    }
+    document.querySelectorAll("#psMsgStrokeColorRow .ps-color-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgStrokeColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        msgStrokeColor = chip.dataset.color;
+        sendMessageNow_();
+      });
+    });
+    document.querySelectorAll("#psMsgStrokeWidthRow [data-stroke-w]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgStrokeWidthRow [data-stroke-w]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgStrokeWidth = Number(btn.dataset.strokeW) || 2;
+        sendMessageNow_();
+      });
+    });
     document.querySelectorAll("#psMsgColorRow .ps-color-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         document.querySelectorAll("#psMsgColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
@@ -1714,9 +1844,65 @@ const PresentationStudio = (() => {
   // beralih dari berkedip ke menghitung beneran) ATAU "🔁 Ulang" ditekan.
   let timerPreviewing_ = false;
 
+  // BARU (7 Sep 2026, permintaan operator) -- MODE Timer: "duration"
+  // (SEPERTI SEBELUMNYA, hitung mundur dari sekian menit/detik) atau
+  // "clock" (🎯 Countdown ke Jam Target -- hitung mundur ke satu titik
+  // JAM DINDING tertentu, mis. "countdown sampai jam 19:00"). Variabel
+  // timerState_/timerPreviewing_ di atas TETAP dipakai APA ADANYA untuk
+  // kedua mode (standby/running/done -- mode "clock" SENGAJA tidak
+  // pernah masuk status "paused", lihat catatan panjang startTimerClock_()
+  // di bawah untuk alasannya) supaya renderTimerUi_() satu-satunya
+  // tetap jadi sumber kebenaran tombol mana yang tampil.
+  let timerMode_ = "duration";
+  let timerClockEndAt_ = null; // epoch ms jam target -- null kalau tidak sedang berjalan
+  let timerClockDisplayInterval_ = null;
+
   function fmtMMSS(totalSec) {
     const s = Math.max(0, Math.round(totalSec));
     return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  // Format JAM:MENIT:DETIK (dipakai KHUSUS mode "clock" -- durasi ke jam
+  // target bisa berjam-jam, MM:SS di atas tidak cukup) -- pola SAMA
+  // seperti fmtClockCountdown() di present.html, HARUS SAMA PERSIS supaya
+  // angka yang operator lihat di Studio = angka yang jemaat lihat di
+  // Layar 2.
+  function fmtHMS_(totalSec) {
+    const s = Math.max(0, Math.round(totalSec));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    const p2 = (n) => String(n).padStart(2, "0");
+    return p2(hh) + ":" + p2(mm) + ":" + p2(ss);
+  }
+
+  // Hitung epoch ms dari <input type="time"> #psTimerClockTarget, SELALU
+  // dianggap HARI INI (tanggal sekarang) -- null kalau input kosong/tidak
+  // valid. TIDAK otomatis "besok" kalau ternyata jamnya sudah lewat dari
+  // sekarang -- itu ditolak eksplisit di startTimerClock_() di bawah,
+  // supaya operator sadar & bisa perbaiki (misalnya salah AM/PM/lupa
+  // tanggal), bukan diam-diam melompat ke hari berikutnya.
+  function computeTimerClockTargetMs_() {
+    const inp = el("psTimerClockTarget");
+    if (!inp || !inp.value) return null;
+    const parts = inp.value.split(":");
+    const hh = Number(parts[0]);
+    const mm = Number(parts[1]);
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm, 0, 0).getTime();
+  }
+
+  // Perbarui angka pratinjau (#psTimerDisplay) untuk mode "clock" SAAT
+  // standby (belum ditekan Mulai) -- statis (tidak nge-tick tiap detik),
+  // pola SAMA seperti setTimerCustomSeconds() untuk mode "duration" --
+  // cukup dihitung ulang tiap kali jam target diubah.
+  function syncTimerClockPreview_() {
+    if (timerMode_ !== "clock") return;
+    const disp = el("psTimerDisplay");
+    if (!disp) return;
+    const targetMs = computeTimerClockTargetMs_();
+    disp.textContent = targetMs == null ? "00:00:00" : fmtHMS_(Math.max(0, (targetMs - Date.now()) / 1000));
   }
 
   // Menampilkan/menyembunyikan tombol Timer sesuai timerState_ SEKARANG
@@ -1728,21 +1914,44 @@ const PresentationStudio = (() => {
     const pauseBtn = el("psTimerStopBtn");
     const resetBtn = el("psTimerCancelBtn");
     const previewBtn = el("psTimerPreviewBtn"); // BARU 7 Sep 2026
+    const modeBtns = Array.from(document.querySelectorAll("[data-timer-mode]"));
     const disp = el("psTimerDisplay");
+    const isClock = timerMode_ === "clock";
     if (disp) {
       disp.classList.toggle("ps-timer-standby", timerState_ === "standby");
       disp.classList.toggle("done", timerState_ === "done");
     }
     if (startBtn) {
       startBtn.hidden = timerState_ === "running" || timerState_ === "done";
-      startBtn.textContent = timerState_ === "paused" ? "▶️ Lanjut" : "▶️ Mulai";
-      startBtn.title = timerState_ === "paused" ? "Lanjutkan dari sisa waktu" : "Mulai";
+      startBtn.textContent = (!isClock && timerState_ === "paused") ? "▶️ Lanjut" : "▶️ Mulai";
+      startBtn.title = (!isClock && timerState_ === "paused") ? "Lanjutkan dari sisa waktu" : "Mulai";
     }
-    if (pauseBtn) pauseBtn.hidden = timerState_ !== "running";
-    if (resetBtn) resetBtn.hidden = timerState_ === "standby";
-    // BARU (7 Sep 2026) -- "👁️ Tampilkan" cuma relevan SAAT standby (begitu
-    // berjalan, Layar 2 otomatis sudah menampilkan angka berjalan beneran).
-    if (previewBtn) previewBtn.hidden = timerState_ !== "standby";
+    // BARU (7 Sep 2026) -- "⏸️ Jeda" TIDAK berlaku untuk mode "clock":
+    // jam target sudah pasti (mis. jam 19:00), "dijeda" lalu "dilanjut"
+    // tidak masuk akal -- jam targetnya tidak ikut mundur. Lihat catatan
+    // panjang startTimerClock_() di bawah.
+    if (pauseBtn) pauseBtn.hidden = isClock || timerState_ !== "running";
+    if (resetBtn) {
+      resetBtn.hidden = timerState_ === "standby";
+      resetBtn.textContent = isClock ? "⏹️ Hentikan" : "🔁 Ulang";
+      resetBtn.title = isClock ? "Hentikan & sembunyikan dari Layar 2" : "Ulang dari standby";
+    }
+    // BARU (7 Sep 2026) -- "👁️ Tampilkan" (preview standby berkedip) cuma
+    // relevan SAAT standby & mode "duration" -- belum didukung utk "clock"
+    // (jam target tidak butuh pratinjau berkedip, jam-nya sudah jelas).
+    if (previewBtn) previewBtn.hidden = isClock || timerState_ !== "standby";
+    // BARU (7 Sep 2026) -- ganti mode HANYA bisa saat standby (belum
+    // berjalan) -- kalau sedang berjalan/dijeda/selesai, tombol mode
+    // dinonaktifkan supaya operator tidak bingung ganti mode di tengah
+    // sesi yang sedang tayang (harus Ulang/Hentikan dulu).
+    modeBtns.forEach((b) => {
+      b.classList.toggle("active", b.dataset.timerMode === timerMode_);
+      b.disabled = timerState_ !== "standby";
+    });
+    if (el("psTimerLabelRow")) el("psTimerLabelRow").hidden = isClock;
+    if (el("psTimerLabelPreview")) el("psTimerLabelPreview").hidden = isClock;
+    if (el("psTimerDurationFields")) el("psTimerDurationFields").hidden = isClock;
+    if (el("psTimerClockFields")) el("psTimerClockFields").hidden = !isClock;
   }
 
   // BARU (7 Sep 2026) -- kirim ULANG overlay standby ke Layar 2 kalau
@@ -1884,6 +2093,83 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
+  // BARU (7 Sep 2026, permintaan operator) -- 🎯 Countdown ke Jam Target.
+  // BEDA dari startTimer()/dst di atas (yang hitung mundur dari SATU
+  // DURASI) -- ini hitung mundur ke SATU TITIK WAKTU JAM DINDING
+  // tertentu (mis. "countdown sampai jam 19:00"), makanya:
+  //   - `endAt` dihitung LANGSUNG dari <input type="time"> saat "▶️ Mulai"
+  //     ditekan (computeTimerClockTargetMs_() di atas), BUKAN dari
+  //     Date.now() + durasi seperti startTimer().
+  //   - TIDAK ada Jeda/Lanjut (lihat renderTimerUi_() di atas) -- cuma
+  //     Mulai & Hentikan (⏹️, pakai psTimerCancelBtn yang sama, teksnya
+  //     berganti otomatis lewat renderTimerUi_()).
+  //   - Dikirim ke Layar 2 lewat pesan TERPISAH `{type:"timerclock",...}`
+  //     (BUKAN `{type:"timer",...}`) supaya tidak tercampur dengan Timer
+  //     ring biasa -- lihat showTimerClock() (present.html) untuk
+  //     tampilannya yang SENGAJA beda (polos, di tengah panggung agak ke
+  //     bawah, tanpa cincin -- cocok ditumpuk di atas 🖼️ Latar Gambar).
+  //   - Begitu jam target tercapai, angka berhenti diam di 00:00:00
+  //     (TIDAK lanjut minus) -- baik di Studio (interval di bawah
+  //     berhenti sendiri) maupun di Layar 2 (lihat tickTimerClock() di
+  //     present.html) -- operator tekan "⏹️ Hentikan" manual kalau sesi
+  //     dianggap sudah selesai.
+  // ------------------------------------------------------------
+  function stopTimerClockDisplay_() {
+    if (timerClockDisplayInterval_) { clearInterval(timerClockDisplayInterval_); timerClockDisplayInterval_ = null; }
+  }
+
+  function startTimerClock_() {
+    const targetMs = computeTimerClockTargetMs_();
+    if (targetMs == null) { flashTimerNeedsDuration(); return; } // belum diisi jam target sama sekali
+    if (targetMs <= Date.now()) {
+      // Jam target sudah lewat hari ini -- SENGAJA ditolak (bukan
+      // otomatis dianggap "besok"), lihat catatan panjang
+      // computeTimerClockTargetMs_() di atas.
+      flashTimerNeedsDuration();
+      alert("Jam target sudah lewat dari sekarang -- pilih jam yang masih akan datang hari ini.");
+      return;
+    }
+    stopTimerClockDisplay_();
+    timerClockEndAt_ = targetMs;
+    timerState_ = "running";
+    const caption = (el("psTimerClockCaption") && el("psTimerClockCaption").value.trim()) || "";
+    const bell = !!(el("psTimerBell") && el("psTimerBell").checked);
+    const bellKey = getSelectedBellKey_();
+    rawPost({ type: "timerclock", action: "start", caption, endAt: timerClockEndAt_, bell, bellKey });
+    renderTimerUi_();
+    const disp = el("psTimerDisplay");
+    timerClockDisplayInterval_ = setInterval(() => {
+      const remain = (timerClockEndAt_ - Date.now()) / 1000;
+      if (disp) disp.textContent = fmtHMS_(remain);
+      if (remain <= 0) {
+        stopTimerClockDisplay_();
+        timerState_ = "done";
+        renderTimerUi_();
+      }
+    }, 250);
+  }
+
+  function stopTimerClock_() {
+    stopTimerClockDisplay_();
+    timerClockEndAt_ = null;
+    timerState_ = "standby";
+    rawPost({ type: "timerclock", action: "stop" });
+    syncTimerClockPreview_();
+    renderTimerUi_();
+  }
+
+  // Ganti mode "Durasi" <-> "Jam Target" -- HANYA diizinkan saat standby
+  // (lihat renderTimerUi_(), tombol mode dinonaktifkan selain saat itu).
+  function setTimerMode_(mode) {
+    if (mode !== "duration" && mode !== "clock") return;
+    if (timerState_ !== "standby" || timerMode_ === mode) return;
+    timerMode_ = mode;
+    if (mode === "clock") syncTimerClockPreview_();
+    else if (el("psTimerDisplay")) el("psTimerDisplay").textContent = fmtMMSS(timerTotal);
+    renderTimerUi_();
+  }
+
+  // ------------------------------------------------------------
   // BARU (7 Sep 2026) -- 🔔 pemilih Suara Bel (CONFIG.BELL_SOUNDS, lihat
   // js/config.js bagian "10) BEL TIMER"). Pola SAMA seperti pemilih tema
   // Warna/dst yang lain di Studio: dropdown diisi dari CONFIG saat init,
@@ -1933,24 +2219,45 @@ const PresentationStudio = (() => {
       el("psTimerCustom").addEventListener("keydown", (e) => { if (e.key === "Enter") applyCustom(); });
     }
     if (el("psTimerLabel")) el("psTimerLabel").addEventListener("input", syncTimerLabelPreview);
+    // BARU (7 Sep 2026) -- toggle mode "⏱️ Durasi" / "🎯 Jam Target".
+    Array.from(document.querySelectorAll("[data-timer-mode]")).forEach((btn) => {
+      btn.addEventListener("click", () => setTimerMode_(btn.dataset.timerMode));
+    });
+    // BARU (7 Sep 2026) -- input jam target & caption, refresh pratinjau
+    // (#psTimerDisplay) tiap kali diubah, pola SAMA seperti
+    // setTimerCustomSeconds()/syncTimerLabelPreview() utk mode "duration".
+    if (el("psTimerClockTarget")) el("psTimerClockTarget").addEventListener("input", syncTimerClockPreview_);
     // psTimerStartBtn SEKARANG dipakai 2 fungsi (lihat renderTimerUi_()):
-    // "▶️ Mulai" saat standby, "▶️ Lanjut" saat dijeda.
+    // "▶️ Mulai" saat standby, "▶️ Lanjut" saat dijeda -- BARU (7 Sep
+    // 2026) ditambah cabang mode "clock" (startTimerClock_(), TIDAK
+    // pernah "Lanjut" -- lihat catatan panjang di sana).
     if (el("psTimerStartBtn")) el("psTimerStartBtn").addEventListener("click", () => {
+      if (timerMode_ === "clock") { startTimerClock_(); return; }
       if (timerState_ === "paused") { resumeTimer_(); return; }
       if (timerTotal > 0) startTimer(timerTotal);
       else flashTimerNeedsDuration(); // belum pilih durasi (preset/custom) -- kasih tanda, jangan diam saja
     });
-    // psTimerStopBtn SEKARANG "⏸️ Jeda" (cuma tampil saat berjalan).
+    // psTimerStopBtn SEKARANG "⏸️ Jeda" (cuma tampil saat berjalan, DAN
+    // cuma utk mode "duration" -- lihat renderTimerUi_()).
     if (el("psTimerStopBtn")) el("psTimerStopBtn").addEventListener("click", () => pauseTimer_());
-    // psTimerCancelBtn SEKARANG "🔁 Ulang" (tampil saat berjalan/dijeda/
-    // selesai) -- lihat resetTimerToStandby_().
-    if (el("psTimerCancelBtn")) el("psTimerCancelBtn").addEventListener("click", () => resetTimerToStandby_());
+    // psTimerCancelBtn SEKARANG "🔁 Ulang" (mode "duration") ATAU
+    // "⏹️ Hentikan" (mode "clock", BARU 7 Sep 2026) -- teks tombolnya
+    // sendiri sudah diatur di renderTimerUi_().
+    if (el("psTimerCancelBtn")) el("psTimerCancelBtn").addEventListener("click", () => {
+      if (timerMode_ === "clock") { stopTimerClock_(); return; }
+      resetTimerToStandby_();
+    });
     // BARU (7 Sep 2026) -- "👁️ Tampilkan ke Layar 2", lihat toggleTimerPreview_().
     if (el("psTimerPreviewBtn")) el("psTimerPreviewBtn").addEventListener("click", () => toggleTimerPreview_());
     // BARU (7 Sep 2026) -- "🔇 Stop Bel": hentikan SUARA bel yang sedang
     // berbunyi di Layar 2 TANPA menghentikan/menyembunyikan timer-nya
-    // sendiri (beda dari psTimerCancelBtn "🔁 Ulang" di atas).
-    if (el("psTimerStopBellBtn")) el("psTimerStopBellBtn").addEventListener("click", () => rawPost({ type: "timer", action: "stopBell" }));
+    // sendiri (beda dari psTimerCancelBtn "🔁 Ulang" di atas). Kirim ke
+    // KEDUA jenis pesan ("timer" & "timerclock") supaya bekerja apa pun
+    // mode yang sedang tayang di Layar 2.
+    if (el("psTimerStopBellBtn")) el("psTimerStopBellBtn").addEventListener("click", () => {
+      rawPost({ type: "timer", action: "stopBell" });
+      rawPost({ type: "timerclock", action: "stopBell" });
+    });
     populateBellSelect_();
     syncTimerLabelPreview();
     renderTimerUi_();
