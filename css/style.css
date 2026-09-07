@@ -2754,6 +2754,15 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .ps-quicktools-sep { width: 1px; align-self: stretch; background: var(--ps-col-border); margin: 0 2px; }
 .ps-btn-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 .ps-btn-row [data-pos].active, .ps-btn-row [data-timer-preset].active { background: var(--brass); color: #1a1206; }
+/* BARU (7 Sep 2026, permintaan operator) -- grid 3x3 posisi Jam Target
+   (lihat psTimerClockPosGrid, index.html). Susunan visualnya SENGAJA
+   meniru tata letak layar (↖️ pojok kiri-atas... ↘️ pojok kanan-bawah)
+   supaya intuitif dipilih tanpa perlu baca label satu-satu. */
+.ps-timerclock-pos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; max-width: 180px;
+}
+.ps-timerclock-pos-grid .chip-btn { font-size: 18px; padding: 8px 0; text-align: center; }
+.ps-timerclock-pos-grid .chip-btn.active { background: var(--brass); color: #1a1206; border-color: var(--brass); }
 
 .ps-verse-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .ps-verse-row {
@@ -3468,7 +3477,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
    BARU (7 Sep 2026, permintaan operator) -- grid ikon siap-pakai di
    panel 📢 Pengumuman (Studio Presentasi), lihat markup di index.html
    (#psAnnIconGrid) & wireAnnouncementIcons_() (js/presentation-
-   studio.js). Ditambahkan di akhir file ini, murni tambahan seperti 
+   studio.js). Ditambahkan di akhir file ini, murni tambahan seperti
    blok "MODE TAMU" di atas -- tidak mengubah aturan lain yang sudah
    ada.
    ============================================================ */
@@ -3504,3 +3513,9 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   cursor: pointer;
 }
 .ps-ann-icon-btn:hover { background: var(--petrol-tint, #eef4f4); }
+/* BARU (7 Sep 2026) -- kotak cari khusus bendera (250 negara, lihat
+   index.html & wireAnnouncementIcons_(), js/presentation-studio.js). */
+.ps-ann-flag-search {
+  flex-basis: 100%; padding: 6px 10px; margin-bottom: 4px;
+  border: 1px solid var(--border, #ddd); border-radius: 8px; font-size: 13px;
+}
