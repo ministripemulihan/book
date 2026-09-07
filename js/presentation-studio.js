@@ -5715,7 +5715,7 @@ const PresentationStudio = (() => {
     // pertama, atau browser/perangkat baru), tidak ada apply() yang
     // dipanggil sama sekali -- --ps-preview-row-h & --ps-preview-box-h
     // dibiarkan kosong, jatuh ke nilai bawaan CSS (minmax(140px,14vh)
-    // untuk tinggi BARIS, tapi 156px TETAP untuk tinggi KOTAK di
+    // untuk tinggi BARIS, tapi 156px TETAP untuk tinggi KOTAK di 
     // dalamnya) -- di banyak layar 14vh lebih PENDEK dari 156px+label,
     // jadi kotak "Berikutnya"/"Tayang" ikut TERPOTONG separuh sejak
     // awal, padahal splitter-nya sendiri sebenarnya sudah bisa
