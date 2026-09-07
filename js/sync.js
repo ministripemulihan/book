@@ -474,4 +474,45 @@ const Sync = {
       return { ok: false, error: "Gagal terhubung ke server." };
     }
   },
+
+  // ---------------- Link publik Drive (BARU, 5 Sep 2026) ----------------
+  // Lihat catatan panjang di setDriveFileSharingForUser_()
+  // (apps-script/Code.gs): `makePublic:true` membuat link "siapa saja
+  // punya link bisa lihat" (bisa dibuka lewat browser mana pun, TANPA
+  // login ke aplikasi ini) untuk 1 fileId yang sudah tersinkron ke
+  // Drive; `makePublic:false` mencabutnya lagi jadi privat. Mengembalikan
+  // {ok, isPublic, url, fileId} kalau berhasil.
+  async setMediaPublicLink(username, fileId, makePublic) {
+    try {
+      return await this._post({ type: "media_public_link", username, fileId, makePublic: !!makePublic });
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
+
+  // ---------------- Life-Study / Pelajaran Hayat (BARU, 6 Sep 2026) ----------------
+  // Lihat catatan panjang di saveLifeStudyProgress_() (apps-script/
+  // Code.gs) -- termasuk nama kolom Sheet Pengguna yang perlu ditambah
+  // manual: "LifeStudyProgressJson" & "LifeStudyMode".
+  async getLifeStudyProgress(username) {
+    try {
+      return await this._get({ type: "lifestudy", username });
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
+  async saveLifeStudyProgress(username, slug, messageNum) {
+    try {
+      return await this._post({ type: "lifestudy_save", username, slug, messageNum });
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
+  async setLifeStudyMode(username, mode) {
+    try {
+      return await this._post({ type: "lifestudy_mode", username, mode });
+    } catch (e) {
+      return { ok: false, error: "Gagal terhubung ke server." };
+    }
+  },
 };
