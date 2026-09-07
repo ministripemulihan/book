@@ -531,7 +531,8 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .simple-dialog-field { margin-bottom: 14px; }
 .simple-dialog-field label { display: block; margin-bottom: 6px; font-family: var(--font-ui); font-size: 13px; color: var(--ink-soft); }
 .simple-dialog-field select,
-.simple-dialog-field input[type="text"] {
+.simple-dialog-field input[type="text"],
+.simple-dialog-field input[type="number"] {
   width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--rule);
   background: var(--paper-raised); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
 }
