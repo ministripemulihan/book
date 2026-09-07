@@ -432,4 +432,59 @@ const CONFIG = {
   GUEST_MODE_ENABLED: true,
   GUEST_DAILY_LIMIT_PER_DEVICE: 10,
   GUEST_TOTAL_DAILY_LIMIT: 100,
+
+  // ----------------------------------------------------------
+  // 10) BEL TIMER (suara saat ⏱️ Timer/Countdown selesai)
+  // ----------------------------------------------------------
+  // Daftar suara bel yang bisa dipilih operator lewat dropdown "🔔 Suara
+  // Bel" (Studio Presentasi maupun panel sederhana di HP -- lihat
+  // js/presentation-studio.js & js/presentation.js). Boleh diisi sampai
+  // 20 baris (atau lebih) -- tinggal tambah/hapus objek di array ini,
+  // tidak perlu ubah kode lain, cukup muat ulang (F5) untuk melihatnya
+  // di dropdown.
+  //
+  // CARA MENAMBAH SUARA SENDIRI (mis. "Oh Tuhan Yesus", "Sudah Selesai"):
+  //  1. Siapkan file .mp3 PENDEK (idealnya di bawah 1-2 MB / beberapa
+  //     detik) -- makin kecil filenya, makin cepat & andal terputar
+  //     tepat saat timer habis.
+  //  2. Upload ke Google Drive, klik kanan > Bagikan > ubah jadi
+  //     "Siapa saja yang memiliki link" (Anyone with the link) -- WAJIB,
+  //     sama seperti syarat file Peta/Gambar & media lain di aplikasi
+  //     ini, kalau tidak, bel TIDAK akan bisa berbunyi sama sekali.
+  //  3. Salin link "Bagikan"-nya APA ADANYA (boleh bentuk
+  //     .../file/d/ID/view atau bentuk lain yang mengandung ID Drive --
+  //     app ini otomatis mengenali & mengubahnya sendiri, TIDAK perlu
+  //     diutak-atik manual, lihat resolveBellAudioUrl_() di present.html).
+  //  4. Tempel link itu sebagai `url` di 1 baris baru pada array
+  //     BELL_SOUNDS di bawah, kasih `key` unik & `label` bebas.
+  //  5. Muat ulang Studio Presentasi -- otomatis muncul di dropdown.
+  //
+  // CATATAN: file yang sangat besar (puluhan MB ke atas) kadang gagal
+  // diputar langsung karena Google Drive menampilkan halaman peringatan
+  // "tidak bisa memindai virus" alih-alih file aslinya -- kalau ini
+  // terjadi, bel akan diam & aplikasi otomatis jatuh balik ke bunyi
+  // "denting" bawaan (supaya operator tetap tahu timer sudah habis).
+  // Solusinya: perkecil ukuran file MP3-nya.
+  //
+  // `key`   : id unik, JANGAN diubah lagi setelah pernah dipakai (dipakai
+  //           menyimpan pilihan terakhir operator per perangkat).
+  // `label` : nama yang tampil di dropdown pemilih.
+  // `url`   : kosongkan ("") KHUSUS untuk "Bel 1 (Bawaan)" -- satu-
+  //           satunya yang tidak butuh file sama sekali (bunyi "denting"
+  //           dibuat langsung oleh kode, jadi tetap bunyi walau tidak
+  //           ada internet / link Drive-nya sedang bermasalah). Baris
+  //           lain WAJIB diisi `url` link Drive (atau link mp3 publik
+  //           lain yang mendukung diputar langsung).
+  BELL_SOUNDS: [
+    { key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" },
+    // Contoh -- hapus tanda komentar (//) di 2 baris ini & ganti link
+    // Drive-nya dengan file Anda sendiri:
+    // { key: "bell2", label: "🙏 Oh Tuhan Yesus", url: "https://drive.google.com/file/d/GANTI_DENGAN_LINK_DRIVE_ANDA/view" },
+    // { key: "bell3", label: "✅ Sudah Selesai", url: "https://drive.google.com/file/d/GANTI_DENGAN_LINK_DRIVE_ANDA/view" },
+  ],
+  // key dari BELL_SOUNDS di atas yang dipakai SEBELUM operator pernah
+  // memilih sendiri di dropdown (pilihan operator sesudah itu tersimpan
+  // per perangkat lewat localStorage -- lihat TIMER_BELL_CHOICE_KEY di
+  // js/presentation-studio.js & js/presentation.js).
+  TIMER_BELL_DEFAULT_KEY: "bell1",
 };
