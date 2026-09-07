@@ -471,6 +471,22 @@
   #timerClockTime.done-text { color: #d9463a; } /* sudah 00:00:00 -- diam, warna merah menandakan sudah tercapai */
   #timerClockWrap.ps-standby #timerClockTime { animation: pStandbyBlink 1.3s ease-in-out infinite; }
 
+  /* BARU (7 Sep 2026, permintaan operator) -- 9 posisi siap-pakai (lihat
+     psTimerClockPosGrid, index.html & wireTimerClockPosition_(), js/
+     presentation-studio.js) -- MENIMPA left/top/transform bawaan
+     (tengah persis) di atas. Jarak dari tepi (5vh/4vw) SENGAJA tidak
+     mepet 0 supaya tidak kepotong tepi layar proyektor asli (yang
+     kadang sedikit "overscan").  ".tc-pos-center" TIDAK perlu aturan
+     apa pun (kosongkan class-nya = otomatis jatuh ke default di atas). */
+  #timerClockWrap.tc-pos-top { top: 6vh; left: 50%; transform: translate(-50%, 0); }
+  #timerClockWrap.tc-pos-bottom { top: auto; bottom: 6vh; left: 50%; transform: translate(-50%, 0); }
+  #timerClockWrap.tc-pos-left { top: 50%; left: 4vw; transform: translate(0, -50%); }
+  #timerClockWrap.tc-pos-right { top: 50%; left: auto; right: 4vw; transform: translate(0, -50%); }
+  #timerClockWrap.tc-pos-top-left { top: 6vh; left: 4vw; transform: none; }
+  #timerClockWrap.tc-pos-top-right { top: 6vh; left: auto; right: 4vw; transform: none; }
+  #timerClockWrap.tc-pos-bottom-left { top: auto; bottom: 6vh; left: 4vw; transform: none; }
+  #timerClockWrap.tc-pos-bottom-right { top: auto; bottom: 6vh; left: auto; right: 4vw; transform: none; }
+
   /* BARU (7 Sep 2026, laporan operator) -- ikon bendera gambar utk teks
      Pengumuman/Teks Cepat. Lihat catatan panjang di flagifyAnnouncementText_()
      (skrip bawah) untuk KENAPA ini perlu (emoji bendera 🇮🇩 dkk. jadi cuma
@@ -1466,6 +1482,16 @@
     // seperti properti lain di atas), bukan present/absent.
     if (theme.timerClockColor) root.setProperty("--p-timerclock-color", theme.timerClockColor);
     else root.style.removeProperty("--p-timerclock-color");
+    // BARU (7 Sep 2026, permintaan operator) -- posisi siap-pakai Jam
+    // Target di layar (lihat catatan panjang CSS .tc-pos-* di atas).
+    // Buang SEMUA kelas tc-pos-* lama dulu (regex) baru pasang yang baru
+    // (kalau bukan "center"/kosong) -- supaya tidak menumpuk kelas lama.
+    if (timerClockWrap) {
+      timerClockWrap.className = timerClockWrap.className.replace(/\btc-pos-\S+/g, "").trim();
+      if (theme.timerClockPos && theme.timerClockPos !== "center") {
+        timerClockWrap.classList.add("tc-pos-" + theme.timerClockPos);
+      }
+    }
     // DIPERBAIKI (7 Sep 2026, laporan operator) -- akar masalah "Jam
     // Target kepinggir kanan bawah" yang SEBENARNYA: fitTimerClockNumber_()
     // (lihat catatan panjang di situ) cuma dipanggil ulang saat JUMLAH
