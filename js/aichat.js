@@ -492,11 +492,41 @@ async function gatherAiChatContext(question) {
     }
   } catch (e) { /* opsional -- AI tetap jalan tanpanya kalau data Kidung belum disinkron */ }
 
+  // 🖊️ Catatan PRIBADI pengguna sendiri -- BARU (7 Sep 2026, permintaan
+  // operator), TERMASUK rujukan "📖 Pelajaran Hayat ..." yang disisipkan
+  // lewat tombol "📖 + Rujukan Pelajaran Hayat" (js/lifestudy.js). SENGAJA
+  // dipisah dari `notes` di atas (yang itu catatan kaki/keterangan ADMIN
+  // pada ayat, MILIK SEMUA ORANG) -- ini murni tulisan pribadi
+  // `currentUser` SENDIRI, TIDAK PERNAH punya orang lain, dicari
+  // `loadLocalNotes()` (js/notes.js, localStorage) + `verseById` (peta
+  // global verse-id -> objek ayat, sudah ada & dipakai juga oleh panel
+  // "🗒️ Catatan Saya", lihat renderNotesMenuPanel()) untuk menerjemahkan
+  // verseId jadi referensi "Kitab pasal:ayat" yang bisa dibaca.
+  let personalNotes = [];
+  try {
+    const allNotes = loadLocalNotes(currentUser);
+    const kwLower = keywords.map((k) => String(k || "").toLowerCase()).filter(Boolean);
+    const qLower = question.toLowerCase();
+    Object.keys(allNotes).forEach((verseId) => {
+      if (personalNotes.length >= 5) return;
+      const entry = allNotes[verseId];
+      const noteText = String((entry && entry.note) || "").trim();
+      if (!noteText) return;
+      const noteLower = noteText.toLowerCase();
+      const hit = kwLower.some((k) => noteLower.includes(k)) || noteLower.includes(qLower);
+      if (!hit) return;
+      const verse = (typeof verseById !== "undefined" && verseById) ? verseById[verseId] : null;
+      const ref = verse ? `${verse.bookName} ${verse.chapter}:${verse.verse}` : "(ayat tidak diketahui)";
+      personalNotes.push({ kind: "personalNote", ref, text: noteText });
+    });
+  } catch (e) { /* opsional -- jangan sampai catatan pribadi bikin AI Chat gagal total */ }
+
   return {
     verses, notes,
     bookPokok: outline.bookPokok, allPokok: outline.allPokok,
     knowledgeContext, knowledgeSources,
     kidung, kidungSources,
+    personalNotes,
   };
 }
 
@@ -804,6 +834,8 @@ const AI_CHAT_SOURCE_KIND_LABEL = {
   note: "📝 Catatan kaki (kolom Note Sheet Alkitab)",
   outline: "📋 Pokok Kitab / Garis Besar",
   knowledge: "🤖 Referensi tambahan (kumpulan catatan AI yang di-inject)",
+  kidung: "🎵 Kidung/Nyanyian Pujian",
+  personalNote: "🖊️ Catatan pribadi Anda",
 };
 
 function renderAiChatThread(thread) {
@@ -935,7 +967,7 @@ async function handleAiChatAsk(question) {
     const aiTurn = {
       role: "ai",
       text: data.answer,
-      sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context), context.knowledgeSources || [], context.kidungSources || []),
+      sources: [].concat(context.verses || [], context.notes || [], outlineContextAsSources(context), context.knowledgeSources || [], context.kidungSources || [], context.personalNotes || []),
     };
     _aiChatState.history.push(aiTurn);
     maybeSaveAiChatTurn(question, aiTurn);
