@@ -1521,9 +1521,16 @@ function renderChapterPickerExtraReserved(bookNum, book) {
   box.hidden = false;
   box.classList.add("chapter-picker-extra--reserved");
 
+  // BARU (6 Sep 2026, permintaan operator) -- "📖 Pelajaran Hayat" SELALU
+  // ditambahkan duluan, SEBELUM pengecekan anyOutlineFeatureAvailable()
+  // di bawah -- beda dari Pokok/Garis Besar/Peta yang bergantung sheet
+  // per kitab, Life-Study tersedia utk SEMUA 66 kitab (data statis, lihat
+  // js/lifestudy.js) jadi tidak perlu nunggu apa pun.
+  if (typeof buildLifeStudyButtonIfAny === "function") buildLifeStudyButtonIfAny(box, book, bookNum);
+
   if (typeof anyOutlineFeatureAvailable !== "function" || !anyOutlineFeatureAvailable()) {
     box.classList.remove("chapter-picker-extra--reserved");
-    box.hidden = true;
+    box.hidden = box.children.length === 0;
     return;
   }
 
@@ -1533,7 +1540,12 @@ function renderChapterPickerExtraReserved(bookNum, book) {
     // baris tombol punya kitab yang lama ini lagi.
     if (!el("chapterPicker") || el("chapterPicker").hidden) return;
     if (el("chapterPickerTitle").textContent !== book.name) return;
-    box.innerHTML = "";
+    // PERBAIKAN (6 Sep 2026) -- dulu box.innerHTML = "" di sini (buang
+    // SEMUA isi lama termasuk tombol "📖 Pelajaran Hayat" yang baru saja
+    // ditambahkan di atas) -- sekarang cuma buang tombol Pokok/Garis
+    // Besar/Peta LAMA (kalau ada, dari render sebelumnya), sisakan
+    // tombol Life-Study.
+    Array.from(box.querySelectorAll(".book-info-btn:not(.lifestudy-book-info-btn)")).forEach((b) => b.remove());
     buildPokokButtonIfAny(box, book, bookNum, pokokHtml);
     buildOutlineButtonIfAny(box, book, bookNum, outline);
     buildMapsButtonIfAny(box, book, bookNum, maps);
@@ -1859,7 +1871,7 @@ function updateVerseNoteBadge(v, block, personalText) {
 // Sekarang tombolnya muncul kalau SALAH SATU (atau keduanya) ada, dan
 // menyalin KEDUANYA sekaligus (diberi label masing-masing) kalau memang
 // keduanya terisi.
-function buildNoteQuickActionsRow(v, refLabel, hasAdminNote, liveDraftEl) {
+function buildNoteQuickActionsRow(v, refLabel, hasAdminNote, liveDraftEl, sourceVerses) {
   const row = document.createElement("div");
   row.className = "inline-note-actions";
 
@@ -1923,6 +1935,32 @@ function buildNoteQuickActionsRow(v, refLabel, hasAdminNote, liveDraftEl) {
   });
   row.appendChild(addCollBtn);
 
+  // BARU (6 Sep 2026, permintaan operator) -- "▶️ Baca dari sini": tombol
+  // pembacaan suara (Google Voice) TTS tidak lagi cuma bisa mulai dari
+  // ayat 1 pasal ini (itu tetap jadi PERILAKU BAWAAN tombol ▶️/⏸️ di
+  // kepala halaman, TIDAK diubah -- lihat playTTS() di bawah) -- di sini,
+  // per-ayat, ada jalan PINTAS untuk mulai membaca dari ayat INI sampai
+  // akhir pasal, memakai bahasa/kolom PERSIS tempat ayat ini berasal
+  // (`sourceVerses`, lihat catatan panjang di buildVerseBlock()) -- jadi
+  // kalau ditekan di kolom Mandarin misalnya, yang dibacakan bahasa
+  // Mandarin, bukan bahasa utama. Kalau ttsSupported false (browser tidak
+  // dukung), tombol tetap dibuat tapi disembunyikan (bukan dihapus)
+  // supaya konsisten dengan tombol lain yang sudah ada.
+  if (typeof ttsSupported !== "undefined" && ttsSupported) {
+    const readFromBtn = document.createElement("button");
+    readFromBtn.type = "button";
+    readFromBtn.className = "chip-btn small";
+    readFromBtn.textContent = "▶️ Baca dari sini";
+    readFromBtn.title = "Mulai bacakan suara dari ayat ini sampai akhir pasal (bahasa sesuai kolom ini)";
+    readFromBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof playTTSFromVerse === "function") {
+        playTTSFromVerse(sourceVerses || (typeof currentChapterVerses !== "undefined" ? currentChapterVerses : []), v.verse);
+      }
+    });
+    row.appendChild(readFromBtn);
+  }
+
   return row;
 }
 
@@ -1931,7 +1969,7 @@ function buildNoteQuickActionsRow(v, refLabel, hasAdminNote, liveDraftEl) {
 // kalau ada, + kotak catatan pribadi + tombol aksi) -- ditaruh sebagai anak
 // TERAKHIR di dalam blok ayat itu sendiri, jadi lebarnya otomatis SAMA
 // PERSIS dengan lebar teks ayat (tidak perlu diatur lebar terpisah lagi).
-function buildInlineNoteCardEl(v, block) {
+function buildInlineNoteCardEl(v, block, sourceVerses) {
   const wrap = document.createElement("div");
   wrap.className = "verse-inline-note";
   wrap.hidden = true;
@@ -1959,7 +1997,7 @@ function buildInlineNoteCardEl(v, block) {
   // menyalin ayat/catatan atau memasukkannya ke Kumpulan Ayat. Tombol
   // "💾 Simpan Catatan" TETAP hanya di bawah (dekat kotak catatan
   // pribadinya) karena aksi itu memang terikat ke kotak tulis di bawah.
-  const topActions = buildNoteQuickActionsRow(v, refLabel, hasAdminNote, textarea);
+  const topActions = buildNoteQuickActionsRow(v, refLabel, hasAdminNote, textarea, sourceVerses);
   topActions.classList.add("inline-note-actions-top");
   wrap.appendChild(topActions);
 
@@ -2017,7 +2055,7 @@ function buildInlineNoteCardEl(v, block) {
   });
   actions.appendChild(saveBtn);
 
-  const bottomQuickActions = buildNoteQuickActionsRow(v, refLabel, hasAdminNote, textarea);
+  const bottomQuickActions = buildNoteQuickActionsRow(v, refLabel, hasAdminNote, textarea, sourceVerses);
   // Digabung ke baris "actions" yang sama (bukan <div> terpisah) supaya
   // tata letak bawah tetap seperti sebelumnya: Simpan Catatan lalu tombol
   // salin/kumpulan sebaris.
@@ -2159,7 +2197,14 @@ function openHighlightPopup(anchorEl, block, v) {
 // Membuat satu blok ayat (nomor, teks, badge catatan, tombol salin) —
 // dipakai baik untuk tampilan satu kolom (biasa) maupun tampilan
 // beberapa-kolom-berdampingan (lihat renderColumnsView).
-function buildVerseBlock(v, idx, fallbackBookName) {
+// BARU (6 Sep 2026, permintaan operator) -- parameter ke-4 `sourceVerses`
+// (opsional): array SATU BAHASA/KOLOM tempat ayat `v` ini berasal --
+// diteruskan ke buildInlineNoteCardEl() -> buildNoteQuickActionsRow() supaya
+// tombol BARU "▶️ Baca dari sini" tahu PERSIS mulai dari mana & bahasa/
+// kolom yang MANA yang harus dibacakan (lihat playTTSFromVerse() di bawah).
+// Kalau tidak diisi (dipanggil dari kode lama yang belum diperbarui),
+// otomatis jatuh ke `currentChapterVerses` (perilaku lama, bahasa utama).
+function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   const block = document.createElement("div");
   block.className = "verse-block";
   block.id = "v-" + v.id;
@@ -2271,7 +2316,7 @@ function buildVerseBlock(v, idx, fallbackBookName) {
   block.appendChild(textWrap);
   block.appendChild(copyBtn);
   block.appendChild(presentBtn);
-  const notePanel = buildInlineNoteCardEl(v, block);
+  const notePanel = buildInlineNoteCardEl(v, block, sourceVerses);
   block.appendChild(notePanel);
   if (typeof setupFootnoteMarkerHandlers === "function") {
     setupFootnoteMarkerHandlers(textWrap, v, block, notePanel);
@@ -2301,10 +2346,10 @@ function langLabelFor(code) {
 
 // Tampilan kolom tunggal (perilaku lama / default).
 function renderSingleColumn(wrap, verses, displayName, bookNum, chapter) {
-  wrap.classList.remove("reader-columns");
+  wrap.classList.remove("reader-columns", "reader-columns-panes", "reader-columns-stacked", "reader-columns-grid");
   wrap.removeAttribute("data-cols");
   wrap.innerHTML = "";
-  verses.forEach((v, idx) => wrap.appendChild(buildVerseBlock(v, idx, displayName)));
+  verses.forEach((v, idx) => wrap.appendChild(buildVerseBlock(v, idx, displayName, verses)));
   insertOutlineHeaders(wrap, bookNum, chapter, verses);
 }
 
@@ -2351,6 +2396,14 @@ async function insertOutlineHeaders(wrap, bookNum, chapter, verses) {
 // penuh (lihat renderChapter()).
 function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, columnsCount, extraLangs, singleVerseNum) {
   wrap.classList.add("reader-columns");
+  // PERBAIKAN (6 Sep 2026) -- bersihkan kelas mode kolom SEBELUMNYA
+  // (mis. dari "3 Kolom Menyamping" balik ke "1 Kolom"/"Atas-bawah")
+  // sebelum menambah kelas yang baru. Tanpa ini, kelas
+  // "reader-columns-panes" (BARU, bawa `height: 68vh` + `display:flex`,
+  // lihat css/style.css) bisa NYANGKUT dari render sebelumnya dan
+  // merusak tampilan mode lain yang seharusnya alir normal setinggi
+  // kontennya sendiri, bukan dipotong 68vh.
+  wrap.classList.remove("reader-columns-panes", "reader-columns-stacked", "reader-columns-grid");
   wrap.setAttribute("data-cols", String(columnsCount));
   const direction = getSetting(currentUser, "columnDirection") || "side";
   wrap.setAttribute("data-direction", direction);
@@ -2364,12 +2417,27 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
     columns.push({ lang, verses });
   }
 
-  // Tampilan "menyamping" (side-by-side) dengan >1 kolom: dirender sebagai
-  // baris grid per nomor ayat, supaya ayat yang sama sejajar tingginya di
-  // semua kolom (tinggi baris grid otomatis mengikuti kolom yang teksnya
-  // paling panjang).
+  // BARU (6 Sep 2026, permintaan operator) -- SEKARANG ADA 3 PILIHAN
+  // tampilan multi-bahasa (bukan cuma 2), supaya versi LAMA tetap bisa
+  // dipakai kalau versi BARU (kolom scroll bebas + Sync) ternyata kurang
+  // cocok untuk sebagian orang -- tidak ada yang dihapus, cuma ditambah:
+  //   "side"       -- (LAMA, PALING LAMA ADA) grid asli, SEMUA kolom
+  //                   SELALU sejajar otomatis per nomor ayat (1 scroll
+  //                   halaman biasa, tidak ada kotak scroll terpisah) --
+  //                   lihat renderColumnsGridAligned() di bawah. Ini
+  //                   NILAI BAWAAN (kalau belum pernah diatur) supaya
+  //                   pengguna lama yang sudah biasa TIDAK berubah
+  //                   tampilannya tanpa mereka minta.
+  //   "side-panes" -- (BARU) kolom scroll bebas + tombol "🔗 Sync" per
+  //                   kolom -- lihat renderColumnsIndependentPanes().
+  //   "stacked"    -- (LAMA) atas-bawah, 1 kolom lebar penuh, tidak
+  //                   berubah -- lihat renderColumnsStacked().
   if (direction === "side" && columnsCount > 1) {
     renderColumnsGridAligned(wrap, columns, displayName, columnsCount);
+    return;
+  }
+  if (direction === "side-panes" && columnsCount > 1) {
+    renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount);
     return;
   }
 
@@ -2380,10 +2448,17 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
   renderColumnsStacked(wrap, columns, displayName);
 }
 
-// Merender kolom paralel sebagai grid asli (bukan kolom independen),
-// dengan satu "baris" grid per nomor ayat lintas semua bahasa, supaya
-// ayat 1 selalu sejajar dengan ayat 1 di kolom lain, ayat 2 sejajar
-// dengan ayat 2, dst — walau panjang teksnya beda-beda antar bahasa.
+// (LAMA, dikembalikan 6 Sep 2026 atas permintaan operator -- lihat
+// catatan panjang "side"/"side-panes"/"stacked" di renderColumnsView()
+// di atas) -- grid asli, satu "baris" grid per nomor ayat lintas semua
+// bahasa, supaya ayat 1 selalu sejajar dengan ayat 1 di kolom lain, ayat
+// 2 sejajar dengan ayat 2, dst — walau panjang teksnya beda-beda antar
+// bahasa. TIDAK ada kotak scroll terpisah per kolom (1 scroll halaman
+// biasa) & TIDAK ada tombol Sync (semua kolom SELALU sejajar, tidak bisa
+// dimatikan) -- inilah tampilan yang sudah dipakai orang sejak awal,
+// dipertahankan APA ADANYA supaya yang sudah nyaman dengan ini (mis.
+// catatan/footnote per ayat, tombol Salin Ayat/Salin Catatan/Kumpulan di
+// tiap kolom) tidak berubah.
 function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
   wrap.classList.add("reader-columns-grid");
 
@@ -2417,7 +2492,7 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
       cell.className = "reader-grid-cell";
       const v = col.verses.find((vv) => vv.verse === vnum);
       if (v) {
-        cell.appendChild(buildVerseBlock(v, vnum - 1, displayName));
+        cell.appendChild(buildVerseBlock(v, vnum - 1, displayName, col.verses));
       } else {
         cell.classList.add("reader-grid-cell-empty");
       }
@@ -2425,6 +2500,121 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
     });
   });
 }
+
+// BARU (6 Sep 2026, permintaan operator, TAMBAHAN -- BUKAN gantikan
+// renderColumnsGridAligned() di atas, lihat catatan panjang "side"/
+// "side-panes"/"stacked" di renderColumnsView()) -- tiap kolom (bahasa)
+// jadi panel sendiri dengan scroll-bar VERTIKAL SENDIRI (bukan lagi 1
+// grid raksasa yang tinggi barisnya dipaksa sama rata mengikuti kolom
+// paling panjang) -- lihat mockup yang diminta: tiap kolom sempit
+// dengan kepala sendiri berisi nama bahasa + tombol "🔗 Sync".
+//
+// CARA KERJA "🔗 Sync" (default AKTIF/tercentang semua): kalau kolom A
+// & kolom B SAMA-SAMA "Sync" aktif, scroll salah satunya (mis. digeser
+// jarinya di kolom A) otomatis ikut menggeser kolom B ke POSISI RELATIF
+// yang sama (persentase scroll, BUKAN piksel mentah -- supaya tetap
+// masuk akal walau panjang teks per bahasa beda jauh, mis. terjemahan
+// Mandarin biasanya jauh lebih pendek dari Inggris untuk ayat yang
+// sama). Kolom yang "Sync"-nya DIMATIKAN dikecualikan dari penggeseran
+// bersama itu -- bisa digeser sendiri bebas TANPA menyeret kolom lain,
+// DAN tidak ikut diseret kalau kolom lain digeser. Berlaku SAMA persis
+// di HP maupun komputer, untuk 2 MAUPUN 3 kolom (bukan cuma salah satu).
+//
+// Kenapa bukan grid 1 buah seperti dulu: grid butuh SEMUA sel di 1 baris
+// (nomor ayat yang sama) tingginya SAMA -- artinya kolom bahasa yang
+// tulisannya pendek jadi banyak ruang kosong menunggu kolom yang paling
+// panjang di baris itu. Dengan panel independen begini, tiap kolom
+// mengalir natural setinggi isinya sendiri di dalam kotak scroll-nya --
+// TIDAK ada lagi ruang kosong terbuang, harganya cuma ayat TIDAK selalu
+// persis sejajar posisinya kecuali operator aktifkan/pertahankan "Sync".
+function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount) {
+  wrap.classList.add("reader-columns-panes");
+  wrap.innerHTML = "";
+
+  columns.forEach((col, colIdx) => {
+    const pane = document.createElement("div");
+    pane.className = "reader-col-pane";
+
+    const head = document.createElement("div");
+    head.className = "reader-col-pane-head";
+    const title = document.createElement("span");
+    title.className = "reader-col-pane-title";
+    title.textContent = col.lang ? langLabelFor(col.lang) : "— pilih bahasa —";
+    head.appendChild(title);
+    // Toggle "🔗 Sync" -- pola/komponen SAMA seperti toggle lain di app
+    // ini (.toggle-switch/.toggle-slider, lihat css/style.css), dipakai
+    // ulang supaya konsisten, bukan bikin gaya toggle baru.
+    const syncLabel = document.createElement("label");
+    syncLabel.className = "reader-col-sync-toggle";
+    syncLabel.title = "Kalau aktif, kolom ini ikut bergeser bersama kolom lain yang Sync-nya juga aktif";
+    const syncText = document.createElement("span");
+    syncText.textContent = "🔗 Sync";
+    const syncSwitchWrap = document.createElement("span");
+    syncSwitchWrap.className = "toggle-switch reader-col-sync-switch";
+    const syncInput = document.createElement("input");
+    syncInput.type = "checkbox";
+    syncInput.checked = true; // default AKTIF (semua kolom sinkron) -- sesuai mockup (kotak tercentang)
+    syncInput.dataset.colIdx = String(colIdx);
+    const syncSlider = document.createElement("span");
+    syncSlider.className = "toggle-slider";
+    syncSwitchWrap.appendChild(syncInput);
+    syncSwitchWrap.appendChild(syncSlider);
+    syncLabel.appendChild(syncText);
+    syncLabel.appendChild(syncSwitchWrap);
+    head.appendChild(syncLabel);
+    pane.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "reader-col-pane-body";
+    if (!col.verses.length) {
+      const empty = document.createElement("p");
+      empty.className = "reader-grid-cell-empty";
+      empty.textContent = "Pasal ini belum tersedia.";
+      body.appendChild(empty);
+    } else {
+      col.verses.forEach((v, idx) => body.appendChild(buildVerseBlock(v, idx, displayName, col.verses)));
+    }
+    pane.appendChild(body);
+    wrap.appendChild(pane);
+  });
+
+  wireColumnPaneSync(wrap);
+}
+
+// Menyambungkan event scroll antar-panel (lihat catatan panjang di
+// renderColumnsIndependentPanes() di atas untuk cara kerjanya). Dipasang
+// ULANG setiap render (tiap pindah pasal/ayat, kolom lama dibuang total
+// lewat wrap.innerHTML="" di atas, jadi tidak ada listener lama yang
+// nyangkut/menumpuk).
+function wireColumnPaneSync(wrap) {
+  const panes = Array.from(wrap.querySelectorAll(".reader-col-pane"));
+  const bodies = panes.map((p) => p.querySelector(".reader-col-pane-body"));
+  const syncInputs = panes.map((p) => p.querySelector('input[type="checkbox"]'));
+  let programmatic = false; // penjaga supaya scrollTop yang KITA set sendiri (mengikuti kolom lain) tidak memicu balik loop tak berkesudahan
+  bodies.forEach((body, i) => {
+    if (!body) return;
+    body.addEventListener("scroll", () => {
+      if (programmatic) return;
+      if (!syncInputs[i] || !syncInputs[i].checked) return; // kolom SUMBER harus Sync aktif juga -- kalau dimatikan, geserannya TIDAK menyeret kolom lain
+      const range = body.scrollHeight - body.clientHeight;
+      const frac = range > 0 ? body.scrollTop / range : 0;
+      programmatic = true;
+      bodies.forEach((otherBody, j) => {
+        if (j === i || !otherBody) return;
+        if (!syncInputs[j] || !syncInputs[j].checked) return; // kolom TUJUAN juga harus Sync aktif -- kalau dimatikan, biarkan posisinya, jangan diseret
+        const otherRange = otherBody.scrollHeight - otherBody.clientHeight;
+        otherBody.scrollTop = otherRange > 0 ? frac * otherRange : 0;
+      });
+      programmatic = false;
+    });
+  });
+}
+
+// (Catatan 6 Sep 2026: renderColumnsGridAligned() -- versi LAMA, di
+// atas fungsi ini -- DIPERTAHANKAN atas permintaan operator, dipakai
+// untuk direction:"side", sedangkan renderColumnsIndependentPanes() di
+// atas dipakai untuk direction:"side-panes" -- keduanya dipanggil dari
+// renderColumnsView(), tidak ada yang dihapus.)
 
 // Merender kolom paralel dalam arah "atas-bawah" (stacked), DIKELOMPOKKAN
 // PER AYAT -- untuk tiap nomor ayat (berurutan), tampilkan versi bahasa 1
@@ -2455,7 +2645,7 @@ function renderColumnsStacked(wrap, columns, displayName) {
     const langsWithVerse = columns.filter((col) => col.verses.some((vv) => vv.verse === vnum));
     langsWithVerse.forEach((col, colIdxInGroup) => {
       const v = col.verses.find((vv) => vv.verse === vnum);
-      const block = buildVerseBlock(v, groupIdx, displayName);
+      const block = buildVerseBlock(v, groupIdx, displayName, col.verses);
       const langTag = document.createElement("span");
       langTag.className = "reader-stacked-lang-tag";
       langTag.textContent = col.lang ? langLabelFor(col.lang) : "?";
@@ -4249,6 +4439,19 @@ function renderCollectionDetailInto(container, id, col) {
   addTextBtn.title = "Tambahkan baris teks bebas atau pengumuman ke kumpulan ini";
   addTextBtn.addEventListener("click", () => handleAddFreeItemToCollection(id, col));
   titleBtns.appendChild(addTextBtn);
+  // BARU (5 Sep 2026, atas permintaan) -- "🔗 Tambah Link" (YouTube/Canva/
+  // SoundCloud) LANGSUNG dari panel Kumpulan Ayat biasa ini, supaya bisa
+  // dipakai dari HP (Mode Layar 1) -- sebelum ini jenis-jenis ini HANYA
+  // bisa ditambahkan lewat tab-tab Studio Presentasi (js/presentation-
+  // studio.js), yang disembunyikan total di layar sempit (lihat
+  // #presentStudioMobileHint di index.html). Lihat
+  // handleAddLinkItemToCollection() di bawah untuk detail per jenis.
+  const addLinkBtn = document.createElement("button");
+  addLinkBtn.className = "chip-btn small";
+  addLinkBtn.textContent = "🔗 Tambah Link";
+  addLinkBtn.title = "Tambahkan video YouTube, presentasi Canva, atau trek/playlist SoundCloud ke kumpulan ini";
+  addLinkBtn.addEventListener("click", () => handleAddLinkItemToCollection(id, col));
+  titleBtns.appendChild(addLinkBtn);
   // Tombol "Salin Semua" -- 22 Agu 2026, atas permintaan: bentuk kotak
   // (bukan bulat) disamakan dengan tombol 📋 di layar Kidung, yang
   // sengaja diganti dari .round-media-btn ke .square-media-btn (lihat
@@ -4437,6 +4640,18 @@ function collectionItemRef(it) {
     const pageLabel = it.pageCount > 1 ? ` (hal ${(it.pageIndex || 0) + 1}/${it.pageCount})` : "";
     return `📎 ${it.name || "Berkas"}${pageLabel}`;
   }
+  // BARU (4 Sep 2026) -- item Canva & SoundCloud (roadmap
+  // ROADMAP-ai-presentation.md Bagian 3 & 4, tab "🔗 Link" Studio
+  // Presentasi). Judul dipakai kalau operator sempat mengisinya saat
+  // menempel link; kalau kosong, fallback ke label generik supaya baris
+  // daftar tetap masuk akal.
+  if (it.type === "canva") return `🖼️ Canva${it.title ? ": " + it.title : ""}`;
+  if (it.type === "soundcloud") return `🎧 SoundCloud${it.title ? ": " + it.title : ""}`;
+  // BARU (5 Sep 2026) -- item YouTube portabel (addYoutubeLinkToCollection(),
+  // js/collections.js), ditambahkan lewat tombol "🔗 Tambah Link" di panel
+  // ini sendiri (bisa dari HP) -- beda dari it.type==="media" yang jadi
+  // referensi Media Tersimpan Studio.
+  if (it.type === "youtube_link") return `▶️ YouTube${it.title ? ": " + it.title : ""}`;
   return "(jenis tidak dikenal)";
 }
 
@@ -4469,6 +4684,18 @@ function collectionItemBodyText(it) {
   // Presentasi (js/presentation-studio.js, sendGenericItemLive() sudah
   // menangani jenis ini dengan mengambil gambarnya dari Media Tersimpan).
   if (it.type === "media") return "(berkas PDF/gambar -- tayangkan lewat Studio Presentasi)";
+  // BARU (4 Sep 2026) -- item Canva & SoundCloud tidak punya bentuk
+  // teks yang masuk akal (isinya iframe/audio pihak ketiga) -- sama
+  // semangat seperti item "media" di atas.
+  if (it.type === "canva") return "(presentasi Canva -- tayangkan lewat Studio Presentasi)";
+  if (it.type === "soundcloud") return "(audio SoundCloud -- putar lewat Studio Presentasi)";
+  // BARU (5 Sep 2026) -- lihat catatan di collectionItemRef() di atas.
+  // Beda dari "media"/"canva"/"soundcloud" (yang keterangannya menyuruh
+  // pindah ke Studio Presentasi), video YouTube portabel ini SUDAH bisa
+  // langsung tayang di Mode Layar Penuh 1-layar ini sendiri (lihat
+  // buildCollectionFsEmbed() di bawah) -- keterangan ini cuma tampil di
+  // daftar teks polos (bukan Mode Layar Penuh).
+  if (it.type === "youtube_link") return "(video YouTube)";
   return "";
 }
 
@@ -4483,12 +4710,67 @@ function collectionItemBodyHtml(it) {
     const baitHtml = (it.bait || [])
       .map((b) => `<div>${escapeHtml((b.noBait ? b.noBait + ". " : "") + b.teks).replace(/\n/g, "<br>")}</div>`)
       .join('<div class="collection-fs-gap">&nbsp;</div>');
+    // PERMINTAAN OPERATOR (5 Sep 2026): dulu SELURUH blok koor (label
+    // "Koor:" MAUPUN isinya) diwarnai kuning sekaligus (lihat CSS lama
+    // .collection-fs-koor di css/style.css). Sekarang dipecah 2 bagian --
+    // label "Koor:" tetap kuning (.collection-fs-koor-label), isi
+    // koornya sendiri BALIK ke warna teks dasar (.collection-fs-koor-body,
+    // var(--ink), ikut tema yang sedang aktif) -- supaya hanya labelnya
+    // saja yang menonjol kuning, bukan seluruh baris koor.
     const koorHtml = it.koorTeks
-      ? `<div class="collection-fs-gap">&nbsp;</div><div class="collection-fs-koor"><b>Koor:</b><br>${escapeHtml(it.koorTeks).replace(/\n/g, "<br>")}</div>`
+      ? `<div class="collection-fs-gap">&nbsp;</div><div class="collection-fs-koor"><b class="collection-fs-koor-label">Koor:</b><br><span class="collection-fs-koor-body">${escapeHtml(it.koorTeks).replace(/\n/g, "<br>")}</span></div>`
       : "";
     return baitHtml + koorHtml;
   }
   return escapeHtml(collectionItemBodyText(it)).replace(/\n/g, "<br>");
+}
+
+// ------------------------------------------------------------
+// BARU (5 Sep 2026, permintaan operator) -- Canva, SoundCloud, MAUPUN
+// YouTube sekarang bisa DITAYANGKAN LANGSUNG (bukan cuma tulisan
+// keterangan "tayangkan lewat Studio Presentasi") di Mode Layar Penuh
+// 1-layar Kumpulan Ayat (openCollectionFullscreen() di bawah) -- dipakai
+// TANPA perlu Studio Presentasi/monitor kedua sama sekali, cocok untuk
+// dipakai sendirian lewat HP.
+// ------------------------------------------------------------
+// Item mana saja yang punya bentuk embed (bukan teks polos) di Mode
+// Layar Penuh -- dipakai openCollectionFullscreen() untuk memutuskan
+// apakah menampilkan .collection-fs-text (teks biasa) ATAU kotak embed.
+function isEmbeddableCollectionItem(it) {
+  return !!it && (it.type === "canva" || it.type === "soundcloud" || it.type === "media" || it.type === "youtube_link");
+}
+
+// Sama PERSIS logikanya dengan resolveSoundCloudSrc() di present.html
+// (Layar 2 Studio Presentasi) -- lihat catatan panjang di sana & Bagian 8
+// ROADMAP-ai-presentation.md soal kenapa link pendek "on.soundcloud.com/..."
+// butuh diterjemahkan dulu lewat oEmbed resmi SoundCloud sebelum dipasang
+// ke widget publik. Sengaja DISALIN (bukan dipakai bareng lewat 1 fungsi)
+// karena present.html berjalan di jendela/dokumen terpisah (popup Layar 2)
+// -- tidak bisa saling memanggil fungsi antar dokumen. auto_play sengaja
+// SELALU false di sini (beda dari Layar 2 yang defaultnya true) -- Mode
+// Layar Penuh ini dipakai perorangan lewat HP, memutar audio otomatis
+// tanpa diminta dianggap kurang sopan di banyak browser (Chrome/Safari HP
+// biasanya memblokirnya diam-diam pula), operator/jemaat menekan ▶️ pada
+// widgetnya sendiri kalau mau memutar.
+async function resolveSoundCloudSrcForCollection(trackUrl) {
+  const paramsTail = "&auto_play=false&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+  try {
+    const oembedUrl = "https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl);
+    const res = await fetch(oembedUrl);
+    if (res.ok) {
+      const json = await res.json();
+      const html = (json && json.html) || "";
+      const srcMatch = /src="([^"]+)"/.exec(html);
+      if (srcMatch && srcMatch[1]) {
+        const urlParamMatch = /[?&]url=([^&]+)/.exec(srcMatch[1]);
+        if (urlParamMatch && urlParamMatch[1]) return "https://w.soundcloud.com/player/?url=" + urlParamMatch[1] + paramsTail;
+        return srcMatch[1]; // fallback: pakai src dari oEmbed apa adanya kalau pola "url=" tidak ketemu
+      }
+    }
+  } catch (err) {
+    // Jaringan gagal / oEmbed tidak bisa dihubungi -- lanjut ke fallback di bawah, JANGAN throw
+  }
+  return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + paramsTail;
 }
 
 function buildCollectionItemRow(id, col, it, i, opts) {
@@ -4680,6 +4962,109 @@ function handleAddFreeItemToCollection(id, col) {
   }, "Tambahkan");
 }
 
+// Versi ringkas normalizeCanvaLink() (js/presentation-studio.js) -- SENGAJA
+// disalin (bukan diimpor), sama alasannya dengan STUDIO_THEME_KEY_FOR_SHARE_
+// di js/collections.js: supaya panel Kumpulan Ayat biasa (file ini) tetap
+// bisa dipakai TANPA presentation-studio.js dimuat (mis. suatu saat mau
+// dipisah), dan supaya fitur ini bisa dipakai dari HP walau seluruh
+// #presentStudio disembunyikan di layar sempit.
+function normalizeCanvaLinkSimple_(raw) {
+  const url = String(raw || "").trim();
+  if (!url) return { url: "", needsEmbedShare: false };
+  const looksLikeShortLink = /canva\.link\//i.test(url) || (/canva\.com/i.test(url) && !/\/design\//i.test(url));
+  if (/canva\.com/i.test(url) && !looksLikeShortLink) {
+    if (/[?&]embed(\b|=)/i.test(url)) return { url, needsEmbedShare: false };
+    const sep = url.includes("?") ? "&" : "?";
+    return { url: url + sep + "embed", needsEmbedShare: false };
+  }
+  return { url, needsEmbedShare: looksLikeShortLink };
+}
+
+// BARU (5 Sep 2026, atas permintaan) -- versi SEDERHANA untuk menambahkan
+// YouTube/Canva/SoundCloud ke Kumpulan Ayat langsung dari panel biasa ini
+// (jalan di HP/Mode Layar 1, TIDAK perlu Studio Presentasi). 1 dialog,
+// dropdown jenis + kotak link + judul opsional -- sengaja jauh lebih
+// ringkas dari tab-tab Studio (yang punya pratinjau live Layar 2, "Tampilkan
+// SEKARANG" dual-monitor, dst -- semua itu memang tidak relevan lagi kalau
+// cuma 1 layar HP, cukup tersimpan ke kumpulan seperti item lain).
+function handleAddLinkItemToCollection(id, col) {
+  showSimpleDialog("🔗 Tambah Link ke Kumpulan", (box) => {
+    const field1 = document.createElement("div");
+    field1.className = "simple-dialog-field";
+    const label1 = document.createElement("label");
+    label1.textContent = "Jenis:";
+    field1.appendChild(label1);
+    const typeSel = document.createElement("select");
+    [
+      { value: "youtube_link", label: "▶️ YouTube" },
+      { value: "canva", label: "🎨 Canva" },
+      { value: "soundcloud", label: "🎵 SoundCloud" },
+    ].forEach((o) => {
+      const opt = document.createElement("option");
+      opt.value = o.value;
+      opt.textContent = o.label;
+      typeSel.appendChild(opt);
+    });
+    field1.appendChild(typeSel);
+    box.appendChild(field1);
+
+    const field2 = document.createElement("div");
+    field2.className = "simple-dialog-field";
+    const label2 = document.createElement("label");
+    label2.textContent = "Link:";
+    field2.appendChild(label2);
+    const linkInput = document.createElement("input");
+    linkInput.type = "text";
+    linkInput.placeholder = "Tempel link di sini…";
+    field2.appendChild(linkInput);
+    box.appendChild(field2);
+
+    const field3 = document.createElement("div");
+    field3.className = "simple-dialog-field";
+    const label3 = document.createElement("label");
+    label3.textContent = "Judul (opsional):";
+    field3.appendChild(label3);
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.placeholder = "mis. Pujian Pembuka";
+    field3.appendChild(titleInput);
+    box.appendChild(field3);
+
+    const hint = document.createElement("p");
+    hint.className = "simple-dialog-hint";
+    hint.textContent = "YouTube: tempel link biasa (youtube.com/watch..., youtu.be/..., atau Shorts). Canva: pakai link \"Bagikan → Sematkan (Embed)\" (berakhiran \"view?embed\") -- link pendek \"canva.link/...\" biasa sering diblokir Canva sendiri. SoundCloud: tempel link trek/playlist biasa (soundcloud.com/... atau on.soundcloud.com/...).";
+    box.appendChild(hint);
+
+    setTimeout(() => linkInput.focus(), 0);
+
+    return () => {
+      const link = linkInput.value.trim();
+      if (!link) return null;
+      return { type: typeSel.value, link, title: titleInput.value.trim() };
+    };
+  }, (val) => {
+    let ok = null;
+    if (val.type === "youtube_link") {
+      const embedUrl = typeof youTubeEmbedUrl === "function" ? youTubeEmbedUrl(val.link) : null;
+      if (!embedUrl) {
+        alert('Link YouTube tidak dikenali -- pastikan link "youtube.com/watch...", "youtu.be/...", atau link Shorts yang valid.');
+        return;
+      }
+      ok = addYoutubeLinkToCollection(currentUser, col.name, { embedUrl, sourceUrl: val.link, title: val.title });
+    } else if (val.type === "canva") {
+      const norm = normalizeCanvaLinkSimple_(val.link);
+      if (norm.needsEmbedShare) {
+        alert('Peringatan: link ini sepertinya link Canva pendek biasa ("canva.link/..."), BUKAN link "Bagikan → Sematkan (Embed)" -- kemungkinan tidak akan tampil. Tetap disimpan, tapi sebaiknya buka desain di Canva -> Bagikan -> Sematkan (Embed) -> salin link itu (berakhiran "view?embed") lalu tambahkan ulang.');
+      }
+      ok = addCanvaToCollection(currentUser, col.name, { embedUrl: norm.url, title: val.title });
+    } else if (val.type === "soundcloud") {
+      ok = addSoundCloudToCollection(currentUser, col.name, { trackUrl: val.link, title: val.title });
+    }
+    if (ok) renderCollectionsPanel(id);
+    else alert("Gagal menambahkan -- periksa lagi link-nya.");
+  }, "Tambahkan");
+}
+
 // ------------------------------------------------------------
 // 8c-3) MODE LAYAR PENUH — KUMPULAN AYAT
 //     Membuka satu ayat per layar (besar & fokus), dengan:
@@ -4751,7 +5136,181 @@ function openCollectionFullscreen(col, startIndex) {
     if (textEl) { textEl.style.fontFamily = f.body; textEl.style.fontWeight = f.weight; }
   }
 
+  // BARU (5 Sep 2026, permintaan operator) -- Mode Layar Penuh Kumpulan
+  // Ayat sekarang JUGA meminta Fullscreen API sungguhan (bukan cuma
+  // overlay yang menutupi layar lewat CSS `position: fixed; inset: 0`
+  // seperti sebelumnya) -- supaya sambungan ke proyektor/monitor kedua
+  // benar-benar bebas dari bilah alamat/tab browser. Overlay CSS lama
+  // tetap dipertahankan APA ADANYA sebagai jaring pengaman: kalau
+  // Fullscreen API ditolak/tidak didukung browser (mis. dibuka di dalam
+  // <iframe> tanpa izin, atau operator menekan "Batal" pada dialog izin),
+  // tampilan tetap terlihat penuh layar seperti biasa lewat CSS, cuma
+  // tanpa menyembunyikan bilah alamat -- TIDAK ada fitur yang rusak.
+  // fsApiActive menandai APAKAH kita sendiri yang memicu permintaan ini
+  // (supaya closeOverlay() hanya keluar dari fullscreen kalau memang kita
+  // yang memasukinya -- tidak mengganggu tombol "⛶ Layar Penuh" umum di
+  // header aplikasi, lihat initFullscreenControl(), kalau itu yang
+  // sedang aktif alih-alih punya kita).
+  let fsApiActive = false;
+  function requestRealFullscreen() {
+    const fn = overlay.requestFullscreen || overlay.webkitRequestFullscreen;
+    if (!fn) return; // browser tidak dukung -- diamkan saja, overlay CSS sudah cukup
+    if (document.fullscreenElement || document.webkitFullscreenElement) return; // sudah ada yg fullscreen (mis. lewat tombol header) -- jangan diganggu
+    try {
+      const p = fn.call(overlay);
+      if (p && typeof p.then === "function") {
+        p.then(() => { fsApiActive = true; updateFsBtnLabel(); }).catch(() => {});
+      } else {
+        // Safari lama: webkitRequestFullscreen tidak balikan Promise --
+        // anggap berhasil (fullscreenchange di bawah akan tetap
+        // memperbaiki fsApiActive kalau ternyata gagal).
+        fsApiActive = true;
+      }
+    } catch (err) { /* diamkan -- degradasi ke overlay CSS biasa */ }
+  }
+  function exitRealFullscreenIfOurs() {
+    if (!fsApiActive) return;
+    fsApiActive = false;
+    const exitFn = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exitFn && (document.fullscreenElement === overlay || document.webkitFullscreenElement === overlay)) {
+      const ret = exitFn.call(document);
+      if (ret && typeof ret.catch === "function") ret.catch(() => {});
+    }
+  }
+  let fsToggleBtnRef = null;
+  function updateFsBtnLabel() {
+    const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (fsToggleBtnRef) {
+      fsToggleBtnRef.textContent = active ? "⤢ Keluar Layar Penuh" : "⛶ Layar Penuh";
+      fsToggleBtnRef.title = active ? "Keluar dari mode layar penuh sungguhan" : "Masuk mode layar penuh sungguhan (sembunyikan bilah browser)";
+    }
+  }
+  function onFullscreenChange() {
+    // Kalau fullscreen keluar sendiri (mis. operator menekan Esc, atau
+    // menekan tombol "Exit fullscreen" bawaan browser) TANPA menutup
+    // overlay ini -- fsApiActive diturunkan supaya closeOverlay() nanti
+    // tidak salah mencoba keluar fullscreen lagi, dan label tombol ikut
+    // diperbarui.
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) fsApiActive = false;
+    updateFsBtnLabel();
+  }
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+
+  // BARU (5 Sep 2026, permintaan operator) -- panel kecil ganti tema
+  // (memakai ulang THEMES/applyTheme() yang sudah ada di Bagian 11b di
+  // bawah berkas ini) supaya tema bisa diganti TANPA keluar dulu dari
+  // Mode Layar Penuh. Statusnya (terbuka/tertutup) sengaja disimpan di
+  // closure ini (bukan dibaca ulang tiap render()) supaya tetap
+  // konsisten selama overlay ini dibuka, sama pola dengan widthBtnRef.
+  let themePanelOpen = false;
+
+  // BARU (5 Sep 2026) -- lihat catatan panjang di atas dekat
+  // isEmbeddableCollectionItem()/resolveSoundCloudSrcForCollection().
+  // renderToken dinaikkan tiap render() dipanggil -- dipakai sebagai
+  // "nomor tiket" supaya hasil permintaan async (oEmbed SoundCloud,
+  // loadMediaItems() utk YouTube) yang datang TERLAMBAT (operator sudah
+  // keburu pindah slide lain sebelum permintaan itu selesai) tidak salah
+  // menimpa DOM slide yang SEDANG tayang sekarang.
+  let renderToken = 0;
+  function buildCollectionFsEmbed(it, myToken) {
+    if (it.type === "youtube_link" && it.embedUrl) {
+      // BARU (5 Sep 2026) -- item YouTube PORTABEL (embedUrl tersimpan
+      // langsung di item, lihat addYoutubeLinkToCollection() di
+      // js/collections.js), jadi TIDAK perlu menunggu loadMediaItems()
+      // async seperti it.type==="media" di bawah -- langsung dibuat.
+      const wrap = document.createElement("div");
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-youtube";
+      const iframe = document.createElement("iframe");
+      iframe.src = it.embedUrl;
+      iframe.setAttribute("allow", "autoplay; fullscreen; encrypted-media");
+      iframe.setAttribute("allowfullscreen", "true");
+      iframe.className = "collection-fs-embed-iframe";
+      wrap.appendChild(iframe);
+      return wrap;
+    }
+    if (it.type === "canva" && it.embedUrl) {
+      const wrap = document.createElement("div");
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-canva";
+      const iframe = document.createElement("iframe");
+      iframe.src = it.embedUrl;
+      iframe.setAttribute("allow", "fullscreen");
+      iframe.setAttribute("allowfullscreen", "true");
+      iframe.loading = "lazy";
+      iframe.className = "collection-fs-embed-iframe";
+      wrap.appendChild(iframe);
+      return wrap;
+    }
+    if (it.type === "soundcloud" && it.trackUrl) {
+      const wrap = document.createElement("div");
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-soundcloud";
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("allow", "autoplay");
+      iframe.className = "collection-fs-embed-iframe collection-fs-embed-iframe-audio";
+      wrap.appendChild(iframe);
+      const openLink = document.createElement("a");
+      openLink.href = it.trackUrl;
+      openLink.target = "_blank";
+      openLink.rel = "noopener noreferrer";
+      openLink.className = "collection-fs-embed-openlink";
+      openLink.textContent = "🔗 Buka di SoundCloud";
+      wrap.appendChild(openLink);
+      resolveSoundCloudSrcForCollection(it.trackUrl).then((src) => {
+        if (myToken !== renderToken) return; // sudah pindah slide -- diamkan
+        iframe.src = src;
+      });
+      return wrap;
+    }
+    if (it.type === "media" && it.mediaItemId) {
+      const wrap = document.createElement("div");
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-media";
+      const loadingMsg = document.createElement("div");
+      loadingMsg.className = "collection-fs-embed-loading";
+      loadingMsg.textContent = "Memuat pratinjau berkas…";
+      wrap.appendChild(loadingMsg);
+      if (typeof loadMediaItems === "function" && currentUser) {
+        loadMediaItems(currentUser).then((items) => {
+          if (myToken !== renderToken) return;
+          const mediaItem = (items || []).find((m) => m.id === it.mediaItemId);
+          const pageIndex = it.pageIndex || 0;
+          wrap.innerHTML = "";
+          if (mediaItem && mediaItem.type === "youtube" && Array.isArray(mediaItem.images) && mediaItem.images[pageIndex]) {
+            // Video YouTube -- ditayangkan langsung di sini (BARU), dulu
+            // cuma tulisan "tayangkan lewat Studio Presentasi".
+            const iframe = document.createElement("iframe");
+            iframe.src = mediaItem.images[pageIndex];
+            iframe.setAttribute("allow", "autoplay; fullscreen; encrypted-media");
+            iframe.setAttribute("allowfullscreen", "true");
+            iframe.className = "collection-fs-embed-iframe";
+            wrap.appendChild(iframe);
+          } else if (mediaItem && Array.isArray(mediaItem.images) && mediaItem.images[pageIndex]) {
+            // Bonus (sekalian, bukan diminta): gambar/halaman PDF biasa
+            // juga langsung ditampilkan di sini, bukan cuma keterangan --
+            // konsisten dengan Canva/SoundCloud/YouTube yang sudah bisa
+            // langsung tayang.
+            const img = document.createElement("img");
+            img.src = mediaItem.images[pageIndex];
+            img.alt = it.name || "Berkas";
+            img.className = "collection-fs-embed-image";
+            wrap.appendChild(img);
+          } else {
+            wrap.textContent = "(berkas tidak ditemukan -- mungkin sudah dihapus dari Media Tersimpan)";
+          }
+        }).catch(() => {
+          if (myToken !== renderToken) return;
+          wrap.textContent = "(gagal memuat pratinjau berkas)";
+        });
+      } else {
+        wrap.textContent = "(berkas -- perlu masuk akun untuk memuat pratinjau)";
+      }
+      return wrap;
+    }
+    return null;
+  }
+
   function render() {
+    renderToken += 1;
+    const myToken = renderToken;
     overlay.innerHTML = "";
     overlay.classList.toggle("fs-wide", currentWidthMode() === "wide");
     // PERBAIKAN (Kumpulan Ayat generik): dulu hanya col.verseIds[idx] (item
@@ -4807,7 +5366,57 @@ function openCollectionFullscreen(col, startIndex) {
     fontSel.addEventListener("change", () => setFontFamily(fontSel.value));
     fontRow.appendChild(fontSel);
 
+    // BARU (5 Sep 2026) -- tombol masuk/keluar Fullscreen API sungguhan
+    // (lihat requestRealFullscreen()/exitRealFullscreenIfOurs() di atas).
+    // Auto-diminta sekali begitu overlay ini dibuka (di bawah, dekat
+    // document.addEventListener("keydown", ...)) -- tombol ini cuma
+    // jaring pengaman kalau operator ingin masuk/keluar manual, atau
+    // kalau permintaan otomatis tadi gagal/ditolak browser.
+    const fsToggleBtn = document.createElement("button");
+    fsToggleBtn.className = "chip-btn small";
+    fsToggleBtnRef = fsToggleBtn;
+    fsToggleBtn.addEventListener("click", () => {
+      if (document.fullscreenElement || document.webkitFullscreenElement) exitRealFullscreenIfOurs();
+      else requestRealFullscreen();
+    });
+    updateFsBtnLabel();
+    fontRow.appendChild(fsToggleBtn);
+
+    // BARU (5 Sep 2026) -- tombol "🎨 Tema" supaya operator bisa ganti
+    // tema tampilan TANPA keluar dari Mode Layar Penuh (panel swatch-nya
+    // dibangun di bawah, dekat navRow, memakai ulang THEMES/applyTheme()
+    // dari Bagian 11b -- lihat komentar di atas dekat `themePanelOpen`).
+    const themeBtn = document.createElement("button");
+    themeBtn.className = "chip-btn small";
+    themeBtn.textContent = "🎨 Tema";
+    themeBtn.title = "Ganti tema tampilan";
+    themeBtn.addEventListener("click", () => { themePanelOpen = !themePanelOpen; render(); });
+    fontRow.appendChild(themeBtn);
+
     overlay.appendChild(fontRow);
+
+    // Panel swatch tema -- HANYA dibangun kalau themePanelOpen true (tombol
+    // "🎨 Tema" di atas ditekan). Memakai ulang array THEMES & fungsi
+    // applyTheme() yang sudah ada (Bagian 11b, lebih bawah di berkas ini)
+    // supaya daftar & warna temanya selalu 100% sama dengan menu Tema utama
+    // -- tidak ada daftar tema kedua yang perlu dirawat terpisah.
+    if (themePanelOpen) {
+      const themePanel = document.createElement("div");
+      themePanel.className = "collection-fs-theme-panel theme-picker";
+      const savedThemeId = parseInt(localStorage.getItem(THEME_STORAGE_KEY), 10) || 1;
+      THEMES.forEach((t) => {
+        const sw = document.createElement("button");
+        sw.type = "button";
+        sw.className = "theme-swatch" + (t.id === savedThemeId ? " active" : "");
+        sw.title = t.name;
+        sw.setAttribute("aria-label", "Tema " + t.name);
+        sw.style.background = t.swatch;
+        sw.style.color = t.ink;
+        sw.addEventListener("click", () => { applyTheme(t.id); render(); });
+        themePanel.appendChild(sw);
+      });
+      overlay.appendChild(themePanel);
+    }
 
     const box = document.createElement("div");
     box.className = "collection-fs-box";
@@ -4826,16 +5435,26 @@ function openCollectionFullscreen(col, startIndex) {
       box.appendChild(fsPlayBtn);
     }
 
-    const textEl = document.createElement("div");
-    textEl.className = "collection-fs-text";
-    textEl.style.fontSize = currentFontSize() + "px";
-    textEl.style.fontFamily = currentFontFamily().body;
-    textEl.style.fontWeight = currentFontFamily().weight;
-    // innerHTML (bukan textContent) khusus supaya item "kidung" bisa
-    // menyorot barisnya koor warna kuning (lihat collectionItemBodyHtml()
-    // di atas) -- item jenis lain tetap sama persis (di-escape dulu).
-    textEl.innerHTML = it ? collectionItemBodyHtml(it) : "";
-    box.appendChild(textEl);
+    // BARU (5 Sep 2026) -- item Canva/SoundCloud/YouTube(media) sekarang
+    // menampilkan KOTAK EMBED sungguhan (lihat buildCollectionFsEmbed()
+    // di atas) alih-alih tulisan keterangan biasa. Item jenis lain (ayat/
+    // teks/pengumuman/kidung/gambar-PDF-tanpa-embed) TETAP memakai
+    // .collection-fs-text seperti sebelumnya, tidak berubah.
+    if (isEmbeddableCollectionItem(it)) {
+      const embedBox = buildCollectionFsEmbed(it, myToken);
+      if (embedBox) box.appendChild(embedBox);
+    } else {
+      const textEl = document.createElement("div");
+      textEl.className = "collection-fs-text";
+      textEl.style.fontSize = currentFontSize() + "px";
+      textEl.style.fontFamily = currentFontFamily().body;
+      textEl.style.fontWeight = currentFontFamily().weight;
+      // innerHTML (bukan textContent) khusus supaya item "kidung" bisa
+      // menyorot barisnya koor warna kuning (lihat collectionItemBodyHtml()
+      // di atas) -- item jenis lain tetap sama persis (di-escape dulu).
+      textEl.innerHTML = it ? collectionItemBodyHtml(it) : "";
+      box.appendChild(textEl);
+    }
 
     if (noteText) {
       const noteEl = document.createElement("div");
@@ -4896,14 +5515,27 @@ function openCollectionFullscreen(col, startIndex) {
   }
   function closeOverlay() {
     stopCollectionVersePlayback();
+    exitRealFullscreenIfOurs();
     overlay.hidden = true;
     overlay.innerHTML = "";
     document.removeEventListener("keydown", onKeyDown);
+    document.removeEventListener("fullscreenchange", onFullscreenChange);
+    document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
   }
 
   document.addEventListener("keydown", onKeyDown);
   overlay.hidden = false;
   render();
+  // Diminta SETELAH render() pertama supaya overlay sudah ada isinya di
+  // DOM saat requestFullscreen() dipanggil -- tetap dalam tumpukan
+  // panggilan (call stack) yang sama dengan klik tombol "Layar Penuh" di
+  // panel Kumpulan Ayat, jadi masih terhitung "gesture pengguna" oleh
+  // browser (syarat wajib API ini, lihat requestRealFullscreen() di
+  // atas). Navigasi Sebelumnya/Selanjutnya sesudah ini TIDAK memanggil
+  // ulang fungsi ini -- overlay yang sama tetap berada di dalam
+  // fullscreen sepanjang dipindah slide (goPrev()/goNext() cuma
+  // menjalankan render() ulang, tidak menyentuh status fullscreen).
+  requestRealFullscreen();
 }
 //     (menu yang dibuka, pencarian, tanggal/jam, OS, IP) yang sudah
 //     dikumpulkan js/activitylog.js, dengan filter & tombol simpan (CSV).
@@ -5759,6 +6391,7 @@ function hideAllPanels() {
   if (el("notesPanel")) el("notesPanel").hidden = true;
   if (el("collectionsPanel")) el("collectionsPanel").hidden = true;
   if (el("kidungPanel")) el("kidungPanel").hidden = true;
+  if (el("lifeStudyPanel")) el("lifeStudyPanel").hidden = true;
   if (el("logPanel")) el("logPanel").hidden = true;
   if (el("driveUsagePanel")) el("driveUsagePanel").hidden = true;
   if (el("monitorPanel")) el("monitorPanel").hidden = true;
@@ -6262,6 +6895,45 @@ function updateTTSButton() {
   btn.title = ttsPlaying ? "Jeda pembacaan" : "Putar pembacaan ayat";
 }
 
+// BARU (6 Sep 2026, permintaan operator) -- logika "bicarakan daftar ayat
+// ini" DIPISAH dari playTTS() supaya bisa dipakai ULANG oleh
+// playTTSFromVerse() (baca mulai dari ayat tertentu, lihat tombol
+// "▶️ Baca dari sini" di buildNoteQuickActionsRow()) TANPA menyalin-nyalin
+// kode yang sama. playTTS() (tombol ▶️/⏸️ di kepala halaman) TETAP
+// berperilaku SAMA PERSIS seperti sebelumnya -- selalu dari ayat 1
+// `currentChapterVerses` -- TIDAK ada yang berubah di sana, cuma badannya
+// dipindah ke sini.
+function speakVerseList(verses) {
+  if (!ttsSupported || !verses || !verses.length) return;
+  window.speechSynthesis.cancel();
+  const voice = pickVoice();
+  verses.forEach((v, idx) => {
+    let spoken = `Ayat ${v.verse}. ${v.text}`;
+    if (ttsSettings.readNotes && v.note && v.note.trim()) {
+      let noteSpoken = noteHtmlToPlainText(v.note);
+      if (ttsSettings.parseArticulation) noteSpoken = cleanArticulationForSpeech(noteSpoken);
+      spoken += ` Catatan. ${noteSpoken}`;
+    }
+    const utter = new SpeechSynthesisUtterance(spoken);
+    if (voice) utter.voice = voice;
+    utter.lang = ttsSettings.lang;
+    utter.rate = ttsSettings.rate;
+    utter.onstart = () => setSpeakingHighlight(el("v-" + v.id));
+    if (idx === verses.length - 1) {
+      utter.onend = () => {
+        ttsPlaying = false;
+        releaseWakeLock();
+        setSpeakingHighlight(null);
+        updateTTSButton();
+      };
+    }
+    window.speechSynthesis.speak(utter);
+  });
+  ttsPlaying = true;
+  requestWakeLock();
+  updateTTSButton();
+}
+
 function playTTS() {
   if (!ttsSupported) return;
 
@@ -6275,35 +6947,22 @@ function playTTS() {
   }
 
   if (!currentChapterVerses.length) return;
-  window.speechSynthesis.cancel();
+  speakVerseList(currentChapterVerses);
+}
 
-  const voice = pickVoice();
-  currentChapterVerses.forEach((v, idx) => {
-    let spoken = `Ayat ${v.verse}. ${v.text}`;
-    if (ttsSettings.readNotes && v.note && v.note.trim()) {
-      let noteSpoken = noteHtmlToPlainText(v.note);
-      if (ttsSettings.parseArticulation) noteSpoken = cleanArticulationForSpeech(noteSpoken);
-      spoken += ` Catatan. ${noteSpoken}`;
-    }
-    const utter = new SpeechSynthesisUtterance(spoken);
-    if (voice) utter.voice = voice;
-    utter.lang = ttsSettings.lang;
-    utter.rate = ttsSettings.rate;
-    utter.onstart = () => setSpeakingHighlight(el("v-" + v.id));
-    if (idx === currentChapterVerses.length - 1) {
-      utter.onend = () => {
-        ttsPlaying = false;
-        releaseWakeLock();
-        setSpeakingHighlight(null);
-        updateTTSButton();
-      };
-    }
-    window.speechSynthesis.speak(utter);
-  });
-
-  ttsPlaying = true;
-  requestWakeLock();
-  updateTTSButton();
+// BARU (6 Sep 2026, permintaan operator) -- "▶️ Baca dari sini": mulai
+// bacakan `verses` (array SATU BAHASA/KOLOM -- lihat sourceVerses di
+// buildVerseBlock()) dari ayat bernomor `startVerseNum` SAMPAI AKHIR
+// pasal itu (BUKAN cuma 1 ayat) -- kalau tidak ketemu nomor itu di array
+// (harusnya tidak pernah terjadi, tapi jaga-jaga), fallback membacakan
+// semuanya dari awal. Tombol ▶️/⏸️ di kepala halaman TETAP bisa dipakai
+// untuk jeda/lanjut pembacaan ini (ttsPlaying/updateTTSButton() dipakai
+// SAMA seperti playTTS() biasa, lewat speakVerseList() bersama).
+function playTTSFromVerse(verses, startVerseNum) {
+  if (!ttsSupported || !verses || !verses.length) return;
+  const idx = verses.findIndex((v) => v.verse === startVerseNum);
+  const toRead = idx >= 0 ? verses.slice(idx) : verses;
+  speakVerseList(toRead);
 }
 
 function pauseTTS() {
@@ -6875,6 +7534,16 @@ function initUIEvents() {
     el("kidungMenuBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
       showKidungPanel();
+      closeSidebarOnMobile();
+    });
+  }
+  // BARU (6 Sep 2026, permintaan operator) -- lihat js/lifestudy.js untuk
+  // seluruh logika panel ini (daftar 66 kitab, link asli bibleread.online,
+  // catatan "terakhir dibaca" lokal per akun).
+  if (el("lifeStudyMenuBtn")) {
+    el("lifeStudyMenuBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      if (typeof showLifeStudyPanel === "function") showLifeStudyPanel();
       closeSidebarOnMobile();
     });
   }
