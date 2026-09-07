@@ -1612,11 +1612,43 @@ const PresentationStudio = (() => {
   // untuk versi awal ini).
   // ------------------------------------------------------------
   function wireMessage() {
+    // BARU (7 Sep 2026) -- ditulis ulang, lihat catatan alur lengkapnya:
+    //  1) Posisi "⬆️ Atas"  -> lapisan {type:"warta"}    (bar nempel ATAS layar)
+    //  2) Posisi "⬇️ Bawah" -> lapisan {type:"footnote"} (bar nempel BAWAH layar)
+    //  3) Posisi "⏺️ Tengah"-> lapisan {type:"msgmid"}   (bar nempel TENGAH layar, BARU)
+    // KETIGANYA murni LAPISAN MENGAMBANG di ATAS #stage (lihat present.html,
+    // applyTicker() & CSS .ticker-bar) -- TIDAK PERNAH mengganti/menghapus
+    // apa pun yang sedang tayang di baliknya (ayat/kidung/YouTube/
+    // pengumuman/stopwatch/timer tetap utuh). SEBELUMNYA posisi "Tengah"
+    // salah kirim {type:"text"} (lewat post()) yang justru MENIMPA isi
+    // utama #stage -- itu sebabnya "Tengah" terasa keliru/beda dari
+    // Atas & Bawah.
+    // Ganti warna ATAU pindah posisi SAAT pesan sedang tayang sekarang
+    // langsung ikut berubah di Layar 2 (sebelumnya harus Stop dulu baru
+    // efeknya kelihatan lain kali Tayangkan ditekan).
+    function hideAllMessageBars_() {
+      rawPost({ type: "warta", show: false, text: "" });
+      rawPost({ type: "footnote", show: false, text: "" });
+      rawPost({ type: "msgmid", show: false, text: "" });
+    }
+    function sendMessageNow_() {
+      if (!msgRunning) return;
+      const text = (el("psMsgText") && el("psMsgText").value.trim()) || "";
+      if (!text) return;
+      const scroll = !!(el("psMsgRunning") && el("psMsgRunning").checked);
+      const payloadType = msgPos === "top" ? "warta" : msgPos === "bottom" ? "footnote" : "msgmid";
+      // Sembunyikan dulu SEMUA posisi (jaga-jaga kalau operator baru saja
+      // memindah posisi selagi pesan tayang) supaya tidak ada 2 bar
+      // nyangkut tampil bersamaan, baru tampilkan di posisi yang benar.
+      hideAllMessageBars_();
+      rawPost({ type: payloadType, show: true, text, scroll, color: msgColor });
+    }
     document.querySelectorAll("#psMsgColorRow .ps-color-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         document.querySelectorAll("#psMsgColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
         chip.classList.add("active");
         msgColor = chip.dataset.color;
+        sendMessageNow_(); // no-op kalau pesan belum tayang (msgRunning masih false)
       });
     });
     document.querySelectorAll("#psMsgPosRow [data-pos]").forEach((btn) => {
@@ -1624,6 +1656,7 @@ const PresentationStudio = (() => {
         document.querySelectorAll("#psMsgPosRow [data-pos]").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         msgPos = btn.dataset.pos;
+        sendMessageNow_(); // no-op kalau pesan belum tayang (msgRunning masih false)
       });
     });
     if (el("psMsgToggleBtn")) {
@@ -1631,36 +1664,15 @@ const PresentationStudio = (() => {
         msgRunning = !msgRunning;
         const btn = el("psMsgToggleBtn");
         const text = (el("psMsgText") && el("psMsgText").value.trim()) || "";
-        // PERBAIKAN (laporan operator 28 Agu 2026, "pesan tidak bisa
-        // jalan marquee dari kanan ke kiri"): checkbox "#psMsgRunning"
-        // ("▶️ Berjalan") SEBELUMNYA TIDAK PERNAH dibaca sama sekali di
-        // sini -- present.html sendiri yang MEMUTUSKAN SENDIRI scroll
-        // atau tidak berdasarkan PANJANG teks (>40 karakter = geser,
-        // <=40 karakter = diam di tengah, lihat applyTicker() di
-        // present.html) -- jadi checkbox itu betul cuma pajangan, tidak
-        // berpengaruh apa pun, dan pesan PENDEK (di bawah 40 karakter,
-        // seperti "sekarang waktunya jalan" di laporan) SELALU tampil
-        // diam di tengah walau checkbox "Berjalan" dicentang.
-        // SEKARANG: pilihan checkbox ini yang MENENTUKAN, dikirim
-        // eksplisit lewat `scroll` -- present.html tidak lagi menebak
-        // sendiri dari panjang teks (lihat applyTicker() di sana, sudah
-        // diperbarui juga). Warna teks (`msgColor`, dari palet "Warna
-        // Teks" di atas) JUGA baru sekarang ikut dikirim -- sebelumnya
-        // tersimpan di variabel ini tapi tidak pernah dipakai sama
-        // sekali, jadi pilihan warnanya juga tidak berpengaruh apa pun.
-        const scroll = !!(el("psMsgRunning") && el("psMsgRunning").checked);
         if (msgRunning) {
           if (!text) { msgRunning = false; return; }
           btn.textContent = "⏹️ Stop";
           btn.classList.add("blinking");
-          if (msgPos === "top") rawPost({ type: "warta", show: true, text, scroll, color: msgColor });
-          else if (msgPos === "bottom") rawPost({ type: "footnote", show: true, text, scroll, color: msgColor });
-          else post({ type: "text", text });
+          sendMessageNow_();
         } else {
           btn.textContent = "▶️ Tayangkan";
           btn.classList.remove("blinking");
-          rawPost({ type: "warta", show: false, text: "" });
-          rawPost({ type: "footnote", show: false, text: "" });
+          hideAllMessageBars_();
         }
       });
     }
@@ -1692,6 +1704,15 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------
   let timerState_ = "standby";
   let timerRemainingAtPause_ = null; // detik sisa saat "⏸️ Jeda" ditekan -- null kalau tidak sedang dijeda
+  // BARU (7 Sep 2026, permintaan operator) -- "👁️ Tampilkan ke Layar 2":
+  // operator bisa menayangkan status "siap, belum mulai" (angka BERKEDIP
+  // + label "MULAI") ke Layar 2 LEBIH DULU, sebelum menekan "▶️ Mulai" --
+  // supaya jemaat sudah tahu ada timer yang akan berjalan. timerPreviewing_
+  // TRUE berarti overlay standby ini SEDANG tayang di Layar 2 (dikirim
+  // ulang otomatis tiap durasi/label berubah, lihat sendTimerStandbyPreview_()
+  // di bawah) -- otomatis jadi FALSE lagi begitu "▶️ Mulai" ditekan (Layar 2
+  // beralih dari berkedip ke menghitung beneran) ATAU "🔁 Ulang" ditekan.
+  let timerPreviewing_ = false;
 
   function fmtMMSS(totalSec) {
     const s = Math.max(0, Math.round(totalSec));
@@ -1706,6 +1727,7 @@ const PresentationStudio = (() => {
     const startBtn = el("psTimerStartBtn");
     const pauseBtn = el("psTimerStopBtn");
     const resetBtn = el("psTimerCancelBtn");
+    const previewBtn = el("psTimerPreviewBtn"); // BARU 7 Sep 2026
     const disp = el("psTimerDisplay");
     if (disp) {
       disp.classList.toggle("ps-timer-standby", timerState_ === "standby");
@@ -1718,6 +1740,35 @@ const PresentationStudio = (() => {
     }
     if (pauseBtn) pauseBtn.hidden = timerState_ !== "running";
     if (resetBtn) resetBtn.hidden = timerState_ === "standby";
+    // BARU (7 Sep 2026) -- "👁️ Tampilkan" cuma relevan SAAT standby (begitu
+    // berjalan, Layar 2 otomatis sudah menampilkan angka berjalan beneran).
+    if (previewBtn) previewBtn.hidden = timerState_ !== "standby";
+  }
+
+  // BARU (7 Sep 2026) -- kirim ULANG overlay standby ke Layar 2 kalau
+  // sedang ditayangkan (timerPreviewing_ true), dipanggil tiap durasi/
+  // label berubah supaya Layar 2 selalu ikut durasi/label TERBARU yang
+  // dipilih operator, bukan angka lama saat "👁️ Tampilkan" pertama ditekan.
+  function sendTimerStandbyPreview_() {
+    if (!timerPreviewing_) return;
+    const label = (el("psTimerLabel") && el("psTimerLabel").value.trim()) || "Sesi Bagi Nikmat";
+    rawPost({ type: "timer", action: "standby", label, totalSeconds: timerTotal });
+  }
+
+  // "👁️ Tampilkan ke Layar 2" / "🙈 Sembunyikan" -- toggle overlay standby
+  // (angka berkedip + label "MULAI") di Layar 2, TANPA memulai hitungan.
+  function toggleTimerPreview_() {
+    const btn = el("psTimerPreviewBtn");
+    if (!timerPreviewing_) {
+      if (timerTotal <= 0) { flashTimerNeedsDuration(); return; } // belum pilih durasi -- sama seperti "▶️ Mulai" tanpa durasi
+      timerPreviewing_ = true;
+      sendTimerStandbyPreview_();
+      if (btn) { btn.textContent = "🙈 Sembunyikan dari Layar 2"; btn.classList.add("blinking"); }
+    } else {
+      timerPreviewing_ = false;
+      rawPost({ type: "timer", action: "stop" });
+      if (btn) { btn.textContent = "👁️ Tampilkan ke Layar 2"; btn.classList.remove("blinking"); }
+    }
   }
 
   function setTimerCustomSeconds(sec) {
@@ -1726,6 +1777,7 @@ const PresentationStudio = (() => {
     if (el("psTimerDisplay")) el("psTimerDisplay").textContent = fmtMMSS(sec);
     timerTotal = sec;
     renderTimerUi_();
+    sendTimerStandbyPreview_(); // BARU 7 Sep 2026 -- ikut update Layar 2 kalau sedang di-preview
   }
 
   function syncTimerLabelPreview() {
@@ -1733,6 +1785,7 @@ const PresentationStudio = (() => {
     if (!preview) return;
     const label = (el("psTimerLabel") && el("psTimerLabel").value.trim()) || "Sesi Bagi Nikmat";
     preview.textContent = label;
+    sendTimerStandbyPreview_(); // BARU 7 Sep 2026 -- ikut update Layar 2 kalau sedang di-preview
   }
 
   // `resumeEndAt`/`resumeTotal` (opsional) -- dipakai KHUSUS oleh
@@ -1747,10 +1800,19 @@ const PresentationStudio = (() => {
     timerEndAt = resumeEndAt || (Date.now() + totalSeconds * 1000);
     timerState_ = "running";
     timerRemainingAtPause_ = null;
+    // BARU (7 Sep 2026) -- overlay standby (kalau sempat ditayangkan)
+    // otomatis "dikonsumsi" begitu beneran Mulai -- Layar 2 beralih dari
+    // berkedip ke menghitung, tombol "👁️ Tampilkan" balik ke teks awal.
+    if (timerPreviewing_) {
+      timerPreviewing_ = false;
+      const previewBtn = el("psTimerPreviewBtn");
+      if (previewBtn) { previewBtn.textContent = "👁️ Tampilkan ke Layar 2"; previewBtn.classList.remove("blinking"); }
+    }
     const label = (el("psTimerLabel") && el("psTimerLabel").value.trim()) || "Sesi Bagi Nikmat";
     const bell = !!(el("psTimerBell") && el("psTimerBell").checked);
+    const bellKey = getSelectedBellKey_();
     syncTimerLabelPreview();
-    rawPost({ type: "timer", action: resumeEndAt ? "resume" : "start", label, totalSeconds: timerTotal, endAt: timerEndAt, bell });
+    rawPost({ type: "timer", action: resumeEndAt ? "resume" : "start", label, totalSeconds: timerTotal, endAt: timerEndAt, bell, bellKey });
     renderTimerUi_();
     const disp = el("psTimerDisplay");
     timerDisplayInterval = setInterval(() => {
@@ -1798,6 +1860,12 @@ const PresentationStudio = (() => {
   function resetTimerToStandby_() {
     stopTimerDisplay();
     timerRemainingAtPause_ = null;
+    // BARU (7 Sep 2026) -- matikan juga status preview supaya tidak
+    // nyangkut "🙈 Sembunyikan" padahal overlay-nya sudah disembunyikan
+    // paksa oleh action "stop" di bawah.
+    timerPreviewing_ = false;
+    const previewBtn = el("psTimerPreviewBtn");
+    if (previewBtn) { previewBtn.textContent = "👁️ Tampilkan ke Layar 2"; previewBtn.classList.remove("blinking"); }
     rawPost({ type: "timer", action: "stop" }); // sembunyikan overlay Layar 2 (kalau sedang tayang/dijeda)
     setTimerCustomSeconds(timerTotal); // balik ke standby, DURASI SAMA seperti sebelumnya (bukan 0)
   }
@@ -1813,6 +1881,35 @@ const PresentationStudio = (() => {
     if (!disp) return;
     disp.classList.add("done");
     setTimeout(() => { if (timerState_ !== "done") disp.classList.remove("done"); }, 500);
+  }
+
+  // ------------------------------------------------------------
+  // BARU (7 Sep 2026) -- 🔔 pemilih Suara Bel (CONFIG.BELL_SOUNDS, lihat
+  // js/config.js bagian "10) BEL TIMER"). Pola SAMA seperti pemilih tema
+  // Warna/dst yang lain di Studio: dropdown diisi dari CONFIG saat init,
+  // pilihan operator disimpan per perangkat lewat localStorage supaya
+  // tidak perlu dipilih ulang tiap kali buka Studio.
+  // ------------------------------------------------------------
+  const TIMER_BELL_CHOICE_KEY = "ps_timer_bell_choice_v1";
+
+  function getSelectedBellKey_() {
+    const sel = el("psTimerBellSelect");
+    if (sel && sel.value) return sel.value;
+    return (typeof CONFIG !== "undefined" && CONFIG.TIMER_BELL_DEFAULT_KEY) || "bell1";
+  }
+
+  function populateBellSelect_() {
+    const sel = el("psTimerBellSelect");
+    if (!sel) return;
+    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }];
+    let saved = "";
+    try { saved = localStorage.getItem(TIMER_BELL_CHOICE_KEY) || ""; } catch (e) {}
+    const fallback = (typeof CONFIG !== "undefined" && CONFIG.TIMER_BELL_DEFAULT_KEY) || list[0].key;
+    sel.innerHTML = list.map((b) => `<option value="${escapeHtml(b.key)}">${escapeHtml(b.label)}</option>`).join("");
+    sel.value = list.some((b) => b.key === saved) ? saved : fallback;
+    sel.addEventListener("change", () => {
+      try { localStorage.setItem(TIMER_BELL_CHOICE_KEY, sel.value); } catch (e) {}
+    });
   }
 
   function wireTimer() {
@@ -1848,6 +1945,13 @@ const PresentationStudio = (() => {
     // psTimerCancelBtn SEKARANG "🔁 Ulang" (tampil saat berjalan/dijeda/
     // selesai) -- lihat resetTimerToStandby_().
     if (el("psTimerCancelBtn")) el("psTimerCancelBtn").addEventListener("click", () => resetTimerToStandby_());
+    // BARU (7 Sep 2026) -- "👁️ Tampilkan ke Layar 2", lihat toggleTimerPreview_().
+    if (el("psTimerPreviewBtn")) el("psTimerPreviewBtn").addEventListener("click", () => toggleTimerPreview_());
+    // BARU (7 Sep 2026) -- "🔇 Stop Bel": hentikan SUARA bel yang sedang
+    // berbunyi di Layar 2 TANPA menghentikan/menyembunyikan timer-nya
+    // sendiri (beda dari psTimerCancelBtn "🔁 Ulang" di atas).
+    if (el("psTimerStopBellBtn")) el("psTimerStopBellBtn").addEventListener("click", () => rawPost({ type: "timer", action: "stopBell" }));
+    populateBellSelect_();
     syncTimerLabelPreview();
     renderTimerUi_();
   }
@@ -1871,6 +1975,11 @@ const PresentationStudio = (() => {
   let swState_ = "standby"; // "standby" | "running" | "paused"
   let swDisplayInterval = null;
   let swLaps_ = []; // { n, splitSec, totalSec } -- operator-side saja, lihat .ps-stopwatch-laps (css/style.css)
+  // BARU (7 Sep 2026) -- "👁️ Tampilkan ke Layar 2" untuk Stopwatch, pola
+  // SAMA persis dengan Timer (lihat timerPreviewing_ & catatan panjangnya
+  // di atas) -- overlay standby "00:00" berkedip + label "MULAI", otomatis
+  // "dikonsumsi" begitu "▶️ Mulai" beneran ditekan.
+  let swPreviewing_ = false;
 
   function fmtStopwatch(totalSec) {
     const s = Math.max(0, Math.floor(totalSec));
@@ -1886,6 +1995,7 @@ const PresentationStudio = (() => {
     const lapBtn = el("psStopwatchLapBtn");
     const pauseBtn = el("psStopwatchStopBtn");
     const resetBtn = el("psStopwatchResetBtn");
+    const previewBtn = el("psStopwatchPreviewBtn"); // BARU 7 Sep 2026
     const disp = el("psStopwatchDisplay");
     if (disp) disp.classList.toggle("ps-timer-standby", swState_ === "standby");
     if (startBtn) {
@@ -1896,6 +2006,26 @@ const PresentationStudio = (() => {
     if (lapBtn) lapBtn.hidden = swState_ !== "running";
     if (pauseBtn) pauseBtn.hidden = swState_ !== "running";
     if (resetBtn) resetBtn.hidden = swState_ !== "paused";
+    // BARU (7 Sep 2026) -- "👁️ Tampilkan" cuma relevan saat standby, sama
+    // seperti Timer (lihat renderTimerUi_()).
+    if (previewBtn) previewBtn.hidden = swState_ !== "standby";
+  }
+
+  // BARU (7 Sep 2026) -- toggle overlay standby Stopwatch ("00:00"
+  // berkedip + label) di Layar 2, pola SAMA persis dengan
+  // toggleTimerPreview_() di atas.
+  function toggleStopwatchPreview_() {
+    const btn = el("psStopwatchPreviewBtn");
+    const labelEl = el("psStopwatchLabel");
+    if (!swPreviewing_) {
+      swPreviewing_ = true;
+      rawPost({ type: "stopwatch", action: "standby", label: (labelEl && labelEl.value.trim()) || "" });
+      if (btn) { btn.textContent = "🙈 Sembunyikan dari Layar 2"; btn.classList.add("blinking"); }
+    } else {
+      swPreviewing_ = false;
+      rawPost({ type: "stopwatch", action: "reset" });
+      if (btn) { btn.textContent = "👁️ Tampilkan ke Layar 2"; btn.classList.remove("blinking"); }
+    }
   }
 
   function renderStopwatchLaps_() {
@@ -1913,6 +2043,9 @@ const PresentationStudio = (() => {
     const disp = el("psStopwatchDisplay");
     function syncLabelPreview() {
       if (labelPreview) labelPreview.textContent = (labelEl && labelEl.value.trim()) || "";
+      // BARU (7 Sep 2026) -- ikut update Layar 2 kalau overlay standby
+      // sedang ditayangkan (lihat toggleStopwatchPreview_()).
+      if (swPreviewing_) rawPost({ type: "stopwatch", action: "standby", label: (labelEl && labelEl.value.trim()) || "" });
     }
     function currentElapsedSec() {
       if (swBaseStartAt == null) return 0;
@@ -1932,20 +2065,31 @@ const PresentationStudio = (() => {
       swState_ = "running";
       const label = (labelEl && labelEl.value.trim()) || "";
       rawPost({ type: "stopwatch", action: "start", label, baseStartAt: swBaseStartAt });
+      // BARU (7 Sep 2026) -- overlay standby (kalau sempat ditayangkan)
+      // otomatis "dikonsumsi" begitu beneran Mulai, sama seperti Timer.
+      if (swPreviewing_) {
+        swPreviewing_ = false;
+        if (el("psStopwatchPreviewBtn")) { el("psStopwatchPreviewBtn").textContent = "👁️ Tampilkan ke Layar 2"; el("psStopwatchPreviewBtn").classList.remove("blinking"); }
+      }
       if (swDisplayInterval) clearInterval(swDisplayInterval);
       swDisplayInterval = setInterval(tick, 250);
       tick();
       renderStopwatchUi_();
     }
     // "🚩 Penanda" -- MENYALIN angka yang SEDANG tampil ke daftar kecil
-    // di bawah (operator-side saja, TIDAK dikirim ke Layar 2 -- jemaat
-    // tidak perlu melihat daftar penanda ini, cukup operator sendiri).
+    // di bawah (operator-side).
+    // BARU (7 Sep 2026, permintaan operator) -- penanda TERBARU (nomor +
+    // selisih) SEKARANG juga dikirim ke Layar 2 (lihat showStopwatchLap_()
+    // di present.html), muncul sebentar sebagai badge kecil di bawah angka
+    // stopwatch supaya jemaat/tim juga bisa melihat penanda terjadi.
     function lap() {
       if (swState_ !== "running") return;
       const totalSec = currentElapsedSec();
       const prevTotal = swLaps_.length ? swLaps_[swLaps_.length - 1].totalSec : 0;
-      swLaps_.push({ n: swLaps_.length + 1, splitSec: Math.max(0, totalSec - prevTotal), totalSec });
+      const entry = { n: swLaps_.length + 1, splitSec: Math.max(0, totalSec - prevTotal), totalSec };
+      swLaps_.push(entry);
       renderStopwatchLaps_();
+      rawPost({ type: "stopwatch", action: "lap", n: entry.n, splitSec: entry.splitSec, totalSec: entry.totalSec });
     }
     function pause() {
       if (swState_ !== "running") return;
@@ -1964,6 +2108,10 @@ const PresentationStudio = (() => {
       swLaps_ = [];
       if (swDisplayInterval) { clearInterval(swDisplayInterval); swDisplayInterval = null; }
       if (disp) disp.textContent = "00:00";
+      // BARU (7 Sep 2026) -- matikan juga status preview, sama seperti
+      // resetTimerToStandby_() untuk Timer.
+      swPreviewing_ = false;
+      if (el("psStopwatchPreviewBtn")) { el("psStopwatchPreviewBtn").textContent = "👁️ Tampilkan ke Layar 2"; el("psStopwatchPreviewBtn").classList.remove("blinking"); }
       rawPost({ type: "stopwatch", action: "reset" });
       renderStopwatchLaps_();
       renderStopwatchUi_();
@@ -1976,6 +2124,8 @@ const PresentationStudio = (() => {
     if (el("psStopwatchLapBtn")) el("psStopwatchLapBtn").addEventListener("click", lap);
     if (el("psStopwatchStopBtn")) el("psStopwatchStopBtn").addEventListener("click", pause);
     if (el("psStopwatchResetBtn")) el("psStopwatchResetBtn").addEventListener("click", reset);
+    // BARU (7 Sep 2026) -- "👁️ Tampilkan ke Layar 2", lihat toggleStopwatchPreview_().
+    if (el("psStopwatchPreviewBtn")) el("psStopwatchPreviewBtn").addEventListener("click", () => toggleStopwatchPreview_());
     syncLabelPreview();
     renderStopwatchUi_();
   }
