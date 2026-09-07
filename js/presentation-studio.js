@@ -1626,7 +1626,17 @@ const PresentationStudio = (() => {
         // BARU (7 Sep 2026) -- ikut kirim rata teks yang sedang dipilih
         // (lihat tombol data-ann-align & applyTheme-nya di present.html,
         // kind "text").
-        post({ type: "text", text: full, align: psAnnAlign_ });
+        // BARU (7 Sep 2026, permintaan operator) -- judul (kalau diisi)
+        // dikirim TERPISAH lewat annTitle/annBody supaya Layar 2 bisa
+        // menampilkannya lebih besar & tebal daripada isi pengumuman
+        // (lihat kind "text" di present.html). `text` (gabungan lama)
+        // tetap ikut dikirim sebagai cadangan untuk penerima yang belum
+        // paham field baru ini. CATATAN: kalau pengumuman ini nanti
+        // dikirim ULANG dari daftar "Kumpulan Ayat" tersimpan (tombol
+        // 📤 Kirim), judul TIDAK ikut tebal lagi -- yang tersimpan di
+        // situ cuma teks gabungan biasa (lihat sendFreeText() di js/
+        // presentation.js), belum menyimpan mana bagian judulnya.
+        post({ type: "text", text: full, align: psAnnAlign_, annTitle: title, annBody: body });
       });
     }
     // ---- Rata teks (kiri/tengah/kanan/justify) ----
