@@ -2032,6 +2032,30 @@ function buildInlineNoteCardEl(v, block, sourceVerses) {
   personalLabel.textContent = "🖊️ Catatan pribadi Anda";
   wrap.appendChild(personalLabel);
 
+  // BARU (7 Sep 2026, permintaan operator) -- "📖 + Rujukan Pelajaran
+  // Hayat": menyisipkan TEKS RUJUKAN (nama kitab + nomor pesan + link
+  // asli bibleread.online) ke DALAM catatan pribadi ini -- BUKAN
+  // menyalin isi Pelajaran Hayat itu sendiri (lihat catatan panjang di
+  // openInsertLifeStudyRefDialog(), js/lifestudy.js, soal batas ini).
+  // Warna pastel highlight ayat sudah ada fiturnya sendiri (ketuk nomor
+  // ayat di sebelah kiri), dipakai BERSAMAAN dengan catatan ini kalau
+  // mau menandai "ayat ini terkait Pelajaran Hayat itu".
+  if (typeof openInsertLifeStudyRefDialog === "function") {
+    const insertRefBtn = document.createElement("button");
+    insertRefBtn.type = "button";
+    insertRefBtn.className = "chip-btn small inline-note-lifestudy-btn";
+    insertRefBtn.textContent = "📖 + Rujukan Pelajaran Hayat";
+    insertRefBtn.title = "Sisipkan rujukan (nama kitab + nomor pesan + link) ke Pelajaran Hayat, ke dalam catatan pribadi ini";
+    insertRefBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openInsertLifeStudyRefDialog(v.bookNumber, (refText) => {
+        textarea.value = (textarea.value.trim() ? textarea.value.trim() + "\n\n" : "") + refText;
+        textarea.focus();
+      });
+    });
+    wrap.appendChild(insertRefBtn);
+  }
+
   wrap.appendChild(textarea);
 
   const actions = document.createElement("div");
