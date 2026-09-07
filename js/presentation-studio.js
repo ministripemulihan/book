@@ -142,6 +142,14 @@ const PresentationStudio = (() => {
   // "" berarti tanpa border sama sekali.
   let msgBorderColor = "";
   let msgBorderWidth = 4;
+  // BARU (7 Sep 2026 v3, permintaan operator) -- kecepatan mode
+  // "➡️ Berjalan" (detik MINIMAL per 1 putaran, lihat #psMsgSpeedRow &
+  // applyTicker() di present.html -- rumus SAMA PERSIS dipakai di dua
+  // tempat supaya progress bar simulasi lokal di bawah akurat), dan
+  // A+/A- ukuran huruf pesan (--p-msg-scale).
+  let msgScrollBaseSec = 12;
+  let msgScale = 1;
+  let msgScrollProgressTimer_ = null;
 
   // (BARU 6 Sep 2026 -- boolean timerRunning lama digantikan timerState_,
   // dideklarasikan sendiri di dekat fmtMMSS() di bawah, supaya berdekatan
@@ -1775,7 +1783,38 @@ const PresentationStudio = (() => {
         pulseSeconds: msgPulseSeconds,
         borderColor: msgBorderColor,
         borderWidth: msgBorderWidth,
+        // BARU (7 Sep 2026 v3) -- kecepatan "Berjalan" (lihat rumus SAMA
+        // persis di applyTicker(), present.html) & A+/A- ukuran huruf.
+        scrollBaseSec: msgScrollBaseSec,
+        scale: msgScale,
       });
+      if (scroll) startScrollProgress_(text.length);
+      else stopScrollProgress_();
+    }
+    // BARU (7 Sep 2026 v3, permintaan operator) -- progress bar & info
+    // "lama 1 putaran" untuk mode "➡️ Berjalan", disimulasikan LOKAL di
+    // Studio (present.html tidak melaporkan balik posisi animasinya
+    // detik-per-detik -- tidak perlu, cukup disinkronkan dari saat
+    // pesan ini dikirim, dengan rumus durasi YANG SAMA PERSIS dipakai
+    // applyTicker() di present.html: max(scrollBaseSec, panjang/6)).
+    function scrollDurationFor_(textLen) {
+      return Math.max(4, msgScrollBaseSec, textLen / 6);
+    }
+    function startScrollProgress_(textLen) {
+      stopScrollProgress_();
+      const durSec = scrollDurationFor_(textLen);
+      if (el("psMsgSpeedInfo")) el("psMsgSpeedInfo").textContent = `Lama 1 putaran penuh: ~${durSec.toFixed(1)} detik.`;
+      const startedAt = Date.now();
+      const fill = el("psMsgSpeedProgress");
+      msgScrollProgressTimer_ = setInterval(() => {
+        if (!fill) return;
+        const elapsed = ((Date.now() - startedAt) / 1000) % durSec;
+        fill.style.width = (elapsed / durSec) * 100 + "%";
+      }, 100);
+    }
+    function stopScrollProgress_() {
+      if (msgScrollProgressTimer_) { clearInterval(msgScrollProgressTimer_); msgScrollProgressTimer_ = null; }
+      if (el("psMsgSpeedProgress")) el("psMsgSpeedProgress").style.width = "0%";
     }
     // PERBAIKAN (7 Sep 2026, laporan operator "sudah ganti teks tapi tidak
     // ikut berubah di Layar 2") -- SEBELUMNYA mengetik ulang teks pesan
@@ -1801,9 +1840,33 @@ const PresentationStudio = (() => {
         btn.classList.add("active");
         msgMode = btn.dataset.mode;
         if (el("psMsgPulseOptions")) el("psMsgPulseOptions").hidden = msgMode !== "pulse";
+        if (el("psMsgSpeedOptions")) el("psMsgSpeedOptions").hidden = msgMode !== "scroll";
         sendMessageNow_();
       });
     });
+    // BARU (7 Sep 2026 v3, permintaan operator "terlalu cepat") --
+    // kecepatan mode "➡️ Berjalan" (Lambat/Sedang/Cepat), lihat rumus
+    // scrollDurationFor_() di atas & applyTicker() (present.html, HARUS
+    // tetap sama persis dengan yang di sini).
+    document.querySelectorAll("#psMsgSpeedRow [data-speed-s]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgSpeedRow [data-speed-s]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgScrollBaseSec = Number(btn.dataset.speedS) || 12;
+        sendMessageNow_();
+      });
+    });
+    // BARU (7 Sep 2026 v3, permintaan operator) -- A+/A- KHUSUS ukuran
+    // huruf 💬 Pesan (--p-msg-scale, present.html), terpisah dari A+/A-
+    // ayat/kidung/pengumuman biasa (tab "🎨 Tampilan"). 50%-200%, langkah
+    // 10%.
+    function applyMsgScale_(next) {
+      msgScale = Math.max(0.5, Math.min(2, next));
+      if (el("psMsgScaleValue")) el("psMsgScaleValue").textContent = Math.round(msgScale * 100) + "%";
+      sendMessageNow_();
+    }
+    if (el("psMsgScaleDec")) el("psMsgScaleDec").addEventListener("click", () => applyMsgScale_(msgScale - 0.1));
+    if (el("psMsgScaleInc")) el("psMsgScaleInc").addEventListener("click", () => applyMsgScale_(msgScale + 0.1));
     document.querySelectorAll("#psMsgPulseSpeedRow [data-pulse-s]").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("#psMsgPulseSpeedRow [data-pulse-s]").forEach((b) => b.classList.remove("active"));
@@ -1860,6 +1923,7 @@ const PresentationStudio = (() => {
         document.querySelectorAll("#psMsgStrokeColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
         chip.classList.add("active");
         msgStrokeColor = chip.dataset.color;
+        if (el("psMsgStrokeColorCustom")) el("psMsgStrokeColorCustom").value = msgStrokeColor;
         sendMessageNow_();
       });
     });
@@ -1876,9 +1940,27 @@ const PresentationStudio = (() => {
         document.querySelectorAll("#psMsgColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
         chip.classList.add("active");
         msgColor = chip.dataset.color;
+        if (el("psMsgColorCustom")) el("psMsgColorCustom").value = msgColor;
         sendMessageNow_(); // no-op kalau pesan belum tayang (msgRunning masih false)
       });
     });
+    // BARU (7 Sep 2026 v3, permintaan operator "warna 24K apa saja") --
+    // pemilih warna BEBAS (24-bit penuh), pelengkap 7 chip preset di
+    // atas -- pola SAMA dengan psCamInkColor (tab Kamera).
+    if (el("psMsgColorCustom")) {
+      el("psMsgColorCustom").addEventListener("input", () => {
+        document.querySelectorAll("#psMsgColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
+        msgColor = el("psMsgColorCustom").value;
+        sendMessageNow_();
+      });
+    }
+    if (el("psMsgStrokeColorCustom")) {
+      el("psMsgStrokeColorCustom").addEventListener("input", () => {
+        document.querySelectorAll("#psMsgStrokeColorRow .ps-color-chip").forEach((c) => c.classList.remove("active"));
+        msgStrokeColor = el("psMsgStrokeColorCustom").value;
+        sendMessageNow_();
+      });
+    }
     document.querySelectorAll("#psMsgPosRow [data-pos]").forEach((btn) => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("#psMsgPosRow [data-pos]").forEach((b) => b.classList.remove("active"));
@@ -1893,7 +1975,22 @@ const PresentationStudio = (() => {
         const btn = el("psMsgToggleBtn");
         const text = (el("psMsgText") && el("psMsgText").value.trim()) || "";
         if (msgRunning) {
-          if (!text) { msgRunning = false; return; }
+          // PERBAIKAN (7 Sep 2026 v3, laporan operator "harus dipancing
+          // Diam dulu baru Berjalan bisa muncul") -- SEBELUMNYA kalau
+          // kotak teks masih kosong saat "▶️ Tayangkan" ditekan, fungsi
+          // ini diam-diam GAGAL (langsung `return` tanpa tanda apa pun)
+          // -- operator tidak tahu kenapa tidak ada reaksi, kadang
+          // mengira mode "Berjalan" yang bermasalah padahal cuma lupa
+          // isi teks. Sekarang kasih tanda kedip merah di kotak teks
+          // supaya jelas.
+          if (!text) {
+            msgRunning = false;
+            if (el("psMsgText")) {
+              el("psMsgText").style.outline = "2px solid #d9463a";
+              setTimeout(() => { if (el("psMsgText")) el("psMsgText").style.outline = ""; }, 500);
+            }
+            return;
+          }
           btn.textContent = "⏹️ Stop";
           btn.classList.add("blinking");
           sendMessageNow_();
@@ -1901,6 +1998,7 @@ const PresentationStudio = (() => {
           btn.textContent = "▶️ Tayangkan";
           btn.classList.remove("blinking");
           hideAllMessageBars_();
+          stopScrollProgress_();
         }
       });
     }
@@ -2347,6 +2445,30 @@ const PresentationStudio = (() => {
     if (el("psTimerClockColorCustom")) {
       el("psTimerClockColorCustom").addEventListener("input", () => setTimerClockColor_(el("psTimerClockColorCustom").value));
     }
+    // BARU (7 Sep 2026 v3, permintaan operator) -- WARNA STROKE (kontur
+    // pinggiran) angka Jam Target, pola SAMA PERSIS dengan warna angka
+    // di atas (1 sumber kebenaran + pemilih bebas), cuma dikirim lewat
+    // theme.timerClockStroke/timerClockStrokeWidth (applyTheme(),
+    // present.html) -- "" berarti tanpa stroke sama sekali (bawaan).
+    const timerClockStrokeBtns = Array.from(document.querySelectorAll("[data-timerclock-stroke]"));
+    function setTimerClockStroke_(color) {
+      saveAndSendTheme({ timerClockStroke: color });
+      timerClockStrokeBtns.forEach((b) => b.classList.toggle("active", b.dataset.timerclockStroke === color));
+      if (color && el("psTimerClockStrokeCustom")) el("psTimerClockStrokeCustom").value = color;
+    }
+    timerClockStrokeBtns.forEach((btn) => {
+      btn.addEventListener("click", () => setTimerClockStroke_(btn.dataset.timerclockStroke));
+    });
+    if (el("psTimerClockStrokeCustom")) {
+      el("psTimerClockStrokeCustom").addEventListener("input", () => setTimerClockStroke_(el("psTimerClockStrokeCustom").value));
+    }
+    Array.from(document.querySelectorAll("[data-timerclock-stroke-w]")).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-timerclock-stroke-w]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        saveAndSendTheme({ timerClockStrokeWidth: Number(btn.dataset.timerclockStrokeW) || 3 });
+      });
+    });
     // BARU (7 Sep 2026, permintaan operator) -- "Posisi di Layar" (9
     // pilihan siap-pakai) untuk kotak Jam Target -- pola SAMA seperti
     // warna di atas (satu sumber kebenaran, dikirim via theme.timerClockPos).
@@ -5339,7 +5461,7 @@ const PresentationStudio = (() => {
   // (0.5x-10x) daripada `scale` karena kebutuhannya beda (angka besar
   // untuk dilihat dari jauh saat permainan/aktivitas, bukan untuk
   // kenyamanan baca ayat).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center" };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3 };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -5379,6 +5501,7 @@ const PresentationStudio = (() => {
     // BARU (4 Sep 2026) -- pulihkan juga angka % yang ditampilkan di
     // samping slider Ukuran Teks/Spasi Baris saat panel dibuka ulang.
     if (el("psFontScaleValue")) el("psFontScaleValue").textContent = Math.round(theme.scale * 100) + "%";
+    if (el("psFontScaleValueCam")) el("psFontScaleValueCam").textContent = Math.round(theme.scale * 100) + "%"; // BARU (7 Sep 2026 v4)
     if (el("psLineHeight")) el("psLineHeight").value = String(Math.round(theme.lineHeight * 100));
     if (el("psLineHeightValue")) el("psLineHeightValue").textContent = Math.round(theme.lineHeight * 100) + "%";
     // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
@@ -5401,6 +5524,21 @@ const PresentationStudio = (() => {
       });
     }
     if (el("psTimerClockColorCustom") && theme.timerClockColor) el("psTimerClockColorCustom").value = theme.timerClockColor;
+    // BARU (7 Sep 2026 v3) -- pulihkan juga tombol aktif WARNA STROKE
+    // angka Jam Target (pola SAMA seperti warna angka di atas).
+    if (el("psTimerClockStrokeRow")) {
+      const savedStroke = theme.timerClockStroke || "";
+      Array.from(el("psTimerClockStrokeRow").querySelectorAll("[data-timerclock-stroke]")).forEach((b) => {
+        b.classList.toggle("active", b.dataset.timerclockStroke === savedStroke);
+      });
+    }
+    if (el("psTimerClockStrokeCustom") && theme.timerClockStroke) el("psTimerClockStrokeCustom").value = theme.timerClockStroke;
+    if (el("psTimerClockStrokeWidthRow")) {
+      const savedW = theme.timerClockStrokeWidth || 3;
+      Array.from(el("psTimerClockStrokeWidthRow").querySelectorAll("[data-timerclock-stroke-w]")).forEach((b) => {
+        b.classList.toggle("active", Number(b.dataset.timerclockStrokeW) === savedW);
+      });
+    }
     // BARU (7 Sep 2026) -- pulihkan tombol posisi Jam Target yang aktif.
     if (el("psTimerClockPosGrid")) {
       const savedPos = theme.timerClockPos || "center";
@@ -5412,7 +5550,7 @@ const PresentationStudio = (() => {
     // panel Studio dibuka ulang/dimuat ulang.
     if (el("psFontBold")) el("psFontBold").checked = !!theme.bold;
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth } });
   }
 
   function saveAndSendTheme(partial) {
@@ -5433,7 +5571,7 @@ const PresentationStudio = (() => {
     // warna di Layar 2 (present.html diam-diam jatuh ke warna aksen tema
     // bawaan, lihat --p-timerclock-color, karena variabelnya memang tidak
     // pernah dikirim/diset).
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -5523,6 +5661,10 @@ const PresentationStudio = (() => {
     function applyScale() {
       const pct = Number(el("psFontScale").value);
       if (el("psFontScaleValue")) el("psFontScaleValue").textContent = pct + "%"; // BARU (4 Sep 2026)
+      // BARU (7 Sep 2026 v4) -- ikut perbarui angka % di panel gabungan
+      // (tab "📷 Kamera") juga, supaya ketiga tempat A-/A+ selalu tampil
+      // angka yang sama persis.
+      if (el("psFontScaleValueCam")) el("psFontScaleValueCam").textContent = pct + "%";
       saveAndSendTheme({ scale: pct / 100 });
     }
     if (el("psFontScale")) el("psFontScale").addEventListener("input", applyScale);
@@ -5539,6 +5681,13 @@ const PresentationStudio = (() => {
     // tombol (di sini & di tab "🎨 Tampilan") selalu sinkron satu sama lain.
     if (el("psFontDecTop")) el("psFontDecTop").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
     if (el("psFontIncTop")) el("psFontIncTop").addEventListener("click", () => { el("psFontScale").value = Math.min(480, Number(el("psFontScale").value) + 10); applyScale(); });
+    // BARU (7 Sep 2026 v4, permintaan operator "satu tempat saja") --
+    // pasangan A-/A+ KETIGA, di panel gabungan Warna/Stroke/Ukuran Huruf
+    // (tab "📷 Kamera") -- SUMBER DATA SAMA (psFontScale/applyScale()),
+    // cuma tampilan tombolnya digandakan supaya operator tidak perlu
+    // pindah tab buat urus warna+stroke+ukuran huruf sekaligus.
+    if (el("psFontDecCam")) el("psFontDecCam").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
+    if (el("psFontIncCam")) el("psFontIncCam").addEventListener("click", () => { el("psFontScale").value = Math.min(480, Number(el("psFontScale").value) + 10); applyScale(); });
     // BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/Stopwatch",
     // SLIDER TERPISAH dari "Ukuran Teks" di atas (lihat catatan panjang
     // di DEFAULT_STAGE_THEME.timerScale & <input id="psTimerScale">,
@@ -5715,7 +5864,7 @@ const PresentationStudio = (() => {
     // pertama, atau browser/perangkat baru), tidak ada apply() yang
     // dipanggil sama sekali -- --ps-preview-row-h & --ps-preview-box-h
     // dibiarkan kosong, jatuh ke nilai bawaan CSS (minmax(140px,14vh)
-    // untuk tinggi BARIS, tapi 156px TETAP untuk tinggi KOTAK di 
+    // untuk tinggi BARIS, tapi 156px TETAP untuk tinggi KOTAK di
     // dalamnya) -- di banyak layar 14vh lebih PENDEK dari 156px+label,
     // jadi kotak "Berikutnya"/"Tayang" ikut TERPOTONG separuh sejak
     // awal, padahal splitter-nya sendiri sebenarnya sudah bisa
