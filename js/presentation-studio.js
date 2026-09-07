@@ -1659,6 +1659,21 @@ const PresentationStudio = (() => {
         el("psAnnIconGrid").hidden = !el("psAnnIconGrid").hidden;
       });
     }
+    // BARU (7 Sep 2026, permintaan operator: "bendera diperbanyak sampai
+    // 250 negara") -- kotak cari KHUSUS bendera (di antara ratusan ikon
+    // lain, cuma bendera yang sebanyak ini, jadi cukup filter yang ini
+    // saja) -- mengetik nama negara ATAU kode 2-huruf (mis. "jp" untuk
+    // Jepang) langsung menyaring `.ps-flag-btn` berdasarkan atribut
+    // `title`-nya (yang sudah berisi "Nama Negara (KODE)").
+    if (el("psAnnFlagSearch")) {
+      el("psAnnFlagSearch").addEventListener("input", () => {
+        const q = el("psAnnFlagSearch").value.trim().toLowerCase();
+        document.querySelectorAll(".ps-flag-btn").forEach((btn) => {
+          const title = (btn.getAttribute("title") || "").toLowerCase();
+          btn.style.display = !q || title.includes(q) ? "" : "none";
+        });
+      });
+    }
     document.querySelectorAll(".ps-ann-icon-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const body = el("psAnnBody");
@@ -2332,6 +2347,19 @@ const PresentationStudio = (() => {
     if (el("psTimerClockColorCustom")) {
       el("psTimerClockColorCustom").addEventListener("input", () => setTimerClockColor_(el("psTimerClockColorCustom").value));
     }
+    // BARU (7 Sep 2026, permintaan operator) -- "Posisi di Layar" (9
+    // pilihan siap-pakai) untuk kotak Jam Target -- pola SAMA seperti
+    // warna di atas (satu sumber kebenaran, dikirim via theme.timerClockPos).
+    // "center" (bawaan) = TIDAK mengirim apa pun berbeda dari sebelumnya
+    // (present.html jatuh ke CSS default top:50%/left:50% yang sudah ada).
+    const timerClockPosBtns = Array.from(document.querySelectorAll("[data-timerclock-pos]"));
+    function setTimerClockPos_(pos) {
+      saveAndSendTheme({ timerClockPos: pos });
+      timerClockPosBtns.forEach((b) => b.classList.toggle("active", b.dataset.timerclockPos === pos));
+    }
+    timerClockPosBtns.forEach((btn) => {
+      btn.addEventListener("click", () => setTimerClockPos_(btn.dataset.timerclockPos));
+    });
     // psTimerStartBtn SEKARANG dipakai 2 fungsi (lihat renderTimerUi_()):
     // "▶️ Mulai" saat standby, "▶️ Lanjut" saat dijeda -- BARU (7 Sep
     // 2026) ditambah cabang mode "clock" (startTimerClock_(), TIDAK
@@ -5311,7 +5339,7 @@ const PresentationStudio = (() => {
   // (0.5x-10x) daripada `scale` karena kebutuhannya beda (angka besar
   // untuk dilihat dari jauh saat permainan/aktivitas, bukan untuk
   // kenyamanan baca ayat).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "" };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center" };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -5361,11 +5389,30 @@ const PresentationStudio = (() => {
     // psContentScale di atas.
     if (el("psTimerScale")) el("psTimerScale").value = String(Math.round((theme.timerScale || 1) * 100));
     if (el("psTimerScaleValue")) el("psTimerScaleValue").textContent = Math.round((theme.timerScale || 1) * 100) + "%";
+    // PERBAIKAN (7 Sep 2026) -- pulihkan juga tombol aktif "WARNA ANGKA
+    // COUNTDOWN" (Jam Target) saat panel dibuka ulang -- sebelumnya tidak
+    // dipulihkan sama sekali di sini (beda dari kirim ke Layar 2 di atas
+    // yang sudah diperbaiki juga, lihat catatan panjang di
+    // saveAndSendTheme()).
+    if (el("psTimerClockColorRow")) {
+      const savedColor = theme.timerClockColor || "";
+      Array.from(el("psTimerClockColorRow").querySelectorAll("[data-timerclock-color]")).forEach((b) => {
+        b.classList.toggle("active", b.dataset.timerclockColor === savedColor);
+      });
+    }
+    if (el("psTimerClockColorCustom") && theme.timerClockColor) el("psTimerClockColorCustom").value = theme.timerClockColor;
+    // BARU (7 Sep 2026) -- pulihkan tombol posisi Jam Target yang aktif.
+    if (el("psTimerClockPosGrid")) {
+      const savedPos = theme.timerClockPos || "center";
+      Array.from(el("psTimerClockPosGrid").querySelectorAll("[data-timerclock-pos]")).forEach((b) => {
+        b.classList.toggle("active", b.dataset.timerclockPos === savedPos);
+      });
+    }
     // BARU (4 Sep 2026) -- pulihkan status centang "Tulisan Tebal" saat
     // panel Studio dibuka ulang/dimuat ulang.
     if (el("psFontBold")) el("psFontBold").checked = !!theme.bold;
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos } });
   }
 
   function saveAndSendTheme(partial) {
@@ -5375,7 +5422,18 @@ const PresentationStudio = (() => {
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale } });
+    // PERBAIKAN (7 Sep 2026) -- `timerClockColor` sebelumnya TIDAK ikut
+    // disertakan di sini (cuma tersimpan ke localStorage lewat baris
+    // `theme = {...theme, ...partial}` di atas, TAPI tidak pernah benar-
+    // benar terkirim ke Layar 2 lewat rawPost() di bawah, karena objek
+    // literal ini secara eksplisit menyebutkan properti satu-satu, dan
+    // `timerClockColor` waktu itu belum ditambahkan ke daftarnya) --
+    // inilah sebab warna yang dipilih di "WARNA ANGKA COUNTDOWN" terlihat
+    // aktif di tombolnya sendiri tapi TIDAK PERNAH benar-benar mengubah
+    // warna di Layar 2 (present.html diam-diam jatuh ke warna aksen tema
+    // bawaan, lihat --p-timerclock-color, karena variabelnya memang tidak
+    // pernah dikirim/diset).
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
