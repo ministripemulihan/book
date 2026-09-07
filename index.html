@@ -759,9 +759,95 @@
         <div class="ps-tab-panel" data-ps-left-panel="pengumuman" hidden>
           <input type="text" id="psAnnTitle" class="columns-lang-select" placeholder="Judul pengumuman (1 baris)" />
           <textarea id="psAnnBody" class="columns-lang-select" rows="5" placeholder="Isi pengumuman…" style="width:100%; box-sizing:border-box; resize:vertical; margin-top:8px;"></textarea>
+          <!-- BARU (7 Sep 2026, permintaan operator) -- rata teks isi
+               pengumuman. Disimpan di memori (psAnnAlign_, js/
+               presentation-studio.js) & dikirim sebagai data.align tiap
+               kali ditayangkan (lihat post({type:"text", text, align})
+               di psAnnInsertBtn) -- dibaca present.html (kind "text") utk
+               mengatur text-align kotak #text di Layar 2. "Tengah" = tetap
+               bawaan lama kalau tidak pernah disentuh. -->
+          <div class="ps-field-label" style="margin-top:8px;">Rata teks</div>
+          <div class="ps-btn-row" id="psAnnAlignRow">
+            <button type="button" class="chip-btn small" data-ann-align="left" title="Rata kiri">⬅️ Kiri</button>
+            <button type="button" class="chip-btn small active" data-ann-align="center" title="Rata tengah">↔️ Tengah</button>
+            <button type="button" class="chip-btn small" data-ann-align="right" title="Rata kanan">➡️ Kanan</button>
+            <button type="button" class="chip-btn small" data-ann-align="justify" title="Rata kiri-kanan (justify)">☰ Rata Kanan-Kiri</button>
+          </div>
+          <!-- BARU (7 Sep 2026, permintaan operator) -- panel ikon siap-
+               pakai untuk disisipkan ke isi pengumuman (mis. "📅 12 Sep
+               2026" atau "📍 Aula Utama"). Klik tombol "😀 Ikon" membuka/
+               menutup grid (hidden diatur lewat JS, lihat
+               wireAnnouncementIcons_()), klik 1 ikon menyisipkannya di
+               posisi kursor terakhir pada psAnnBody (bukan selalu di
+               akhir) lalu grid TETAP terbuka supaya bisa klik beberapa
+               ikon berturut-turut. Emoji dipakai (bukan gambar/file)
+               supaya tidak perlu aset tambahan & otomatis ikut warna/
+               ukuran font apa pun di Layar 2. -->
+          <button type="button" id="psAnnIconToggleBtn" class="chip-btn small" style="margin-top:8px;">😀 Ikon</button>
+          <div id="psAnnIconGrid" class="ps-ann-icon-grid" hidden>
+            <div class="ps-ann-icon-group-label">Tanggal &amp; Waktu</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="📅" title="Tanggal">📅</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🗓️" title="Tanggal (2)">🗓️</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="⏰" title="Waktu">⏰</button>
+            <div class="ps-ann-icon-group-label">Lokasi &amp; Pesan</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="📍" title="Lokasi/Tempat">📍</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="💬" title="Pesan">💬</button>
+            <div class="ps-ann-icon-group-label">Orang</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="👶" title="Anak kecil">👶</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🧒" title="Anak">🧒</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🧑" title="Remaja/Pemuda">🧑</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🧓" title="Orang tua">🧓</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="👨‍👩‍👧" title="Orang tua &amp; anak">👨‍👩‍👧</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🙏" title="Doa">🙏</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🤓" title="Pakai kacamata">🤓</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🎤" title="Nyanyi">🎤</button>
+            <div class="ps-ann-icon-group-label">Kendaraan</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🏍️" title="Motor">🏍️</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🚲" title="Sepeda">🚲</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🚗" title="Mobil">🚗</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🚐" title="Minibus">🚐</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🚚" title="Truk">🚚</button>
+            <div class="ps-ann-icon-group-label">Alam &amp; Suasana</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🛣️" title="Jalan">🛣️</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="☀️" title="Matahari">☀️</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🌙" title="Bulan">🌙</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🔥" title="Api">🔥</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="⭐" title="Bintang">⭐</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="❤️" title="Hati">❤️</button>
+            <div class="ps-ann-icon-group-label">Makan &amp; Musik</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🍽️" title="Piring &amp; sendok">🍽️</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="☕" title="Kopi/teh">☕</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🎂" title="Kue tart">🎂</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🎵" title="Musik">🎵</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🧊" title="Ice breaking">🧊</button>
+            <div class="ps-ann-icon-group-label">Bendera</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🇮🇩" title="Indonesia">🇮🇩</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🇸🇬" title="Singapura">🇸🇬</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🇲🇾" title="Malaysia">🇲🇾</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🇹🇭" title="Thailand">🇹🇭</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🇦🇺" title="Australia">🇦🇺</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🇺🇸" title="Amerika">🇺🇸</button>
+            <div class="ps-ann-icon-group-label">Hewan</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🐶" title="Anjing">🐶</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🐱" title="Kucing">🐱</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🐼" title="Panda">🐼</button>
+            <div class="ps-ann-icon-group-label">Lain-lain</div>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🔔" title="Lonceng">🔔</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🔴" title="Tombol bulat merah">🔴</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🔵" title="Tombol bulat biru">🔵</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="🎉" title="Lucu/perayaan">🎉</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="😄" title="Lucu">😄</button>
+            <button type="button" class="ps-ann-icon-btn" data-icon="👍" title="Jempol">👍</button>
+          </div>
           <div class="ps-btn-row">
             <button type="button" id="psAnnClearBtn" class="chip-btn small">🗑️ Hapus Isi</button>
             <button type="button" id="psAnnInsertBtn" class="chip-btn small">➕ Sisipkan ke Kumpulan Ayat</button>
+            <!-- BARU (7 Sep 2026, permintaan operator) -- salin judul+isi
+                 pengumuman (apa adanya, termasuk ikon yang sudah
+                 disisipkan) ke clipboard perangkat, supaya bisa ditempel
+                 di tempat lain (mis. grup WhatsApp). Lihat
+                 wireAnnouncementCopy_() (js/presentation-studio.js). -->
+            <button type="button" id="psAnnCopyBtn" class="chip-btn small">📋 Salin</button>
           </div>
         </div>
 
@@ -914,6 +1000,22 @@
             <input type="time" id="psTimerClockTarget" class="columns-lang-select" />
             <div class="ps-field-label" style="margin-top:6px;">Teks tambahan di atas countdown (opsional)</div>
             <input type="text" id="psTimerClockCaption" class="columns-lang-select" placeholder="mis. Ibadah dimulai dalam" />
+            <!-- BARU (7 Sep 2026, permintaan operator) -- warna khusus angka
+                 besar Jam Target (terpisah dari warna aksen tema Layar 2
+                 biasa), 4 pilihan cepat + pemilih warna bebas (24-bit).
+                 Lihat wireTimerClockColor() (js/presentation-studio.js) &
+                 --p-timerclock-color (present.html). Tombol "Ikut Tema"
+                 mengosongkan pilihan supaya kembali memakai warna aksen
+                 tema seperti sebelumnya (bawaan lama). -->
+            <div class="ps-field-label" style="margin-top:6px;">Warna angka countdown</div>
+            <div class="ps-btn-row" id="psTimerClockColorRow">
+              <button type="button" class="chip-btn small active" data-timerclock-color="">Ikut Tema</button>
+              <button type="button" class="chip-btn small" data-timerclock-color="#e9c977">🟡 24K</button>
+              <button type="button" class="chip-btn small" data-timerclock-color="#ffffff">⚪ Putih</button>
+              <button type="button" class="chip-btn small" data-timerclock-color="#111111">⚫ Hitam</button>
+              <button type="button" class="chip-btn small" data-timerclock-color="#ffe000">🟨 Kuning</button>
+              <input type="color" id="psTimerClockColorCustom" value="#e9c977" title="Warna bebas" />
+            </div>
           </div>
           <div class="ps-timer-label-preview" id="psTimerLabelPreview">Sesi Bagi Nikmat</div>
           <div class="ps-timer-display" id="psTimerDisplay">00:00</div>
