@@ -3463,3 +3463,44 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   opacity: .7;
 }
 .book-item.book-guest-locked:hover { background: transparent; }
+
+/* ============================================================
+   BARU (7 Sep 2026, permintaan operator) -- grid ikon siap-pakai di
+   panel 📢 Pengumuman (Studio Presentasi), lihat markup di index.html
+   (#psAnnIconGrid) & wireAnnouncementIcons_() (js/presentation-
+   studio.js). Ditambahkan di akhir file ini, murni tambahan seperti
+   blok "MODE TAMU" di atas -- tidak mengubah aturan lain yang sudah
+   ada.
+   ============================================================ */
+.ps-ann-icon-grid {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-content: flex-start;
+}
+.ps-ann-icon-group-label {
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  margin: 6px 0 2px;
+}
+.ps-ann-icon-group-label:first-child { margin-top: 0; }
+.ps-ann-icon-btn {
+  font-size: 20px;
+  line-height: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.ps-ann-icon-btn:hover { background: var(--petrol-tint, #eef4f4); }
