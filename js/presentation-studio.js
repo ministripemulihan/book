@@ -5,7 +5,7 @@
 //  panel lama (js/presentation.js) tetap dipakai apa adanya untuk
 //  HP / mode 1 layar & sebagai mesin pengiriman pesan (postMessage)
 //  ke present.html, supaya tidak menduplikasi logic buka/tutup
-//  jendela Layar 2. 
+//  jendela Layar 2.
 //
 //  STATUS (lihat jawaban chat untuk detail per tahap):
 //   0b) BARU 19 Agu 2026: saat menyimpan ayat ke Kumpulan Ayat lewat
