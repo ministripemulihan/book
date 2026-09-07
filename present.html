@@ -25,6 +25,13 @@
        (js/presentation-studio.js). 400 = bawaan lama (tidak berubah sama
        sekali kalau operator tidak pernah menyentuh toggle ini). */
     --p-font-weight: 400;
+    /* BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/Stopwatch",
+       TERPISAH dari --p-scale di atas (yang untuk ayat/teks/kidung) --
+       lihat catatan panjang di DEFAULT_STAGE_THEME.timerScale
+       (js/presentation-studio.js) & slider "Ukuran Timer/Stopwatch"
+       (index.html) untuk alasan kenapa dipisah. 1 = bawaan lama (tidak
+       berubah), dipakai #timerRing & #stopwatchTime di bawah. */
+    --p-timer-scale: 1;
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -282,6 +289,13 @@
   }
   #wartaBar { top: 0; box-shadow: 0 6px 18px rgba(0,0,0,0.25); border-bottom: 1px solid rgba(216,180,92,0.35); }
   #footBar { bottom: 0; box-shadow: 0 -6px 18px rgba(0,0,0,0.25); border-top: 1px solid rgba(216,180,92,0.35); }
+  /* BARU (7 Sep 2026) -- #msgMidBar: SAMA seperti #wartaBar/#footBar
+     (posisi tetap terhadap LAYAR, bukan terhadap #stage), cuma nempel
+     di TENGAH (bukan mepet atas/bawah) -- transform:translateY(-50%)
+     dari titik top:50% supaya bar-nya sendiri yang dipusatkan (bukan
+     cuma teks di dalamnya), persis seperti "1 baris melayang di tengah
+     layar" yang diminta operator. */
+  #msgMidBar { top: 50%; transform: translateY(-50%); box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
   .ticker-bar .ticker-inner {
     display: inline-block;
     padding-left: 100%;
@@ -289,7 +303,22 @@
   .ticker-bar.scrolling .ticker-inner {
     animation: tickerScroll linear infinite;
   }
+  /* PERBAIKAN (7 Sep 2026, laporan operator "isi 2 baris tapi tampil
+     1 baris panjang") -- SEBELUMNYA "white-space: normal" di sini
+     mengikuti aturan HTML biasa: karakter baris baru (\n) dari textarea
+     DIABAIKAN TOTAL (dianggap 1 spasi biasa), jadi pesan yang diketik
+     2 baris terpisah selalu digabung jadi 1 baris utuh (baru dipotong
+     otomatis kalau kepanjangan untuk lebar layar, BUKAN mengikuti Enter
+     yang diketik operator). "pre-line" TETAP membungkus teks yang
+     kepanjangan seperti biasa (tidak meluber ke luar layar), TAPI JUGA
+     menghormati Enter yang diketik operator -- 2 baris diketik = 2
+     baris tampil, persis seperti yang diminta. Baris ini HANYA berlaku
+     saat "▶️ Berjalan" (marquee) MATI (class "static") -- saat marquee
+     NYALA baris baru tetap digabung 1 baris memanjang (lihat applyTicker()
+     di skrip bawah), karena marquee bergeser HORIZONTAL, tidak masuk akal
+     kalau isinya bertumpuk banyak baris sekaligus. */
   .ticker-bar.static { white-space: normal; text-align: center; padding: 10px 4vw; }
+  .ticker-bar.static .ticker-inner { white-space: pre-line; padding-left: 0; }
   @keyframes tickerScroll {
     from { transform: translateX(0); }
     to   { transform: translateX(-100%); }
@@ -309,8 +338,15 @@
   #timerWrap { display: none; align-items: center; justify-content: center; gap: 6vw; }
   #timerWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
   #timerRing {
-    width: min(32vh, 30vw); height: min(32vh, 30vw);
+    /* BARU (6 Sep 2026, permintaan operator) -- lihat catatan panjang
+       --p-timer-scale di <style> atas. SVG otomatis membesarkan ISINYA
+       (lingkaran & angka #timerTime di dalamnya) mengikuti lebar/tinggi
+       kotaknya sendiri (viewBox 0 0 100 100), jadi cukup kalikan width/
+       height di sini -- tidak perlu font-size terpisah untuk #timerTime. */
+    width: calc(min(32vh, 30vw) * var(--p-timer-scale));
+    height: calc(min(32vh, 30vw) * var(--p-timer-scale));
     filter: drop-shadow(0 4px 24px rgba(0,0,0,0.35));
+    max-width: 92vw; max-height: 85vh; /* jangan sampai tumpah keluar layar walau scale sangat besar */
   }
   #timerRing circle { fill: none; stroke-width: 7; }
   #timerRingBg { stroke: color-mix(in srgb, var(--p-ink) 16%, transparent); }
@@ -330,6 +366,35 @@
   }
   #timerTime.done-text { fill: #d9463a; }
 
+  /* ---- BARU (7 Sep 2026, permintaan operator) -- overlay "siap, belum
+     mulai" (👁️ Tampilkan ke Layar 2, js/presentation-studio.js) & badge
+     status (jeda) untuk Timer, dikendalikan lewat class di #timerWrap
+     (ps-standby / ps-paused) -- lihat showTimerStandby()/pauseTimerDisplay()
+     di skrip bawah. Pola CSS SAMA untuk Stopwatch di bawahnya. ---- */
+  #timerWrap.ps-standby #timerTime { animation: pStandbyBlink 1.3s ease-in-out infinite; }
+  #timerWrap.ps-standby #timerRingFg { opacity: .35; }
+  @keyframes pStandbyBlink { 0%, 100% { opacity: 1; } 50% { opacity: .28; } }
+  #timerStatusBadge, #stopwatchStatusBadge {
+    display: none; margin-top: 1.6vh;
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+    font-size: calc(clamp(13px, 1.7vw, 24px) * var(--p-scale));
+    color: #fff; background: rgba(217, 70, 58, 0.92);
+    padding: 7px 22px; border-radius: 999px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  #timerWrap.ps-paused #timerStatusBadge, #stopwatchWrap.ps-paused #stopwatchStatusBadge { display: inline-block; }
+  #timerWrap.ps-standby #timerStatusBadge, #stopwatchWrap.ps-standby #stopwatchStatusBadge {
+    display: inline-block; background: rgba(216, 180, 92, 0.95); color: #1a1206;
+    animation: pStandbyBlink 1.3s ease-in-out infinite;
+  }
+  /* Badge penanda (lap) Stopwatch -- lihat showStopwatchLap_() di skrip bawah. */
+  #stopwatchLapBadge {
+    display: none; margin-top: 1vh;
+    font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.02em;
+    font-size: calc(clamp(14px, 2vw, 30px) * var(--p-scale)); color: var(--p-ink); opacity: .88;
+  }
+  #stopwatchWrap.ps-has-lap #stopwatchLapBadge { display: block; animation: fadeUp .35s ease both; }
+
   /* ---- Stopwatch (BARU 27 Agu 2026) -- hitung MAJU dari 0, tanpa
      cincin progres (tidak ada "target" yang bisa diisi persentasenya
      seperti Timer mundur di atas). Pola display:none/:not([hidden])
@@ -343,7 +408,12 @@
   }
   #stopwatchTime {
     font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
-    font-size: calc(clamp(56px, 12vw, 160px) * var(--p-scale)); color: var(--p-accent);
+    /* BARU (6 Sep 2026, permintaan operator) -- dulu ikut --p-scale
+       (Ukuran Teks umum, maks 480% sekarang), SEKARANG dipisah pakai
+       --p-timer-scale sendiri (maks 1000%/10x, lihat catatan panjang di
+       <style> atas) supaya bisa dibuat jauh lebih besar TANPA ikut
+       membesarkan ayat/teks/kidung lain. */
+    font-size: calc(clamp(56px, 12vw, 160px) * var(--p-timer-scale)); color: var(--p-accent);
     font-variant-numeric: tabular-nums;
   }
 
@@ -403,6 +473,16 @@
   <!-- BARU (28 Agu 2026) -- lihat catatan #imgBg di <style> di atas. -->
   <img id="imgBg" hidden />
   <div id="wartaBar" class="ticker-bar" hidden><span class="ticker-inner" id="wartaText"></span></div>
+  <!-- BARU (7 Sep 2026) -- overlay "💬 Pesan" posisi TENGAH (lihat catatan
+       panjang #msgMidBar di <style> & wireMessage() di
+       js/presentation-studio.js). Pola SAMA PERSIS dengan #wartaBar/
+       #footBar di atas/bawah -- SATU BARIS/BAR yang menutupi SEBAGIAN
+       layar secara mengambang DI ATAS apa pun yang sedang tayang di
+       #stage (ayat/kidung/YouTube/timer/stopwatch dst TETAP utuh di
+       belakangnya, TIDAK diganti/dihapus) -- beda dari psMsgToggleBtn
+       versi LAMA yang salah kirim {type:"text"} untuk posisi Tengah
+       (itu MENIMPA isi utama, bukan bikin lapisan baru di atasnya). -->
+  <div id="msgMidBar" class="ticker-bar" hidden><span class="ticker-inner" id="msgMidText"></span></div>
 
   <div id="stage">
     <div id="ref" hidden></div>
@@ -427,12 +507,19 @@
         <circle id="timerRingFg" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"></circle>
         <text id="timerTime" x="50" y="55" text-anchor="middle">00:00</text>
       </svg>
-      <div id="timerLabel"></div>
+      <div>
+        <div id="timerLabel"></div>
+        <!-- BARU (7 Sep 2026) -- lihat catatan CSS #timerStatusBadge di atas. -->
+        <div id="timerStatusBadge"></div>
+      </div>
     </div>
     <!-- BARU (27 Agu 2026) -- lihat catatan CSS #stopwatchWrap di atas. -->
     <div id="stopwatchWrap" hidden>
       <div id="stopwatchLabel"></div>
       <div id="stopwatchTime">00:00</div>
+      <!-- BARU (7 Sep 2026) -- lihat catatan CSS #stopwatchLapBadge/#stopwatchStatusBadge di atas. -->
+      <div id="stopwatchLapBadge"></div>
+      <div id="stopwatchStatusBadge"></div>
     </div>
     <div id="idle">Menunggu tayangan dari layar utama…</div>
   </div>
@@ -464,6 +551,11 @@
        (ayat/kidung/dst) tidak ikut error, cuma kontrol SoundCloud yang
        tidak akan merespons sampai koneksi & jendela ini dimuat ulang. -->
   <script src="https://w.soundcloud.com/player/api.js"></script>
+  <!-- BARU (7 Sep 2026) -- daftar suara 🔔 Bel Timer (CONFIG.BELL_SOUNDS),
+       lihat js/config.js bagian "10) BEL TIMER" untuk cara menambah suara
+       custom sendiri. Dimuat di sini (bukan cuma di index.html) karena
+       Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
+  <script src="js/config.js"></script>
 
 <script>
   const stageEl = document.getElementById("stage");
@@ -495,14 +587,22 @@
   const timerTimeEl = document.getElementById("timerTime");
   const timerLabelEl = document.getElementById("timerLabel");
   const timerRingFg = document.getElementById("timerRingFg");
+  const timerStatusBadgeEl = document.getElementById("timerStatusBadge"); // BARU 7 Sep 2026
   // BARU (27 Agu 2026) -- lihat showStopwatch()/tickStopwatch() di bawah.
   const stopwatchWrap = document.getElementById("stopwatchWrap");
   const stopwatchTimeEl = document.getElementById("stopwatchTime");
   const stopwatchLabelEl = document.getElementById("stopwatchLabel");
+  const stopwatchStatusBadgeEl = document.getElementById("stopwatchStatusBadge"); // BARU 7 Sep 2026
+  const stopwatchLapBadgeEl = document.getElementById("stopwatchLapBadge"); // BARU 7 Sep 2026
   const wartaBar = document.getElementById("wartaBar");
   const wartaText = document.getElementById("wartaText");
   const footBar = document.getElementById("footBar");
   const footText = document.getElementById("footText");
+  // BARU (7 Sep 2026) -- overlay "💬 Pesan" posisi Tengah, lihat catatan
+  // panjang di #msgMidBar (HTML di atas) & wireMessage() di
+  // js/presentation-studio.js.
+  const msgMidBar = document.getElementById("msgMidBar");
+  const msgMidText = document.getElementById("msgMidText");
   const pointerDot = document.getElementById("pointerDot");
   const magnifierLens = document.getElementById("magnifierLens");
   const magnifierBadge = document.getElementById("magnifierBadge");
@@ -600,6 +700,83 @@
     } catch (e) {}
   }
 
+  // ------------------------------------------------------------
+  // BARU (7 Sep 2026) -- 🔔 Bel Timer CUSTOM (bukan cuma bunyi "denting"
+  // oscillator di atas). Operator memilih salah satu dari CONFIG.BELL_SOUNDS
+  // (js/config.js) lewat dropdown di Studio/panel sederhana; pilihannya
+  // (`bellKey`) dikirim bersama pesan {type:"timer", ...} dan disimpan di
+  // timerState.bellKey (lihat showTimer() di bawah), lalu dipakai tickTimer()
+  // saat waktu habis.
+  // ------------------------------------------------------------
+  let bellAudioEl = null;
+  function ensureBellAudioEl_() {
+    if (bellAudioEl) return bellAudioEl;
+    bellAudioEl = document.createElement("audio");
+    bellAudioEl.id = "bellAudioEl";
+    bellAudioEl.preload = "auto";
+    bellAudioEl.style.display = "none";
+    bellAudioEl.setAttribute("playsinline", "");
+    document.body.appendChild(bellAudioEl);
+    return bellAudioEl;
+  }
+
+  // Mengenali link Google Drive dalam bentuk APA PUN (.../file/d/ID/view,
+  // .../open?id=ID, dst -- sama pola pengenalan seperti driveFileIdFromUrl()
+  // di js/media.js, disalin ringkas di sini karena Layar 2 tidak memuat
+  // js/media.js) lalu mengubahnya jadi link unduh langsung yang BISA
+  // dipasang sebagai src <audio>. Link non-Drive (mp3 publik lain) dipakai
+  // apa adanya.
+  function resolveBellAudioUrl_(rawUrl) {
+    const s = String(rawUrl || "").trim();
+    if (!s) return "";
+    if (!/drive\.google\.com/.test(s)) return s;
+    const m = s.match(/\/d\/([a-zA-Z0-9_-]{10,})/) || s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    return m ? ("https://drive.google.com/uc?export=download&id=" + m[1]) : s;
+  }
+
+  function findBellSound_(key) {
+    const list = (window.CONFIG && Array.isArray(CONFIG.BELL_SOUNDS)) ? CONFIG.BELL_SOUNDS : [];
+    return list.find((b) => b.key === key) || list[0] || null;
+  }
+
+  // Menghentikan bel yang SEDANG berbunyi (custom mp3) -- dipanggil saat:
+  // (a) operator menekan tombol "🔇 Hentikan Bel" di Studio (pesan
+  //     {type:"timer", action:"stopBell"}, lihat dispatcher di bawah),
+  // (b) siapa pun mengklik DI MANA SAJA di layar Layar 2 ini (listener di
+  //     bawah), atau (c) timer di-Stop/Ulang seperti biasa (stopTimer()).
+  // Bunyi "denting" oscillator (beep()) TIDAK perlu dihentikan paksa --
+  // durasinya sudah pendek (0.9 detik) & selesai sendiri.
+  function stopBellSound() {
+    if (bellAudioEl) {
+      try { bellAudioEl.pause(); bellAudioEl.currentTime = 0; } catch (e) {}
+    }
+  }
+
+  function ringBell(bellKey) {
+    const sound = findBellSound_(bellKey);
+    const url = resolveBellAudioUrl_(sound && sound.url);
+    if (!url) { beep(); return; } // "Bel 1 (Bawaan)" / key tidak dikenal -> bunyi denting bawaan
+    try {
+      const a = ensureBellAudioEl_();
+      a.src = url;
+      a.currentTime = 0;
+      const p = a.play();
+      if (p && typeof p.catch === "function") {
+        // Gagal diputar (mis. link Drive belum "Anyone with the link",
+        // file kebesaran, atau belum ada interaksi klik sama sekali di
+        // Layar 2 ini) -- tetap bunyikan denting bawaan supaya operator
+        // TIDAK kehilangan tanda "timer sudah habis" sama sekali.
+        p.catch(() => beep());
+      }
+    } catch (e) { beep(); }
+  }
+
+  // Klik DI MANA SAJA di Layar 2 ini menghentikan bel custom yang sedang
+  // berbunyi (permintaan operator: bisa dihentikan tanpa harus balik ke
+  // Studio dulu). Tidak mengganggu listener "activateOverlay" di atas --
+  // keduanya sama-sama boleh berjalan untuk klik yang sama.
+  document.addEventListener("click", stopBellSound);
+
   function tickTimer() {
     if (!timerState) return;
     const remain = (timerState.endAt - Date.now()) / 1000;
@@ -612,7 +789,7 @@
     timerTimeEl.classList.toggle("done-text", isDone);
     if (isDone && !timerState._rang) {
       timerState._rang = true;
-      if (timerState.bell) beep();
+      if (timerState.bell) ringBell(timerState.bellKey);
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     }
   }
@@ -621,6 +798,11 @@
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
     stopwatchState = null;
     stopwatchWrap.hidden = true;
+    // BARU (7 Sep 2026) -- bersihkan status standby/dijeda/penanda juga,
+    // supaya sesi Stopwatch BERIKUTNYA tidak mewarisi sisa badge lama.
+    stopwatchWrap.classList.remove("ps-standby", "ps-paused", "ps-has-lap");
+    if (stopwatchStatusBadgeEl) stopwatchStatusBadgeEl.textContent = "";
+    if (stopwatchLapBadgeEl) stopwatchLapBadgeEl.textContent = "";
     if (showIdle) idleEl.hidden = false;
   }
 
@@ -628,8 +810,12 @@
     stopTimer(false);
     stopStopwatch(false); // BARU -- Timer & Stopwatch berbagi ruang tengah yang sama, tidak boleh berbarengan
     hideMagnify(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
-    timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, _rang: false };
+    timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerLabelEl.textContent = timerState.label;
+    // BARU (7 Sep 2026) -- beneran Mulai/Lanjut: lepas status
+    // standby/dijeda (kalau ada sisa dari sebelumnya) & kosongkan badge.
+    timerWrap.classList.remove("ps-standby", "ps-paused");
+    if (timerStatusBadgeEl) timerStatusBadgeEl.textContent = "";
     timerWrap.hidden = false;
     idleEl.hidden = true;
     refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
@@ -639,9 +825,55 @@
   }
   function stopTimer(showIdle) {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    stopBellSound(); // BARU (7 Sep 2026) -- Stop/Ulang timer ikut menghentikan bel custom kalau sedang berbunyi
     timerState = null;
     timerWrap.hidden = true;
+    timerWrap.classList.remove("ps-standby", "ps-paused"); // BARU 7 Sep 2026
+    if (timerStatusBadgeEl) timerStatusBadgeEl.textContent = "";
     if (showIdle) idleEl.hidden = false;
+  }
+  // BARU (6 Sep 2026, permintaan operator) -- "⏸️ Jeda": BEDA dari
+  // stopTimer() di atas -- overlay TETAP tampil, `timerState` TIDAK
+  // di-null-kan, cuma interval-nya berhenti (angka & cincin progres
+  // terakhir tetap beku di layar) -- pola SAMA persis dengan
+  // pauseStopwatchDisplay() di bawah untuk Stopwatch. "▶️ Lanjut" di
+  // Studio (resumeTimer_(), js/presentation-studio.js) mengirim ULANG
+  // pesan {type:"timer", action:"resume", endAt BARU, totalSeconds SAMA
+  // seperti semula} -- ditangani sebagai showTimer(data) biasa (lihat
+  // dispatcher di bawah), jadi tidak perlu fungsi terpisah untuk resume.
+  //
+  // BARU (7 Sep 2026, permintaan operator) -- SEKARANG juga menandai
+  // #timerWrap dengan class "ps-paused" supaya badge "⏸ JEDA" (lihat CSS
+  // #timerStatusBadge) tampil di Layar 2, supaya jemaat/tim tahu ini
+  // dijeda, bukan macet/error.
+  function pauseTimerDisplay() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerWrap.classList.add("ps-paused");
+    if (timerStatusBadgeEl) timerStatusBadgeEl.textContent = "⏸ Jeda";
+  }
+
+  // BARU (7 Sep 2026, permintaan operator) -- "👁️ Tampilkan ke Layar 2"
+  // (toggleTimerPreview_(), js/presentation-studio.js): tampilkan overlay
+  // Timer LEBIH DULU, SEBELUM "▶️ Mulai" ditekan -- angka & cincin
+  // BERKEDIP (lihat CSS .ps-standby) + badge kuning "MULAI" supaya jemaat
+  // tahu ada sesi timer yang akan segera berjalan.
+  function showTimerStandby(data) {
+    stopTimer(false);
+    stopStopwatch(false);
+    hideMagnify();
+    timerState = null; // BUKAN sedang menghitung -- tickTimer() sengaja TIDAK dipanggil/di-interval-kan di sini
+    timerLabelEl.textContent = data.label || "";
+    timerTimeEl.textContent = fmtMMSS(data.totalSeconds || 0);
+    timerTimeEl.classList.remove("done-text");
+    timerRingFg.classList.remove("done");
+    timerRingFg.style.strokeDashoffset = "0"; // cincin penuh, belum berkurang
+    timerWrap.classList.add("ps-standby");
+    timerWrap.classList.remove("ps-paused");
+    if (timerStatusBadgeEl) timerStatusBadgeEl.textContent = "Mulai";
+    timerWrap.hidden = false;
+    idleEl.hidden = true;
+    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
   }
 
   // ------------------------------------------------------------
@@ -684,6 +916,11 @@
     hideMagnify();
     stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
     stopwatchLabelEl.textContent = stopwatchState.label;
+    // BARU (7 Sep 2026) -- beneran Mulai/Lanjut: lepas status standby/
+    // dijeda (penanda/#stopwatchLapBadge SENGAJA TIDAK dikosongkan di sini
+    // -- kalau ini "Lanjut" dari jeda, penanda sebelumnya tetap relevan).
+    stopwatchWrap.classList.remove("ps-standby", "ps-paused");
+    if (stopwatchStatusBadgeEl) stopwatchStatusBadgeEl.textContent = "";
     stopwatchWrap.hidden = false;
     idleEl.hidden = true;
     refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
@@ -697,7 +934,43 @@
     // cuma centangnya berhenti (angka terakhir tetap beku di layar),
     // supaya operator/jemaat masih bisa melihat berapa lama sesi
     // berjalan sejauh ini walau sedang dijeda.
+    // BARU (7 Sep 2026) -- tambah badge "⏸ Jeda", sama seperti Timer.
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
+    stopwatchWrap.classList.add("ps-paused");
+    if (stopwatchStatusBadgeEl) stopwatchStatusBadgeEl.textContent = "⏸ Jeda";
+  }
+
+  // BARU (7 Sep 2026, permintaan operator) -- "👁️ Tampilkan ke Layar 2"
+  // untuk Stopwatch, pola SAMA persis dengan showTimerStandby() di atas:
+  // "00:00" berkedip + badge kuning "MULAI", SEBELUM "▶️ Mulai" ditekan.
+  function showStopwatchStandby(data) {
+    stopTimer(false);
+    if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
+    stopwatchState = null;
+    hideMagnify();
+    stopwatchLabelEl.textContent = data.label || "";
+    stopwatchTimeEl.textContent = "00:00";
+    stopwatchWrap.classList.add("ps-standby");
+    stopwatchWrap.classList.remove("ps-paused", "ps-has-lap"); // sesi baru -- penanda lama (kalau ada) tidak relevan lagi
+    if (stopwatchLapBadgeEl) stopwatchLapBadgeEl.textContent = "";
+    if (stopwatchStatusBadgeEl) stopwatchStatusBadgeEl.textContent = "Mulai";
+    stopwatchWrap.hidden = false;
+    idleEl.hidden = true;
+    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+  }
+
+  // BARU (7 Sep 2026, permintaan operator) -- "🚩 Penanda" (lap) SEKARANG
+  // juga tampil sebentar di Layar 2 sebagai badge kecil di bawah angka
+  // stopwatch (dikirim dari lap(), js/presentation-studio.js), supaya
+  // jemaat/tim juga bisa melihat penanda terjadi -- TETAP tampil sampai
+  // penanda berikutnya, atau sampai stopwatch di-reset/standby lagi.
+  function showStopwatchLap_(data) {
+    if (!stopwatchLapBadgeEl) return;
+    stopwatchLapBadgeEl.textContent = "🚩 Penanda " + data.n + " • +" + fmtStopwatch(data.splitSec || 0);
+    stopwatchWrap.classList.remove("ps-has-lap");
+    void stopwatchWrap.offsetWidth; // restart animasi fadeUp walau class-nya sudah ada dari penanda sebelumnya
+    stopwatchWrap.classList.add("ps-has-lap");
   }
 
   function koorColorForBg(hex) {
@@ -916,6 +1189,9 @@
     // `false` (mati) tetap diterapkan, bukan ikut terlewati begitu saja
     // seperti string/angka kosong.
     if (typeof theme.bold === "boolean") root.setProperty("--p-font-weight", theme.bold ? "700" : "400");
+    // BARU (6 Sep 2026) -- lihat catatan panjang --p-timer-scale di
+    // <style> atas.
+    if (theme.timerScale) root.setProperty("--p-timer-scale", theme.timerScale);
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -1149,16 +1425,27 @@
       return;
     }
     if (data.type === "timer") {
+      // BARU (6 Sep 2026) -- lihat catatan panjang di pauseTimerDisplay()
+      // di atas. "start" (baru) & "resume" (lanjut dari jeda) sama-sama
+      // ditangani showTimer() -- keduanya sudah membawa endAt & totalSeconds
+      // yang benar dari sisi Studio, tidak ada bedanya bagi Layar 2.
+      // BARU (7 Sep 2026) -- "standby" (lihat showTimerStandby() di atas).
       if (data.action === "stop") { stopTimer(true); }
+      else if (data.action === "stopBell") { stopBellSound(); } // BARU (7 Sep 2026) -- "🔇 Hentikan Bel" dari Studio, TANPA menghentikan/menyembunyikan timer-nya sendiri
+      else if (data.action === "pause") { pauseTimerDisplay(); }
+      else if (data.action === "standby") { showTimerStandby(data); }
       else { showTimer(data); }
       return;
     }
     if (data.type === "stopwatch") {
       // BARU (27 Agu 2026) -- lihat catatan panjang di showStopwatch() di
-      // atas untuk arti tiap `action`.
+      // atas untuk arti tiap `action`. BARU (7 Sep 2026) -- "standby"
+      // (showStopwatchStandby()) & "lap" (showStopwatchLap_()).
       if (data.action === "start") showStopwatch(data);
       else if (data.action === "stop") pauseStopwatchDisplay();
       else if (data.action === "reset") stopStopwatch(true);
+      else if (data.action === "standby") showStopwatchStandby(data);
+      else if (data.action === "lap") showStopwatchLap_(data);
       return;
     }
     if (data.type === "theme") { applyTheme(data.theme); return; }
@@ -1173,6 +1460,12 @@
     if (data.type === "latartext") { applyCamTextStyle(data.mode, data.widthPx, data.ink, data.outline); return; }
     if (data.type === "warta") { applyTicker(wartaBar, wartaText, data); return; }
     if (data.type === "footnote") { applyTicker(footBar, footText, data); return; }
+    // BARU (7 Sep 2026) -- overlay "💬 Pesan" posisi Tengah (msgmid) --
+    // dulunya posisi ini SALAH mengirim {type:"text"} yang MENIMPA isi
+    // utama (ayat/kidung/dst hilang diganti tulisan pesan); sekarang
+    // jadi LAPISAN sendiri sama seperti warta/footnote, isi utama di
+    // #stage TETAP utuh di belakangnya.
+    if (data.type === "msgmid") { applyTicker(msgMidBar, msgMidText, data); return; }
     if (data.type === "pointer") {
       if (!data.on) { pointerDot.style.display = "none"; return; }
       pointerDot.style.display = "block";
