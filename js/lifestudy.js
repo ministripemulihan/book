@@ -267,6 +267,82 @@ function renderLifeStudyPanel() {
   });
 }
 
+// ------------------------------------------------------------
+// BARU (7 Sep 2026, permintaan operator) -- "🔖 Rujukan Pelajaran Hayat"
+// di dalam CATATAN PRIBADI ayat (js/app.js, buildInlineNoteCardEl()).
+// PENTING soal batas yang SENGAJA dijaga di sini: ini CUMA menyisipkan
+// TEKS RUJUKAN (nama kitab + nomor pesan + link asli bibleread.online)
+// ke kotak catatan pribadi milik USER SENDIRI -- SAMA SEKALI TIDAK
+// mengambil/menyalin ISI Life-Study yang sebenarnya dari mana pun.
+// Warna pastel highlight ayatnya sendiri sudah ada fiturnya (ketuk nomor
+// ayat -> openHighlightPopup(), js/app.js) -- tidak perlu diubah apa-apa
+// di sana, tinggal dipakai bersamaan dengan catatan ini.
+// ------------------------------------------------------------
+function openInsertLifeStudyRefDialog(bookNum, onInsert) {
+  const defaultBook = LIFE_STUDY_BOOKS.find((b) => b.num === bookNum) || LIFE_STUDY_BOOKS[0];
+  showSimpleDialog("📖 Sisipkan Rujukan Pelajaran Hayat", (box) => {
+    const hint = document.createElement("p");
+    hint.className = "simple-dialog-hint";
+    hint.textContent = "Ini cuma menyisipkan RUJUKAN (nama kitab + nomor pesan + link asli) ke catatan pribadi Anda -- bukan menyalin isi Pelajaran Hayat itu sendiri.";
+    box.appendChild(hint);
+
+    const field1 = document.createElement("div");
+    field1.className = "simple-dialog-field";
+    const label1 = document.createElement("label");
+    label1.textContent = "Kitab:";
+    field1.appendChild(label1);
+    const bookSel = document.createElement("select");
+    ["PB", "PL"].forEach((testament) => {
+      const group = document.createElement("optgroup");
+      group.label = testament === "PB" ? "Perjanjian Baru" : "Perjanjian Lama";
+      LIFE_STUDY_BOOKS.filter((b) => b.testament === testament).forEach((b) => {
+        const opt = document.createElement("option");
+        opt.value = b.slug;
+        opt.textContent = b.name + " (" + b.total + " pesan)";
+        if (b.slug === defaultBook.slug) opt.selected = true;
+        group.appendChild(opt);
+      });
+      bookSel.appendChild(group);
+    });
+    field1.appendChild(bookSel);
+    box.appendChild(field1);
+
+    const field2 = document.createElement("div");
+    field2.className = "simple-dialog-field";
+    const label2 = document.createElement("label");
+    label2.textContent = "Nomor pesan:";
+    field2.appendChild(label2);
+    const msgInput = document.createElement("input");
+    msgInput.type = "number";
+    msgInput.min = "1";
+    msgInput.value = "1";
+    field2.appendChild(msgInput);
+    box.appendChild(field2);
+
+    const field3 = document.createElement("div");
+    field3.className = "simple-dialog-field";
+    const label3 = document.createElement("label");
+    label3.textContent = "Keterangan (opsional, mis. \"¶3\" atau \"bagian ttg iman\"):";
+    field3.appendChild(label3);
+    const detailInput = document.createElement("input");
+    detailInput.type = "text";
+    detailInput.placeholder = "mis. paragraf ke-3";
+    field3.appendChild(detailInput);
+    box.appendChild(field3);
+
+    setTimeout(() => msgInput.focus(), 0);
+
+    return () => {
+      const book = LIFE_STUDY_BOOKS.find((b) => b.slug === bookSel.value);
+      const n = Math.max(1, Math.round(Number(msgInput.value) || 1));
+      const detail = detailInput.value.trim();
+      const url = lifeStudyUrlFor(book.slug, n);
+      const label = `📖 Pelajaran Hayat ${book.name}, Pesan ${n}${detail ? " (" + detail + ")" : ""} — ${url}`;
+      return label;
+    };
+  }, (refText) => onInsert(refText), "Sisipkan");
+}
+
 function renderLifeStudyBookRow(book, lastRead) {
   const row = document.createElement("div");
   row.className = "lifestudy-book-row";
