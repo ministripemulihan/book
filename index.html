@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260907b" />
+<link rel="stylesheet" href="css/style.css?v=20260907c" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -163,6 +163,14 @@
       <div class="brand">
         <span class="brand-mark">☩</span>
         <span class="brand-name" id="appTitle">Alkitab</span>
+        <!-- BARU (7 Sep 2026, permintaan operator) -- indikator kecil
+             "tidak ada internet", lihat CSS .net-offline-badge & skrip
+             pemantauan online/offline di dekat pendaftaran Service
+             Worker (bawah halaman). Bawaan tersembunyi -- cuma muncul
+             SAAT benar-benar offline, supaya operator langsung tahu
+             (mis. sebelum mencoba memutar video YouTube yang pasti akan
+             gagal) tanpa perlu menebak-nebak kenapa sesuatu tidak jalan. -->
+        <span id="netOfflineBadge" class="net-offline-badge" hidden title="Tidak ada koneksi internet -- fitur yang butuh internet (video YouTube, login, sinkron, dst) tidak akan berfungsi sampai koneksi kembali. Alkitab/Kidung/Pengumuman yang sudah pernah dimuat tetap bisa dipakai seperti biasa.">📡 Offline</span>
       </div>
 
       <form id="searchForm" class="search-form" role="search">
@@ -402,6 +410,24 @@
           <span class="toggle-slider"></span>
         </span>
       </label>
+
+      <!-- BARU (7 Sep 2026, permintaan operator: "download alkitab
+           tertentu yang tidak aktif") -- pilih bahasa mana yang MAU
+           disimpan ke perangkat ini saat "🔄 Sinkronkan ulang Alkitab"
+           ditekan. Kosongkan centang bahasa yang tidak pernah dipakai
+           supaya IndexedDB perangkat tidak penuh oleh bahasa yang tidak
+           perlu. Lihat DEFAULT_SETTINGS.bibleLangFilter (js/settings.js)
+           & filternya di syncFromServer() (js/app.js). Pengaturan ini
+           TIDAK mengecilkan ukuran UNDUHAN (server tetap kirim semua
+           bahasa sekaligus dalam 1 file) -- cuma yang DISIMPAN di
+           perangkat ini yang berkurang. Ikut tersinkron ke akun yang
+           sama di HP lain (lewat js/sync.js pushSettings), sama seperti
+           pengaturan lain di atas. -->
+      <div class="more-menu-section" id="bibleLangFilterSection">
+        <div class="more-menu-section-title">📥 Bahasa yang Diunduh &amp; Disimpan</div>
+        <p class="announcement-compose-hint" style="margin-top:0;">Centang bahasa yang MAU disimpan di perangkat ini. Kosongkan centang bahasa yang tidak dipakai supaya hemat ruang penyimpanan HP. (Catatan: ukuran UNDUHAN dari server tetap sama -- ini cuma mengatur apa yang disimpan setelah diunduh.) Kalau TIDAK ADA yang dicentang sama sekali, semua bahasa disimpan seperti biasa. Setelah mengubah pilihan, tekan "🔄 Sinkronkan ulang Alkitab" supaya berlaku.</p>
+        <div id="bibleLangFilterList" class="more-menu-checkbox-list"></div>
+      </div>
 
       <!-- ===================== MODE PRESENTASI 2 LAYAR (baru) =====================
            Disembunyikan untuk Mode Tamu lewat Presentation.refreshGuestGate()
@@ -1094,6 +1120,29 @@
                  wireAnnouncementCopy_() (js/presentation-studio.js). -->
             <button type="button" id="psAnnCopyBtn" class="chip-btn small">📋 Salin</button>
           </div>
+
+          <!-- BARU (7 Sep 2026, permintaan operator) -- Template Pengumuman:
+               daftar pengumuman siap-pakai TERPISAH dari Kumpulan Ayat
+               (yang isinya campuran ayat/kidung/teks). Tersimpan lokal di
+               perangkat ini (localStorage, pola sama seperti "Tulisan
+               Bebas" -- lihat ps_ann_templates_v1 di js/presentation-
+               studio.js, wireAnnouncementTemplates_()). Simpan judul+isi
+               yang sedang diketik sebagai 1 template bernama, lalu bisa
+               dimuat ulang (isi balik ke kotak judul/isi di atas supaya
+               bisa diedit), ditayangkan langsung, atau dihapus. -->
+          <div class="ps-field-label" style="margin-top:16px;">🗂️ Template Pengumuman</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Simpan judul &amp; isi di atas sebagai template bernama (mis. "Waktu Makan", "Latihan Musik", "Bawa Buku") supaya bisa dipakai berulang -- beda dari Kumpulan Ayat yang isinya campuran ayat/kidung. Tersimpan di perangkat ini saja.</p>
+          <div class="ps-btn-row">
+            <input type="text" id="psAnnTemplateName" class="columns-lang-select" placeholder="Nama template (mis. Waktu Makan)" style="flex:1; min-width:160px;" />
+            <button type="button" id="psAnnTemplateSaveBtn" class="chip-btn small primary">💾 Simpan sebagai Template</button>
+          </div>
+          <div class="ps-btn-row" id="psAnnQuickPhraseRow" style="margin-top:6px;">
+            <button type="button" class="chip-btn small" data-ann-quick="✅ Bawa Buku Alkitab / Catatan">✅ Bawa Buku</button>
+            <button type="button" class="chip-btn small" data-ann-quick="🙏 Doa Pembuka">🙏 Doa Pembuka</button>
+            <button type="button" class="chip-btn small" data-ann-quick="🎤 MC bertugas: ">🎤 MC Bertugas</button>
+            <button type="button" class="chip-btn small" data-ann-quick="🎶 Pujian: ">🎶 Pujian</button>
+          </div>
+          <div id="psAnnTemplateList" class="present-saved-list" style="margin-top:8px;"></div>
         </div>
 
         <div class="ps-tab-panel" data-ps-left-panel="pesan" hidden>
@@ -1414,6 +1463,7 @@
           <button type="button" class="ps-tab" data-ps-mid-tab="kidung">🎵 Kidung / Hymn</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="file">🖼️ File</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="youtube">▶️ YouTube</button>
+          <button type="button" class="ps-tab" data-ps-mid-tab="videolocal">🎬 Video Lokal</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="link">🔗 Link</button>
           <button type="button" class="ps-tab" data-ps-mid-tab="ai">🤖 AI Presentation</button>
         </div>
@@ -1581,6 +1631,60 @@
           </select>
           <p class="announcement-compose-hint">Urutkan "Durasi" &amp; "Tanggal upload" butuh kolom TAMBAHAN opsional di Sheet: <b>Durasi</b> (angka menit, mis. "12" atau "7.5", atau format jam:menit:detik mis. "1:02:30") &amp; <b>Tanggal</b> (mis. "2026-08-30"). Video yang belum diisi kolom itu otomatis ditaruh paling bawah, bukan hilang.</p>
           <div id="psYtPlaylistList" class="ps-file-list"><p class="present-saved-empty">Belum ada video dimuat -- tempel link Google Sheet lalu tekan "🔄 Muat Ulang".</p></div>
+        </div>
+
+        <!-- ============================================================
+             BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4).
+             BEDA MENDASAR dari tab "▶️ YouTube" di atas: video di sini
+             TIDAK PERNAH diunggah ke server/internet mana pun & TIDAK
+             butuh internet sama sekali untuk diputar -- videonya dibaca
+             LANGSUNG dari komputer ini (file di komputer operator),
+             lalu Blob file-nya dikirim SATU KALI langsung dari memori
+             jendela Studio ini ke memori jendela Layar 2 lewat
+             postMessage (lihat wireLocalVideoTab()/js/presentation-
+             studio.js & showLocalVideo()/present.html) -- makanya:
+               - TIDAK ADA batas ukuran file yang dipaksakan oleh kode
+                 (cuma dibatasi RAM/penyimpanan komputer itu sendiri).
+               - Bukan "upload" -- tidak ada proses kirim ke server yang
+                 makan waktu, videonya langsung siap diputar begitu
+                 dipilih.
+               - 100% offline -- cocok untuk lokasi tanpa internet.
+             Dua cara pilih video (lihat komentar wireLocalVideoTab()
+             untuk kenapa 2 cara):
+               1. "📂 Hubungkan Folder Video" -- pakai File System Access
+                  API (Chrome/Edge terbaru saja), operator memilih SATU
+                  folder di komputer berisi file-file MP4, lalu SEMUA isi
+                  folder itu otomatis terdaftar & bisa langsung ditayangkan
+                  kapan saja TANPA pilih file satu-satu lagi -- bahkan
+                  "diingat" lagi otomatis lain kali Studio dibuka (izin
+                  akses folder disimpan, tidak perlu pilih ulang tiap
+                  sesi, lihat catatan panjang di JS).
+               2. "➕ Pilih File Video" -- cara cadangan yang bekerja di
+                  SEMUA browser (input file biasa), tapi harus dipilih
+                  ulang tiap kali Studio dibuka/disegarkan (browser tidak
+                  mengizinkan mengingat file lepas begini demi keamanan).
+        ============================================================ -->
+        <div class="ps-tab-panel" data-ps-mid-panel="videolocal" hidden>
+          <p class="announcement-compose-hint">Video MP4 di sini dibaca LANGSUNG dari komputer ini, TIDAK diunggah ke internet & TIDAK ada batas ukuran file -- cocok dipakai tanpa internet sama sekali. "▶️ Tampilkan" langsung memutar SEKARANG JUGA di Layar 2. Khusus laptop/komputer (dual layar); tidak tersedia di HP.</p>
+          <div class="ps-btn-row">
+            <button type="button" id="psLvConnectFolderBtn" class="chip-btn primary">📂 Hubungkan Folder Video</button>
+            <button type="button" id="psLvPickFilesBtn" class="chip-btn small">➕ Pilih File Video</button>
+            <input type="file" id="psLvFileInput" accept="video/mp4,video/*" multiple hidden />
+          </div>
+          <div class="ps-yt-hint" id="psLvFolderStatus">Belum ada folder terhubung. "📂 Hubungkan Folder Video" hanya didukung Chrome/Edge versi baru di komputer (bukan HP) -- kalau tombolnya tidak berfungsi di browser Anda, pakai "➕ Pilih File Video" sebagai gantinya.</div>
+          <div class="ps-field-label" style="margin-top:10px;">Daftar video</div>
+          <div class="ps-yt-row">
+            <input type="text" id="psLvSearch" class="columns-lang-select" placeholder="🔍 Cari nama file video..." />
+          </div>
+          <div id="psLvList" class="ps-file-list"><p class="present-saved-empty">Belum ada video -- hubungkan folder atau pilih file di atas.</p></div>
+          <div class="ps-field-label" style="margin-top:10px;">Video sedang tayang</div>
+          <div class="ps-yt-hint" id="psLvNowPlaying">Belum ada video lokal yang tayang.</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psLvPlayBtn" class="chip-btn small">▶️ Play</button>
+            <button type="button" id="psLvPauseBtn" class="chip-btn small">⏸️ Pause</button>
+            <button type="button" id="psLvMuteBtn" class="chip-btn small">🔇 Mute</button>
+            <button type="button" id="psLvStopBtn" class="chip-btn small danger">⏹ Stop</button>
+          </div>
         </div>
 
         <!-- BARU (4 Sep 2026) -- tab "🔗 Link": Canva & SoundCloud, lihat
@@ -2077,7 +2181,7 @@
   <script src="js/activitylog.js?v=20260818b"></script>
   <script src="js/notes.js?v=20260818b"></script>
   <script src="js/highlights.js?v=20260818b"></script>
-  <script src="js/settings.js?v=20260818b"></script>
+  <script src="js/settings.js?v=20260907a"></script>
   <script src="js/plans.js?v=20260818b"></script>
   <script src="js/media.js?v=20260821b"></script>
   <script src="js/outlines.js?v=20260820b"></script>
@@ -2088,13 +2192,45 @@
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
   <script src="js/presentation.js?v=20260907b"></script>
-  <script src="js/presentation-studio.js?v=20260907d"></script>
+  <script src="js/presentation-studio.js?v=20260907e"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260907a"></script>
+  <script src="js/app.js?v=20260907b"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
   <script src="js/kidungversecheck.js?v=20260821a"></script>
+  <!-- BARU (7 Sep 2026, permintaan operator) -- daftarkan Service Worker
+       (sw.js) supaya aplikasi ini SENDIRI (HTML/CSS/JS/font) bisa
+       dibuka tanpa internet setelah kunjungan pertama -- lihat catatan
+       panjang di sw.js untuk apa saja yang di-cache & apa yang SENGAJA
+       tidak (Apps Script/YouTube/dst, tetap butuh internet). Dibungkus
+       try/catch & pengecekan dukungan browser supaya browser lama yang
+       tidak mendukung Service Worker tetap jalan normal seperti biasa
+       (fitur ini otomatis "tidak aktif", bukan error). -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+    // BARU (7 Sep 2026, permintaan operator) -- indikator kecil "📡
+    // Offline" di header (lihat #netOfflineBadge & .net-offline-badge di
+    // atas). `navigator.onLine` TIDAK 100% akurat di semua kondisi
+    // jaringan (mis. wifi terhubung tapi tanpa internet sungguhan kadang
+    // masih dianggap "online" oleh browser), tapi cukup untuk kasus
+    // paling umum (mati total/pesawat/tidak ada wifi sama sekali) yang
+    // relevan di sini -- lengkap dengan event "online"/"offline" supaya
+    // langsung berubah otomatis begitu koneksi hilang/kembali, tanpa
+    // perlu memuat ulang halaman.
+    (function () {
+      const badge = document.getElementById("netOfflineBadge");
+      if (!badge) return;
+      function sync() { badge.hidden = navigator.onLine; }
+      window.addEventListener("online", sync);
+      window.addEventListener("offline", sync);
+      sync();
+    })();
+  </script>
 </body>
 </html>
