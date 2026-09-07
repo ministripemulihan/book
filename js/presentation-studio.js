@@ -5,7 +5,7 @@
 //  panel lama (js/presentation.js) tetap dipakai apa adanya untuk
 //  HP / mode 1 layar & sebagai mesin pengiriman pesan (postMessage)
 //  ke present.html, supaya tidak menduplikasi logic buka/tutup
-//  jendela Layar 2.
+//  jendela Layar 2. 
 //
 //  STATUS (lihat jawaban chat untuk detail per tahap):
 //   0b) BARU 19 Agu 2026: saat menyimpan ayat ke Kumpulan Ayat lewat
@@ -125,7 +125,9 @@ const PresentationStudio = (() => {
   let msgPos = "top";
   let msgRunning = false;
 
-  let timerRunning = false;
+  // (BARU 6 Sep 2026 -- boolean timerRunning lama digantikan timerState_,
+  // dideklarasikan sendiri di dekat fmtMMSS() di bawah, supaya berdekatan
+  // dengan sisa kode Timer yang memakainya.)
   let timerDisplayInterval = null;
   let timerEndAt = null;
   let timerTotal = 0;
@@ -843,6 +845,16 @@ const PresentationStudio = (() => {
       sendCanvaSlide(it);
     } else if (it.type === "soundcloud") {
       sendSoundCloudSlide(it);
+    } else if (it.type === "youtube_link") {
+      // BARU (5 Sep 2026) -- item YouTube portabel yang ditambahkan dari
+      // panel Kumpulan Ayat biasa/HP (addYoutubeLinkToCollection(),
+      // js/collections.js) -- `embedUrl` sudah tersimpan langsung di
+      // item, tinggal kirim persis seperti video YouTube lain (pola sama
+      // dengan cabang it.type==="media" untuk youtube di
+      // sendMediaSlideFromCollection(), cuma tanpa perlu lookup Media
+      // Tersimpan sama sekali).
+      rawPost({ type: "youtube", embedUrl: it.embedUrl });
+      renderStudioPreview({ type: "youtube", embedUrl: it.embedUrl });
     }
   }
 
@@ -1317,7 +1329,7 @@ const PresentationStudio = (() => {
       // bertumpuk (bukan YouTube -- video sudah punya sub-daftar judul
       // sendiri di bawah, lihat videoLabels di bawah).
       const showGrid = multi && !isYt;
-      row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${item.driveFileId ? "☁️ " : ""}${escapeHtml(item.name)}</span>
+      row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${item.driveFileId ? "☁️ " : ""}${item.publicUrl ? "🔓 " : ""}${escapeHtml(item.name)}</span>
         <span class="ps-file-actions">
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
           ${showGrid ? `<button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
@@ -1327,10 +1339,63 @@ const PresentationStudio = (() => {
           <button type="button" class="chip-btn small" data-act="addcol" title="${isYt ? "Tambahkan video yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)" : "Tambahkan halaman yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)"}">➕ Kumpulan</button>
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="download" title="Unduh halaman yang sedang ditampilkan sebagai gambar">⬇️</button>` : ""}
           ${item.originalFile ? `<button type="button" class="chip-btn small" data-act="downloadOriginal" title="Unduh file PDF ASLI (utuh, bukan gambar per halaman)">⬇️ PDF Asli</button>` : ""}
+          ${item.driveFileId ? `<button type="button" class="chip-btn small" data-act="publiclink" title="${item.publicUrl ? "Lihat/salin link publik, atau cabut supaya jadi privat lagi" : "Buat link Drive yang bisa dibuka SIAPA SAJA lewat browser mana pun, tanpa login ke aplikasi ini"}">${item.publicUrl ? "🔓 Link Publik" : "🔗 Buat Link Publik"}</button>` : ""}
           ${item.driveFileId ? `<button type="button" class="chip-btn small danger" data-act="deldrive" title="Hapus PERMANEN dari Drive (bukan cuma dari daftar ini)">🗑️ Hapus dari Drive</button>` : ""}
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
       itemWrap.appendChild(row);
+      // BARU (5 Sep 2026) -- "🔗 Buat Link Publik" / "🔓 Link Publik".
+      // Lihat catatan keamanan panjang di setDriveFileSharingForUser_()
+      // (apps-script/Code.gs): sekali dibuat publik, SIAPA PUN yang tahu
+      // link itu bisa membukanya lewat browser mana pun TANPA login ke
+      // aplikasi ini, sampai dicabut lagi lewat tombol yang sama (ketik
+      // "cabut" di kotak yang muncul). Beda dari media_file (endpoint
+      // internal aplikasi) yang selalu dicek username-nya dulu.
+      const publicLinkBtn = row.querySelector('[data-act="publiclink"]');
+      if (publicLinkBtn) publicLinkBtn.addEventListener("click", async () => {
+        if (item.publicUrl) {
+          const choice = prompt(
+            `Link publik "${item.name}" (bisa dibuka siapa saja lewat browser mana pun, tanpa login ke aplikasi):\n\n${item.publicUrl}\n\nKetik "cabut" lalu OK untuk menonaktifkan link ini (jadi privat lagi). Biarkan seperti ini lalu OK/Batal untuk sekadar menutup kotak ini (link tidak berubah).`,
+            item.publicUrl
+          );
+          if (choice === null || choice.trim().toLowerCase() !== "cabut") return;
+          publicLinkBtn.disabled = true;
+          publicLinkBtn.textContent = "⏳ Mencabut…";
+          const res = await setMediaPublicLink(username, item.driveFileId, false);
+          publicLinkBtn.disabled = false;
+          if (!res || !res.ok) {
+            alert("Gagal mencabut link publik: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+            publicLinkBtn.textContent = "🔓 Link Publik";
+            return;
+          }
+          item.publicUrl = null;
+          item.updatedAt = new Date().toISOString();
+          if (typeof LocalDB !== "undefined") await LocalDB.putMediaItem(item).catch(() => {});
+          alert(`Link publik "${item.name}" sudah dicabut -- sekarang privat lagi (hanya bisa diakses lewat aplikasi seperti sebelumnya).`);
+          renderMediaList();
+          return;
+        }
+        if (!confirm(`Buat link publik untuk "${item.name}"?\n\nSiapa pun yang punya link ini nanti bisa membukanya LANGSUNG lewat browser apa pun (komputer/HP, tidak perlu login ke aplikasi ini) -- tidak ada kadaluarsa otomatis, tapi bisa dicabut lagi kapan saja lewat tombol yang sama.`)) return;
+        publicLinkBtn.disabled = true;
+        publicLinkBtn.textContent = "⏳ Membuat…";
+        const res = await setMediaPublicLink(username, item.driveFileId, true);
+        publicLinkBtn.disabled = false;
+        if (!res || !res.ok) {
+          alert("Gagal membuat link publik: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+          publicLinkBtn.textContent = "🔗 Buat Link Publik";
+          return;
+        }
+        item.publicUrl = res.url;
+        item.updatedAt = new Date().toISOString();
+        if (typeof LocalDB !== "undefined") await LocalDB.putMediaItem(item).catch(() => {});
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(res.url).catch(() => {});
+          alert(`Link publik berhasil dibuat & disalin ke clipboard:\n${res.url}`);
+        } else {
+          alert(`Link publik berhasil dibuat:\n${res.url}`);
+        }
+        renderMediaList();
+      });
       const deleteFromDriveBtn = row.querySelector('[data-act="deldrive"]');
       if (deleteFromDriveBtn) deleteFromDriveBtn.addEventListener("click", async () => {
         // BARU (27 Agu 2026) -- lihat catatan panjang di
@@ -1604,18 +1669,63 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------
   // Timer
   // ------------------------------------------------------------
+  // BARU (6 Sep 2026, permintaan operator) -- state machine standby/
+  // berjalan/dijeda/selesai, gantikan boolean timerRunning lama (yang
+  // cuma bisa bedakan "jalan" vs "tidak jalan", tidak cukup untuk
+  // membedakan "belum pernah dimulai" vs "sempat jalan lalu dijeda").
+  //   "standby" -- durasi sudah dipilih (preset/custom) TAPI belum
+  //                ditekan Mulai (ATAU baru saja "🔁 Ulang" ditekan).
+  //                Angka BERKEDIP (lihat .ps-timer-standby, css/style.css)
+  //                supaya jelas ini status "siap, tinggal ditekan" --
+  //                permintaan operator persis, lihat referensi HP.
+  //   "running"  -- sedang menghitung mundur, dikirim ke Layar 2.
+  //   "paused"   -- dijeda di tengah jalan ("⏸️ Jeda" ditekan) -- angka
+  //                 BEKU (tidak berkedip, tidak berubah) di sisa waktu
+  //                 terakhir, TIDAK dikirim "stop" ke Layar 2 (overlay
+  //                 tetap kelihatan beku di sana juga, lihat action
+  //                 "pause" BARU di present.html) -- operator bisa
+  //                 "▶️ Lanjut" (meneruskan dari sisa waktu itu) ATAU
+  //                 "🔁 Ulang" (kembali ke standby, durasi awal lagi).
+  //   "done"     -- hitungan sampai 0 sendiri (lihat startTimer() di
+  //                 bawah) -- angka merah solid (.done, TIDAK berkedip),
+  //                 satu-satunya tombol yang tersisa "🔁 Ulang".
+  // ------------------------------------------------------------
+  let timerState_ = "standby";
+  let timerRemainingAtPause_ = null; // detik sisa saat "⏸️ Jeda" ditekan -- null kalau tidak sedang dijeda
+
   function fmtMMSS(totalSec) {
     const s = Math.max(0, Math.round(totalSec));
     return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
   }
 
-  function setTimerCustomSeconds(sec) {
-    if (el("psTimerDisplay")) {
-      el("psTimerDisplay").textContent = fmtMMSS(sec);
-      el("psTimerDisplay").classList.remove("done");
-      el("psTimerDisplay").classList.toggle("ps-timer-idle", sec > 0 && !timerRunning);
+  // Menampilkan/menyembunyikan tombol Timer sesuai timerState_ SEKARANG
+  // -- SATU-SATUNYA tempat yang boleh mengubah `hidden`/teks tombol,
+  // supaya tidak ada 2 tempat kode yang bisa saling menimpa keputusan
+  // status yang mana yang lagi aktif.
+  function renderTimerUi_() {
+    const startBtn = el("psTimerStartBtn");
+    const pauseBtn = el("psTimerStopBtn");
+    const resetBtn = el("psTimerCancelBtn");
+    const disp = el("psTimerDisplay");
+    if (disp) {
+      disp.classList.toggle("ps-timer-standby", timerState_ === "standby");
+      disp.classList.toggle("done", timerState_ === "done");
     }
+    if (startBtn) {
+      startBtn.hidden = timerState_ === "running" || timerState_ === "done";
+      startBtn.textContent = timerState_ === "paused" ? "▶️ Lanjut" : "▶️ Mulai";
+      startBtn.title = timerState_ === "paused" ? "Lanjutkan dari sisa waktu" : "Mulai";
+    }
+    if (pauseBtn) pauseBtn.hidden = timerState_ !== "running";
+    if (resetBtn) resetBtn.hidden = timerState_ === "standby";
+  }
+
+  function setTimerCustomSeconds(sec) {
+    timerState_ = "standby";
+    timerRemainingAtPause_ = null;
+    if (el("psTimerDisplay")) el("psTimerDisplay").textContent = fmtMMSS(sec);
     timerTotal = sec;
+    renderTimerUi_();
   }
 
   function syncTimerLabelPreview() {
@@ -1625,54 +1735,84 @@ const PresentationStudio = (() => {
     preview.textContent = label;
   }
 
-  function startTimer(totalSeconds) {
+  // `resumeEndAt`/`resumeTotal` (opsional) -- dipakai KHUSUS oleh
+  // resumeTimer_() di bawah untuk "▶️ Lanjut": endAt BARU (dihitung dari
+  // sisa waktu saat dijeda) tapi `totalSeconds` yang dikirim ke Layar 2
+  // tetap DURASI ASLI (bukan sisa waktunya) -- supaya cincin progres
+  // (#timerRingFg, present.html) melanjutkan dari posisi yang benar,
+  // bukan terlihat "penuh lagi dari 0%" seperti mulai baru.
+  function startTimer(totalSeconds, resumeEndAt, resumeTotal) {
     stopTimerDisplay();
-    timerTotal = totalSeconds;
-    timerEndAt = Date.now() + totalSeconds * 1000;
-    timerRunning = true;
+    timerTotal = resumeTotal || totalSeconds;
+    timerEndAt = resumeEndAt || (Date.now() + totalSeconds * 1000);
+    timerState_ = "running";
+    timerRemainingAtPause_ = null;
     const label = (el("psTimerLabel") && el("psTimerLabel").value.trim()) || "Sesi Bagi Nikmat";
     const bell = !!(el("psTimerBell") && el("psTimerBell").checked);
     syncTimerLabelPreview();
-    rawPost({ type: "timer", action: "start", label, totalSeconds, endAt: timerEndAt, bell });
+    rawPost({ type: "timer", action: resumeEndAt ? "resume" : "start", label, totalSeconds: timerTotal, endAt: timerEndAt, bell });
+    renderTimerUi_();
     const disp = el("psTimerDisplay");
-    if (disp) disp.classList.remove("ps-timer-idle");
     timerDisplayInterval = setInterval(() => {
       const remain = (timerEndAt - Date.now()) / 1000;
       if (disp) {
         disp.textContent = fmtMMSS(remain);
-        disp.classList.toggle("done", remain <= 0);
       }
-      if (remain <= 0) { clearInterval(timerDisplayInterval); timerDisplayInterval = null; timerRunning = false; }
+      if (remain <= 0) {
+        clearInterval(timerDisplayInterval); timerDisplayInterval = null;
+        timerState_ = "done";
+        renderTimerUi_();
+      }
     }, 250);
+  }
+
+  // "⏸️ Jeda" -- BEDA dari stopTimer() di bawah: Layar 2 TETAP tampil,
+  // beku di sisa waktu terakhir (lihat action "pause" BARU di
+  // present.html, tickTimer() cukup berhenti dipanggil, state-nya TIDAK
+  // di-null-kan seperti stopTimer()).
+  function pauseTimer_() {
+    if (timerState_ !== "running") return;
+    const remain = Math.max(0, (timerEndAt - Date.now()) / 1000);
+    stopTimerDisplay();
+    timerRemainingAtPause_ = remain;
+    timerState_ = "paused";
+    rawPost({ type: "timer", action: "pause" });
+    renderTimerUi_();
+  }
+
+  function resumeTimer_() {
+    if (timerState_ !== "paused" || timerRemainingAtPause_ == null) return;
+    const newEndAt = Date.now() + timerRemainingAtPause_ * 1000;
+    startTimer(timerRemainingAtPause_, newEndAt, timerTotal);
   }
 
   function stopTimerDisplay() {
     if (timerDisplayInterval) { clearInterval(timerDisplayInterval); timerDisplayInterval = null; }
   }
 
-  function stopTimer() {
+  // "🔁 Ulang" -- kembali ke status "standby" dengan DURASI ASLI yang
+  // tadi dipilih (preset/custom), siap ditekan "▶️ Mulai" lagi -- beda
+  // dari psTimerCancelBtn LAMA (dulu "✖️ Batal", mengosongkan durasi ke
+  // 0) -- lihat catatan HTML index.html untuk alasan tombol ini dipakai
+  // ulang (bukan ditambah tombol baru).
+  function resetTimerToStandby_() {
     stopTimerDisplay();
-    timerRunning = false;
-    // Kirim "stop" WALAUPUN belum sempat "start" tersambung ke Layar 2
-    // (mis. baru saja dibuka) -- lihat perbaikan antrean pesan di
-    // js/presentation.js (sendToWindow/flushQueue): pesan ini akan
-    // ditahan dulu lalu dikirim otomatis begitu Layar 2 siap, jadi
-    // tombol "✖️" / "⏹️ Stop" tetap membuat overlay timer hilang di
-    // Layar 2, bukan cuma di panel operator ini.
-    rawPost({ type: "timer", action: "stop" });
-    const disp = el("psTimerDisplay");
-    if (disp) {
-      disp.textContent = "00:00";
-      disp.classList.remove("done");
-      disp.classList.add("ps-timer-idle");
-    }
+    timerRemainingAtPause_ = null;
+    rawPost({ type: "timer", action: "stop" }); // sembunyikan overlay Layar 2 (kalau sedang tayang/dijeda)
+    setTimerCustomSeconds(timerTotal); // balik ke standby, DURASI SAMA seperti sebelumnya (bukan 0)
+  }
+
+  function stopTimer() {
+    // Dipertahankan untuk pemanggil lama (mis. saat panel Studio
+    // ditutup) -- perilakunya SEKARANG sama seperti "🔁 Ulang".
+    resetTimerToStandby_();
   }
 
   function flashTimerNeedsDuration() {
     const disp = el("psTimerDisplay");
     if (!disp) return;
     disp.classList.add("done");
-    setTimeout(() => { if (!timerRunning) disp.classList.remove("done"); }, 500);
+    setTimeout(() => { if (timerState_ !== "done") disp.classList.remove("done"); }, 500);
   }
 
   function wireTimer() {
@@ -1696,18 +1836,20 @@ const PresentationStudio = (() => {
       el("psTimerCustom").addEventListener("keydown", (e) => { if (e.key === "Enter") applyCustom(); });
     }
     if (el("psTimerLabel")) el("psTimerLabel").addEventListener("input", syncTimerLabelPreview);
+    // psTimerStartBtn SEKARANG dipakai 2 fungsi (lihat renderTimerUi_()):
+    // "▶️ Mulai" saat standby, "▶️ Lanjut" saat dijeda.
     if (el("psTimerStartBtn")) el("psTimerStartBtn").addEventListener("click", () => {
+      if (timerState_ === "paused") { resumeTimer_(); return; }
       if (timerTotal > 0) startTimer(timerTotal);
       else flashTimerNeedsDuration(); // belum pilih durasi (preset/custom) -- kasih tanda, jangan diam saja
     });
-    if (el("psTimerStopBtn")) el("psTimerStopBtn").addEventListener("click", () => stopTimer());
-    if (el("psTimerCancelBtn")) el("psTimerCancelBtn").addEventListener("click", () => {
-      stopTimer();
-      setTimerCustomSeconds(0);
-      document.querySelectorAll("[data-timer-preset]").forEach((b) => b.classList.remove("active"));
-      if (el("psTimerCustomBtn")) el("psTimerCustomBtn").classList.remove("active");
-    });
+    // psTimerStopBtn SEKARANG "⏸️ Jeda" (cuma tampil saat berjalan).
+    if (el("psTimerStopBtn")) el("psTimerStopBtn").addEventListener("click", () => pauseTimer_());
+    // psTimerCancelBtn SEKARANG "🔁 Ulang" (tampil saat berjalan/dijeda/
+    // selesai) -- lihat resetTimerToStandby_().
+    if (el("psTimerCancelBtn")) el("psTimerCancelBtn").addEventListener("click", () => resetTimerToStandby_());
     syncTimerLabelPreview();
+    renderTimerUi_();
   }
 
   // ------------------------------------------------------------
@@ -1718,11 +1860,17 @@ const PresentationStudio = (() => {
   // Layar 2 (present.html, lihat showStopwatch() di sana), cuma beda
   // elemen DOM yang dipakai (prefix "ps" utk Studio, "present" utk panel
   // sederhana) -- lihat juga wireStopwatchSimple() di js/presentation.js.
+  //
+  // BARU (6 Sep 2026, permintaan operator) -- state machine standby/
+  // berjalan/dijeda (pola SAMA seperti Timer di atas, TANPA status
+  // "selesai" karena stopwatch hitung MAJU, tidak ada target akhir) +
+  // "🚩 Penanda" (lap) khusus muncul saat berjalan.
   // ------------------------------------------------------------
   let swBaseStartAt = null; // Date.now() - (durasi yang sudah berjalan sejauh ini, dalam ms) -- SELAMA berjalan
   let swAccumulatedMs = 0; // durasi yang sudah terkumpul SAAT dijeda (dipakai start() berikutnya untuk melanjutkan, bukan mengulang dari 0)
-  let swRunning = false;
+  let swState_ = "standby"; // "standby" | "running" | "paused"
   let swDisplayInterval = null;
+  let swLaps_ = []; // { n, splitSec, totalSec } -- operator-side saja, lihat .ps-stopwatch-laps (css/style.css)
 
   function fmtStopwatch(totalSec) {
     const s = Math.max(0, Math.floor(totalSec));
@@ -1733,6 +1881,32 @@ const PresentationStudio = (() => {
     return hh > 0 ? `${hh}:${pad2(mm)}:${pad2(ss)}` : `${pad2(mm)}:${pad2(ss)}`;
   }
 
+  function renderStopwatchUi_() {
+    const startBtn = el("psStopwatchStartBtn");
+    const lapBtn = el("psStopwatchLapBtn");
+    const pauseBtn = el("psStopwatchStopBtn");
+    const resetBtn = el("psStopwatchResetBtn");
+    const disp = el("psStopwatchDisplay");
+    if (disp) disp.classList.toggle("ps-timer-standby", swState_ === "standby");
+    if (startBtn) {
+      startBtn.hidden = swState_ === "running";
+      startBtn.textContent = swState_ === "paused" ? "▶️ Lanjut" : "▶️ Mulai";
+      startBtn.title = swState_ === "paused" ? "Lanjutkan dari angka ini" : "Mulai";
+    }
+    if (lapBtn) lapBtn.hidden = swState_ !== "running";
+    if (pauseBtn) pauseBtn.hidden = swState_ !== "running";
+    if (resetBtn) resetBtn.hidden = swState_ !== "paused";
+  }
+
+  function renderStopwatchLaps_() {
+    const box = el("psStopwatchLaps");
+    if (!box) return;
+    if (!swLaps_.length) { box.innerHTML = ""; return; }
+    box.innerHTML = swLaps_.map((l) =>
+      `<div class="ps-stopwatch-laps-row"><span>Penanda ${l.n}</span><span>+${fmtStopwatch(l.splitSec)}</span><span>${fmtStopwatch(l.totalSec)}</span></div>`
+    ).reverse().join("");
+  }
+
   function wireStopwatch() {
     const labelEl = el("psStopwatchLabel");
     const labelPreview = el("psStopwatchLabelPreview");
@@ -1740,44 +1914,70 @@ const PresentationStudio = (() => {
     function syncLabelPreview() {
       if (labelPreview) labelPreview.textContent = (labelEl && labelEl.value.trim()) || "";
     }
+    function currentElapsedSec() {
+      if (swBaseStartAt == null) return 0;
+      return (Date.now() - swBaseStartAt) / 1000;
+    }
     function tick() {
-      if (!swRunning || swBaseStartAt == null) return;
-      if (disp) disp.textContent = fmtStopwatch((Date.now() - swBaseStartAt) / 1000);
+      if (swState_ !== "running" || swBaseStartAt == null) return;
+      if (disp) disp.textContent = fmtStopwatch(currentElapsedSec());
     }
     function start() {
-      if (swRunning) return;
+      if (swState_ === "running") return;
       // Melanjutkan dari jeda (swAccumulatedMs > 0) ATAU mulai murni dari
       // 0 -- baseStartAt digeser mundur sejauh durasi yang SUDAH terkumpul
       // supaya "Date.now() - baseStartAt" tetap menghasilkan total yang
       // benar tanpa perlu melacak jeda secara terpisah di Layar 2.
       swBaseStartAt = Date.now() - swAccumulatedMs;
-      swRunning = true;
+      swState_ = "running";
       const label = (labelEl && labelEl.value.trim()) || "";
       rawPost({ type: "stopwatch", action: "start", label, baseStartAt: swBaseStartAt });
       if (swDisplayInterval) clearInterval(swDisplayInterval);
       swDisplayInterval = setInterval(tick, 250);
       tick();
+      renderStopwatchUi_();
+    }
+    // "🚩 Penanda" -- MENYALIN angka yang SEDANG tampil ke daftar kecil
+    // di bawah (operator-side saja, TIDAK dikirim ke Layar 2 -- jemaat
+    // tidak perlu melihat daftar penanda ini, cukup operator sendiri).
+    function lap() {
+      if (swState_ !== "running") return;
+      const totalSec = currentElapsedSec();
+      const prevTotal = swLaps_.length ? swLaps_[swLaps_.length - 1].totalSec : 0;
+      swLaps_.push({ n: swLaps_.length + 1, splitSec: Math.max(0, totalSec - prevTotal), totalSec });
+      renderStopwatchLaps_();
     }
     function pause() {
-      if (!swRunning) return;
-      swRunning = false;
+      if (swState_ !== "running") return;
+      swState_ = "paused";
       swAccumulatedMs = Date.now() - swBaseStartAt; // simpan durasi yang sudah berjalan sejauh ini
       if (swDisplayInterval) { clearInterval(swDisplayInterval); swDisplayInterval = null; }
       rawPost({ type: "stopwatch", action: "stop" });
+      renderStopwatchUi_();
     }
+    // "🔁 Ulang" -- HANYA muncul saat dijeda (lihat renderStopwatchUi_()),
+    // kembali ke status standby 00:00 berkedip + daftar penanda dikosongkan.
     function reset() {
-      swRunning = false;
+      swState_ = "standby";
       swBaseStartAt = null;
       swAccumulatedMs = 0;
+      swLaps_ = [];
       if (swDisplayInterval) { clearInterval(swDisplayInterval); swDisplayInterval = null; }
       if (disp) disp.textContent = "00:00";
       rawPost({ type: "stopwatch", action: "reset" });
+      renderStopwatchLaps_();
+      renderStopwatchUi_();
     }
     if (labelEl) labelEl.addEventListener("input", syncLabelPreview);
+    // psStopwatchStartBtn dipakai 2 fungsi (lihat renderStopwatchUi_()):
+    // "▶️ Mulai" saat standby, "▶️ Lanjut" saat dijeda -- keduanya sama
+    // persis alurnya di start() (baseStartAt digeser dari swAccumulatedMs).
     if (el("psStopwatchStartBtn")) el("psStopwatchStartBtn").addEventListener("click", start);
+    if (el("psStopwatchLapBtn")) el("psStopwatchLapBtn").addEventListener("click", lap);
     if (el("psStopwatchStopBtn")) el("psStopwatchStopBtn").addEventListener("click", pause);
     if (el("psStopwatchResetBtn")) el("psStopwatchResetBtn").addEventListener("click", reset);
     syncLabelPreview();
+    renderStopwatchUi_();
   }
 
   // ------------------------------------------------------------
@@ -4542,7 +4742,14 @@ const PresentationStudio = (() => {
     }
   }
 
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false };
+  // BARU (6 Sep 2026, permintaan operator) -- `timerScale`: SATU angka
+  // TERPISAH dari `scale` (Ukuran Teks ayat/kidung/dst) -- lihat catatan
+  // panjang di slider "Ukuran Timer/Stopwatch" (index.html) & --p-timer-
+  // scale (present.html). Default 1 (100%), rentang jauh lebih lebar
+  // (0.5x-10x) daripada `scale` karena kebutuhannya beda (angka besar
+  // untuk dilihat dari jauh saat permainan/aktivitas, bukan untuk
+  // kenyamanan baca ayat).
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1 };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -4587,11 +4794,16 @@ const PresentationStudio = (() => {
     // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
     // layar), lihat catatan --p-content-scale di present.html.
     if (el("psContentScale")) el("psContentScale").value = String(Math.round((theme.contentScale || 1) * 100));
+    // BARU (6 Sep 2026) -- pulihkan slider "Ukuran Timer/Stopwatch" saat
+    // panel Studio dibuka ulang/dimuat ulang, pola sama seperti
+    // psContentScale di atas.
+    if (el("psTimerScale")) el("psTimerScale").value = String(Math.round((theme.timerScale || 1) * 100));
+    if (el("psTimerScaleValue")) el("psTimerScaleValue").textContent = Math.round((theme.timerScale || 1) * 100) + "%";
     // BARU (4 Sep 2026) -- pulihkan status centang "Tulisan Tebal" saat
     // panel Studio dibuka ulang/dimuat ulang.
     if (el("psFontBold")) el("psFontBold").checked = !!theme.bold;
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale } });
   }
 
   function saveAndSendTheme(partial) {
@@ -4601,7 +4813,7 @@ const PresentationStudio = (() => {
     theme = { ...theme, ...partial };
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -4694,14 +4906,33 @@ const PresentationStudio = (() => {
       saveAndSendTheme({ scale: pct / 100 });
     }
     if (el("psFontScale")) el("psFontScale").addEventListener("input", applyScale);
+    // PERMINTAAN OPERATOR (6 Sep 2026): batas atas dinaikkan dari 160%
+    // jadi 480% (3x lipat) -- lihat catatan panjang di <input id=
+    // "psFontScale"> (index.html). Langkah +/- (10) TIDAK diubah, cuma
+    // batas atasnya, jadi kebiasaan menekan A+ berkali-kali tetap terasa
+    // sama, cuma sekarang bisa diteruskan lebih jauh.
     if (el("psFontDec")) el("psFontDec").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
-    if (el("psFontInc")) el("psFontInc").addEventListener("click", () => { el("psFontScale").value = Math.min(160, Number(el("psFontScale").value) + 10); applyScale(); });
+    if (el("psFontInc")) el("psFontInc").addEventListener("click", () => { el("psFontScale").value = Math.min(480, Number(el("psFontScale").value) + 10); applyScale(); });
     // Duplikat A-/A+ di baris ps-preview-quicktools (selalu kelihatan di
     // atas kotak "Tayang") -- pakai fungsi applyScale() & psFontScale yang
     // SAMA (sumber kebenaran tetap 1: psFontScale), jadi kedua pasang
     // tombol (di sini & di tab "🎨 Tampilan") selalu sinkron satu sama lain.
     if (el("psFontDecTop")) el("psFontDecTop").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
-    if (el("psFontIncTop")) el("psFontIncTop").addEventListener("click", () => { el("psFontScale").value = Math.min(160, Number(el("psFontScale").value) + 10); applyScale(); });
+    if (el("psFontIncTop")) el("psFontIncTop").addEventListener("click", () => { el("psFontScale").value = Math.min(480, Number(el("psFontScale").value) + 10); applyScale(); });
+    // BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/Stopwatch",
+    // SLIDER TERPISAH dari "Ukuran Teks" di atas (lihat catatan panjang
+    // di DEFAULT_STAGE_THEME.timerScale & <input id="psTimerScale">,
+    // index.html) -- rentang jauh lebih lebar (50%-1000% / 0.5x-10x)
+    // karena dipakai untuk angka Timer/Stopwatch yang kadang perlu
+    // terlihat dari jauh (permainan/aktivitas), bukan cuma ayat.
+    function applyTimerScale() {
+      const pct = Number(el("psTimerScale").value);
+      if (el("psTimerScaleValue")) el("psTimerScaleValue").textContent = pct + "%";
+      saveAndSendTheme({ timerScale: pct / 100 });
+    }
+    if (el("psTimerScale")) el("psTimerScale").addEventListener("input", applyTimerScale);
+    if (el("psTimerScaleDec")) el("psTimerScaleDec").addEventListener("click", () => { el("psTimerScale").value = Math.max(50, Number(el("psTimerScale").value) - 25); applyTimerScale(); });
+    if (el("psTimerScaleInc")) el("psTimerScaleInc").addEventListener("click", () => { el("psTimerScale").value = Math.min(1000, Number(el("psTimerScale").value) + 25); applyTimerScale(); });
     // BARU (28 Agu 2026) -- "Spasi Baris" (line-height Layar 2, lihat
     // --p-line-height di present.html). PERMINTAAN OPERATOR: teks
     // panjang (mis. hasil unggah file Word/.doc, lihat wireFileTab())
