@@ -265,6 +265,16 @@
      klik pertama tetap berhasil mendaratkan klik ke overlay itu (atau
      ke halaman di belakangnya), bukan ke video. */
   #ytView { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; pointer-events: none; }
+  /* BARU (7 Sep 2026) -- lihat catatan panjang di HTML <video id="localVideoEl">
+     di atas. `object-fit:contain` supaya video apa pun rasionya (16:9,
+     4:3, potrait dari HP, dst) tidak terpotong/gepeng -- ditambah latar
+     hitam di belakangnya (sama seperti bioskop) lewat #stage yang sudah
+     gelap, ATAU lewat background:#000 di sini kalau tema terang sedang
+     aktif (supaya video tidak "mengambang" di atas warna tema terang). */
+  #localVideoEl {
+    width: 100vw; height: 100vh; position: fixed; inset: 0; border: none;
+    object-fit: contain; background: #000; z-index: 1;
+  }
   /* BARU (4 Sep 2026) -- embed Canva ("🤖 AI Presentation" roadmap,
      Bagian 3). BEDA dari #ytView: Canva TIDAK punya API kontrol
      jarak-jauh resmi (tidak ada play/pause/seek lewat postMessage
@@ -714,6 +724,17 @@
     <img id="logoView" hidden />
     <img id="slideView" hidden />
     <iframe id="ytView" hidden allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0"></iframe>
+    <!-- BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4):
+         BEDA dari #ytView di atas (iframe YouTube, butuh internet) --
+         ini <video> HTML5 biasa yang `src`-nya diisi Object URL dari
+         Blob file MP4 lokal yang dikirim LANGSUNG lewat postMessage dari
+         Studio (lihat showLocalVideo() & dispatcher `type==="localvideo"`
+         di bawah, dan wireLocalVideoTab() di js/presentation-studio.js
+         untuk penjelasan panjang kenapa ini BUKAN "upload" -- videonya
+         TIDAK PERNAH dikirim ke server mana pun, cuma dipindah Blob-nya
+         SATU KALI, langsung dari memori jendela Studio ke memori jendela
+         Layar 2 ini, jadi TIDAK ada batas ukuran buatan & 100% offline. -->
+    <video id="localVideoEl" hidden playsinline></video>
     <iframe id="ytBg" allow="autoplay; encrypted-media" frameborder="0" tabindex="-1"></iframe>
     <!-- BARU (4 Sep 2026) -- lihat catatan CSS #canvaView & #scView di
          atas, dan showMain() kind "canva"/"soundcloud" di skrip bawah. -->
@@ -782,6 +803,20 @@
        custom sendiri. Dimuat di sini (bukan cuma di index.html) karena
        Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
   <script src="js/config.js"></script>
+  <!-- BARU (7 Sep 2026) -- daftarkan Service Worker juga di Layar 2 itu
+       sendiri (jendela terpisah dari index.html) supaya halaman ini pun
+       bisa dibuka tanpa internet -- lihat catatan panjang di sw.js &
+       index.html. Scope Service Worker sama (root "/"), jadi 1
+       pendaftaran dari salah satu halaman cukup sebenarnya, tapi
+       didaftarkan dari keduanya supaya tetap aktif walau Layar 2 dibuka
+       duluan / terpisah (mis. dites langsung tanpa lewat index.html). -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
 
 <script>
   const stageEl = document.getElementById("stage");
@@ -792,6 +827,23 @@
   const logoEl = document.getElementById("logoView");
   const slideEl = document.getElementById("slideView");
   const ytEl = document.getElementById("ytView");
+  // BARU (7 Sep 2026) -- 🎬 Video Lokal (MP4), lihat catatan panjang di
+  // HTML <video id="localVideoEl"> & showLocalVideo() di bawah.
+  const localVideoEl = document.getElementById("localVideoEl");
+  let localVideoObjectUrl_ = null; // URL.createObjectURL() aktif saat ini -- WAJIB direvoke saat ganti/berhenti supaya tidak bocor memori (lihat stopLocalVideo()).
+  // BARU (7 Sep 2026, permintaan operator) -- lihat catatan panjang di
+  // kind==="youtube" (showMain()) untuk kenapa ini ada. Diisi data video
+  // YouTube yang GAGAL ditampilkan karena sedang offline, supaya bisa
+  // dicoba otomatis lagi begitu koneksi internet kembali (listener
+  // "online" di bawah) -- TIDAK perlu operator menekan ulang "Tampilkan".
+  let pendingOfflineYoutube_ = null;
+  window.addEventListener("online", () => {
+    if (pendingOfflineYoutube_) {
+      const data = pendingOfflineYoutube_;
+      pendingOfflineYoutube_ = null;
+      showMain("youtube", data);
+    }
+  });
   const canvaEl = document.getElementById("canvaView"); // BARU (4 Sep 2026)
   const scEl = document.getElementById("scView"); // BARU (4 Sep 2026)
   let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
@@ -1041,6 +1093,7 @@
     stopTimer(false);
     stopStopwatch(false); // BARU -- Timer & Stopwatch berbagi ruang tengah yang sama, tidak boleh berbarengan
     stopTimerClock(false); // BARU (7 Sep 2026) -- ikut Countdown Jam Target di ruang tengah yang sama
+    stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     hideMagnify(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
     timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerLabelEl.textContent = timerState.label;
@@ -1093,6 +1146,7 @@
     stopTimer(false);
     stopStopwatch(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
+    stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     hideMagnify();
     timerState = null; // BUKAN sedang menghitung -- tickTimer() sengaja TIDAK dipanggil/di-interval-kan di sini
     timerLabelEl.textContent = data.label || "";
@@ -1225,6 +1279,59 @@
   }
 
   // ------------------------------------------------------------
+  // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4).
+  // BEDA MENDASAR dari #ytView (YouTube) di atas: video ini TIDAK
+  // PERNAH diunggah ke server/internet mana pun -- Studio (jendela
+  // lain) mengirim langsung objek Blob file MP4-nya lewat postMessage
+  // (sama seperti mengoper alamat memori, BUKAN menyalin lewat internet
+  // -- lihat wireLocalVideoTab()/js/presentation-studio.js untuk
+  // penjelasan lengkap kenapa ini bukan "upload"), lalu di sini
+  // `URL.createObjectURL(blob)` dipakai supaya <video> bisa memutarnya
+  // -- SELURUHNYA di memori perangkat yang membuka Layar 2 ini, 100%
+  // offline, TANPA batas ukuran file yang dipaksakan oleh kode.
+  //
+  // `URL.revokeObjectURL()` WAJIB dipanggil begitu video diganti/
+  // dihentikan -- Object URL yang tidak direvoke akan terus menahan
+  // Blob-nya di memori (bocor memori) walau videonya sudah tidak
+  // ditampilkan lagi -- lihat stopLocalVideo() & showLocalVideo() di
+  // bawah, keduanya SELALU revoke URL LAMA sebelum lanjut.
+  //
+  // Otoplai (autoplay bersuara) di sini KEMUNGKINAN diblokir browser
+  // (kebijakan autoplay: perintah "putar" datang dari jendela LAIN
+  // lewat postMessage, bukan klik langsung di jendela Layar 2 ini) --
+  // makanya showLocalVideo() SENGAJA tetap mencoba play() (berhasil di
+  // kebanyakan kasus setelah Layar 2 pernah "dipakai" sebelumnya,
+  // browser modern mengingat itu), tapi kalau gagal, video tetap
+  // dimuat siap (paused) & operator tinggal kirim ulang perintah
+  // "▶️ Play" dari Studio (lihat action "play" di dispatcher
+  // `type==="localvideo_control"` di bawah) -- pola SAMA persis
+  // seperti video YouTube di atas yang juga bisa diperintah play/pause/
+  // seek dari Studio tanpa reload.
+  // ------------------------------------------------------------
+  function showLocalVideo(data) {
+    stopTimer(false); stopStopwatch(false); stopTimerClock(false); hideMagnify();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // Video Lokal & YouTube tidak boleh berbarengan
+    if (localVideoObjectUrl_) { URL.revokeObjectURL(localVideoObjectUrl_); localVideoObjectUrl_ = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    localVideoObjectUrl_ = URL.createObjectURL(data.blob);
+    localVideoEl.muted = false;
+    localVideoEl.src = localVideoObjectUrl_;
+    localVideoEl.hidden = false;
+    localVideoEl.currentTime = 0;
+    const p = localVideoEl.play();
+    if (p && typeof p.catch === "function") p.catch(() => { /* diblokir kebijakan autoplay -- biarkan siap/paused, lihat catatan panjang di atas */ });
+  }
+  function stopLocalVideo(showIdle) {
+    try { localVideoEl.pause(); } catch (e) {}
+    localVideoEl.removeAttribute("src");
+    try { localVideoEl.load(); } catch (e) {} // lepas referensi ke Blob sepenuhnya (Chrome kadang menahannya sampai load() dipanggil)
+    localVideoEl.hidden = true;
+    if (localVideoObjectUrl_) { URL.revokeObjectURL(localVideoObjectUrl_); localVideoObjectUrl_ = null; }
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  // ------------------------------------------------------------
   // BARU (27 Agu 2026) -- ⏱️ Stopwatch (hitung MAJU dari 0, dikendalikan
   // dari Layar 1/Controller lewat #psStopwatchStartBtn dkk di
   // js/presentation-studio.js & #presentStopwatchStartBtn dkk di
@@ -1262,6 +1369,7 @@
   function showStopwatch(data) {
     stopTimer(false); // Timer & Stopwatch tidak boleh berbarengan (lihat catatan di atas)
     stopTimerClock(false); // BARU (7 Sep 2026)
+    stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     hideMagnify();
     stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
     stopwatchLabelEl.textContent = stopwatchState.label;
@@ -1295,6 +1403,7 @@
   function showStopwatchStandby(data) {
     stopTimer(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
+    stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
     stopwatchState = null;
     hideMagnify();
@@ -1798,6 +1907,7 @@
     stopTimer(false);
     stopStopwatch(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
+    stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     hideMagnify(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
     setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
     idleEl.hidden = true;
@@ -1886,6 +1996,23 @@
       // Video YouTube penuh 1 layar (tab "▶️ YouTube" di Studio Presentasi).
       refEl.hidden = true; refEl.textContent = "";
       textEl.textContent = "";
+      // BARU (7 Sep 2026, permintaan operator) -- video YouTube TETAP
+      // butuh internet (wajar, video-nya sendiri disimpan di server
+      // YouTube, bukan di app ini) -- kalau SEDANG tidak ada koneksi,
+      // JANGAN coba muat iframe-nya sama sekali (kalau dipaksa, cuma
+      // akan tampil kotak putih/rusak kosong tanpa penjelasan apa pun
+      // ke jemaat). Tampilkan pesan yang jelas sebagai gantinya, DAN
+      // simpan datanya (pendingOfflineYoutube_) supaya otomatis dicoba
+      // lagi begitu koneksi kembali (lihat listener "online" di bawah)
+      // -- operator tidak perlu menekan "Tampilkan" ulang secara manual.
+      if (!navigator.onLine) {
+        pendingOfflineYoutube_ = data;
+        ytEl.hidden = true; ytEl.src = "";
+        refEl.hidden = false; refEl.textContent = "📡 Tidak ada koneksi internet";
+        textEl.textContent = "Video YouTube tidak bisa diputar saat ini. Akan otomatis diputar begitu koneksi internet kembali.";
+        return;
+      }
+      pendingOfflineYoutube_ = null;
       if (data.embedUrl) {
         ytEl.src = data.embedUrl;
         ytEl.hidden = false;
@@ -1968,6 +2095,7 @@
       stopTimer(true);
       stopStopwatch(true);
       stopTimerClock(true); // BARU (7 Sep 2026)
+      stopLocalVideo(true); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
       hideMagnify();
       setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
@@ -1997,6 +2125,26 @@
       if (data.action === "stop") { stopTimerClock(true); }
       else if (data.action === "stopBell") { stopBellSound(); }
       else { showTimerClock(data); }
+      return;
+    }
+    // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4),
+    // lihat catatan panjang di HTML <video id="localVideoEl"> &
+    // showLocalVideo() di atas. `type:"localvideo"` = tayang/hentikan
+    // (mengirim/melepas Blob-nya sendiri); `type:"localvideo_control"`
+    // = perintah TANPA kirim ulang Blob (video yang SAMA sedang tayang,
+    // cuma play/pause/mute -- dipakai tombol kontrol di Studio supaya
+    // tidak perlu memuat ulang filenya tiap kali dijeda/dilanjut).
+    if (data.type === "localvideo") {
+      if (data.action === "stop") { stopLocalVideo(true); }
+      else { showLocalVideo(data); }
+      return;
+    }
+    if (data.type === "localvideo_control") {
+      if (localVideoEl.hidden) return; // tidak ada video lokal yang sedang tayang, abaikan
+      if (data.action === "play") { const p = localVideoEl.play(); if (p && p.catch) p.catch(() => {}); }
+      else if (data.action === "pause") { localVideoEl.pause(); }
+      else if (data.action === "mute") { localVideoEl.muted = true; }
+      else if (data.action === "unmute") { localVideoEl.muted = false; }
       return;
     }
     if (data.type === "stopwatch") {
