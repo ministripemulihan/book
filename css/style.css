@@ -356,9 +356,20 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    "▾/▸ Tombol" (lihat buildKidungToolbar() di js/kidung-ui.js) supaya
    tidak terus menutupi syair saat sedang dibaca/dinyanyikan, terutama
    di layar HP yang sempit. */
-.kidung-toolbar { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 12px; }
-.kidung-toolbar-body { display: flex; flex-direction: column; gap: 10px; }
-.kidung-toolbar.collapsed .kidung-toolbar-body { display: none; }
+/* BARU (8 Sep 2026, permintaan operator) -- ".collapsible-toolbar" adalah
+   ALIAS generik dari pola "toolbar bisa dilipat" yang sebelumnya cuma
+   dipakai di layar Kidung (garis tipis + panah v/^ di bagian PALING
+   BAWAH, ditekan untuk menaikkan/menyembunyikan sekumpulan tombol fitur,
+   supaya bisa dipakai jg di layar lain -- Pembaca Alkitab 3-kolom
+   Sync (renderColumnsIndependentPanes()) & panel Kumpulan Ayat 1-layar
+   (renderCollectionDetailInto()), lihat buildCollapsibleToolbar() di
+   js/app.js. Aturan visualnya SENGAJA disatukan lewat selector gabungan
+   di bawah (bukan disalin ulang) supaya kalau salah satu diubah,
+   semuanya ikut konsisten. */
+.kidung-toolbar, .collapsible-toolbar { margin-top: 22px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.kidung-toolbar-body, .collapsible-toolbar-body { display: flex; flex-direction: column; gap: 10px; }
+.kidung-toolbar.collapsed .kidung-toolbar-body,
+.collapsible-toolbar.collapsed .collapsible-toolbar-body { display: none; }
 
 /* ---- ◀ [kelompok tengah, boleh melipat] ▶ ----
    .kidung-toolbar-grid = baris LUAR, TIDAK melipat (nowrap) -- isinya
@@ -412,22 +423,24 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    dulu pakai lingkaran ▾/▸ yang lebih besar/tebal). Tombolnya sendiri
    (elemen <button>) tetap SELEBAR PENUH baris + padding tipis, supaya
    area yang bisa disentuh jari tetap lega walau yang KELIHATAN kecil. */
-.kidung-toolbar-toggle {
+.kidung-toolbar-toggle, .collapsible-toolbar-toggle {
   display: flex; align-items: center; gap: 6px;
   width: 100%; margin: 8px 0 0; padding: 6px 2px;
   border: none; background: transparent; cursor: pointer;
 }
-.kidung-toolbar-toggle::before {
+.kidung-toolbar-toggle::before, .collapsible-toolbar-toggle::before {
   content: ""; flex: 1; height: 1px; background: var(--rule); opacity: .5;
 }
-.kidung-toolbar-toggle-arrow {
+.kidung-toolbar-toggle-arrow, .collapsible-toolbar-toggle-arrow {
   flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   width: 18px; height: 18px;
   background: transparent; border: none;
   color: var(--ink-soft); opacity: .45; font-size: 11px; font-weight: 700;
 }
-.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow { color: var(--petrol); opacity: .9; }
-.kidung-toolbar-toggle:hover::before { opacity: .9; border-color: var(--petrol); }
+.kidung-toolbar-toggle:hover .kidung-toolbar-toggle-arrow,
+.collapsible-toolbar-toggle:hover .collapsible-toolbar-toggle-arrow { color: var(--petrol); opacity: .9; }
+.kidung-toolbar-toggle:hover::before,
+.collapsible-toolbar-toggle:hover::before { opacity: .9; border-color: var(--petrol); }
 
 /* Pemutar MP3 toggle bulat + progress bar (lihat buildLoopingMp3Player()
    di js/media.js) -- 1 tombol bulat ▶️/⏸️ (loop terus sampai ditekan
@@ -446,7 +459,7 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
      bersama syair) supaya panah/bagikan/putar selalu terjangkau tanpa
      harus gulung ke bawah dulu -- tombol "▾/▸ Tombol" tetap bisa
      menyembunyikannya kalau dianggap mengganggu bacaan. */
-  .kidung-toolbar {
+  .kidung-toolbar, .collapsible-toolbar {
     position: sticky; bottom: 0;
     background: var(--paper);
     margin-left: -14px; margin-right: -14px; margin-bottom: -14px;
@@ -1905,8 +1918,13 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 }
 .hl-swatch-clear:hover { color: var(--petrol); border-color: var(--petrol); }
 
-.reader-nav-bottom { margin-top: 22px; margin-bottom: 0; }
+/* BARU (8 Sep 2026) -- .reader-nav-bottom sekarang hidup DI DALAM
+   #readerNavBottomWrap (.collapsible-toolbar, lihat index.html), yang
+   sudah punya margin-top/border/padding sendiri -- margin-top di sini
+   DIHAPUS (dulu 22px) supaya tidak dobel jaraknya dengan wrapper. */
+.reader-nav-bottom { margin-top: 0; margin-bottom: 0; }
 .reader-nav-bottom h2 { font-size: 16px; opacity: .7; }
+.reader-nav-bottom-font-row { margin-top: 10px; justify-content: center; }
 
 /* ============================================================
    TAMPILAN KOLOM PARALEL (1/2/3 bahasa berdampingan)
@@ -1993,8 +2011,9 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    ------------------------------------------------------------ */
 .reader-columns.reader-columns-panes {
   display: flex; gap: 10px; align-items: stretch; overflow-x: hidden;
-  height: 68vh; /* lihat catatan kenapa tinggi eksplisit dibutuhkan, di bawah */
+  height: 74vh; /* lihat catatan kenapa tinggi eksplisit dibutuhkan, di bawah -- dinaikkan dari 68vh (8 Sep 2026) supaya area baca lebih lega, sejalan dgn toolbar kontrol yang sekarang bisa dilipat di bawahnya */
 }
+.reader-columns-panes-font-row { display: flex; gap: 8px; }
 .reader-col-pane {
   flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
   border: 1px solid var(--rule); border-radius: 10px; overflow: hidden;
@@ -2073,7 +2092,21 @@ body.pane-fullscreen-open { overflow: hidden; }
      perubahan UI lain) -- halaman secara keseluruhan MASIH bisa
      digulir normal seperti biasa kalau perlu melihat bagian di atas/
      bawah kotak kolom ini. */
-  .reader-columns.reader-columns-panes { height: 62vh; gap: 6px; }
+  .reader-columns.reader-columns-panes { height: 80vh; gap: 6px; } /* dinaikkan dari 62vh (8 Sep 2026) -- ".reader-columns-panes-toolbar" di bawahnya bisa dilipat jadi cuma garis tipis, jadi area baca aman dinaikkan */
+  /* BARU (8 Sep 2026, permintaan operator: "mandarin bisa keluar 3 kata")
+     -- KHUSUS mode 3-kolom (data-cols="3") di HP, ukuran huruf ayat
+     dikecilkan SEDIKIT (bukan diubah global -- tetap `var(--verse-font-size)`
+     bawaan di mode 1/2 kolom & di semua layar lain, cuma DITIMPA LOKAL
+     di dalam kotak 3-kolom ini lewat custom property yang sama). Kolom
+     sempit (kira-kira 1/3 layar) + tulisan Mandarin yang TANPA SPASI
+     antar-kata jadi lebih longgar per barisnya kalau hurufnya sedikit
+     lebih kecil -- targetnya kira-kira 3-4 aksara per baris, bukan
+     cuma 1-2. Tombol "A-/A+" di toolbar bisa-dilipat kolom ini (lihat
+     renderColumnsIndependentPanes()) TETAP jalan seperti biasa di atas
+     ukuran dasar ini (mengalikan, bukan menimpa, variabelnya). */
+  .reader-columns.reader-columns-panes[data-cols="3"] {
+    --verse-font-size: calc(var(--verse-font-size, 19px) * 0.82);
+  }
   .reader-col-pane-head { padding: 6px 6px; font-size: 10px; }
   .reader-col-sync-toggle { font-size: 10px; }
 }
