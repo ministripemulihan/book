@@ -32,12 +32,36 @@ const INFO_KAMI_FALLBACK = [
   { key: "versi", label: "Versi Aplikasi", value: "2026.08.17" },
   { key: "amanat_kami", label: "Amanat Kami", value: "Firman Tuhan menyebar ke Seluruh Indonesia" },
   { key: "misi_kami", label: "Misi Kami", value: "Misi Kami membuat Firman Tuhan hidup  di dalam hidup orang Kristen" },
-  { key: "harapan_kami", label: "Harapan Kami", value: "Harapan Kami membuat Firman Tuhan terus bertumbuh di dalam hidup orang Kristen" },
   { key: "donasi", label: "Anda Bisa Donasi di", value: "Persembahan Anda bisa mencantumkan biaya keperluan Pembuatan Website ke BCA 0108387800 an Gereja Sidang Jemaat Kristus dengan isi: pembuatan Website AI" },
   { key: "dibuat_dari", label: "Dibuat oleh", value: "Para Aktivis Pencinta Tuhan" },
   { key: "sumber_alkitab", label: "Sumber Alkitab diambil dari", value: "Alkitab Versi Pemulihan TB1, dan seterusnya" },
   { key: "ai_chat", label: "AI Chat", value: "Ditenagai oleh Gemini AI.\n\nVersi Gratis (Free): untuk pengguna dengan Plan reguler.\nVersi Premium (Pro): untuk pengguna dengan Plan Premium, kemampuan AI Chat lebih tinggi." },
+  // BARU (8 Sep 2026) -- 2 baris ini dipakai LANGSUNG oleh panel ℹ️ di
+  // Layar Baca Kidung (lihat openKidungInfoPanel() di js/kidung-ui.js),
+  // BUKAN cuma di panel Info Kami ini. Ini fallback SAJA (dipakai kalau
+  // tab "Setup" di Sheet belum diisi/offline) -- admin BISA & SEBAIKNYA
+  // menimpa isinya kapan saja langsung dari Sheet, tab Setup, kolom
+  // Key="sejarah_kidung"/"cara_baca_kidung" -- tidak perlu ubah kode ini.
+  { key: "sejarah_kidung", label: "Sejarah Buku Kidung", value: "(Admin: isi cerita singkat asal-usul buku Kidung ini di tab Setup, baris Key \"sejarah_kidung\".)" },
+  { key: "cara_baca_kidung", label: "Cara Membaca Kidung", value: "Tanda hubung (mis. \"ke-a-dil-an\") memecah 1 kata jadi beberapa suku kata -- tiap suku kata dinyanyikan 1 not.\nTanda petik (mis. \"s'mua\") = 1 huruf dilesapkan supaya pas jumlah suku katanya.\n\"Birama\" (mis. \"D 3/4\") = nada dasar + jumlah ketukan tiap birama.\n\"Pola suku kata\" (mis. \"8 8 8 8\") = jumlah suku kata tiap baris syair." },
 ];
+
+// Ambil 1 item Info Kami SECARA SINKRON dari cache localStorage (hasil
+// panel ℹ️ terakhir dibuka) atau INFO_KAMI_FALLBACK di atas kalau cache
+// belum pernah terisi -- dipakai openKidungInfoPanel() (js/kidung-ui.js)
+// supaya layar baca Kidung TIDAK perlu menunggu fetch appinfo lagi
+// (datanya sudah pasti kepakai/di-cache begitu Info Kami pernah dibuka
+// sekali, atau minimal dapat teks fallback yang masih berguna).
+function getInfoKamiItemSync(key) {
+  let items = null;
+  try {
+    const raw = localStorage.getItem(INFO_KAMI_CACHE_KEY);
+    if (raw) items = JSON.parse(raw);
+  } catch (e) { /* diamkan, jatuh ke fallback */ }
+  if (!items || !items.length) items = INFO_KAMI_FALLBACK;
+  const found = items.find((it) => it.key === key);
+  return (found && found.value) ? String(found.value) : "";
+}
 
 const InfoKami = {
   async open() {
