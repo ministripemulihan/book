@@ -2184,8 +2184,130 @@
           <div class="ps-btn-row" id="psCamLayoutRow">
             <button type="button" class="chip-btn small active" data-cam-layout="full">🖥️ Latar Penuh (teks ditimpa)</button>
             <button type="button" class="chip-btn small" data-cam-layout="split">📐 Kamera Atas, Teks Bawah</button>
+            <!-- BARU (8 Sep 2026 v2, permintaan operator "seperti nonton
+                 video ada subtitlenya") -- kamera/gambar MEMENUHI LAYAR
+                 PENUH, teks tampil sebagai bar SUBTITLE menempel di
+                 bawah (gradasi gelap tipis, video tetap kelihatan penuh
+                 sampai ke atas) -- lihat body.cam-subtitle (present.html). -->
+            <button type="button" class="chip-btn small" data-cam-layout="subtitle">🎬 Latar Penuh + Subtitle</button>
+            <!-- BARU (8 Sep 2026 v3, permintaan operator "dibalik, jadi
+                 tulisan semua ayat, kameranya bulat taruh kanan bawah")
+                 -- KEBALIKAN dari mode lain: di sini TEKS yang jadi
+                 utama (memenuhi layar penuh, latar solid warna tema,
+                 SAMA seperti tampilan biasa tanpa kamera sama sekali),
+                 Kamera/Gambar Latar cuma jadi lingkaran KECIL mengambang
+                 di pojok kanan-bawah (gaya "bubble" webcam ala Zoom/
+                 Meet) -- lihat body.cam-bubble (present.html). -->
+            <button type="button" class="chip-btn small" data-cam-layout="bubble">🔵 Teks Penuh, Kamera Bulat</button>
           </div>
-          <div class="ps-pointer-hint">"Kamera Atas, Teks Bawah" cocok kalau ingin ayat/kidung/pengumuman SELALU jelas terbaca di zona sendiri (latar solid), tanpa perlu mengandalkan warna/stroke kontras -- kamera/gambar cuma mengisi bagian atas layar.</div>
+          <div class="ps-pointer-hint">"Kamera Atas, Teks Bawah" cocok kalau ingin ayat/kidung/pengumuman SELALU jelas terbaca di zona sendiri (latar solid). "Latar Penuh + Subtitle" cocok kalau ingin kamera/gambar tetap terlihat PENUH layar seperti video, dengan teks sebagai caption/subtitle menempel di bawah. "Teks Penuh, Kamera Bulat" cocok kalau ayat/kidung/pengumuman ingin selalu jadi fokus utama layar, kamera cuma sebagai jendela kecil di pojok (gaya video call).</div>
+          <!-- BARU (8 Sep 2026 v2, permintaan operator) -- slider bebas
+               untuk "Ukuran Zona Kamera" (dulu terkunci 42%), khusus
+               berlaku di mode "📐 Kamera Atas, Teks Bawah". -->
+          <div class="ps-field-label" style="margin-top:10px;">Ukuran zona Kamera (mode "Kamera Atas, Teks Bawah")</div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Zona kamera kecil">▭</span>
+            <input type="range" id="psCamSplitPctSlider" min="10" max="90" step="1" value="42" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Zona kamera besar">▮</span>
+            <span id="psCamSplitPctValue" class="ps-pen-size-value">42%</span>
+          </div>
+          <div class="ps-pointer-hint">Geser ke kanan supaya Kamera/Gambar Latar mendapat porsi layar lebih besar (dan zona ayat/kidung/pengumuman mengecil) -- atau ke kiri untuk sebaliknya.</div>
+
+          <!-- BARU (8 Sep 2026 v4, permintaan operator "latar belakang
+               transparan atau ada backgroundnya") -- zona teks di mode
+               "Kamera Atas, Teks Bawah" bawaannya solid warna tema
+               supaya selalu jelas dibaca -- centang ini kalau mau zona
+               itu TEMBUS PANDANG (kamera/gambar tetap kelihatan di
+               baliknya). Lihat body.cam-split #stage (present.html). -->
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:10px;">
+            <input type="checkbox" id="psStageTransparent" style="margin:0;" />
+            🪟 Latar zona teks transparan (mode "Kamera Atas, Teks Bawah") -- bukan solid
+          </label>
+          <div class="ps-pointer-hint">Kalau mati (bawaan): zona teks solid warna tema, paling mudah dibaca. Nyalakan kalau ingin kamera/gambar tetap terlihat samar di balik teksnya.</div>
+
+          <!-- BARU (8 Sep 2026 v3, permintaan operator) -- slider ukuran
+               lingkaran, khusus mode "🔵 Teks Penuh, Kamera Bulat". -->
+          <div class="ps-field-label" style="margin-top:10px;">Ukuran lingkaran Kamera (mode "Teks Penuh, Kamera Bulat")</div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Lingkaran kecil">◦</span>
+            <input type="range" id="psCamBubbleSizeSlider" min="120" max="420" step="10" value="200" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Lingkaran besar">●</span>
+            <span id="psCamBubbleSizeValue" class="ps-pen-size-value">200px</span>
+          </div>
+
+          <!-- BARU (8 Sep 2026, permintaan operator "video ada
+               subtitle-nya") -- kalau dicentang, ayat/kidung/pengumuman
+               yang SEDANG tayang TIDAK ikut hilang saat operator pindah
+               ke tab ▶️ YouTube / 🎬 Video Lokal -- videonya jadi
+               "latar" (persis seperti Kamera/Gambar Latar di atas), dan
+               teks yang sudah ada tetap muncul DI ATASNYA, memakai tata
+               letak yang SAMA yang dipilih di atas (Latar Penuh/Kamera
+               Atas Teks Bawah/Subtitle/Teks Penuh+Bulat -- utk video,
+               "Kamera Atas Teks Bawah" & "Teks Penuh+Bulat" tidak relevan
+               krn tidak ada lingkaran kamera, videonya sendiri yang
+               mengisi zona atas/latar). Lihat videoTextOverlay
+               (present.html, showMain()/showLocalVideo()). MATI secara
+               bawaan (perilaku lama: video menimpa/menghapus teks) --
+               operator yang menyalakan. -->
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:14px;">
+            <input type="checkbox" id="psVideoTextOverlay" style="margin:0;" />
+            📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video (▶️ YouTube &amp; 🎬 Video Lokal), pakai Tata Letak yang sama di atas
+          </label>
+          <div class="ps-pointer-hint">Kalau mati (bawaan): video memenuhi layar sendiri, teks disembunyikan sementara -- sama seperti sebelumnya.</div>
+
+          <!-- BARU (8 Sep 2026, permintaan operator "tombol shortcut mode
+               & bel") -- ⚡ Mode Cepat: tombol siap-pakai yang langsung
+               menerapkan KOMBINASI Tata Letak + toggle "Teks di atas
+               Video/File" sekaligus (operator tidak perlu klik 2-3
+               kontrol terpisah tiap ganti gaya). Daftarnya BISA
+               DIKUSTOMISASI penuh (tambah/hapus tombol sendiri) -- lihat
+               MODE_PRESETS_KEY & renderModeShortcutRow()/js/presentation-
+               studio.js. Preset TIDAK menyalakan Kamera/sumber latar apa
+               pun sendiri (supaya tidak minta izin kamera tiba-tiba di
+               luar sepengetahuan operator) -- cuma mengatur GAYA tampilan,
+               sumber (Kamera/Video/File) tetap dipilih manual seperti
+               biasa di tab masing-masing. -->
+          <div class="ps-field-label" style="margin-top:20px;">⚡ Mode Cepat (Tata Letak + Teks-di-atas-Video sekaligus)</div>
+          <div class="ps-btn-row" id="psModeShortcutRow"></div>
+          <div class="ps-btn-row">
+            <button type="button" id="psModeAddBtn" class="chip-btn small">➕ Tambah Mode Sendiri</button>
+          </div>
+          <div class="ps-pointer-hint">Tekan sekali utk langsung menerapkan gaya tampilan itu. Angka 1-9 di keyboard = jalan pintas menerapkan Mode ke-1 s/d ke-9 sesuai urutan tombolnya (tidak berlaku selagi sedang mengetik di kotak isian).</div>
+          <div class="ps-add-mode-form" id="psModeAddForm" hidden style="border:1px dashed var(--ps-dropzone-border, #4a3c28); border-radius:10px; padding:12px; margin-top:8px;">
+            <div class="ps-field-label" style="margin-top:0;">Nama tombol</div>
+            <input type="text" id="psModeAddName" placeholder="mis. Video Full + Teks" style="width:100%; box-sizing:border-box;" />
+            <div class="ps-field-label" style="margin-top:10px;">Tata letak</div>
+            <select id="psModeAddLayout" class="columns-lang-select">
+              <option value="full">🖥️ Latar Penuh (teks ditimpa)</option>
+              <option value="split">📐 Kamera/Video Atas, Teks Bawah</option>
+              <option value="subtitle">🎬 Latar Penuh + Subtitle</option>
+              <option value="bubble">🔵 Teks Penuh, Kamera Bulat</option>
+            </select>
+            <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:10px;">
+              <input type="checkbox" id="psModeAddOverlay" style="margin:0;" />
+              📝 Sertakan "Teks tetap tampil di atas Video/File"
+            </label>
+            <div class="ps-btn-row" style="margin-top:10px;">
+              <button type="button" id="psModeAddSaveBtn" class="chip-btn small active">💾 Simpan Mode</button>
+              <button type="button" id="psModeAddCancelBtn" class="chip-btn small">Batal</button>
+            </div>
+          </div>
+
+          <!-- BARU (8 Sep 2026, permintaan operator "shortcut bel 1 2 3")
+               -- membunyikan salah satu 🔔 CONFIG.BELL_SOUNDS (js/config.js)
+               LANGSUNG SAAT ITU JUGA, terpisah dari bel otomatis Timer --
+               dipakai mis. utk tanda mulai/selesai sesi TANPA harus
+               mengatur Timer sama sekali. Daftarnya otomatis mengikuti
+               CONFIG.BELL_SOUNDS (tambah bel baru di sana -> otomatis
+               muncul tombolnya di sini juga, lihat renderBellShortcutRow()
+               /js/presentation-studio.js). -->
+          <div class="ps-field-label" style="margin-top:20px;">🔔 Bel Cepat (bunyi langsung, terpisah dari Timer)</div>
+          <div class="ps-btn-row" id="psBellShortcutRow"></div>
+          <div class="ps-btn-row">
+            <button type="button" id="psBellStopBtn" class="chip-btn small">🔇 Hentikan Bel</button>
+          </div>
+          <div class="ps-pointer-hint">Alt+1 s/d Alt+9 di keyboard = jalan pintas membunyikan Bel ke-1 s/d ke-9 sesuai urutan di atas. Tambah bel baru lewat CONFIG.BELL_SOUNDS (js/config.js).</div>
+
 
           <!-- BARU (28 Agu 2026) -- 🖼️ Gambar Latar: alternatif dari
                Kamera -- gambar diam yang diunggah, dipakai sebagai
@@ -2290,7 +2412,7 @@
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
   <script src="js/presentation.js?v=20260907b"></script>
-  <script src="js/presentation-studio.js?v=20260907f"></script>
+  <script src="js/presentation-studio.js?v=20260908a"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260908d"></script>
