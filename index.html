@@ -1320,6 +1320,22 @@
               <button type="button" class="chip-btn small" data-border-w="7">Tebal</button>
             </div>
           </div>
+          <!-- BARU (8 Sep 2026, permintaan operator) -- latar/background
+               BAR PESAN diwarnai PENUH SOLID (mis. Merah semua, bukan
+               cuma garis tepi seperti "Border latar pesan" di atas).
+               Cocok dipakai bareng "Warna teks" Putih + ukuran huruf
+               besar untuk pesan penting/darurat. Lihat wireMessage()
+               (js/presentation-studio.js) & applyTicker() (present.html). -->
+          <div class="ps-field-label" style="margin-top:10px;">Warna latar (background) pesan</div>
+          <div class="ps-btn-row" id="psMsgBgRow">
+            <button type="button" class="chip-btn small active" data-msgbg="">Tanpa (gelap bawaan)</button>
+            <button type="button" class="chip-btn small" data-msgbg="#e74c3c">🔴 Merah</button>
+            <button type="button" class="chip-btn small" data-msgbg="#173f91">🔵 Biru</button>
+            <button type="button" class="chip-btn small" data-msgbg="#1a7a3c">🟢 Hijau</button>
+            <button type="button" class="chip-btn small" data-msgbg="#ffffff">⚪ Putih</button>
+            <input type="color" id="psMsgBgCustom" value="#e74c3c" class="ps-color-input" title="Warna bebas" />
+          </div>
+          <p class="announcement-compose-hint" style="margin:2px 0 0;">👆 Latar PENUH bar pesan (mis. Merah semua) -- gabungkan dengan "Warna teks" Putih di atas untuk pesan darurat/penting yang jelas mencolok.</p>
           <!-- BARU (7 Sep 2026, permintaan operator) -- pilihan jenis huruf
                (font) untuk pesan ini, terpisah dari font ayat/kidung utama. -->
           <div class="ps-field-label" style="margin-top:10px;">Jenis huruf (font)</div>
@@ -1565,6 +1581,12 @@
               <option value="3+koor">3 bait / layar + koor</option>
               <!-- BARU (4 Sep 2026, permintaan operator) -->
               <option value="4+koor">4 bait / layar + koor</option>
+              <!-- BARU (8 Sep 2026, permintaan operator) -- melengkapi
+                   deret "N bait/layar + koor" (1-4 sudah ada di atas)
+                   sampai 5 bait, supaya kidung 5 bait bisa juga
+                   ditampilkan SEMUA bait sekaligus + koor di akhir
+                   dalam 1 slide, sama pola dengan 1-4 di atas. -->
+              <option value="5+koor">5 bait / layar + koor</option>
               <!-- BARU (7 Sep 2026, permintaan operator) -- "model 2" untuk
                    kidung 2/3/4+ bait: bait 1 dulu (+koor), koor tampil,
                    BARU sisa baitnya (2, 3, 4, dst -- otomatis menyesuaikan)
@@ -2147,6 +2169,23 @@
             <input type="checkbox" id="psCamMirror" style="margin:0;" />
             🪞 Cermin (balik horizontal -- cocok kalau kamera menghadap operator sendiri)
           </label>
+
+          <!-- BARU (8 Sep 2026, permintaan operator) -- Tata Letak
+               Kamera/Gambar Latar: "Latar Penuh" (bawaan lama, kamera/
+               gambar memenuhi layar & ayat/kidung/pengumuman ditimpakan
+               di tengah, dibaca lewat warna+stroke kontras di bawah)
+               ATAU "📐 Kamera Atas, Teks Bawah" (BARU -- kamera/gambar
+               dipepet ke atas saja, ayat/kidung/pengumuman punya zona
+               SENDIRI solid di bawahnya, tidak saling menimpa). Berlaku
+               untuk Kamera MAUPUN Gambar Latar (keduanya pakai zona yang
+               sama). Lihat body.cam-split (present.html) &
+               theme.camSplit (js/presentation-studio.js). -->
+          <div class="ps-field-label" style="margin-top:16px;">Tata letak Kamera/Gambar Latar</div>
+          <div class="ps-btn-row" id="psCamLayoutRow">
+            <button type="button" class="chip-btn small active" data-cam-layout="full">🖥️ Latar Penuh (teks ditimpa)</button>
+            <button type="button" class="chip-btn small" data-cam-layout="split">📐 Kamera Atas, Teks Bawah</button>
+          </div>
+          <div class="ps-pointer-hint">"Kamera Atas, Teks Bawah" cocok kalau ingin ayat/kidung/pengumuman SELALU jelas terbaca di zona sendiri (latar solid), tanpa perlu mengandalkan warna/stroke kontras -- kamera/gambar cuma mengisi bagian atas layar.</div>
 
           <!-- BARU (28 Agu 2026) -- 🖼️ Gambar Latar: alternatif dari
                Kamera -- gambar diam yang diunggah, dipakai sebagai
