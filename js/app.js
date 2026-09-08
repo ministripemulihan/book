@@ -2535,6 +2535,17 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
     const strayToolbar = wrap.parentNode.querySelector(".reader-columns-panes-toolbar");
     if (strayToolbar) strayToolbar.remove();
   }
+  // PERBAIKAN (8 Sep 2026): tombol "🔗 Sinkron Semua Kolom" yang
+  // disisipkan renderColumnsIndependentPanes() ke DALAM
+  // #readerNavBottomWrap (lihat catatan di sana) juga perlu dibuang di
+  // sini kalau mode kolom yang dipilih SEKARANG bukan "side-panes" --
+  // #readerNavBottomWrap elemen STATIS yang tetap ada di semua mode,
+  // jadi tombol itu tidak ikut hilang sendiri lewat wrap.innerHTML=""
+  // di atas (itu di luar `wrap`).
+  if (!(direction === "side-panes" && columnsCount > 1)) {
+    const oldSyncBtn = document.getElementById("readerPanesSyncAllBtn");
+    if (oldSyncBtn) oldSyncBtn.remove();
+  }
 
   const columns = [{ lang: currentLang, verses: primaryVerses }];
   for (let i = 0; i < columnsCount - 1; i++) {
@@ -2776,57 +2787,39 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
 
   wireColumnPaneSync(wrap);
 
-  // BARU (8 Sep 2026, permintaan operator) -- toolbar bisa-dilipat gaya
-  // Kidung DI BAWAH kotak 3-kolom ini (di luar `wrap`, sebagai elemen
-  // bersebelahan/sibling -- bukan di dalam wrap, supaya tidak ikut
-  // kehapus tiap wrap.innerHTML="" di atas): isinya kontrol yang jarang
-  // dipakai (Sinkron Semua Kolom sekaligus + ukuran huruf A-/A+) supaya
-  // kotak baca 3-kolom bisa dipakai lega, operator tinggal tekan garis
-  // tipis paling bawah kalau perlu kontrol itu. Ditandai class
-  // ".reader-columns-panes-toolbar" & DIBUANG-BANGUN-ULANG tiap render
-  // (tiap pindah pasal dst) supaya tidak menumpuk jadi berkali-kali.
-  const panesParent = wrap.parentNode;
-  if (panesParent) {
-    const oldToolbar = panesParent.querySelector(".reader-columns-panes-toolbar");
-    if (oldToolbar) oldToolbar.remove();
+  // PERBAIKAN (8 Sep 2026, permintaan operator: "sampai ada 2 garis di
+  // bagian bawah") -- SEBELUMNYA toolbar bisa-dilipat khusus panel ini
+  // (tombol "Sinkron Semua Kolom" + A-/A+) dibuat sebagai kotak
+  // TERPISAH, jadi sebelumnya NUMPUK dengan #readerNavBottomWrap (garis
+  // bisa-dilipat "Pasal Sebelumnya/Berikutnya" + A-/A+ yang SELALU ada
+  // di bawah `#reader`, lihat index.html & initReaderBottomToolbar()) --
+  // hasilnya 2 garis tipis bertumpuk di HP, bukan 1. SEKARANG: tombol
+  // "🔗 Sinkron Semua Kolom" disisipkan LANGSUNG ke DALAM
+  // #readerNavBottomWrap yang sudah ada itu (jadi cuma 1 toolbar/garis
+  // total untuk seluruh layar baca, apa pun mode kolomnya) -- font
+  // A-/A+ TIDAK diulang lagi di sini karena sudah ada di toolbar itu.
+  // Tombol ditandai id tetap (readerPanesSyncAllBtn) supaya render
+  // berikutnya bisa membuang yang lama dulu (dedupe, tidak menumpuk),
+  // & supaya renderColumnsView() bisa membuangnya balik kalau operator
+  // pindah ke mode kolom lain yang bukan "side-panes" (lihat sana).
+  const bottomWrap = el("readerNavBottomWrap");
+  if (bottomWrap) {
+    const bottomBody = bottomWrap.querySelector(".collapsible-toolbar-body");
+    if (bottomBody) {
+      const oldSyncBtn = document.getElementById("readerPanesSyncAllBtn");
+      if (oldSyncBtn) oldSyncBtn.remove();
 
-    const syncAllBtn = document.createElement("button");
-    syncAllBtn.type = "button";
-    syncAllBtn.className = "chip-btn small";
-    syncAllBtn.textContent = "🔗 Sinkron Semua Kolom";
-    syncAllBtn.title = "Nyalakan Sync di semua kolom sekaligus, biar ayat yang sama selalu sejajar lagi";
-    syncAllBtn.addEventListener("click", () => {
-      wrap.querySelectorAll('.reader-col-pane input[type="checkbox"]').forEach((cb) => { cb.checked = true; });
-    });
-
-    const fontRow = document.createElement("div");
-    fontRow.className = "reader-columns-panes-font-row";
-    const minusBtn = document.createElement("button");
-    minusBtn.type = "button";
-    minusBtn.className = "chip-btn small";
-    minusBtn.textContent = "A-";
-    minusBtn.title = "Perkecil huruf ayat";
-    minusBtn.addEventListener("click", () => {
-      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
-      applyFontSize(current - CONFIG.FONT_SIZE_STEP);
-    });
-    const plusBtn = document.createElement("button");
-    plusBtn.type = "button";
-    plusBtn.className = "chip-btn small";
-    plusBtn.textContent = "A+";
-    plusBtn.title = "Perbesar huruf ayat";
-    plusBtn.addEventListener("click", () => {
-      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
-      applyFontSize(current + CONFIG.FONT_SIZE_STEP);
-    });
-    fontRow.appendChild(minusBtn);
-    fontRow.appendChild(plusBtn);
-
-    const panesToolbar = buildCollapsibleToolbar([syncAllBtn, fontRow], {
-      title: "Sembunyikan/tampilkan kontrol kolom (Sinkron Semua, ukuran huruf)",
-    });
-    panesToolbar.classList.add("reader-columns-panes-toolbar");
-    panesParent.insertBefore(panesToolbar, wrap.nextSibling);
+      const syncAllBtn = document.createElement("button");
+      syncAllBtn.type = "button";
+      syncAllBtn.id = "readerPanesSyncAllBtn";
+      syncAllBtn.className = "chip-btn small reader-panes-sync-all-btn";
+      syncAllBtn.textContent = "🔗 Sinkron Semua Kolom";
+      syncAllBtn.title = "Nyalakan Sync di semua kolom sekaligus, biar ayat yang sama selalu sejajar lagi";
+      syncAllBtn.addEventListener("click", () => {
+        wrap.querySelectorAll('.reader-col-pane input[type="checkbox"]').forEach((cb) => { cb.checked = true; });
+      });
+      bottomBody.insertBefore(syncAllBtn, bottomBody.firstChild);
+    }
   }
 }
 
@@ -3028,6 +3021,14 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
   if (columnsCount > 1) {
     renderColumnsView(wrap, bookNum, chapter, versesToRender, displayName, columnsCount, columnLangs, verseMode === "verse" ? currentSingleVerse : null);
   } else {
+    // PERBAIKAN (8 Sep 2026): renderColumnsView() (yang biasa membuang
+    // tombol "🔗 Sinkron Semua Kolom" sisa mode "side-panes", lihat
+    // catatan di sana) TIDAK dipanggil sama sekali di jalur 1-kolom ini
+    // -- kalau tidak dibuang di sini juga, tombol itu bisa nyangkut di
+    // #readerNavBottomWrap kalau operator pindah LANGSUNG dari mode
+    // sync 3-kolom ke mode 1-kolom.
+    const oldSyncBtn = document.getElementById("readerPanesSyncAllBtn");
+    if (oldSyncBtn) oldSyncBtn.remove();
     renderSingleColumn(wrap, versesToRender, displayName, bookNum, chapter);
   }
 
