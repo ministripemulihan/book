@@ -5239,6 +5239,49 @@ function handleAddFreeItemToCollection(id, col) {
     field1.appendChild(typeSel);
     box.appendChild(field1);
 
+    // BARU (8 Sep 2026, permintaan operator) -- "Template cepat": tombol
+    // siap-pakai yang langsung mengisi kotak "Isi" di bawah dengan pola
+    // kalimat umum (bagian "____" tinggal diketik timpa) -- supaya tidak
+    // perlu mengetik dari nol tiap kali mau umumkan acara atau kidung
+    // yang akan dinyanyikan. Menekan salah satu tombol ini JUGA otomatis
+    // memilih Jenis = "📢 Pengumuman" di atas (acara & pemberitahuan
+    // kidung memang biasanya diumumkan, bukan teks bebas) -- operator
+    // tetap bebas ganti Jenis-nya lagi sesudahnya kalau mau. Daftar
+    // templatenya sengaja ditaruh di sini (bukan menu terpisah) supaya
+    // gampang ditambah/diedit sendiri kalau operator perlu pola lain.
+    const QUICK_TEMPLATES = [
+      { label: "📅 Acara", text: "Acara ____, jam ____." },
+      { label: "🎵 Kidung", text: "Kidung No. ____ ____, syair ____ bait." },
+    ];
+    const tplField = document.createElement("div");
+    tplField.className = "simple-dialog-field";
+    const tplLabel = document.createElement("label");
+    tplLabel.textContent = "Template cepat:";
+    tplField.appendChild(tplLabel);
+    const tplBtnRow = document.createElement("div");
+    tplBtnRow.style.display = "flex";
+    tplBtnRow.style.gap = "8px";
+    tplBtnRow.style.flexWrap = "wrap";
+    QUICK_TEMPLATES.forEach((tpl) => {
+      const tplBtn = document.createElement("button");
+      tplBtn.type = "button";
+      tplBtn.className = "chip-btn small";
+      tplBtn.textContent = tpl.label;
+      tplBtn.title = `Isi kotak "Isi" di bawah dengan: "${tpl.text}" -- bagian "____" tinggal diketik timpa`;
+      tplBtn.addEventListener("click", () => {
+        textarea.value = tpl.text;
+        typeSel.value = "announcement";
+        textarea.focus();
+        // Sorot bagian "____" PERTAMA supaya operator tinggal ketik
+        // langsung menimpanya, tidak perlu hapus manual dulu.
+        const blankStart = tpl.text.indexOf("____");
+        if (blankStart >= 0) textarea.setSelectionRange(blankStart, blankStart + 4);
+      });
+      tplBtnRow.appendChild(tplBtn);
+    });
+    tplField.appendChild(tplBtnRow);
+    box.appendChild(tplField);
+
     const field2 = document.createElement("div");
     field2.className = "simple-dialog-field";
     const label2 = document.createElement("label");
