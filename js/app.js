@@ -5256,11 +5256,6 @@ function handleAddFreeItemToCollection(id, col) {
       { label: "🎤 MC bertugas: ", text: "🎤 MC bertugas:  ____ ____, ." },
       { label: "✅ Bawa Buku Alkitab: ", text: "✅ Bawa Buku Alkitab  ____ ____, ." },
       { label: "🎶 Pujian: ", text: "🎶 Pujian:  ____ ____, ." },
-🎤 MC bertugas: 
-🎤 MC bertugas: 
-🙏 Doa Pembuka
-✅ Bawa Buku Alkitab / Catatan
-🎶 Pujian: 
     ];
     const tplField = document.createElement("div");
     tplField.className = "simple-dialog-field";
