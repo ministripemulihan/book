@@ -2787,40 +2787,19 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
 
   wireColumnPaneSync(wrap);
 
-  // PERBAIKAN (8 Sep 2026, permintaan operator: "sampai ada 2 garis di
-  // bagian bawah") -- SEBELUMNYA toolbar bisa-dilipat khusus panel ini
-  // (tombol "Sinkron Semua Kolom" + A-/A+) dibuat sebagai kotak
-  // TERPISAH, jadi sebelumnya NUMPUK dengan #readerNavBottomWrap (garis
-  // bisa-dilipat "Pasal Sebelumnya/Berikutnya" + A-/A+ yang SELALU ada
-  // di bawah `#reader`, lihat index.html & initReaderBottomToolbar()) --
-  // hasilnya 2 garis tipis bertumpuk di HP, bukan 1. SEKARANG: tombol
-  // "🔗 Sinkron Semua Kolom" disisipkan LANGSUNG ke DALAM
-  // #readerNavBottomWrap yang sudah ada itu (jadi cuma 1 toolbar/garis
-  // total untuk seluruh layar baca, apa pun mode kolomnya) -- font
-  // A-/A+ TIDAK diulang lagi di sini karena sudah ada di toolbar itu.
-  // Tombol ditandai id tetap (readerPanesSyncAllBtn) supaya render
-  // berikutnya bisa membuang yang lama dulu (dedupe, tidak menumpuk),
-  // & supaya renderColumnsView() bisa membuangnya balik kalau operator
-  // pindah ke mode kolom lain yang bukan "side-panes" (lihat sana).
-  const bottomWrap = el("readerNavBottomWrap");
-  if (bottomWrap) {
-    const bottomBody = bottomWrap.querySelector(".collapsible-toolbar-body");
-    if (bottomBody) {
-      const oldSyncBtn = document.getElementById("readerPanesSyncAllBtn");
-      if (oldSyncBtn) oldSyncBtn.remove();
-
-      const syncAllBtn = document.createElement("button");
-      syncAllBtn.type = "button";
-      syncAllBtn.id = "readerPanesSyncAllBtn";
-      syncAllBtn.className = "chip-btn small reader-panes-sync-all-btn";
-      syncAllBtn.textContent = "🔗 Sinkron Semua Kolom";
-      syncAllBtn.title = "Nyalakan Sync di semua kolom sekaligus, biar ayat yang sama selalu sejajar lagi";
-      syncAllBtn.addEventListener("click", () => {
-        wrap.querySelectorAll('.reader-col-pane input[type="checkbox"]').forEach((cb) => { cb.checked = true; });
-      });
-      bottomBody.insertBefore(syncAllBtn, bottomBody.firstChild);
-    }
-  }
+  // DIHAPUS (8 Sep 2026, permintaan operator: "A+, A-, sinkron semua itu
+  // buat apa? dibuang aja") -- tombol "🔗 Sinkron Semua Kolom" (dulu
+  // sempat digabung ke dalam #readerNavBottomWrap supaya cuma 1 toolbar/
+  // garis, lihat riwayat di ROADMAP) SEKARANG DIBUANG TOTAL, bukan
+  // digabung lagi -- operator tidak butuh tombol ini (toggle "🔗 Sync"
+  // per-kolom di kepala tiap panel sudah cukup, lihat wireColumnPaneSync()
+  // di atas). Kalau nanti operator ternyata masih menemukan kotak kedua
+  // ini muncul lagi di HP-nya, itu tandanya berkas js/app.js yang
+  // dipasang di situs LIVE masih versi LAMA (sebelum penghapusan ini) --
+  // pastikan file js/app.js (bukan cuma css/style.css) ikut di-upload
+  // ulang & di-deploy ulang, karena Apps Script/hosting biasanya perlu
+  // versi/deployment baru supaya kode JS yang berubah benar-benar aktif
+  // untuk pengguna, bukan cuma disimpan di editor.
 }
 
 // BARU (7 Sep 2026) -- buka/tutup 1 kolom (.reader-col-pane) jadi
