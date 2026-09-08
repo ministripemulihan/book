@@ -412,6 +412,7 @@ async function getKidungCategories(bukuFilter) {
 //   "2+koor"   -> 2 bait / slide, ditempeli koor bait TERAKHIR di slide.
 //   "3+koor"   -> 3 bait / slide, sama seperti atas tapi 3 bait.
 //   "4+koor"   -> 4 bait / slide, sama seperti atas tapi 4 bait.
+//   "5+koor"   -> 5 bait / slide, sama seperti atas tapi 5 bait.
 //   "koor"     -> slide isi koor SAJA (semua koor unik dalam kidung
 //                 itu, deduplikasi -- 1 kidung 2 koor jadi 2 slide).
 //   "1firstKoor" -> BARU (7 Sep 2026, permintaan operator) -- "bait 1
@@ -486,6 +487,7 @@ function splitKidungIntoSlides(baits, mode, groupSizes) {
       : mode === "2+koor" ? 2
       : mode === "3+koor" ? 3
       : mode === "4+koor" ? 4
+      : mode === "5+koor" ? 5
       : 1;
     sizes = [];
     let remaining = baits.length;
