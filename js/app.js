@@ -5250,8 +5250,17 @@ function handleAddFreeItemToCollection(id, col) {
     // templatenya sengaja ditaruh di sini (bukan menu terpisah) supaya
     // gampang ditambah/diedit sendiri kalau operator perlu pola lain.
     const QUICK_TEMPLATES = [
-      { label: "📅 Acara", text: "Acara ____, jam ____." },
-      { label: "🎵 Kidung", text: "Kidung No. ____ ____, syair ____ bait." },
+      { label: "📅 Acara", text: "📅17-  -2026, ⏰09.00 WIB 📍di Tempat datang, 👥Semua Tim datang." },
+      { label: "🎵 Kidung", text: "🎵 Kidung. ____ ____, syair ____ bait." },
+      { label: "🙏 Doa Pembuka ", text: "🙏 Doa Pembuka  ____ ____, ." },
+      { label: "🎤 MC bertugas: ", text: "🎤 MC bertugas:  ____ ____, ." },
+      { label: "✅ Bawa Buku Alkitab: ", text: "✅ Bawa Buku Alkitab  ____ ____, ." },
+      { label: "🎶 Pujian: ", text: "🎶 Pujian:  ____ ____, ." },
+🎤 MC bertugas: 
+🎤 MC bertugas: 
+🙏 Doa Pembuka
+✅ Bawa Buku Alkitab / Catatan
+🎶 Pujian: 
     ];
     const tplField = document.createElement("div");
     tplField.className = "simple-dialog-field";
