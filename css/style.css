@@ -161,6 +161,19 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .tts-note-toggle { margin-top: 4px; }
 .chip-btn.small { padding: 4px 8px; font-size: 0.82rem; }
 .chip-btn.small.active { background: var(--petrol); color: #fff; border-color: var(--petrol); }
+/* BARU (8 Sep 2026 v5, permintaan operator "info tombol 1-9 apa, mudah
+   dimengerti") -- badge nomor shortcut (①②③.../Alt+1, dst) yang
+   ditempel di depan label tombol Mode Cepat & Bel Cepat (lihat
+   renderModeShortcutRow()/renderBellShortcutRow() di js/presentation-
+   studio.js) -- dibuat sedikit menonjol (kotak kecil, warna beda tipis)
+   supaya langsung kelihatan sebagai "kode angka", bukan bagian dari
+   nama modenya sendiri. */
+.ps-shortcut-badge {
+  display: inline-block; min-width: 1.4em; padding: 0 4px;
+  border-radius: 5px; margin-right: 2px;
+  background: color-mix(in srgb, var(--petrol) 14%, transparent);
+  font-weight: 700; font-size: 0.85em;
+}
 .chip-btn.danger-outline { border-color: var(--danger); color: var(--danger); }
 .chip-btn.danger-outline:hover { background: var(--danger); color: #fff; }
 
