@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260908b" />
+<link rel="stylesheet" href="css/style.css?v=20260908c" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -679,10 +679,36 @@
             <!-- kotak "📌 Pokok Kitab" -- hanya tampil di pasal 1 kalau datanya ada -->
             <div id="readerPokokSlot" class="reader-pokok-slot" hidden></div>
             <div id="readerVerses" class="reader-verses"></div>
-            <div class="reader-nav reader-nav-bottom">
-              <button id="prevChapterBottom" class="chip-btn">← Pasal Sebelumnya</button>
-              <h2 id="readerTitleBottom"></h2>
-              <button id="nextChapterBottom" class="chip-btn">Pasal Berikutnya →</button>
+            <!-- BARU (8 Sep 2026, permintaan operator) -- "mode fullscreen" ala
+                 Kidung di layar 1-kolom (mode_layar biasa): navigasi
+                 pasal + ukuran huruf yang tadinya SELALU tampil penuh di
+                 bawah pasal, sekarang dibungkus jadi toolbar bisa-dilipat
+                 (garis tipis + panah "v"/"^", persis pola
+                 buildCollapsibleToolbar()/.kidung-toolbar di
+                 css/style.css) supaya area baca terasa lega/"fullscreen"
+                 di HP -- operator tinggal tekan garis di paling bawah
+                 kalau perlu pindah pasal atau ubah ukuran huruf. Ini
+                 elemen STATIS (tidak dibangun ulang tiap renderChapter()
+                 seperti punya Kidung), jadi listener-nya cukup dipasang
+                 SEKALI lewat initReaderBottomToolbar() di js/app.js --
+                 lihat juga initFontSizeControl() untuk tombol A-/A+ di
+                 sini yang berbagi pengaturan sama persis dengan A-/A+ di
+                 header atas (localStorage sama, cuma jalan pintas kedua). -->
+            <div id="readerNavBottomWrap" class="collapsible-toolbar collapsed">
+              <div class="collapsible-toolbar-body">
+                <div class="reader-nav reader-nav-bottom">
+                  <button id="prevChapterBottom" class="chip-btn">← Pasal Sebelumnya</button>
+                  <h2 id="readerTitleBottom"></h2>
+                  <button id="nextChapterBottom" class="chip-btn">Pasal Berikutnya →</button>
+                </div>
+                <div class="reader-columns-panes-font-row reader-nav-bottom-font-row">
+                  <button type="button" id="readerBottomFontDecrease" class="chip-btn small" title="Perkecil huruf ayat" aria-label="Perkecil huruf ayat">A-</button>
+                  <button type="button" id="readerBottomFontIncrease" class="chip-btn small" title="Perbesar huruf ayat" aria-label="Perbesar huruf ayat">A+</button>
+                </div>
+              </div>
+              <button type="button" id="readerNavBottomToggle" class="collapsible-toolbar-toggle" title="Sembunyikan/tampilkan navigasi pasal & ukuran huruf" aria-label="Sembunyikan/tampilkan navigasi pasal & ukuran huruf">
+                <span class="collapsible-toolbar-toggle-arrow">^</span>
+              </button>
             </div>
           </article>
 
@@ -2213,7 +2239,7 @@
   <script src="js/presentation-studio.js?v=20260907f"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260907c"></script>
+  <script src="js/app.js?v=20260908a"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
