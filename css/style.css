@@ -3765,7 +3765,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
    panel 📢 Pengumuman (Studio Presentasi), lihat markup di index.html
    (#psAnnIconGrid) & wireAnnouncementIcons_() (js/presentation-
    studio.js). Ditambahkan di akhir file ini, murni tambahan seperti
-   blok "MODE TAMU" di atas -- tidak mengubah aturan lain yang sudah
+   blok "MODE TAMU" di atas -- tidak mengubah aturan lain yang sudah 
    ada.
    ============================================================ */
 .ps-ann-icon-grid {
