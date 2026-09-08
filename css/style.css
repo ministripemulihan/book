@@ -635,6 +635,37 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
   align-self: flex-end; background: transparent; border: 1px solid var(--rule);
   border-radius: 8px; padding: 6px 12px; color: var(--ink); font-size: 14px; margin-bottom: 8px;
 }
+/* BARU (8 Sep 2026) -- baris atas overlay Layar Penuh Kumpulan Ayat:
+   toolbar bisa-dilipat (kiri, melebar) + tombol "✕ Tutup" (kanan) SEJAJAR
+   dalam 1 baris. `align-self: stretch` PENTING di sini -- tanpanya, baris
+   ini ikut kena `align-items: center` milik `.collection-fs-overlay`
+   (flex-column) dan menyusut selebar isinya saja lalu ditengahkan (lihat
+   catatan panjang di openCollectionFullscreen(), js/app.js, untuk kenapa
+   ini akar masalah toolbar yang tadinya kelihatan "melayang" di tengah
+   & menutupi ayat). */
+.collection-fs-top-row {
+  align-self: stretch; width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.collection-fs-top-row .collection-fs-close { align-self: center; margin-bottom: 0; flex-shrink: 0; }
+/* Toolbar di dalam baris ini HARUS selalu tampil sebagai baris biasa
+   sejajar tombol Tutup -- BUKAN kotak bergaris-atas (tidak perlu lagi,
+   sudah dipisah lewat gap milik .collection-fs-top-row), dan BUKAN
+   "menempel di bawah layar" seperti versi HP `.collapsible-toolbar`
+   biasa (lihat @media max-width:640px di atas) -- supaya HP & komputer
+   SAMA PERSIS posisinya (selalu di ATAS, sejajar "✕ Tutup"), reset ini
+   ditulis TANPA media query supaya menang di kedua ukuran layar. */
+.collection-fs-top-row .collapsible-toolbar {
+  flex: 1; min-width: 0;
+  margin-top: 0; border-top: none; padding-top: 0;
+  position: static; background: transparent;
+  margin-left: 0; margin-right: 0; margin-bottom: 0;
+  padding-left: 0; padding-right: 0; padding-bottom: 0;
+  box-shadow: none; border-radius: 0; z-index: auto;
+}
+.collection-fs-top-row .collapsible-toolbar.collapsed { margin-top: 0; }
+.collection-fs-top-row .collapsible-toolbar-toggle { margin-top: 0; }
 .collection-fs-font-row { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
 .collection-fs-box {
   max-width: 760px; width: 100%; flex: 1;
