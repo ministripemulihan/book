@@ -246,6 +246,29 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 
 /* ---------------- 🎵 Kidung (menu utama, js/kidung-ui.js) ---------------- */
 .kidung-panel h2 { font-family: var(--font-display); font-size: 24px; margin: 0 0 14px; }
+@media (max-width: 640px) {
+  /* PERBAIKAN (8 Sep 2026, permintaan operator: "kidung tidak bisa
+     sampai turun ke bawah, minta seperti Alkitab") -- AKAR MASALAH:
+     `.kidung-toolbar` bawah (position:sticky;bottom:0, lihat @media
+     max-width:640px di atas dekat definisi .kidung-toolbar) HANYA bisa
+     "menempel" sejauh tinggi KOTAK INDUKnya sendiri (#kidungPanel) --
+     dan #kidungPanel itu div BIASA, tingginya cuma SETINGGI ISINYA
+     (syair kidung dst), BUKAN otomatis setinggi sisa layar seperti
+     punya Pembaca Alkitab (yang kotak kolomnya sengaja diberi tinggi
+     eksplisit "74vh/80vh", lihat .reader-columns.reader-columns-panes).
+     Akibatnya kidung yang PENDEK (mis. cuma 4-5 bait) -- kotak
+     #kidungPanel-nya juga ikut pendek, jadi garis toolbar berhenti
+     tepat di bawah bait terakhir, MASIH JAUH dari tepi bawah layar
+     sungguhan (sisanya cuma ruang kosong bawaan .content-wrap).
+     SOLUSI: #kidungPanel diberi tinggi MINIMAL setinggi sisa layar di
+     bawah header (var(--header-h), sama seperti dipakai .sidebar) --
+     kidung PANJANG tidak berubah sama sekali (kontennya sendiri sudah
+     lebih tinggi dari ini), kidung PENDEK sekarang kotaknya ikut
+     "dipaksa" setinggi sisa layar, jadi toolbar-nya punya ruang utk
+     benar-benar menempel di tepi PALING BAWAH layar, sama seperti di
+     Pembaca Alkitab. */
+  .kidung-panel { min-height: calc(100dvh - var(--header-h, 57px)); }
+}
 .kidung-book-toggle { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 .kidung-book-toggle-btn {
   padding: 8px 16px; border-radius: 999px; border: 1px solid var(--rule);
