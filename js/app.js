@@ -6767,24 +6767,15 @@ function initFontSizeControl() {
     });
   }
 
-  // Tombol A-/A+ di toolbar-bisa-dilipat bawah pasal (#readerNavBottomWrap,
-  // lihat index.html & initReaderBottomToolbar() di bawah) -- jalan pintas
-  // KETIGA ke pengaturan ukuran huruf yang SAMA (localStorage sama persis
-  // dengan yang di header atas & panel pencarian), supaya operator yang
-  // sudah membuka toolbar bawah untuk pindah pasal tidak perlu gulir ke
-  // atas cuma untuk atur ukuran huruf.
-  if (el("readerBottomFontIncrease")) {
-    el("readerBottomFontIncrease").addEventListener("click", () => {
-      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
-      applyFontSize(current + CONFIG.FONT_SIZE_STEP);
-    });
-  }
-  if (el("readerBottomFontDecrease")) {
-    el("readerBottomFontDecrease").addEventListener("click", () => {
-      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
-      applyFontSize(current - CONFIG.FONT_SIZE_STEP);
-    });
-  }
+  // DIHAPUS (8 Sep 2026, permintaan operator) -- tombol A-/A+ jalan-
+  // pintas kedua di toolbar bawah pasal (#readerNavBottomWrap) sudah
+  // dilepas dari index.html (kebanyakan tombol A-/A+ bikin bingung mau
+  // pakai yang mana) -- blok listener readerBottomFontIncrease/Decrease
+  // yang dulu di sini ikut dihapus. Pengaturan ukuran huruf itu sendiri
+  // TIDAK hilang, tombolnya di header atas (#fontIncrease/#fontDecrease
+  // di atas) tetap jalan seperti biasa & SEKARANG memang benar-benar
+  // mengubah ukuran teks ayat di 1/2/3-kolom (lihat perbaikan
+  // `.verse-text-wrap` di css/style.css).
 }
 
 // BARU (8 Sep 2026, permintaan operator) -- pasang tombol buka/tutup
