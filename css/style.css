@@ -1679,7 +1679,32 @@ input { font-family: inherit; }
 .verse-num-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 .verse-block.note-open .verse-num-btn { background: var(--brass); }
 .verse-block.speaking .verse-num { background: var(--brass); }
-.verse-text-wrap { flex: 1; }
+.verse-text-wrap {
+  flex: 1;
+  /* PERBAIKAN (8 Sep 2026, permintaan operator: "A+/A- di atas tidak
+     membesarkan tulisan di 3 kolom") -- AKAR MASALAH: applyFontSize()
+     (js/app.js, dipanggil oleh SEMUA tombol A-/A+ di aplikasi ini --
+     header atas & panel pencarian) memang benar
+     mengubah custom property `--verse-font-size` di <html>, TAPI tidak
+     ada satu pun aturan CSS di sini yang benar-benar MEMBACA variabel
+     itu untuk teks ayat (`.verse-text-wrap`) -- yang membaca cuma
+     `#readerVerses.reader-verses` (KHUSUS mode 1-kolom, elemennya ada
+     di index.html), `.kidung-verse/-koor`, & `.result-text`. Mode
+     kolom (`.reader-columns`, dipakai untuk 2/3 bahasa berdampingan --
+     PERSIS kasus yang dilaporkan) tidak pernah punya elemen `.reader-
+     verses` sama sekali di dalamnya. Akibatnya
+     tombol A-/A+ di mana pun ditekan TIDAK PERNAH berpengaruh ke teks
+     ayat mode kolom sama sekali, sejak awal (mode 1-kolom sendiri
+     sudah benar dari dulu). Ditambahkan di SINI
+     (bukan di `.reader-verses` yang mati) supaya berlaku otomatis di
+     SEMUA mode (1 kolom, grid lama, panes Sync, stacked) sekaligus --
+     mode 3-kolom yang override lokal `--verse-font-size` (dikalikan
+     0.82 di HP khusus data-cols="3", lihat aturan ".reader-columns.
+     reader-columns-panes[data-cols=\"3\"]" & ".reader-columns[data-cols=
+     \"3\"]" di bawah) tetap ikut naik/turun proporsional karena
+     keduanya sama-sama lewat var() yang sama. */
+  font-size: var(--verse-font-size, 19px);
+}
 /* ------------------------------------------------------------
    TANDA CATATAN KAKI DI DALAM TEKS AYAT (mis. "1a", "2", "3b") --
    lihat js/footnotes.js. Warna aksen birunya bisa dimatikan lewat
@@ -3765,7 +3790,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
    panel 📢 Pengumuman (Studio Presentasi), lihat markup di index.html
    (#psAnnIconGrid) & wireAnnouncementIcons_() (js/presentation-
    studio.js). Ditambahkan di akhir file ini, murni tambahan seperti
-   blok "MODE TAMU" di atas -- tidak mengubah aturan lain yang sudah 
+   blok "MODE TAMU" di atas -- tidak mengubah aturan lain yang sudah
    ada.
    ============================================================ */
 .ps-ann-icon-grid {
