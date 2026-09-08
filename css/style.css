@@ -1703,7 +1703,7 @@ input { font-family: inherit; }
      reader-columns-panes[data-cols=\"3\"]" & ".reader-columns[data-cols=
      \"3\"]" di bawah) tetap ikut naik/turun proporsional karena
      keduanya sama-sama lewat var() yang sama. */
-  font-size: var(--verse-font-size, 19px);
+  font-size: calc(var(--verse-font-size, 19px) * var(--verse-font-scale-narrow, 1));
 }
 /* ------------------------------------------------------------
    TANDA CATATAN KAKI DI DALAM TEKS AYAT (mis. "1a", "2", "3b") --
@@ -2085,8 +2085,32 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
      "Sync". Cuma DITIMPA LOKAL lewat custom property yang sama, TIDAK
      mengubah `--verse-font-size` global (mode 1/2 kolom & layar lain
      tetap seperti biasa). */
+  /* PERBAIKAN (8 Sep 2026 v2, permintaan operator: "A+/A- di atas tidak
+     berhasil di 3 kolom") -- AKAR MASALAH ditemukan lewat pengujian
+     langsung (Playwright): aturan LAMA di sini menimpa `--verse-font-
+     size` dengan RUMUS YANG MEMAKAI DIRINYA SENDIRI di elemen yang
+     SAMA (`--verse-font-size: calc(var(--verse-font-size) * 0.82)`).
+     Menurut spesifikasi CSS, custom property yang rumusnya bergantung
+     pada NILAI DIRINYA SENDIRI di deklarasi yang sama itu SIKLIK/TIDAK
+     SAH -- browser diam-diam menganggap `--verse-font-size` di elemen
+     ini KOSONG/tidak terdefinisi (dibuktikan lewat pengujian: nilainya
+     benar-benar string kosong), BUKAN 82% dari nilai atasnya seperti
+     yang dimaksud. Akibatnya `.verse-text-wrap` di dalamnya (yang
+     baca `var(--verse-font-size, 19px)`) SELALU jatuh ke angka
+     cadangan "19px" itu, TIDAK PEDULI tombol A-/A+ diapakan sama
+     sekali -- inilah sebab pastinya kenapa 3-kolom "tidak bisa"
+     padahal 1/2-kolom "berhasil" (yang tidak menimpa ulang nama
+     variabel yang sama). SOLUSI: dipindah ke NAMA properti BARU
+     (`--verse-font-scale-narrow`, cuma menyimpan ANGKA pengali 0.82,
+     bukan menimpa ulang `--verse-font-size` itu sendiri) supaya tidak
+     ada lagi self-reference -- lalu `.verse-text-wrap` (lihat
+     definisinya di atas) mengalikannya lewat
+     `calc(var(--verse-font-size,19px) * var(--verse-font-scale-narrow,1))`.
+     Elemen lain yang TIDAK di dalam kotak 3-kolom ini otomatis dapat
+     `--verse-font-scale-narrow` = 1 (tidak terdefinisi -> pakai
+     fallback 1 di var()), jadi tidak berubah sama sekali. */
   .reader-columns-grid[data-cols="3"] {
-    --verse-font-size: calc(var(--verse-font-size, 19px) * 0.82);
+    --verse-font-scale-narrow: 0.82;
   }
 }
 
@@ -2217,7 +2241,21 @@ body.pane-fullscreen-open { overflow: hidden; }
      perubahan UI lain) -- halaman secara keseluruhan MASIH bisa
      digulir normal seperti biasa kalau perlu melihat bagian di atas/
      bawah kotak kolom ini. */
-  .reader-columns.reader-columns-panes { height: 80vh; gap: 6px; } /* dinaikkan dari 62vh (8 Sep 2026) -- ".reader-columns-panes-toolbar" di bawahnya bisa dilipat jadi cuma garis tipis, jadi area baca aman dinaikkan */
+  /* PERBAIKAN (8 Sep 2026 v2, permintaan operator: "mode alkitab ruang
+     bacanya tidak bisa lebih besar seperti kidung") -- dinaikkan lagi
+     dari 80vh: dulu 80vh sudah "aman" dengan asumsi ADA 2 baris
+     toolbar bisa-dilipat di bawahnya (A-/A+ duplikat + navigasi pasal),
+     tapi baris A-/A+ duplikat itu SUDAH DIHAPUS (lihat riwayat
+     perbaikan sebelumnya di readerNavBottomWrap, index.html) -- cuma
+     tersisa 1 baris (navigasi pasal saja), jadi ruangnya aman
+     dinaikkan lagi. Dipakai `dvh` (viewport DINAMIS, ikut tinggi layar
+     sungguhan setelah address bar HP naik/turun) dengan fallback `vh`
+     biasa buat browser lama yang belum kenal dvh -- supaya mendekati
+     "sampai bawah sekali" seperti kidung, TANPA sampai 100% (masih
+     perlu sisa tempat utk garis+panah toolbar navigasi pasal yang
+     collapsed di bawahnya, kalau 100vh persis toolbar itu akan tertutup/
+     terdesak keluar layar). */
+  .reader-columns.reader-columns-panes { height: 80vh; height: 88dvh; gap: 6px; }
   /* BARU (8 Sep 2026, permintaan operator: "mandarin bisa keluar 3 kata")
      -- KHUSUS mode 3-kolom (data-cols="3") di HP, ukuran huruf ayat
      dikecilkan SEDIKIT (bukan diubah global -- tetap `var(--verse-font-size)`
@@ -2230,7 +2268,14 @@ body.pane-fullscreen-open { overflow: hidden; }
      renderColumnsIndependentPanes()) TETAP jalan seperti biasa di atas
      ukuran dasar ini (mengalikan, bukan menimpa, variabelnya). */
   .reader-columns.reader-columns-panes[data-cols="3"] {
-    --verse-font-size: calc(var(--verse-font-size, 19px) * 0.82);
+    /* PERBAIKAN (8 Sep 2026 v2) -- lihat catatan panjang "AKAR MASALAH
+       ditemukan lewat pengujian langsung" di `.reader-columns-grid
+       [data-cols="3"]` di atas (masalah & solusi PERSIS sama di sini,
+       cuma beda mode kolom): dulu self-reference `--verse-font-size:
+       calc(var(--verse-font-size)*0.82)` (SIKLIK/TIDAK SAH, bikin
+       `.verse-text-wrap` di dalamnya selalu jatuh ke 19px terlepas dari
+       tombol A-/A+), sekarang nama properti BARU yang tidak siklik. */
+    --verse-font-scale-narrow: 0.82;
   }
   .reader-col-pane-head { padding: 6px 6px; font-size: 10px; }
   .reader-col-sync-toggle { font-size: 10px; }
