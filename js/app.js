@@ -5683,7 +5683,19 @@ function openCollectionFullscreen(col, startIndex) {
     themeBtn.addEventListener("click", () => { themePanelOpen = !themePanelOpen; render(); });
     fontRow.appendChild(themeBtn);
 
-    overlay.appendChild(fontRow);
+    // PERBAIKAN (8 Sep 2026, permintaan operator: "toolbar atas mode 1
+    // layar dibuat 1 garis dulu, baru tampil semua kalau ditekan") --
+    // fontRow (A-/A+/Lebar HP-Komputer/jenis huruf/Layar Penuh/Tema)
+    // dibungkus toolbar bisa-dilipat yang SAMA persis polanya dengan
+    // Kidung/Pembaca Alkitab (buildCollapsibleToolbar(), lihat definisi
+    // & catatan panjangnya di atas) -- ISI MENUNYA SAMA SEKALI TIDAK
+    // DIUBAH/DIHAPUS (permintaan eksplisit operator), cuma dibungkus.
+    // Mulai TERLIPAT (cuma garis tipis + panah) supaya area baca Layar
+    // Penuh langsung lega begitu dibuka, operator tinggal tekan garis
+    // itu kalau perlu ubah ukuran huruf dkk.
+    overlay.appendChild(buildCollapsibleToolbar([fontRow], {
+      title: "Sembunyikan/tampilkan pengaturan tampilan (ukuran huruf, lebar, jenis huruf, layar penuh, tema)",
+    }));
 
     // Panel swatch tema -- HANYA dibangun kalau themePanelOpen true (tombol
     // "🎨 Tema" di atas ditekan). Memakai ulang array THEMES & fungsi
@@ -5814,6 +5826,20 @@ function openCollectionFullscreen(col, startIndex) {
   }
 
   document.addEventListener("keydown", onKeyDown);
+  // BARU (8 Sep 2026, permintaan operator: "bisa juga swipe kiri swipe
+  // kanan seperti mode kidung") -- simpan referensi goPrev/goNext
+  // TERKINI di elemen overlay itu sendiri (`overlay` dipakai ULANG
+  // lintas pemanggilan openCollectionFullscreen() yang berbeda-beda,
+  // lihat `let overlay = el(...) || document.createElement(...)` di
+  // atas -- kalau goPrev/goNext langsung "ditutup" oleh listener
+  // touch, listener yang dipasang SEKALI di pembukaan PERTAMA akan
+  // nyangkut ke closure LAMA & rusak begitu Kumpulan Ayat lain dibuka
+  // -- sama persis bug yang pernah diperbaiki di attachKidungSwipeNav(),
+  // js/kidung-ui.js, makanya di sini dipakai pola SAMA: baca lewat
+  // referensi yang di-update tiap panggilan, bukan closure langsung).
+  overlay._collectionFsGoPrev = goPrev;
+  overlay._collectionFsGoNext = goNext;
+  attachCollectionFsSwipeNav(overlay);
   overlay.hidden = false;
   render();
   // Diminta SETELAH render() pertama supaya overlay sudah ada isinya di
@@ -5826,6 +5852,53 @@ function openCollectionFullscreen(col, startIndex) {
   // fullscreen sepanjang dipindah slide (goPrev()/goNext() cuma
   // menjalankan render() ulang, tidak menyentuh status fullscreen).
   requestRealFullscreen();
+}
+
+// ------------------------------------------------------------
+//  SWIPE KIRI/KANAN (HP) mode Layar Penuh Kumpulan Ayat -- BARU (8 Sep
+//  2026, permintaan operator: "seperti mode kidung"). Pola & ambang
+//  batasnya PERSIS SAMA dengan attachKidungSwipeNav() (js/kidung-ui.js)
+//  supaya rasanya konsisten di seluruh aplikasi -- termasuk ATURAN ARAH
+//  yang sama: swipe KE KANAN (dx>0) = Selanjutnya (➡️), swipe KE KIRI
+//  (dx<0) = Sebelumnya (⬅️). Dipasang SEKALI SAJA seumur hidup elemen
+//  `overlay` (dijaga lewat flag `_collectionFsSwipeAttached`, sama
+//  seperti kidung) -- overlay ini dipakai ULANG setiap kali Kumpulan
+//  Ayat manapun dibuka lewat Layar Penuh, jadi goPrev/goNext yang
+//  dipanggil di touchend SELALU diambil dari `overlay._collectionFsGoPrev`/
+//  `_collectionFsGoNext` (di-update tiap kali openCollectionFullscreen()
+//  dipanggil, lihat di atas), bukan lewat closure langsung -- supaya
+//  tidak nyangkut ke Kumpulan Ayat yang SEBELUMNYA dibuka.
+function attachCollectionFsSwipeNav(overlay) {
+  if (!overlay || overlay._collectionFsSwipeAttached) return;
+  overlay._collectionFsSwipeAttached = true;
+
+  const THRESHOLD = 60;
+  const MAX_OFF_AXIS = 70;
+  const MAX_MS = 800;
+  let startX = null, startY = null, startT = 0, swiping = false;
+
+  overlay.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+    swiping = true;
+  }, { passive: true });
+
+  overlay.addEventListener("touchend", (e) => {
+    if (!swiping || startX == null) return;
+    swiping = false;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const dt = Date.now() - startT;
+    startX = null;
+    if (Math.abs(dy) > MAX_OFF_AXIS) return; // gerak vertikal -> scroll biasa (mis. di dalam kotak teks panjang)
+    if (Math.abs(dx) < THRESHOLD) return;
+    if (dt > MAX_MS) return;
+    if (dx > 0) { if (overlay._collectionFsGoNext) overlay._collectionFsGoNext(); }
+    else { if (overlay._collectionFsGoPrev) overlay._collectionFsGoPrev(); }
+  }, { passive: true });
 }
 //     (menu yang dibuka, pencarian, tanggal/jam, OS, IP) yang sudah
 //     dikumpulkan js/activitylog.js, dengan filter & tombol simpan (CSV).
