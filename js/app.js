@@ -1035,6 +1035,7 @@ function afterDataReady() {
   initFontFamilyControl();
   initNoteFontFamilyControl();
   initFullscreenControl();
+  initReaderBottomToolbar();
   initTTS();
   initReadingProgressControl();
   initFootnoteAccentControl();
@@ -2524,6 +2525,16 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
   const direction = getSetting(currentUser, "columnDirection") || "side";
   wrap.setAttribute("data-direction", direction);
   wrap.innerHTML = "";
+  // Jaga-jaga (8 Sep 2026): kalau render SEBELUMNYA pakai mode
+  // "side-panes" (renderColumnsIndependentPanes() di bawah menambah
+  // toolbar bisa-dilipat SEBAGAI SIBLING wrap, bukan di dalamnya --
+  // lihat catatan di sana), lalu operator ganti ke mode lain, toolbar
+  // itu perlu dibuang manual di sini karena wrap.innerHTML="" di atas
+  // tidak menyentuh elemen di LUAR wrap.
+  if (wrap.parentNode) {
+    const strayToolbar = wrap.parentNode.querySelector(".reader-columns-panes-toolbar");
+    if (strayToolbar) strayToolbar.remove();
+  }
 
   const columns = [{ lang: currentLang, verses: primaryVerses }];
   for (let i = 0; i < columnsCount - 1; i++) {
@@ -2643,8 +2654,54 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
 // mengalir natural setinggi isinya sendiri di dalam kotak scroll-nya --
 // TIDAK ada lagi ruang kosong terbuang, harganya cuma ayat TIDAK selalu
 // persis sejajar posisinya kecuali operator aktifkan/pertahankan "Sync".
+// BARU (8 Sep 2026, permintaan operator) -- versi GENERIK dari pola
+// "toolbar bisa dilipat" yang tadinya cuma ada di layar Kidung
+// (buildKidungToolbar() di js/kidung-ui.js): garis tipis + panah "v"/"^"
+// di bagian PALING BAWAH kotak, ditekan untuk menyembunyikan/menaikkan
+// kembali sekumpulan tombol fitur -- supaya layar baca (Alkitab 3-kolom
+// Sync, panel Kumpulan Ayat 1-layar, dst) bisa dibuat lega/"fullscreen"
+// dengan cara yang SAMA seperti Kidung, bukan bikin pola baru lagi.
+// Dipakai di renderColumnsIndependentPanes() & renderCollectionDetailInto()
+// di bawah/atas. CSS-nya lihat ".collapsible-toolbar*" di css/style.css
+// (berbagi definisi visual yang SAMA dengan ".kidung-toolbar*" lewat
+// selector gabungan, supaya kalau salah satu gaya diubah nanti,
+// keduanya ikut konsisten).
+//
+// `bodyChildren`: array elemen DOM yang mau ditaruh di dalam (baris
+// tombol dst) -- disusun apa adanya, TIDAK diberi grid/flex tertentu,
+// jadi pemanggil bebas atur sendiri lewat class-nya masing-masing.
+// `opts.startCollapsed` (default true): mulai terlipat (cuma garis +
+// panah yg kelihatan) supaya area baca langsung lega begitu dibuka,
+// operator tinggal tekan garis itu kalau perlu tombolnya.
+function buildCollapsibleToolbar(bodyChildren, opts) {
+  opts = opts || {};
+  const wrap = document.createElement("div");
+  wrap.className = "collapsible-toolbar" + (opts.startCollapsed !== false ? " collapsed" : "");
+
+  const body = document.createElement("div");
+  body.className = "collapsible-toolbar-body";
+  bodyChildren.forEach((el) => { if (el) body.appendChild(el); });
+  wrap.appendChild(body);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "collapsible-toolbar-toggle";
+  const startsCollapsed = opts.startCollapsed !== false;
+  toggleBtn.innerHTML = '<span class="collapsible-toolbar-toggle-arrow">' + (startsCollapsed ? "^" : "v") + "</span>";
+  toggleBtn.title = opts.title || "Sembunyikan/tampilkan tombol";
+  toggleBtn.setAttribute("aria-label", toggleBtn.title);
+  toggleBtn.addEventListener("click", () => {
+    const collapsed = wrap.classList.toggle("collapsed");
+    toggleBtn.querySelector(".collapsible-toolbar-toggle-arrow").textContent = collapsed ? "^" : "v";
+  });
+  wrap.appendChild(toggleBtn);
+
+  return wrap;
+}
+
 function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount) {
   wrap.classList.add("reader-columns-panes");
+
   wrap.innerHTML = "";
 
   columns.forEach((col, colIdx) => {
@@ -2718,6 +2775,59 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
   });
 
   wireColumnPaneSync(wrap);
+
+  // BARU (8 Sep 2026, permintaan operator) -- toolbar bisa-dilipat gaya
+  // Kidung DI BAWAH kotak 3-kolom ini (di luar `wrap`, sebagai elemen
+  // bersebelahan/sibling -- bukan di dalam wrap, supaya tidak ikut
+  // kehapus tiap wrap.innerHTML="" di atas): isinya kontrol yang jarang
+  // dipakai (Sinkron Semua Kolom sekaligus + ukuran huruf A-/A+) supaya
+  // kotak baca 3-kolom bisa dipakai lega, operator tinggal tekan garis
+  // tipis paling bawah kalau perlu kontrol itu. Ditandai class
+  // ".reader-columns-panes-toolbar" & DIBUANG-BANGUN-ULANG tiap render
+  // (tiap pindah pasal dst) supaya tidak menumpuk jadi berkali-kali.
+  const panesParent = wrap.parentNode;
+  if (panesParent) {
+    const oldToolbar = panesParent.querySelector(".reader-columns-panes-toolbar");
+    if (oldToolbar) oldToolbar.remove();
+
+    const syncAllBtn = document.createElement("button");
+    syncAllBtn.type = "button";
+    syncAllBtn.className = "chip-btn small";
+    syncAllBtn.textContent = "🔗 Sinkron Semua Kolom";
+    syncAllBtn.title = "Nyalakan Sync di semua kolom sekaligus, biar ayat yang sama selalu sejajar lagi";
+    syncAllBtn.addEventListener("click", () => {
+      wrap.querySelectorAll('.reader-col-pane input[type="checkbox"]').forEach((cb) => { cb.checked = true; });
+    });
+
+    const fontRow = document.createElement("div");
+    fontRow.className = "reader-columns-panes-font-row";
+    const minusBtn = document.createElement("button");
+    minusBtn.type = "button";
+    minusBtn.className = "chip-btn small";
+    minusBtn.textContent = "A-";
+    minusBtn.title = "Perkecil huruf ayat";
+    minusBtn.addEventListener("click", () => {
+      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+      applyFontSize(current - CONFIG.FONT_SIZE_STEP);
+    });
+    const plusBtn = document.createElement("button");
+    plusBtn.type = "button";
+    plusBtn.className = "chip-btn small";
+    plusBtn.textContent = "A+";
+    plusBtn.title = "Perbesar huruf ayat";
+    plusBtn.addEventListener("click", () => {
+      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+      applyFontSize(current + CONFIG.FONT_SIZE_STEP);
+    });
+    fontRow.appendChild(minusBtn);
+    fontRow.appendChild(plusBtn);
+
+    const panesToolbar = buildCollapsibleToolbar([syncAllBtn, fontRow], {
+      title: "Sembunyikan/tampilkan kontrol kolom (Sinkron Semua, ukuran huruf)",
+    });
+    panesToolbar.classList.add("reader-columns-panes-toolbar");
+    panesParent.insertBefore(panesToolbar, wrap.nextSibling);
+  }
 }
 
 // BARU (7 Sep 2026) -- buka/tutup 1 kolom (.reader-col-pane) jadi
@@ -4706,10 +4816,22 @@ function renderCollectionDetailInto(container, id, col) {
     fsBtn.className = "chip-btn primary";
     fsBtn.textContent = "⛶ Mode Layar Penuh";
     fsBtn.addEventListener("click", () => openCollectionFullscreen(col, 0));
-    titleBtns.appendChild(fsBtn);
+    titleRow.appendChild(fsBtn); // TETAP di baris judul (bukan ikut dilipat) -- ini aksi utama paling sering dipakai
   }
-  titleRow.appendChild(titleBtns);
   container.appendChild(titleRow);
+
+  // BARU (8 Sep 2026, permintaan operator) -- tombol-tombol SEKUNDER
+  // (Ganti Nama/Teks-Pengumuman/Tambah Link/Salin Semua/Bagikan/Terapkan
+  // Tema, semuanya sudah terkumpul di `titleBtns` di atas) dipindah ke
+  // toolbar bisa-dilipat model Kidung (lihat buildCollapsibleToolbar()) --
+  // supaya panel Kumpulan Ayat di Mode 1 Layar (HP) tidak dipenuhi
+  // sederet tombol begitu dibuka, sesuai contoh "slider seperti di
+  // Kidung" yang diminta. "⛶ Mode Layar Penuh" TIDAK ikut dipindah
+  // (tetap di titleRow di atas) karena itu aksi yang paling sering
+  // langsung ditekan.
+  container.appendChild(buildCollapsibleToolbar([titleBtns], {
+    title: "Sembunyikan/tampilkan tombol Kumpulan Ayat (ganti nama, tambah teks/link, salin, bagikan, dst.)",
+  }));
 
   // Baris pilihan "Bahasa suara" (Google Voice) khusus panel Kumpulan Ayat --
   // dipakai oleh tombol ▶️ Putar di tiap ayat & di Mode Layar Penuh di bawah.
@@ -6664,6 +6786,46 @@ function initFontSizeControl() {
       applyFontSize(current - CONFIG.FONT_SIZE_STEP);
     });
   }
+
+  // Tombol A-/A+ di toolbar-bisa-dilipat bawah pasal (#readerNavBottomWrap,
+  // lihat index.html & initReaderBottomToolbar() di bawah) -- jalan pintas
+  // KETIGA ke pengaturan ukuran huruf yang SAMA (localStorage sama persis
+  // dengan yang di header atas & panel pencarian), supaya operator yang
+  // sudah membuka toolbar bawah untuk pindah pasal tidak perlu gulir ke
+  // atas cuma untuk atur ukuran huruf.
+  if (el("readerBottomFontIncrease")) {
+    el("readerBottomFontIncrease").addEventListener("click", () => {
+      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+      applyFontSize(current + CONFIG.FONT_SIZE_STEP);
+    });
+  }
+  if (el("readerBottomFontDecrease")) {
+    el("readerBottomFontDecrease").addEventListener("click", () => {
+      const current = parseInt(localStorage.getItem(CONFIG.FONT_SIZE_STORAGE_KEY), 10) || CONFIG.FONT_SIZE_DEFAULT;
+      applyFontSize(current - CONFIG.FONT_SIZE_STEP);
+    });
+  }
+}
+
+// BARU (8 Sep 2026, permintaan operator) -- pasang tombol buka/tutup
+// toolbar bawah pasal (#readerNavBottomWrap, lihat index.html), pola
+// SAMA seperti garis tipis+panah "v"/"^" di layar Kidung
+// (buildKidungToolbar()) & 3-kolom Sync/Kumpulan Ayat
+// (buildCollapsibleToolbar()) -- bedanya elemen ini STATIS (sudah ada
+// di index.html, bukan dibangun ulang tiap ganti pasal), jadi cukup
+// SEKALI dipasang di sini saat aplikasi mulai (dipanggil dari initApp(),
+// dekat initFontSizeControl()/initFullscreenControl()), bukan tiap
+// renderChapter(). Mulai TERLIPAT (cuma garis tipis) supaya area baca
+// pasal langsung lega/"fullscreen" begitu dibuka, operator tinggal tekan
+// garis itu kalau perlu pindah pasal atau ubah ukuran huruf.
+function initReaderBottomToolbar() {
+  const wrap = el("readerNavBottomWrap");
+  const toggleBtn = el("readerNavBottomToggle");
+  if (!wrap || !toggleBtn) return;
+  toggleBtn.addEventListener("click", () => {
+    const collapsed = wrap.classList.toggle("collapsed");
+    toggleBtn.querySelector(".collapsible-toolbar-toggle-arrow").textContent = collapsed ? "^" : "v";
+  });
 }
 
 // ------------------------------------------------------------
