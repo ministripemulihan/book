@@ -5267,6 +5267,7 @@ const PresentationStudio = (() => {
     if (typeof applyStoredTheme === "function") applyStoredTheme();
     renderModeShortcutRow(); // refresh status tombol "sedang aktif"
   }
+  const NUM_BADGES_ = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"];
   function renderModeShortcutRow() {
     const row = el("psModeShortcutRow");
     if (!row) return;
@@ -5275,7 +5276,16 @@ const PresentationStudio = (() => {
     try { theme = JSON.parse(localStorage.getItem(THEME_KEY) || "{}") || {}; } catch (e) {}
     row.innerHTML = list.map((p, i) => {
       const active = (theme.camLayout || "full") === p.camLayout && !!theme.videoTextOverlay === !!p.videoTextOverlay;
-      return `<button type="button" class="chip-btn small${active ? " active" : ""}" data-mode-preset-id="${escapeHtml(p.id)}" title="Shortcut keyboard: angka ${i + 1}">${escapeHtml(p.label)}${p.custom ? ` <span data-mode-del-id="${escapeHtml(p.id)}" title="Hapus mode ini" style="opacity:.7; cursor:pointer;">✕</span>` : ""}</button>`;
+      // BARU (8 Sep 2026 v5, permintaan operator "info tombol 1-9 apa,
+      // mudah dimengerti") -- badge nomor (①②③...) ditempel LANGSUNG di
+      // tombolnya (bukan cuma lewat `title`/hover, yang tidak kelihatan
+      // sama sekali di HP layar sentuh) -- operator langsung tahu angka
+      // berapa yang harus ditekan tanpa perlu menebak/hover dulu. Kalau
+      // urutan tombol lebih dari 9 (mis. setelah nambah "Custom"),
+      // sisanya TIDAK dapat badge angka karena shortcut keyboard memang
+      // cuma sampai tombol ke-9 (lihat wireModeAndBellKeyboardShortcuts()).
+      const badge = i < 9 ? `<span class="ps-shortcut-badge" title="Tekan angka ${i + 1} di keyboard">${NUM_BADGES_[i]}</span> ` : "";
+      return `<button type="button" class="chip-btn small${active ? " active" : ""}" data-mode-preset-id="${escapeHtml(p.id)}" title="Shortcut keyboard: angka ${i + 1}">${badge}${escapeHtml(p.label)}${p.custom ? ` <span data-mode-del-id="${escapeHtml(p.id)}" title="Hapus mode ini" style="opacity:.7; cursor:pointer;">✕</span>` : ""}</button>`;
     }).join("");
     row.querySelectorAll("[data-mode-preset-id]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -5340,7 +5350,12 @@ const PresentationStudio = (() => {
     const row = el("psBellShortcutRow");
     if (!row) return;
     const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)" }];
-    row.innerHTML = list.map((b, i) => `<button type="button" class="chip-btn small" data-bell-key="${escapeHtml(b.key)}" title="Shortcut keyboard: Alt+${i + 1}">${escapeHtml(b.label)}</button>`).join("");
+    // BARU (8 Sep 2026 v5) -- badge nomor Alt+N, pola SAMA seperti
+    // renderModeShortcutRow() di atas (lihat catatan panjang di sana).
+    row.innerHTML = list.map((b, i) => {
+      const badge = i < 9 ? `<span class="ps-shortcut-badge" title="Tekan Alt+${i + 1} di keyboard">Alt+${i + 1}</span> ` : "";
+      return `<button type="button" class="chip-btn small" data-bell-key="${escapeHtml(b.key)}" title="Shortcut keyboard: Alt+${i + 1}">${badge}${escapeHtml(b.label)}</button>`;
+    }).join("");
     row.querySelectorAll("[data-bell-key]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "bell", action: "ring", key: btn.dataset.bellKey }));
     });
