@@ -5242,20 +5242,28 @@ function handleAddFreeItemToCollection(id, col) {
     // BARU (8 Sep 2026, permintaan operator) -- "Template cepat": tombol
     // siap-pakai yang langsung mengisi kotak "Isi" di bawah dengan pola
     // kalimat umum (bagian "____" tinggal diketik timpa) -- supaya tidak
-    // perlu mengetik dari nol tiap kali mau umumkan acara atau kidung
-    // yang akan dinyanyikan. Menekan salah satu tombol ini JUGA otomatis
-    // memilih Jenis = "📢 Pengumuman" di atas (acara & pemberitahuan
-    // kidung memang biasanya diumumkan, bukan teks bebas) -- operator
-    // tetap bebas ganti Jenis-nya lagi sesudahnya kalau mau. Daftar
+    // perlu mengetik dari nol tiap kali mau umumkan acara, kidung yang
+    // akan dinyanyikan, dst. Menekan salah satu tombol ini JUGA otomatis
+    // memilih Jenis = "📢 Pengumuman" di atas (semuanya memang biasanya
+    // diumumkan, bukan teks bebas) -- operator tetap bebas ganti
+    // Jenis-nya lagi sesudahnya kalau mau. Template "📅 Acara" SENGAJA
+    // pakai "\n" (baris baru sungguhan, bukan cuma koma) di antara tiap
+    // baris ikon supaya begitu ditampilkan di Layar 2 / Mode Layar Penuh,
+    // tanggal/jam/tempat/tim masing-masing jadi baris SENDIRI (gampang
+    // dibaca dari jauh), bukan menyambung jadi 1 baris panjang. Daftar
     // templatenya sengaja ditaruh di sini (bukan menu terpisah) supaya
-    // gampang ditambah/diedit sendiri kalau operator perlu pola lain.
+    // gampang ditambah/diedit sendiri kalau operator perlu pola lain --
+    // SAMA persis 6 template yang juga tersedia sebagai tombol frasa
+    // cepat di Studio Presentasi (lihat #psAnnQuickPhraseRow di
+    // index.html & wireAnnouncementQuickPhrases_() di js/presentation-
+    // studio.js), supaya konsisten dipakai dari HP maupun komputer.
     const QUICK_TEMPLATES = [
-      { label: "📅 Acara", text: "📅17-  -2026, ⏰09.00 WIB 📍di Tempat datang, 👥Semua Tim datang." },
-      { label: "🎵 Kidung", text: "🎵 Kidung. ____ ____, syair ____ bait." },
-      { label: "🙏 Doa Pembuka ", text: "🙏 Doa Pembuka  ____ ____, ." },
-      { label: "🎤 MC bertugas: ", text: "🎤 MC bertugas:  ____ ____, ." },
-      { label: "✅ Bawa Buku Alkitab: ", text: "✅ Bawa Buku Alkitab  ____ ____, ." },
-      { label: "🎶 Pujian: ", text: "🎶 Pujian:  ____ ____, ." },
+      { label: "📅 Acara", text: "📅 Acara: 17-  -2026\n⏰ 09.00 WIB\n📍 di Tempat\n👥 Semua Tim datang" },
+      { label: "🎵 Kidung", text: "🎵 Kidung No. ____ ____, syair ____ bait." },
+      { label: "🙏 Doa Pembuka", text: "🙏 Doa Pembuka: ____" },
+      { label: "🎤 MC bertugas", text: "🎤 MC bertugas: ____" },
+      { label: "✅ Bawa Buku Alkitab", text: "✅ Bawa Buku Alkitab / Catatan" },
+      { label: "🎶 Pujian", text: "🎶 Pujian: ____" },
     ];
     const tplField = document.createElement("div");
     tplField.className = "simple-dialog-field";
@@ -5292,7 +5300,7 @@ function handleAddFreeItemToCollection(id, col) {
     label2.textContent = "Isi:";
     field2.appendChild(label2);
     const textarea = document.createElement("textarea");
-    textarea.rows = 4;
+    textarea.rows = 6;
     textarea.placeholder = "Ketik isinya di sini…";
     field2.appendChild(textarea);
     box.appendChild(field2);
