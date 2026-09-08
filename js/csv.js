@@ -381,6 +381,21 @@ function normalizeKidungRecord(rec) {
     // otomatis melewatkan baris ini kalau kosong (lihat buildKidungShareText
     // di js/kidung.js).
     birama: (get("birama", "notasi", "time signature", "birama/notasi") || "").trim(),
+    // BARU (8 Sep 2026, permintaan operator) -- SENGAJA kolom BARU, bukan
+    // ditumpuk ke `birama` di atas: `birama` sudah dipakai utk nada dasar +
+    // ketukan (mis. "D 3/4") pada >100 kidung, kalau pola suku kata (mis.
+    // "8 8 8 8"/"7 7 7 7") ditulis ke kolom yang sama akan menimpa data
+    // yang sudah ada. Nama kolom di Sheet: "pola_suku_kata" (opsional,
+    // kosong -> "" -> badge-nya otomatis tidak tampil, lihat kidung-ui.js).
+    polaSukuKata: (get("pola_suku_kata", "pola suku kata", "suku_kata", "metrum") || "").trim(),
+    // BARU (8 Sep 2026) -- cerita/latar belakang KIDUNG INI SAJA (mis.
+    // "Reginald Heber - 1823, ke India..."). SENGAJA dipisah dari
+    // `pengarang` di atas (yang sekarang murni nama penulis) supaya
+    // `pengarang` tidak lagi tampil aneh dalam kurung di judul (lihat
+    // titleLine di kidung-ui.js). Sejarah UMUM buku Kidung (bukan per
+    // lagu) & panduan cara baca ditaruh di tab "Setup" (panel ℹ️ Info
+    // Kami) lewat key "sejarah_kidung"/"cara_baca_kidung", BUKAN di sini.
+    sejarah: (get("sejarah", "sejarah_kidung", "sejarah kidung", "latar_belakang", "history") || "").trim(),
     kategori: (get("kategori", "category") || "").trim(),
     // Ikon/simbol kecil yang tampil di depan "No. XXX -- Judul" di Layar 2
     // (present.html) & label daftar Kumpulan Ayat -- PERMINTAAN OPERATOR
