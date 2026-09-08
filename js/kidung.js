@@ -38,9 +38,15 @@
 // ============================================================
 
 // Nama field IndexedDB (lihat CONFIG.KIDUNG_STORE_NAME di js/db.js):
-// { id, buku, noKidung, judul, pengarang, birama, kategori, tags, urutan,
-//   jenis, noBait, teks, koorGroup, linkMp3_1, linkMp3_2, linkVideo,
-//   linkYoutube, linkMidi }
+// { id, buku, noKidung, judul, pengarang, birama, polaSukuKata, sejarah,
+//   kategori, tags, urutan, jenis, noBait, teks, koorGroup, linkMp3_1,
+//   linkMp3_2, linkVideo, linkYoutube, linkMidi }
+// `polaSukuKata` (BARU 8 Sep 2026, kolom Sheet "pola_suku_kata") = pola
+// jumlah suku kata per baris syair (mis. "8 8 8 8"/"7 7 7 7") -- BEDA
+// dari `birama` (nada dasar + ketukan, mis. "D 3/4"). `sejarah` (kolom
+// Sheet "sejarah") = cerita latar belakang kidung INI SAJA -- sejarah
+// UMUM buku Kidung & panduan cara baca ada di panel ℹ️ Info Kami
+// (tab Setup), bukan di sini.
 // `id` = buku + "_" + noKidung + "_" + urutan (unik per baris, termasuk
 // lintas-buku -- Kidung No.95 & Suplemen No.95 tidak akan bentrok).
 
@@ -56,18 +62,20 @@
 // kalau suatu saat operator sheet cuma mengisi baris pertama saja seperti
 // judul/pengarang/kategori -- tidak menimpa nilai yang memang sudah diisi.
 function forwardFillKidungRows(rows) {
-  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", kategori: "", ikon: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "" };
+  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", polaSukuKata: "", sejarah: "", kategori: "", ikon: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "" };
   return rows.map((r) => {
     if (r.noKidung !== last.noKidung || r.buku !== last.buku) {
       // Kidung baru mulai -- reset "ingatan" forward-fill supaya tidak
       // ketularan metadata kidung sebelumnya kalau baris pertama kidung
       // baru ini entah kenapa kosong juga.
-      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, kategori: r.kategori, ikon: r.ikon, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi };
+      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, polaSukuKata: r.polaSukuKata, sejarah: r.sejarah, kategori: r.kategori, ikon: r.ikon, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi };
     } else {
       if (!r.buku || r.buku === "Kidung") r.buku = last.buku; else last.buku = r.buku;
       if (!r.judul) r.judul = last.judul; else last.judul = r.judul;
       if (!r.pengarang) r.pengarang = last.pengarang; else last.pengarang = r.pengarang;
       if (!r.birama) r.birama = last.birama; else last.birama = r.birama;
+      if (!r.polaSukuKata) r.polaSukuKata = last.polaSukuKata; else last.polaSukuKata = r.polaSukuKata;
+      if (!r.sejarah) r.sejarah = last.sejarah; else last.sejarah = r.sejarah;
       if (!r.kategori) r.kategori = last.kategori; else last.kategori = r.kategori;
       if (!r.ikon) r.ikon = last.ikon; else last.ikon = r.ikon;
       if (!r.tags || !r.tags.length) r.tags = last.tags; else last.tags = r.tags;
@@ -122,6 +130,7 @@ async function getKidungList(bukuFilter) {
     if (!map.has(key)) {
       map.set(key, {
         buku: r.buku, noKidung: r.noKidung, judul: r.judul, pengarang: r.pengarang, birama: r.birama || "",
+        polaSukuKata: r.polaSukuKata || "", sejarah: r.sejarah || "",
         kategori: r.kategori, ikon: r.ikon || "", tags: r.tags || [], jumlahBait: 0,
         linkMp3_1: r.linkMp3_1 || "", linkMp3_2: r.linkMp3_2 || "", linkVideo: r.linkVideo || "",
         linkYoutube: r.linkYoutube || "", linkMidi: r.linkMidi || "",
@@ -294,14 +303,86 @@ async function getKidungBaitsWithKoor(buku, noKidung) {
       }));
   }
 
-  return baitRows
-    .sort((a, b) => (a.noBait || 0) - (b.noBait || 0))
-    .map((r) => ({
-      noBait: r.noBait,
-      teks: r.teks,
-      koorGroup: r.koorGroup || null,
-      koorTeks: r.koorGroup ? (koorByGroup[r.koorGroup] || null) : null,
-    }));
+  // BARU (8 Sep 2026, laporan operator: "kidung No.388 tampil
+  // berselang-seling/dobel") -- AKAR MASALAH: baris di atas dulu selalu
+  // mengurutkan SEMUA baris bait 1 KIDUNG SEKALIGUS murni berdasar
+  // `no_bait` GLOBAL. Ini benar untuk kidung BIASA (1 kelompok bait,
+  // nomornya naik terus 1..N tanpa pernah ulang) -- TAPI kidung yang
+  // punya lebih dari 1 "SYAIR" dengan penomoran bait yang MENGULANG
+  // dari 1 lagi tiap syair (mis. No.388 "Mengalami Kristus": SYAIR KE
+  // SATU = bait 1-9, lalu SYAIR KEDUA = bait 1-15 lagi, lihat baris
+  // koor_group berjudul "SYAIR KE SATU"/"SYAIR KEDUA" tepat SEBELUM
+  // bait pertama tiap syair di Sheet) jadi RUSAK: semua bait no.1 (dari
+  // syair 1 & syair 2 SEKALIGUS) ketarik jadi bersebelahan, lalu semua
+  // no.2, dst -- persis gejala "1. ... 1. ... Koor: SYAIR KEDUA / 2.
+  // ... 2. ... Koor: SYAIR KEDUA" yang dilaporkan.
+  //
+  // FIX: pecah dulu baitRows (yang SUDAH terurut sesuai `urutan` Sheet
+  // asli, lihat getKidungRows()) jadi "grup" tiap kali no_bait
+  // TURUN/ULANG ke awal lagi (bukan naik terus) -- ini otomatis
+  // mendeteksi batas antar-syair TANPA perlu koor_group terisi benar
+  // (yang di Sheet kadang tidak konsisten diisi tiap syair). Grup
+  // TETAP di urutan asli Sheet (syair 1 dulu, baru syair 2, dst,
+  // berapa pun banyak syairnya) -- tidak pernah dicampur lagi.
+  const baitGroups = [];
+  let curGroup = [];
+  let prevNoBait = -Infinity;
+  baitRows.forEach((r) => {
+    const n = r.noBait || 0;
+    if (curGroup.length && n <= prevNoBait) {
+      baitGroups.push(curGroup);
+      curGroup = [];
+    }
+    curGroup.push(r);
+    prevNoBait = n;
+  });
+  if (curGroup.length) baitGroups.push(curGroup);
+
+  // Kidung BIASA (cuma 1 grup) -- perilaku LAMA dipertahankan PERSIS:
+  // tiap bait ditempeli koorTeks lewat koorGroup-nya sendiri (dipakai
+  // utk kidung yang memang punya 1 koor/refrain yang diulang tiap
+  // bait, mis. hasil mode "1+koor"/"2+koor" dst di Studio Presentasi).
+  if (baitGroups.length <= 1) {
+    return baitRows
+      .sort((a, b) => (a.noBait || 0) - (b.noBait || 0))
+      .map((r) => ({
+        noBait: r.noBait,
+        teks: r.teks,
+        koorGroup: r.koorGroup || null,
+        koorTeks: r.koorGroup ? (koorByGroup[r.koorGroup] || null) : null,
+      }));
+  }
+
+  // Kidung ber-SYAIR-GANDA -- tiap grup dikasih JUDUL SYAIR (field baru
+  // `sectionTitle`, ditempel di bait PERTAMA grup itu saja) diambil
+  // dari baris jenis="koor" yang letaknya TEPAT SEBELUM bait pertama
+  // grup ini di Sheet (pola umum No.388: baris "SYAIR KE SATU"/"SYAIR
+  // KEDUA" ditulis persis sebelum bait 1 tiap syair) -- cara ini TIDAK
+  // bergantung pada koor_group terisi benar, jadi tetap kebaca walau
+  // datanya tidak rapi. `koorTeks` per-bait SENGAJA dikosongkan (null)
+  // di sini (beda dari kasus 1-grup di atas) supaya "SYAIR KE SATU"/
+  // "SYAIR KEDUA" tampil SEKALI saja sebagai judul bagian di reader
+  // (js/kidung-ui.js), bukan diulang-ulang sebagai "Koor:" di bawah
+  // tiap bait.
+  const koorRowsSorted = rows.filter((r) => r.jenis === "koor").sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
+  const out = [];
+  baitGroups.forEach((group) => {
+    const sorted = group.slice().sort((a, b) => (a.noBait || 0) - (b.noBait || 0));
+    const first = sorted[0];
+    const precedingTitle = koorRowsSorted
+      .filter((k) => (k.urutan || 0) < (first.urutan || 0))
+      .pop(); // yang paling dekat (urutan terbesar sebelum bait pertama grup ini)
+    sorted.forEach((r, i) => {
+      out.push({
+        noBait: r.noBait,
+        teks: r.teks,
+        koorGroup: null,
+        koorTeks: null,
+        sectionTitle: i === 0 && precedingTitle ? precedingTitle.teks : null,
+      });
+    });
+  });
+  return out;
 }
 
 // Semua kategori yang benar-benar dipakai (buat filter/menu nanti) --
@@ -330,8 +411,21 @@ async function getKidungCategories(bukuFilter) {
 //   "1+koor"   -> 1 bait / slide, ditempeli koor bait itu (kalau ada).
 //   "2+koor"   -> 2 bait / slide, ditempeli koor bait TERAKHIR di slide.
 //   "3+koor"   -> 3 bait / slide, sama seperti atas tapi 3 bait.
+//   "4+koor"   -> 4 bait / slide, sama seperti atas tapi 4 bait.
 //   "koor"     -> slide isi koor SAJA (semua koor unik dalam kidung
 //                 itu, deduplikasi -- 1 kidung 2 koor jadi 2 slide).
+//   "1firstKoor" -> BARU (7 Sep 2026, permintaan operator) -- "bait 1
+//                 dulu, koor, baru sisa bait": slide PERTAMA = bait 1
+//                 SAJA + koor ditempel di situ; slide KEDUA = SEMUA
+//                 bait sisanya (2, 3, 4, dst) digabung jadi 1 slide,
+//                 TANPA koor lagi (supaya tidak diulang 2x) -- dipakai
+//                 sebagai "model 2" utk kidung 2/3/4 bait (model 1 =
+//                 mode "N+koor" yang sudah ada, semua bait tampil
+//                 sekaligus baru koor di akhir). Sengaja HANYA 1 nama
+//                 mode generik (bukan "2firstKoor"/"3firstKoor"/dst)
+//                 karena polanya SAMA persis berapa pun jumlah baitnya
+//                 -- yang beda cuma isi slide KEDUA (otomatis
+//                 menyesuaikan sisa bait, lihat kode di bawah).
 //  Custom (mis. [1,2+koor1],[3+koor],[4] seperti dicontohkan) tinggal
 //  panggil splitKidungIntoSlides() dengan `groupSizes` custom -- lihat
 //  parameter opsional di bawah -- jadi tidak perlu mode baru per kasus.
@@ -356,6 +450,30 @@ function splitKidungIntoSlides(baits, mode, groupSizes) {
       seen.add(b.koorGroup);
       slides.push({ baits: [], koorTeks: b.koorTeks, koorGroup: b.koorGroup, onlyKoor: true });
     });
+    return slides;
+  }
+
+  if (mode === "1firstKoor") {
+    // Lihat catatan panjang "1firstKoor" di atas -- bait 1 sendirian
+    // (+koor), lalu SISA bait (2 dst, berapa pun jumlahnya) digabung
+    // jadi 1 slide tanpa koor lagi. Kidung 1 bait saja: cukup 1 slide
+    // (bait 1 + koor), tidak ada slide kedua yang kosong.
+    const first = baits[0];
+    const slides = [{
+      baits: [{ noBait: first.noBait, teks: first.teks }],
+      koorTeks: first.koorTeks || null,
+      koorGroup: first.koorGroup || null,
+      onlyKoor: false,
+    }];
+    const rest = baits.slice(1);
+    if (rest.length) {
+      slides.push({
+        baits: rest.map((b) => ({ noBait: b.noBait, teks: b.teks })),
+        koorTeks: null,
+        koorGroup: null,
+        onlyKoor: false,
+      });
+    }
     return slides;
   }
 
