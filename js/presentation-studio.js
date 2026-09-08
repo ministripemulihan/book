@@ -5219,6 +5219,167 @@ const PresentationStudio = (() => {
   // buka dialog folder ulang (kecuali browser memang minta konfirmasi
   // ulang, tetap wajar & aman).
   // ============================================================
+  // ------------------------------------------------------------
+  // BARU (8 Sep 2026, permintaan operator "tombol shortcut mode & bel")
+  // -- ⚡ MODE CEPAT: tombol siap-pakai yang menerapkan KOMBINASI
+  // `camLayout` + `videoTextOverlay` sekaligus lewat 1 klik (operator
+  // tidak perlu buka panel 🎥 Kamera lalu klik 2-3 kontrol terpisah
+  // setiap kali mau ganti gaya tampilan). Daftarnya TERSIMPAN di
+  // localStorage (`MODE_PRESETS_KEY`) & BISA DIKUSTOMISASI PENUH oleh
+  // operator (tambah/hapus tombol sendiri lewat "➕ Tambah Mode Sendiri",
+  // lihat wireModeShortcuts() di bawah) -- daftar di bawah ini HANYA
+  // dipakai sebagai ISIAN AWAL (seed) sekali saat localStorage masih
+  // kosong, BUKAN daftar tetap yang tidak bisa diubah.
+  //
+  // PENTING -- preset SENGAJA HANYA mengubah GAYA (camLayout/
+  // videoTextOverlay), TIDAK ikut menyalakan Kamera/Video/File apa pun
+  // sendiri -- kalau preset otomatis menyalakan Kamera, operator bisa
+  // kaget tiba-tiba diminta izin kamera oleh Layar 2 padahal cuma
+  // klik tombol gaya. Sumber (Kamera/Video Lokal/YouTube/File) TETAP
+  // dipilih manual seperti biasa lewat tab masing-masing -- preset cuma
+  // menyiapkan "wadah" tampilannya duluan.
+  // ------------------------------------------------------------
+  const MODE_PRESETS_KEY = "presentModePresetsV1";
+  const DEFAULT_MODE_PRESETS = [
+    { id: "m1", label: "🎬 Video Full", camLayout: "full", videoTextOverlay: false },
+    { id: "m2", label: "📐 Video + Teks (Separuh)", camLayout: "split", videoTextOverlay: true },
+    { id: "m3", label: "🎬📝 Video Full + Teks", camLayout: "subtitle", videoTextOverlay: true },
+    { id: "m4", label: "🎥 Kamera Full + Teks", camLayout: "full", videoTextOverlay: false },
+    { id: "m5", label: "🔵 Kamera Bulat + Teks", camLayout: "bubble", videoTextOverlay: false },
+    { id: "m6", label: "📄 File/PDF + Teks", camLayout: "full", videoTextOverlay: true },
+  ];
+  function loadModePresets_() {
+    try {
+      const raw = localStorage.getItem(MODE_PRESETS_KEY);
+      if (raw) { const list = JSON.parse(raw); if (Array.isArray(list) && list.length) return list; }
+    } catch (e) {}
+    return DEFAULT_MODE_PRESETS.slice();
+  }
+  function saveModePresets_(list) {
+    try { localStorage.setItem(MODE_PRESETS_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  function applyModePreset_(preset) {
+    saveAndSendTheme({ camLayout: preset.camLayout, videoTextOverlay: !!preset.videoTextOverlay });
+    // Sinkronkan ulang SEMUA kontrol terkait (tombol Tata Letak aktif,
+    // slider, centang overlay) supaya panel Studio tidak "ketinggalan"
+    // menampilkan gaya lama -- applyStoredTheme() membaca ulang
+    // localStorage yang baru saja ditulis saveAndSendTheme() di atas.
+    if (typeof applyStoredTheme === "function") applyStoredTheme();
+    renderModeShortcutRow(); // refresh status tombol "sedang aktif"
+  }
+  function renderModeShortcutRow() {
+    const row = el("psModeShortcutRow");
+    if (!row) return;
+    const list = loadModePresets_();
+    let theme = {};
+    try { theme = JSON.parse(localStorage.getItem(THEME_KEY) || "{}") || {}; } catch (e) {}
+    row.innerHTML = list.map((p, i) => {
+      const active = (theme.camLayout || "full") === p.camLayout && !!theme.videoTextOverlay === !!p.videoTextOverlay;
+      return `<button type="button" class="chip-btn small${active ? " active" : ""}" data-mode-preset-id="${escapeHtml(p.id)}" title="Shortcut keyboard: angka ${i + 1}">${escapeHtml(p.label)}${p.custom ? ` <span data-mode-del-id="${escapeHtml(p.id)}" title="Hapus mode ini" style="opacity:.7; cursor:pointer;">✕</span>` : ""}</button>`;
+    }).join("");
+    row.querySelectorAll("[data-mode-preset-id]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        if (e.target.closest("[data-mode-del-id]")) return; // klik ✕ ditangani terpisah di bawah, jangan ikut menerapkan preset
+        const id = btn.dataset.modePresetId;
+        const preset = loadModePresets_().find((p) => p.id === id);
+        if (preset) applyModePreset_(preset);
+      });
+    });
+    row.querySelectorAll("[data-mode-del-id]").forEach((x) => {
+      x.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = x.dataset.modeDelId;
+        saveModePresets_(loadModePresets_().filter((p) => p.id !== id));
+        renderModeShortcutRow();
+      });
+    });
+  }
+  function wireModeShortcuts() {
+    renderModeShortcutRow();
+    if (el("psModeAddBtn")) {
+      el("psModeAddBtn").addEventListener("click", () => {
+        if (el("psModeAddForm")) el("psModeAddForm").hidden = false;
+        if (el("psModeAddName")) el("psModeAddName").focus();
+      });
+    }
+    if (el("psModeAddCancelBtn")) {
+      el("psModeAddCancelBtn").addEventListener("click", () => {
+        if (el("psModeAddForm")) el("psModeAddForm").hidden = true;
+        if (el("psModeAddName")) el("psModeAddName").value = "";
+        if (el("psModeAddOverlay")) el("psModeAddOverlay").checked = false;
+      });
+    }
+    if (el("psModeAddSaveBtn")) {
+      el("psModeAddSaveBtn").addEventListener("click", () => {
+        const name = (el("psModeAddName") && el("psModeAddName").value.trim()) || "";
+        if (!name) { if (el("psModeAddName")) el("psModeAddName").focus(); return; }
+        const layout = (el("psModeAddLayout") && el("psModeAddLayout").value) || "full";
+        const overlay = !!(el("psModeAddOverlay") && el("psModeAddOverlay").checked);
+        const list = loadModePresets_();
+        list.push({ id: "custom-" + Date.now(), label: name, camLayout: layout, videoTextOverlay: overlay, custom: true });
+        saveModePresets_(list);
+        renderModeShortcutRow();
+        if (el("psModeAddForm")) el("psModeAddForm").hidden = true;
+        if (el("psModeAddName")) el("psModeAddName").value = "";
+        if (el("psModeAddOverlay")) el("psModeAddOverlay").checked = false;
+      });
+    }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (8 Sep 2026, permintaan operator "shortcut bel 1 2 3") -- 🔔 Bel
+  // Cepat: membunyikan salah satu CONFIG.BELL_SOUNDS (js/config.js)
+  // LANGSUNG lewat pesan {type:"bell", action:"ring", key}, ditangani
+  // ringBell() di present.html (fungsi yang SAMA dipakai bel otomatis
+  // Timer) -- terpisah total dari alur Timer, bisa dipakai kapan saja
+  // (mis. tanda mulai sesi, tanda giliran bicara, dst). Daftar tombolnya
+  // OTOMATIS mengikuti CONFIG.BELL_SOUNDS -- tambah bel baru di sana,
+  // tombolnya otomatis muncul di sini juga tanpa perlu ubah kode ini.
+  // ------------------------------------------------------------
+  function renderBellShortcutRow() {
+    const row = el("psBellShortcutRow");
+    if (!row) return;
+    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)" }];
+    row.innerHTML = list.map((b, i) => `<button type="button" class="chip-btn small" data-bell-key="${escapeHtml(b.key)}" title="Shortcut keyboard: Alt+${i + 1}">${escapeHtml(b.label)}</button>`).join("");
+    row.querySelectorAll("[data-bell-key]").forEach((btn) => {
+      btn.addEventListener("click", () => rawPost({ type: "bell", action: "ring", key: btn.dataset.bellKey }));
+    });
+  }
+  function wireBellShortcuts() {
+    renderBellShortcutRow();
+    if (el("psBellStopBtn")) el("psBellStopBtn").addEventListener("click", () => rawPost({ type: "bell", action: "stop" }));
+  }
+
+  // ------------------------------------------------------------
+  // BARU (8 Sep 2026, permintaan operator "pakai shortcut") -- pintasan
+  // KEYBOARD utk Mode Cepat (angka 1-9, sesuai URUTAN tombol "⚡ Mode
+  // Cepat") & Bel Cepat (Alt+1 s/d Alt+9, sesuai urutan tombol "🔔 Bel
+  // Cepat"). Pola guard SAMA seperti wirePlaylistKeyNav() di atas: HANYA
+  // aktif selagi Studio Presentasi terbuka, dan TIDAK aktif sedang
+  // fokus di kotak isian (select/input/textarea) supaya tidak
+  // mengganggu pengetikan biasa (mis. mengetik nomor kidung/menit Timer).
+  // ------------------------------------------------------------
+  function wireModeAndBellKeyboardShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      const studio = el("presentStudio");
+      if (!studio || studio.hidden) return;
+      const tag = (document.activeElement && document.activeElement.tagName) || "";
+      if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+      const n = Number(e.key);
+      if (!Number.isInteger(n) || n < 1 || n > 9) return;
+      if (e.altKey) {
+        // Alt+1..Alt+9 -> Bel Cepat ke-N
+        const bells = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS)) ? CONFIG.BELL_SOUNDS : [];
+        const bell = bells[n - 1];
+        if (bell) { e.preventDefault(); rawPost({ type: "bell", action: "ring", key: bell.key }); }
+      } else {
+        // 1..9 polos -> Mode Cepat ke-N
+        const preset = loadModePresets_()[n - 1];
+        if (preset) { e.preventDefault(); applyModePreset_(preset); }
+      }
+    });
+  }
+
   function wireLocalVideoTab() {
     const LV_DB_NAME = "bibleAppLocalVideoFolder_v1";
     const LV_STORE = "handles";
@@ -5597,19 +5758,69 @@ const PresentationStudio = (() => {
     // "Latar Penuh" (bawaan, kamera/gambar penuh layar + teks ditimpakan
     // di tengah) vs "📐 Kamera Atas, Teks Bawah" (kamera/gambar dipepet
     // ke ATAS, ayat/kidung/pengumuman punya zona SENDIRI di bawahnya,
-    // latar solid, tidak saling menimpa) -- lihat theme.camSplit
-    // (DEFAULT_STAGE_THEME) & body.cam-split (present.html). Disimpan
-    // lewat saveAndSendTheme() (SAMA tempat tema lain disimpan) supaya
-    // pulih otomatis & tersinkron dengan pengaturan tema lainnya.
+    // latar solid, tidak saling menimpa) vs "🎬 Latar Penuh + Subtitle"
+    // (BARU v2 -- kamera/gambar MEMENUHI LAYAR PENUH seperti nonton
+    // video, teks tampil sebagai bar SUBTITLE menempel di bawah) --
+    // lihat theme.camLayout (DEFAULT_STAGE_THEME) & body.cam-split/
+    // body.cam-subtitle (present.html). Disimpan lewat saveAndSendTheme()
+    // (SAMA tempat tema lain disimpan) supaya pulih otomatis & tersinkron
+    // dengan pengaturan tema lainnya.
     if (el("psCamLayoutRow")) {
       document.querySelectorAll("#psCamLayoutRow [data-cam-layout]").forEach((btn) => {
         btn.addEventListener("click", () => {
           document.querySelectorAll("#psCamLayoutRow [data-cam-layout]").forEach((b) => b.classList.remove("active"));
           btn.classList.add("active");
-          saveAndSendTheme({ camSplit: btn.dataset.camLayout === "split" });
+          saveAndSendTheme({ camLayout: btn.dataset.camLayout });
         });
       });
     }
+    // BARU (8 Sep 2026 v2, permintaan operator "slider biar bebas
+    // ukurannya") -- "Ukuran Zona Kamera" (10%-90%, bawaan 42%), khusus
+    // mode "📐 Kamera Atas, Teks Bawah" -- makin besar persentasenya,
+    // makin besar bagian layar yang dipakai Kamera/Gambar (sisanya
+    // otomatis jadi bagian ayat/kidung/pengumuman). Lihat --p-cam-
+    // split-pct (present.html).
+    if (el("psCamSplitPctSlider")) {
+      el("psCamSplitPctSlider").addEventListener("input", () => {
+        const v = Number(el("psCamSplitPctSlider").value) || 42;
+        if (el("psCamSplitPctValue")) el("psCamSplitPctValue").textContent = v + "%";
+        saveAndSendTheme({ camSplitPct: v });
+      });
+    }
+    // BARU (8 Sep 2026 v3, permintaan operator "kamera bulat kanan
+    // bawah") -- slider "Ukuran lingkaran Kamera" (120px-420px, bawaan
+    // 200px), khusus mode "🔵 Teks Penuh, Kamera Bulat".
+    if (el("psCamBubbleSizeSlider")) {
+      el("psCamBubbleSizeSlider").addEventListener("input", () => {
+        const v = Number(el("psCamBubbleSizeSlider").value) || 200;
+        if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").textContent = v + "px";
+        saveAndSendTheme({ camBubbleSize: v });
+      });
+    }
+    // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
+    // toggle "📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video".
+    if (el("psVideoTextOverlay")) {
+      el("psVideoTextOverlay").addEventListener("change", () => {
+        saveAndSendTheme({ videoTextOverlay: el("psVideoTextOverlay").checked });
+      });
+    }
+    // BARU (8 Sep 2026 v4, permintaan operator "latar belakang transparan
+    // atau ada backgroundnya") -- zona teks di mode "📐 Kamera Atas, Teks
+    // Bawah" SEBELUMNYA selalu solid warna tema (--p-bg), sekarang bisa
+    // dicentang supaya TRANSPARAN (kamera/gambar tetap tembus pandang di
+    // baliknya, mirip mode Subtitle tapi utk zona bawah yang solid ini).
+    // Lihat theme.stageTransparent & body.cam-split #stage (present.html).
+    if (el("psStageTransparent")) {
+      el("psStageTransparent").addEventListener("change", () => {
+        saveAndSendTheme({ stageTransparent: el("psStageTransparent").checked });
+      });
+    }
+    // BARU (8 Sep 2026, permintaan operator "tombol shortcut mode & bel")
+    // -- lihat definisi fungsi lengkap & catatan panjang di dekat
+    // MODE_PRESETS_KEY (bawah, sebelum wireLocalVideoTab()).
+    wireModeShortcuts();
+    wireBellShortcuts();
+    wireModeAndBellKeyboardShortcuts();
 
     // BARU -- 🖼️ Unggah Gambar Latar (dropzone sama pola dengan tab
     // File, tapi 1 gambar saja -- gambar BARU menggantikan yang lama).
@@ -5867,12 +6078,16 @@ const PresentationStudio = (() => {
   // (0.5x-10x) daripada `scale` karena kebutuhannya beda (angka besar
   // untuk dilihat dari jauh saat permainan/aktivitas, bukan untuk
   // kenyamanan baca ayat).
-  // BARU (8 Sep 2026, permintaan operator) -- `camSplit`: tata letak
-  // "Kamera/Gambar Latar di Atas, Ayat/Kidung/Pengumuman di Bawah"
-  // (lihat body.cam-split di <style> present.html) -- false = perilaku
-  // lama (latar penuh layar, teks ditimpakan di tengah), sama seperti
-  // sebelum toggle ini ada.
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camSplit: false };
+  // BARU (8 Sep 2026, permintaan operator) -- `camLayout`: tata letak
+  // Kamera/Gambar Latar terhadap ayat/kidung/pengumuman -- "full"
+  // (bawaan lama, latar penuh layar + teks ditimpakan di tengah),
+  // "split" (kamera/gambar di ATAS, teks di zona SENDIRI di bawah,
+  // lihat body.cam-split di <style> present.html), atau "subtitle"
+  // (BARU v2 -- kamera/gambar MEMENUHI LAYAR PENUH seperti nonton
+  // video, teks tampil sebagai BAR SUBTITLE menempel di bawah, lihat
+  // body.cam-subtitle). `camSplitPct`: tinggi zona kamera (%) untuk
+  // mode "split", bisa diatur bebas lewat slider (bawaan 42).
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -5961,15 +6176,33 @@ const PresentationStudio = (() => {
     // panel Studio dibuka ulang/dimuat ulang.
     if (el("psFontBold")) el("psFontBold").checked = !!theme.bold;
     // BARU (8 Sep 2026) -- pulihkan tombol aktif Tata Letak Kamera
-    // (Penuh/Split), lihat catatan panjang camSplit di DEFAULT_STAGE_THEME.
+    // (Penuh/Split/Subtitle/Bubble) & slider "Ukuran Zona Kamera", lihat
+    // catatan panjang camLayout/camSplitPct di DEFAULT_STAGE_THEME.
     if (el("psCamLayoutRow")) {
-      const savedSplit = !!theme.camSplit;
+      const savedLayout = theme.camLayout || "full";
       Array.from(el("psCamLayoutRow").querySelectorAll("[data-cam-layout]")).forEach((b) => {
-        b.classList.toggle("active", (b.dataset.camLayout === "split") === savedSplit);
+        b.classList.toggle("active", b.dataset.camLayout === savedLayout);
       });
     }
+    if (el("psCamSplitPctSlider")) {
+      const savedPct = theme.camSplitPct || 42;
+      el("psCamSplitPctSlider").value = String(savedPct);
+      if (el("psCamSplitPctValue")) el("psCamSplitPctValue").textContent = savedPct + "%";
+    }
+    // BARU (8 Sep 2026 v3) -- pulihkan slider "Ukuran lingkaran Kamera".
+    if (el("psCamBubbleSizeSlider")) {
+      const savedBubble = theme.camBubbleSize || 200;
+      el("psCamBubbleSizeSlider").value = String(savedBubble);
+      if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").textContent = savedBubble + "px";
+    }
+    // BARU (8 Sep 2026) -- pulihkan status centang "Ayat/Kidung/Pengumuman
+    // TETAP tampil di atas video".
+    if (el("psVideoTextOverlay")) el("psVideoTextOverlay").checked = !!theme.videoTextOverlay;
+    // BARU (8 Sep 2026 v4) -- pulihkan status centang "Latar teks
+    // transparan" (mode "Kamera Atas, Teks Bawah").
+    if (el("psStageTransparent")) el("psStageTransparent").checked = !!theme.stageTransparent;
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camSplit: theme.camSplit } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent } });
   }
 
   function saveAndSendTheme(partial) {
@@ -5990,7 +6223,7 @@ const PresentationStudio = (() => {
     // warna di Layar 2 (present.html diam-diam jatuh ke warna aksen tema
     // bawaan, lihat --p-timerclock-color, karena variabelnya memang tidak
     // pernah dikirim/diset).
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camSplit: theme.camSplit } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
