@@ -5617,7 +5617,6 @@ function openCollectionFullscreen(col, startIndex) {
     closeBtn.className = "collection-fs-close";
     closeBtn.textContent = "✕ Tutup";
     closeBtn.addEventListener("click", closeOverlay);
-    overlay.appendChild(closeBtn);
 
     const fontRow = document.createElement("div");
     fontRow.className = "collection-fs-font-row";
@@ -5683,19 +5682,31 @@ function openCollectionFullscreen(col, startIndex) {
     themeBtn.addEventListener("click", () => { themePanelOpen = !themePanelOpen; render(); });
     fontRow.appendChild(themeBtn);
 
-    // PERBAIKAN (8 Sep 2026, permintaan operator: "toolbar atas mode 1
-    // layar dibuat 1 garis dulu, baru tampil semua kalau ditekan") --
-    // fontRow (A-/A+/Lebar HP-Komputer/jenis huruf/Layar Penuh/Tema)
-    // dibungkus toolbar bisa-dilipat yang SAMA persis polanya dengan
-    // Kidung/Pembaca Alkitab (buildCollapsibleToolbar(), lihat definisi
-    // & catatan panjangnya di atas) -- ISI MENUNYA SAMA SEKALI TIDAK
-    // DIUBAH/DIHAPUS (permintaan eksplisit operator), cuma dibungkus.
-    // Mulai TERLIPAT (cuma garis tipis + panah) supaya area baca Layar
-    // Penuh langsung lega begitu dibuka, operator tinggal tekan garis
-    // itu kalau perlu ubah ukuran huruf dkk.
-    overlay.appendChild(buildCollapsibleToolbar([fontRow], {
+    // PERBAIKAN (8 Sep 2026, permintaan operator: "garis toolbar melayang
+    // di tengah & menutupi tulisan") -- AKAR MASALAH: `.collection-fs-overlay`
+    // adalah flex-column dengan `align-items: center`, jadi toolbar
+    // bisa-dilipat ini (kalau ditaruh sebagai elemen SENDIRIAN di situ)
+    // ikut menyusut selebar ISINYA saja lalu ditengahkan -- bukan garis
+    // penuh selebar layar seperti di Kidung/Pembaca Alkitab, makanya
+    // kelihatan seperti kotak kecil melayang di tengah menutupi ayat.
+    // SOLUSI: closeBtn ("✕ Tutup") & toolbar ini SEKARANG digabung jadi
+    // SATU baris (.collection-fs-top-row, lihat CSS -- diberi
+    // `align-self: stretch` supaya baris ini SENDIRI yang selebar penuh,
+    // menembus align-items:center milik induknya), ditaruh PALING ATAS
+    // overlay (sebelum apa pun lain) -- jadi garis toolbar ini persis
+    // SEJAJAR (sama posisi Y) dengan tombol "✕ Tutup" di kanan, SAMA
+    // baik di HP maupun komputer (posisi "sticky di bawah" milik
+    // `.collapsible-toolbar` versi HP sengaja DIMATIKAN khusus di sini
+    // lewat `.collection-fs-top-row .collapsible-toolbar`, lihat CSS --
+    // supaya tidak malah nempel ke BAWAH lagi di HP, beda dari tampilan
+    // komputer).
+    const topRow = document.createElement("div");
+    topRow.className = "collection-fs-top-row";
+    topRow.appendChild(buildCollapsibleToolbar([fontRow], {
       title: "Sembunyikan/tampilkan pengaturan tampilan (ukuran huruf, lebar, jenis huruf, layar penuh, tema)",
     }));
+    topRow.appendChild(closeBtn);
+    overlay.appendChild(topRow);
 
     // Panel swatch tema -- HANYA dibangun kalau themePanelOpen true (tombol
     // "🎨 Tema" di atas ditekan). Memakai ulang array THEMES & fungsi
