@@ -950,7 +950,21 @@ async function syncFromServer(isFirstTime) {
         setLoadingProgress(pct);
       },
       onBatch: async (rawBatch) => {
-        const normalized = rawBatch.map(normalizeVerseRecord).filter((v) => v.verseId);
+        let normalized = rawBatch.map(normalizeVerseRecord).filter((v) => v.verseId);
+        // BARU (7 Sep 2026, permintaan operator) -- lewati bahasa yang
+        // TIDAK dipilih di Pengaturan (⋮ -> Pengaturan -> Bahasa yang
+        // Diunduh), lihat DEFAULT_SETTINGS.bibleLangFilter di js/
+        // settings.js. Array kosong = semua bahasa (perilaku lama).
+        // Filter di sini (SETELAH diunduh, SEBELUM disimpan) karena
+        // sumbernya 1 CSV gabungan semua bahasa -- kuota unduh tetap
+        // sama, tapi ruang IndexedDB & memori di perangkat ini hanya
+        // dipakai untuk bahasa yang benar-benar dipakai operator.
+        const filterUsername = typeof currentUser !== "undefined" ? currentUser : null;
+        const langFilter = typeof getSetting === "function" ? (getSetting(filterUsername, "bibleLangFilter") || []) : [];
+        if (langFilter.length) {
+          const allowed = new Set(langFilter);
+          normalized = normalized.filter((v) => allowed.has(v.lang));
+        }
         allRecords.push(...normalized);
         await LocalDB.bulkPut(normalized);
         savedCount += normalized.length;
@@ -1040,6 +1054,58 @@ function updateResyncBtnLabel() {
   btn.textContent = bibleData.length
     ? "🔄 Sinkronkan ulang Alkitab"
     : "📥 Unduh Data Alkitab";
+}
+
+// ------------------------------------------------------------
+// BARU (7 Sep 2026, permintaan operator: "download alkitab tertentu
+// yang tidak aktif") -- render & wiring daftar centang bahasa unduhan
+// (#bibleLangFilterList di index.html). Dipanggil sekali saat init
+// (lihat pemanggilnya di dekat footnoteAccentToggle). Nilai tersimpan
+// di setting "bibleLangFilter" (js/settings.js, array kosong = semua
+// bahasa dicentang/disimpan -- perilaku lama). Lihat filternya sendiri
+// di syncFromServer() (fungsi di atas).
+// ------------------------------------------------------------
+function wireBibleLangFilterUi() {
+  const wrap = el("bibleLangFilterList");
+  if (!wrap || typeof CONFIG === "undefined" || !CONFIG.LANGUAGES) return;
+  const current = (typeof getSetting === "function" ? getSetting(currentUser, "bibleLangFilter") : []) || [];
+  // Array kosong = "semua" -- tampilkan SEMUA kotak sudah tercentang
+  // (bukan berarti daftar disimpan sebagai "semua kode satu-satu",
+  // tetap kosong di penyimpanan sampai operator benar-benar
+  // MENGOSONGKAN salah satu centang, lihat commitFilter_() di bawah).
+  const allChecked = current.length === 0;
+  wrap.innerHTML = "";
+  CONFIG.LANGUAGES.forEach((lang) => {
+    const row = document.createElement("label");
+    row.className = "more-menu-checkbox-row";
+    const checked = allChecked || current.includes(lang.code);
+    row.innerHTML = `<input type="checkbox" data-lang-code="${lang.code}" ${checked ? "checked" : ""} /> <span>${lang.label} (${lang.code})</span>`;
+    wrap.appendChild(row);
+  });
+  function commitFilter_() {
+    const boxes = Array.from(wrap.querySelectorAll("input[type=checkbox]"));
+    const checkedCodes = boxes.filter((b) => b.checked).map((b) => b.dataset.langCode);
+    // Kalau operator mencentang SEMUA kembali, simpan sebagai array
+    // kosong lagi (bukan daftar semua kode 1-per-1) -- supaya bahasa
+    // BARU yang ditambahkan admin ke CONFIG.LANGUAGES nanti otomatis
+    // ikut tercentang juga tanpa perlu diatur ulang manual.
+    const toSave = checkedCodes.length === CONFIG.LANGUAGES.length ? [] : checkedCodes;
+    if (typeof setSetting === "function") setSetting(currentUser, "bibleLangFilter", toSave);
+  }
+  wrap.querySelectorAll("input[type=checkbox]").forEach((box) => {
+    box.addEventListener("change", () => {
+      const anyChecked = Array.from(wrap.querySelectorAll("input[type=checkbox]")).some((b) => b.checked);
+      if (!anyChecked) {
+        // Tidak boleh 0 bahasa tercentang sama sekali (berarti tidak
+        // ada yang tersimpan sama sekali, app jadi kosong) -- kembalikan
+        // centang ini, beri tahu operator.
+        box.checked = true;
+        alert("Minimal 1 bahasa harus dicentang.");
+        return;
+      }
+      commitFilter_();
+    });
+  });
 }
 
 async function updateStatusPanel() {
@@ -2320,6 +2386,31 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
     copyTextWithFeedback(refText, copyBtn);
   });
 
+  // BARU (7 Sep 2026, permintaan operator) -- "📚" Kumpulan Ayat SEKARANG
+  // langsung jadi tombol di baris utama ayat (sejajar dengan tombol
+  // "📋" salin), TIDAK perlu lagi buka panel catatan dulu (tekan-dua-kali
+  // nomor ayat) baru ketemu tombolnya -- berlaku SAMA di semua kolom
+  // bahasa (Indonesia/Inggris/Mandarin dst), termasuk kolom "panes"
+  // (lihat renderColumnsIndependentPanes()) supaya sistem "nomor, isi
+  // ayat, tombol copy, tombol kumpulan ayat" konsisten di mana pun ayat
+  // ini dirender. Tombol lama "📚 Kumpulan" di dalam panel catatan
+  // (lihat baris berisi addCollBtn di atas) TETAP ada, tidak dihapus --
+  // supaya alur lama yang sudah biasa dipakai tidak tiba-tiba hilang.
+  const collBtn = document.createElement("button");
+  collBtn.type = "button";
+  collBtn.className = "verse-coll-btn";
+  collBtn.title = "Simpan ayat ini ke Kumpulan Ayat";
+  collBtn.setAttribute("aria-label", "Simpan ayat ini ke Kumpulan Ayat");
+  collBtn.textContent = "📚";
+  collBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (typeof Guest !== "undefined" && Guest.isGuest()) {
+      Guest.showFeatureLocked("Kumpulan Ayat");
+      return;
+    }
+    handleAddToCollection(v);
+  });
+
   // Tombol "kirim ke Layar 2" -- ada di DOM untuk setiap ayat, tapi hanya
   // TERLIHAT saat Mode Presentasi 2 Layar aktif (lihat body.present-mode-on
   // di css/style.css & js/presentation.js). Tidak tampil untuk Mode Tamu
@@ -2339,6 +2430,7 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   block.appendChild(num);
   block.appendChild(textWrap);
   block.appendChild(copyBtn);
+  block.appendChild(collBtn);
   block.appendChild(presentBtn);
   const notePanel = buildInlineNoteCardEl(v, block, sourceVerses);
   block.appendChild(notePanel);
@@ -2586,6 +2678,29 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
     syncLabel.appendChild(syncText);
     syncLabel.appendChild(syncSwitchWrap);
     head.appendChild(syncLabel);
+
+    // BARU (7 Sep 2026, permintaan operator) -- tombol "⤢" untuk membuka
+    // kolom INI SAJA jadi layar penuh. Ini jawaban untuk kolom yang jadi
+    // sempit/berdesakan kalau 3 bahasa berdampingan di HP (mis. Mandarin,
+    // yang tanpa spasi antar-kata jadi kelihatan terpotong-potong kalau
+    // lebarnya cuma sepertiga layar) -- sekali tekan, kolom itu melebar
+    // penuh 1 layar dan tulisannya mengalir normal sebagai paragraf
+    // biasa (lihat toggleColumnPaneFullscreen() + CSS .pane-fullscreen
+    // di css/style.css). Tekan lagi (ikon berubah jadi "✕") untuk
+    // kembali ke tampilan kolom-berdampingan semula. Tidak memuat apa
+    // pun dari jaringan -- cuma tambah/cabut 1 class CSS -- jadi tetap
+    // jalan sepenuhnya offline.
+    const expandBtn = document.createElement("button");
+    expandBtn.type = "button";
+    expandBtn.className = "reader-col-pane-expand-btn";
+    expandBtn.title = "Buka kolom ini layar penuh";
+    expandBtn.setAttribute("aria-label", "Buka kolom ini layar penuh");
+    expandBtn.textContent = "⤢";
+    expandBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleColumnPaneFullscreen(pane);
+    });
+    head.appendChild(expandBtn);
     pane.appendChild(head);
 
     const body = document.createElement("div");
@@ -2605,12 +2720,61 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
   wireColumnPaneSync(wrap);
 }
 
+// BARU (7 Sep 2026) -- buka/tutup 1 kolom (.reader-col-pane) jadi
+// overlay layar-penuh. Lihat tombol "⤢" di renderColumnsIndependentPanes()
+// di atas untuk pemakaiannya.
+function toggleColumnPaneFullscreen(pane) {
+  if (pane.classList.contains("pane-fullscreen")) {
+    closeColumnPaneFullscreen(pane);
+    return;
+  }
+  // Jaga-jaga: tutup dulu kolom lain kalau ada yang kebetulan masih
+  // fullscreen (harusnya cuma 1 aktif setiap saat).
+  document.querySelectorAll(".reader-col-pane.pane-fullscreen").forEach((p) => {
+    if (p !== pane) closeColumnPaneFullscreen(p);
+  });
+  pane.classList.add("pane-fullscreen");
+  document.body.classList.add("pane-fullscreen-open"); // kunci scroll halaman di belakangnya
+  const btn = pane.querySelector(".reader-col-pane-expand-btn");
+  if (btn) {
+    btn.textContent = "✕";
+    btn.title = "Tutup layar penuh";
+    btn.setAttribute("aria-label", "Tutup layar penuh");
+  }
+}
+function closeColumnPaneFullscreen(pane) {
+  pane.classList.remove("pane-fullscreen");
+  if (!document.querySelector(".reader-col-pane.pane-fullscreen")) {
+    document.body.classList.remove("pane-fullscreen-open");
+  }
+  const btn = pane.querySelector(".reader-col-pane-expand-btn");
+  if (btn) {
+    btn.textContent = "⤢";
+    btn.title = "Buka kolom ini layar penuh";
+    btn.setAttribute("aria-label", "Buka kolom ini layar penuh");
+  }
+}
+// Tombol Escape (keyboard, komputer) juga menutup kolom yang sedang
+// layar-penuh -- dipasang SEKALI saja (bukan tiap render) lewat penjaga
+// _paneFullscreenEscWired supaya listener tidak menumpuk tiap pindah pasal.
+let _paneFullscreenEscWired = false;
+function wireColumnPaneFullscreenEsc() {
+  if (_paneFullscreenEscWired) return;
+  _paneFullscreenEscWired = true;
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const openPane = document.querySelector(".reader-col-pane.pane-fullscreen");
+    if (openPane) closeColumnPaneFullscreen(openPane);
+  });
+}
+
 // Menyambungkan event scroll antar-panel (lihat catatan panjang di
 // renderColumnsIndependentPanes() di atas untuk cara kerjanya). Dipasang
 // ULANG setiap render (tiap pindah pasal/ayat, kolom lama dibuang total
 // lewat wrap.innerHTML="" di atas, jadi tidak ada listener lama yang
 // nyangkut/menumpuk).
 function wireColumnPaneSync(wrap) {
+  wireColumnPaneFullscreenEsc();
   const panes = Array.from(wrap.querySelectorAll(".reader-col-pane"));
   const bodies = panes.map((p) => p.querySelector(".reader-col-pane-body"));
   const syncInputs = panes.map((p) => p.querySelector('input[type="checkbox"]'));
@@ -7703,6 +7867,7 @@ function initUIEvents() {
       applyFootnoteAccentSetting(e.target.checked);
     });
   }
+  if (typeof wireBibleLangFilterUi === "function") wireBibleLangFilterUi();
   initChangePasswordUI();
   el("logoutBtn").addEventListener("click", () => {
     const guestNow = typeof Guest !== "undefined" && Guest.isGuest();
