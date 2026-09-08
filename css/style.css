@@ -2555,9 +2555,21 @@ body.pane-fullscreen-open { overflow: hidden; }
    LAYAR PENUH (Fullscreen API) — sembunyikan elemen yang tidak
    perlu supaya fokus ke bacaan
    ============================================================ */
-:fullscreen .app-header .brand,
-:fullscreen .sidebar,
-:fullscreen .sidebar-backdrop { display: none; }
+/* PERBAIKAN (8 Sep 2026, permintaan operator: "menu kiri atas tidak
+   bisa dibuka saat fullscreen") -- BENAR, ini memang sengaja dibatasi
+   sebelumnya: `.sidebar`/`.sidebar-backdrop` (daftar kitab/pasal yang
+   dibuka lewat tombol "☰" kiri atas) dipaksa `display:none` SELAMA
+   Fullscreen API aktif. Tombol "☰"-nya sendiri TIDAK disembunyikan &
+   tetap bisa ditekan (makanya kelihatan seperti tombolnya "hidup" tapi
+   tidak terjadi apa-apa) -- klik tetap membuka status "sidebar
+   terbuka" di JS, cuma CSS ini yang selalu memaksanya tetap
+   tersembunyi. Ternyata ini KELIRU: sidebar itu bukan sekadar hiasan,
+   tapi satu-satunya jalan pindah kitab/pasal -- membatasinya berarti
+   operator TERPAKSA keluar dulu dari mode layar penuh cuma untuk
+   pindah pasal. Sekarang HANYA logo (`.brand`, murni dekoratif) yang
+   tetap disembunyikan saat layar penuh -- sidebar & tombol "☰" berlaku
+   NORMAL, bisa dibuka-tutup seperti biasa walau sedang layar penuh. */
+:fullscreen .app-header .brand { display: none; }
 :fullscreen .content-wrap { padding-top: 8px; }
 
 /* ============================================================
