@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260907c" />
+<link rel="stylesheet" href="css/style.css?v=20260908b" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -161,7 +161,19 @@
     <header class="app-header">
       <button id="sidebarToggle" class="icon-btn" aria-label="Buka daftar kitab">☰</button>
       <div class="brand">
-        <span class="brand-mark">☩</span>
+        <!-- BARU (8 Sep 2026, permintaan operator) -- ganti tanda "☩" teks
+             polos dengan logo asli "IN CHRIST · Living Stream Ministry"
+             (file assets/logo-inchrist.png, latar sudah ditransparankan
+             supaya pas di tema terang MAUPUN gelap/sephia, lihat pilihan
+             tema di js/settings.js). Ukuran diatur lewat CSS .brand-mark
+             img (lihat css/style.css) -- kalau logo gagal dimuat (mis.
+             file kehapus/offline pertama kali sebelum sempat ke-cache
+             service worker), fallback ke tanda "☩" lama lewat atribut
+             onerror supaya header tidak pernah kosong total. -->
+        <span class="brand-mark">
+          <img src="assets/logo-inchrist.png" alt="Living Stream Ministry" width="28" height="28"
+               onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'☩'}))" />
+        </span>
         <span class="brand-name" id="appTitle">Alkitab</span>
         <!-- BARU (7 Sep 2026, permintaan operator) -- indikator kecil
              "tidak ada internet", lihat CSS .net-offline-badge & skrip
@@ -1512,6 +1524,12 @@
               <option value="3+koor">3 bait / layar + koor</option>
               <!-- BARU (4 Sep 2026, permintaan operator) -->
               <option value="4+koor">4 bait / layar + koor</option>
+              <!-- BARU (7 Sep 2026, permintaan operator) -- "model 2" untuk
+                   kidung 2/3/4+ bait: bait 1 dulu (+koor), koor tampil,
+                   BARU sisa baitnya (2, 3, 4, dst -- otomatis menyesuaikan)
+                   digabung 1 slide. Lihat catatan panjang mode
+                   "1firstKoor" di splitKidungIntoSlides() (js/kidung.js). -->
+              <option value="1firstKoor">1 bait dulu + koor, baru sisa bait</option>
               <option value="koor">Koor saja</option>
             </select>
             <div id="psKidungSlideList" class="ps-verse-list"></div>
@@ -2185,17 +2203,17 @@
   <script src="js/plans.js?v=20260818b"></script>
   <script src="js/media.js?v=20260821b"></script>
   <script src="js/outlines.js?v=20260820b"></script>
-  <script src="js/kidung.js?v=20260822a"></script>
-  <script src="js/kidung-ui.js?v=20260827a"></script>
+  <script src="js/kidung.js?v=20260908b"></script>
+  <script src="js/kidung-ui.js?v=20260908a"></script>
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
   <script src="js/presentation.js?v=20260907b"></script>
-  <script src="js/presentation-studio.js?v=20260907e"></script>
+  <script src="js/presentation-studio.js?v=20260907f"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260907b"></script>
+  <script src="js/app.js?v=20260907c"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
