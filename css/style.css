@@ -2079,6 +2079,40 @@ body.pane-fullscreen-open { overflow: hidden; }
 .reader-col-pane-body .verse-block,
 .reader-col-pane-body .verse-text-wrap { min-width: 0; }
 .reader-col-pane-body .verse-block { padding: 6px 4px; }
+/* PERBAIKAN (8 Sep 2026, permintaan operator: "mode paragraf saja") --
+   AKAR MASALAH kenapa teks (Mandarin PALING kentara, tapi sebenarnya
+   semua bahasa) patah tiap 1 kata/aksara di kolom sempit: `.verse-block`
+   biasa pakai flex-row (nomor + teks + tombol 📋/📚 semuanya flex-item
+   SEJAJAR). Di kolom sesempit ini, nomor+tombol yang lebar TETAPnya
+   sudah memakan hampir semua lebar baris, jadi `.verse-text-wrap`
+   (flex:1, boleh menyusut sampai 0 lewat min-width:0 di atas) kebagian
+   sisa cuma ~24px -- SAMA SAJA lebar 1 huruf, makanya kelihatan
+   "1 aksara per baris" padahal kotaknya sendiri jauh lebih lebar dari
+   itu (dibuktikan lewat pengujian screenshot). SOLUSI: KHUSUS di dalam
+   kolom panel ini (tidak mengubah tampilan Alkitab 1/2-kolom biasa),
+   `.verse-block` diubah dari flex-row jadi block biasa + nomor ayat
+   "mengambang" (float) di kiri seperti nomor ayat pada Alkitab cetak --
+   `.verse-text-wrap` mengalir sebagai teks BIASA (inline) mengelilingi
+   nomor itu, dan tombol 📋/📚 ikut jadi bagian ALIRAN teks (inline-flex)
+   sehingga nongol tepat di akhir kalimat, bukan kolom terpisah yang
+   menyita tempat. Hasilnya teks memakai HAMPIR SELURUH lebar kolom,
+   jadi Mandarin bisa dapat beberapa aksara per baris (bukan cuma 1) &
+   bahasa lain juga tidak lagi patah tiap 1 kata. */
+.reader-col-pane-body .verse-block {
+  display: block; overflow: hidden; /* overflow:hidden di sini HANYA utk clearfix float nomor ayat, BUKAN memotong teks */
+}
+.reader-col-pane-body .verse-num {
+  float: left; margin: 2px 8px 4px 0;
+}
+.reader-col-pane-body .verse-text-wrap {
+  display: inline; flex: none;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.reader-col-pane-body .verse-copy-btn,
+.reader-col-pane-body .verse-coll-btn {
+  display: inline-flex; vertical-align: middle;
+  margin: 0 0 0 4px;
+}
 .reader-col-pane-body .reader-grid-cell-empty {
   color: var(--ink-soft); font-size: 12px; font-style: italic; padding: 10px 0;
 }
