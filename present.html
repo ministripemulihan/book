@@ -73,8 +73,37 @@
     position: fixed; inset: 0; z-index: 0;
     width: 100vw; height: 100vh; object-fit: cover;
     background: #000;
-    transition: opacity .35s ease;
+    transition: opacity .35s ease, height .3s ease, top .3s ease;
   }
+  /* BARU (8 Sep 2026, permintaan operator) -- Tata Letak "Kamera di
+     Atas, Teks di Bawah": SEBELUMNYA Kamera/Gambar Latar SELALU
+     memenuhi layar penuh (#camBg/#imgBg inset:0) dengan ayat/kidung/
+     pengumuman DITIMPAKAN di tengah-tengahnya (dibaca lewat warna+
+     stroke kontras di panel "🎨 Warna, Stroke & Ukuran Huruf"). Mode
+     baru ini (toggle "📐 Kamera Atas, Teks Bawah" di tab 🎥 Kamera,
+     Studio) TIDAK menimpa -- kamera/gambar dipepetkan ke ATAS layar
+     saja (tinggi diatur --p-cam-split-pct, bawaan 42%), sisanya di
+     BAWAH jadi milik #stage sepenuhnya (latar solid warna tema
+     --p-bg, BUKAN transparan) supaya ayat/kidung/pengumuman selalu
+     terbaca jelas TANPA perlu bergantung pada stroke/kontur. Dipicu
+     lewat class "cam-split" di <body>, dikirim sebagai bagian dari
+     objek tema biasa (lihat theme.camSplit, applyTheme() di bawah &
+     saveAndSendTheme()/js/presentation-studio.js) supaya tersimpan &
+     pulih otomatis sama seperti pengaturan tema lainnya. */
+  body.cam-split #camBg, body.cam-split #imgBg {
+    height: var(--p-cam-split-pct, 42%);
+    top: 0; bottom: auto;
+  }
+  body.cam-split #stage {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    top: var(--p-cam-split-pct, 42%);
+    height: auto;
+    background: var(--p-bg);
+    justify-content: center;
+  }
+  /* Vignette (body::before) & dim (.cam-active::after) di atas tetap
+     menutupi seluruh layar di mode split -- tidak masalah, opacitynya
+     sangat tipis dan tetap enak dilihat di kedua zona. */
   /* BARU (28 Agu 2026) -- 🖼️ Latar Gambar: gambar latar yang diunggah
      operator (tab "🎥 Kamera" -> "Sumber Latar" -> "Gambar"), lapisan
      PERSIS SAMA seperti #camBg (di bawah #stage, di atas --p-bg polos)
@@ -1706,6 +1735,9 @@
     if ((theme.scale || theme.timerScale) && typeof timerClockState !== "undefined" && timerClockState) {
       fitTimerClockNumber_();
     }
+    // BARU (8 Sep 2026) -- lihat catatan panjang "Kamera di Atas, Teks
+    // di Bawah" di <style> (body.cam-split) di atas.
+    if (typeof theme.camSplit === "boolean") document.body.classList.toggle("cam-split", theme.camSplit);
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -1767,6 +1799,14 @@
       barEl.style.borderTop = "";
       barEl.style.borderBottom = "";
     }
+    // BARU (8 Sep 2026, permintaan operator) -- LATAR/BACKGROUND bar
+    // pesan bisa diwarnai PENUH SOLID (mis. Merah penuh untuk pesan
+    // darurat/penting), beda dari `borderColor` di atas yang cuma garis
+    // tepi tipis. Kosong ("") berarti balik ke latar gelap solid bawaan
+    // (rgba(6,6,10,0.92), lihat .ticker-bar di <style>) -- lihat
+    // psMsgBgColorRow (index.html) & wireMessage() (js/presentation-
+    // studio.js) untuk kontrolnya.
+    barEl.style.background = data.bg || "";
     // BARU (7 Sep 2026, permintaan operator) -- jenis huruf (font) &
     // stroke/kontur tebal di sekeliling huruf (mis. isi Merah + kontur
     // Putih tebal supaya tetap kelihatan jelas di latar apa pun).
