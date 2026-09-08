@@ -823,6 +823,28 @@ function renderKidungReader(meta, baits) {
 function attachKidungSwipeNav(panelEl, meta) {
   const noInt = parseInt(meta.noKidung, 10);
   if (!panelEl || isNaN(noInt)) return;
+
+  // FIX (8 Sep 2026) -- BUG "swipe jalan terus tidak berhenti": panel
+  // (`el("kidungPanel")`) dipakai ULANG di setiap openKidungReader/
+  // renderKidungReader (cuma `panel.innerHTML = ""` yang dikosongkan,
+  // elemen panel-nya sendiri TIDAK pernah diganti/dibuang). Dulu fungsi
+  // ini dipanggil setiap render dan SELALU nempelin touchstart/touchend
+  // BARU ke panel yang sama -- listener lama TIDAK pernah dilepas
+  // (innerHTML="" tidak menghapus listener yang nempel di panel itu
+  // sendiri, cuma di anak-anaknya). Akibatnya tiap kali pindah kidung,
+  // jumlah listener nambah terus (1, 2, 3, ...) -- jadi 1x gerakan jari
+  // swipe bisa memicu navigasi BERKALI-KALI sekaligus (lompat beberapa
+  // nomor), dan tiap navigasi itu me-render ulang lalu nambah listener
+  // LAGI -- makin lama makin banyak & keliatan "jalan terus tidak
+  // berhenti". FIX: pasang listener touch cuma SEKALI per elemen panel
+  // (pakai flag `_kidungSwipeAttached`), tapi `meta`/`noInt` yang
+  // dipakai saat swipe diambil dari `panelEl._kidungSwipeMeta` yang
+  // di-update SETIAP render -- jadi listener tunggal ini selalu tahu
+  // kidung mana yang sedang dibuka sekarang.
+  panelEl._kidungSwipeMeta = meta;
+  if (panelEl._kidungSwipeAttached) return;
+  panelEl._kidungSwipeAttached = true;
+
   const THRESHOLD = 60;
   const MAX_OFF_AXIS = 70;
   const MAX_MS = 800;
@@ -847,8 +869,14 @@ function attachKidungSwipeNav(panelEl, meta) {
     if (Math.abs(dy) > MAX_OFF_AXIS) return; // gerak vertikal -> scroll biasa
     if (Math.abs(dx) < THRESHOLD) return;
     if (dt > MAX_MS) return;
+    // Ambil meta TERKINI (bisa sudah berubah kalau kidung sudah
+    // berpindah sejak listener ini pertama kali dipasang) -- lihat
+    // catatan FIX di atas.
+    const curMeta = panelEl._kidungSwipeMeta || meta;
+    const curNoInt = parseInt(curMeta.noKidung, 10);
+    if (isNaN(curNoInt)) return;
     const direction = dx > 0 ? 1 : -1; // ARAH: dx>0 (ke kanan) = selanjutnya
-    findAdjacentKidungCrossBook(meta.buku, noInt, direction).then((target) => {
+    findAdjacentKidungCrossBook(curMeta.buku, curNoInt, direction).then((target) => {
       if (target) openKidungReader(target.buku, String(target.no));
     });
   }, { passive: true });
