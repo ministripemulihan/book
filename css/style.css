@@ -370,6 +370,26 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .kidung-toolbar-body, .collapsible-toolbar-body { display: flex; flex-direction: column; gap: 10px; }
 .kidung-toolbar.collapsed .kidung-toolbar-body,
 .collapsible-toolbar.collapsed .collapsible-toolbar-body { display: none; }
+/* PERBAIKAN (8 Sep 2026, permintaan operator: "masih ada 2 garis di
+   bagian bawah" pada layar Pembaca 3-kolom) -- TERLIPAT (.collapsed),
+   toolbar ini SEBELUMNYA masih menampakkan DUA garis tipis sekaligus:
+   (1) `border-top` milik kotak wrapper di atas ini + `padding-top: 12px`
+   di bawahnya, DITAMBAH (2) garis dekoratif punya
+   `.collapsible-toolbar-toggle::before` sendiri (lihat di bawah) --
+   isi (.kidung-toolbar-body/.collapsible-toolbar-body) sudah
+   disembunyikan total (display:none tepat di atas), jadi garis (1) itu
+   TIDAK ada gunanya lagi selain memakan tempat & bikin kelihatan
+   "dobel" -- terutama kerasa di HP mode kolom sempit (position:sticky,
+   lihat @media di bawah) yang jadi tidak "sampai bawah sekali" karena
+   kotaknya lebih tinggi dari perlunya. Garis (2) --tetap dipertahankan
+   -- itulah SATU-SATUNYA garis yang perlu, sebagai pegangan visual utk
+   tombol buka/tutup. Waktu toolbar TIDAK terlipat (garis body kelihatan
+   penuh), border-top + padding-top TETAP dipakai seperti biasa (perlu
+   sebagai pemisah dari isi pasal di atasnya) -- override ini KHUSUS
+   status .collapsed saja. */
+.kidung-toolbar.collapsed, .collapsible-toolbar.collapsed {
+  border-top: none; padding-top: 0; margin-top: 6px;
+}
 
 /* ---- ◀ [kelompok tengah, boleh melipat] ▶ ----
    .kidung-toolbar-grid = baris LUAR, TIDAK melipat (nowrap) -- isinya
@@ -1966,6 +1986,38 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
 .reader-columns-grid .reader-grid-cell { min-width: 0; }
 .reader-columns-grid .reader-grid-cell .verse-block { height: 100%; }
 .reader-columns-grid .reader-grid-cell-empty { color: var(--ink-soft); font-size: 12px; font-style: italic; padding: 10px 0; }
+/* PERBAIKAN (8 Sep 2026, permintaan operator: screenshot "Matius 1" mode
+   grid LAMA, Mandarin 1 aksara per baris) -- AKAR MASALAH SAMA PERSIS
+   dengan yang sudah diperbaiki di `.reader-col-pane-body` (lihat catatan
+   panjang "mode paragraf saja" di bawah, sekitar baris 2082): `.verse-block`
+   biasa pakai flex-row (nomor + teks + tombol 📋/📚 semuanya flex-item
+   SEJAJAR). Perbaikan itu SEBELUMNYA hanya menyasar `.reader-col-pane-body`
+   (mode "side-panes"/Sync BARU) -- TIDAK PERNAH menyentuh
+   `.reader-columns-grid` (mode "side" LAMA, yang dipakai di screenshot
+   ini: 3 kolom sejajar TANPA kepala "Sync"). Solusinya SAMA: KHUSUS di
+   dalam sel grid ini, `.verse-block` diubah dari flex-row jadi block
+   biasa + nomor ayat mengambang (float) di kiri, `.verse-text-wrap`
+   mengalir sebagai teks BIASA (inline) mengelilingi nomor itu, tombol
+   📋/📚 ikut jadi bagian ALIRAN teks (inline-flex) -- hasilnya Mandarin
+   dapat beberapa aksara per baris (bukan cuma 1), sama seperti mode
+   "Sync". `height:100%` di atas (dipakai supaya baris grid antar-kolom
+   tetap sejajar tingginya) TIDAK diubah -- masih jalan normal dengan
+   `display:block` (block-level element tetap boleh diberi height). */
+.reader-columns-grid .reader-grid-cell .verse-block {
+  display: block; overflow: hidden; /* overflow:hidden di sini HANYA utk clearfix float nomor ayat, BUKAN memotong teks */
+}
+.reader-columns-grid .reader-grid-cell .verse-num {
+  float: left; margin: 2px 8px 4px 0;
+}
+.reader-columns-grid .reader-grid-cell .verse-text-wrap {
+  display: inline; flex: none;
+  overflow-wrap: break-word; word-break: break-word;
+}
+.reader-columns-grid .reader-grid-cell .verse-copy-btn,
+.reader-columns-grid .reader-grid-cell .verse-coll-btn {
+  display: inline-flex; vertical-align: middle;
+  margin: 0 0 0 4px;
+}
 @media (max-width: 859px) {
   /* Perbaikan lama (masih berlaku, TIDAK diubah oleh penambahan mode
      "side-panes" BARU): supaya versi grid LAMA ini pun tetap muat 2/3
@@ -1996,6 +2048,20 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   .reader-columns-grid .inline-note-actions .chip-btn.small,
   .reader-columns-panes .inline-note-actions .chip-btn.small {
     padding: 4px 6px; font-size: 10.5px;
+  }
+  /* PERBAIKAN (8 Sep 2026, permintaan operator: "mandarin jadi 3 aksara",
+     screenshot mode grid LAMA) -- SAMA PERSIS dengan perbaikan
+     `--verse-font-size` yang sudah dipakai di
+     `.reader-columns.reader-columns-panes[data-cols="3"]` (lihat di
+     bawah): mode grid LAMA (data-cols="3") ini kolomnya SAMA sempitnya
+     (kira-kira 1/3 layar) dan tulisan Mandarin TETAP tanpa spasi
+     antar-kata, jadi butuh pengecilan lokal yang sama supaya beberapa
+     aksara (bukan cuma 1-2) bisa muat per baris, konsisten dengan mode
+     "Sync". Cuma DITIMPA LOKAL lewat custom property yang sama, TIDAK
+     mengubah `--verse-font-size` global (mode 1/2 kolom & layar lain
+     tetap seperti biasa). */
+  .reader-columns-grid[data-cols="3"] {
+    --verse-font-size: calc(var(--verse-font-size, 19px) * 0.82);
   }
 }
 
