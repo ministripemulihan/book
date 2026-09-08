@@ -142,6 +142,11 @@ const PresentationStudio = (() => {
   // "" berarti tanpa border sama sekali.
   let msgBorderColor = "";
   let msgBorderWidth = 4;
+  // BARU (8 Sep 2026, permintaan operator) -- LATAR/BACKGROUND bar pesan
+  // bisa diwarnai PENUH SOLID (mis. Merah penuh untuk pesan darurat),
+  // beda dari msgBorderColor di atas yang cuma garis tepi tipis. "" =
+  // balik ke latar gelap solid bawaan (lihat applyTicker(), present.html).
+  let msgBgColor = "";
   // BARU (7 Sep 2026 v3, permintaan operator) -- kecepatan mode
   // "➡️ Berjalan" (detik MINIMAL per 1 putaran, lihat #psMsgSpeedRow &
   // applyTicker() di present.html -- rumus SAMA PERSIS dipakai di dua
@@ -1929,6 +1934,9 @@ const PresentationStudio = (() => {
         pulseSeconds: msgPulseSeconds,
         borderColor: msgBorderColor,
         borderWidth: msgBorderWidth,
+        // BARU (8 Sep 2026) -- latar/background bar PENUH SOLID, lihat
+        // catatan panjang msgBgColor di atas & applyTicker() (present.html).
+        bg: msgBgColor,
         // BARU (7 Sep 2026 v3) -- kecepatan "Berjalan" (lihat rumus SAMA
         // persis di applyTicker(), present.html) & A+/A- ukuran huruf.
         scrollBaseSec: msgScrollBaseSec,
@@ -2051,6 +2059,27 @@ const PresentationStudio = (() => {
         sendMessageNow_();
       });
     });
+    // BARU (8 Sep 2026, permintaan operator "background pesan merah
+    // semua") -- checklist LATAR/BACKGROUND bar pesan PENUH SOLID
+    // (Tanpa=gelap bawaan/Merah/Putih/Biru), sama pola seperti Border di
+    // atas tapi ini yang mengisi SELURUH latar bar, bukan cuma garis
+    // tepi. Bisa dikombinasikan bebas dengan Border (mis. latar Merah
+    // penuh + tanpa border, atau latar Merah + border Putih).
+    document.querySelectorAll("#psMsgBgRow [data-msgbg]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#psMsgBgRow [data-msgbg]").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        msgBgColor = btn.dataset.msgbg;
+        sendMessageNow_();
+      });
+    });
+    if (el("psMsgBgCustom")) {
+      el("psMsgBgCustom").addEventListener("input", () => {
+        document.querySelectorAll("#psMsgBgRow [data-msgbg]").forEach((b) => b.classList.remove("active"));
+        msgBgColor = el("psMsgBgCustom").value;
+        sendMessageNow_();
+      });
+    }
     if (el("psMsgFont")) {
       el("psMsgFont").addEventListener("change", () => {
         msgFont = el("psMsgFont").value;
@@ -5564,6 +5593,24 @@ const PresentationStudio = (() => {
     if (el("psCamOutlineSlider")) el("psCamOutlineSlider").addEventListener("input", applyOutline);
     sendLatarTextState(); // kirim gaya tersimpan sekali di awal, siap dipakai begitu Kamera/Gambar dinyalakan
 
+    // BARU (8 Sep 2026, permintaan operator) -- toggle Tata Letak
+    // "Latar Penuh" (bawaan, kamera/gambar penuh layar + teks ditimpakan
+    // di tengah) vs "📐 Kamera Atas, Teks Bawah" (kamera/gambar dipepet
+    // ke ATAS, ayat/kidung/pengumuman punya zona SENDIRI di bawahnya,
+    // latar solid, tidak saling menimpa) -- lihat theme.camSplit
+    // (DEFAULT_STAGE_THEME) & body.cam-split (present.html). Disimpan
+    // lewat saveAndSendTheme() (SAMA tempat tema lain disimpan) supaya
+    // pulih otomatis & tersinkron dengan pengaturan tema lainnya.
+    if (el("psCamLayoutRow")) {
+      document.querySelectorAll("#psCamLayoutRow [data-cam-layout]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#psCamLayoutRow [data-cam-layout]").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          saveAndSendTheme({ camSplit: btn.dataset.camLayout === "split" });
+        });
+      });
+    }
+
     // BARU -- 🖼️ Unggah Gambar Latar (dropzone sama pola dengan tab
     // File, tapi 1 gambar saja -- gambar BARU menggantikan yang lama).
     const bgDz = el("psBgImageDropzone");
@@ -5820,7 +5867,12 @@ const PresentationStudio = (() => {
   // (0.5x-10x) daripada `scale` karena kebutuhannya beda (angka besar
   // untuk dilihat dari jauh saat permainan/aktivitas, bukan untuk
   // kenyamanan baca ayat).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3 };
+  // BARU (8 Sep 2026, permintaan operator) -- `camSplit`: tata letak
+  // "Kamera/Gambar Latar di Atas, Ayat/Kidung/Pengumuman di Bawah"
+  // (lihat body.cam-split di <style> present.html) -- false = perilaku
+  // lama (latar penuh layar, teks ditimpakan di tengah), sama seperti
+  // sebelum toggle ini ada.
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camSplit: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -5908,8 +5960,16 @@ const PresentationStudio = (() => {
     // BARU (4 Sep 2026) -- pulihkan status centang "Tulisan Tebal" saat
     // panel Studio dibuka ulang/dimuat ulang.
     if (el("psFontBold")) el("psFontBold").checked = !!theme.bold;
+    // BARU (8 Sep 2026) -- pulihkan tombol aktif Tata Letak Kamera
+    // (Penuh/Split), lihat catatan panjang camSplit di DEFAULT_STAGE_THEME.
+    if (el("psCamLayoutRow")) {
+      const savedSplit = !!theme.camSplit;
+      Array.from(el("psCamLayoutRow").querySelectorAll("[data-cam-layout]")).forEach((b) => {
+        b.classList.toggle("active", (b.dataset.camLayout === "split") === savedSplit);
+      });
+    }
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camSplit: theme.camSplit } });
   }
 
   function saveAndSendTheme(partial) {
@@ -5930,7 +5990,7 @@ const PresentationStudio = (() => {
     // warna di Layar 2 (present.html diam-diam jatuh ke warna aksen tema
     // bawaan, lihat --p-timerclock-color, karena variabelnya memang tidak
     // pernah dikirim/diset).
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camSplit: theme.camSplit } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
