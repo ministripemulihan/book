@@ -80,16 +80,19 @@
      memenuhi layar penuh (#camBg/#imgBg inset:0) dengan ayat/kidung/
      pengumuman DITIMPAKAN di tengah-tengahnya (dibaca lewat warna+
      stroke kontras di panel "🎨 Warna, Stroke & Ukuran Huruf"). Mode
-     baru ini (toggle "📐 Kamera Atas, Teks Bawah" di tab 🎥 Kamera,
+     "split" ini (toggle "📐 Kamera Atas, Teks Bawah" di tab 🎥 Kamera,
      Studio) TIDAK menimpa -- kamera/gambar dipepetkan ke ATAS layar
-     saja (tinggi diatur --p-cam-split-pct, bawaan 42%), sisanya di
-     BAWAH jadi milik #stage sepenuhnya (latar solid warna tema
-     --p-bg, BUKAN transparan) supaya ayat/kidung/pengumuman selalu
-     terbaca jelas TANPA perlu bergantung pada stroke/kontur. Dipicu
-     lewat class "cam-split" di <body>, dikirim sebagai bagian dari
-     objek tema biasa (lihat theme.camSplit, applyTheme() di bawah &
-     saveAndSendTheme()/js/presentation-studio.js) supaya tersimpan &
-     pulih otomatis sama seperti pengaturan tema lainnya. */
+     saja, sisanya di BAWAH jadi milik #stage sepenuhnya (latar solid
+     warna tema --p-bg, BUKAN transparan) supaya ayat/kidung/pengumuman
+     selalu terbaca jelas TANPA perlu bergantung pada stroke/kontur.
+     BARU (8 Sep 2026 v2, permintaan operator) -- tinggi zona kamera
+     SEKARANG bisa diatur BEBAS lewat slider "Ukuran Zona Kamera" di
+     Studio (10%-90%, bawaan 42%) -- nilainya dikirim sebagai
+     `--p-cam-split-pct` (lihat theme.camSplitPct, applyTheme() di
+     bawah & wireTheme()/js/presentation-studio.js), BUKAN lagi angka
+     42% tetap. Dipicu lewat class "cam-split" di <body> (bagian dari
+     `theme.camLayout`, lihat catatan panjang mode "cam-subtitle" di
+     bawah untuk pilihan tata letak KE-2 yang BARU juga ditambahkan). */
   body.cam-split #camBg, body.cam-split #imgBg {
     height: var(--p-cam-split-pct, 42%);
     top: 0; bottom: auto;
@@ -101,9 +104,98 @@
     background: var(--p-bg);
     justify-content: center;
   }
+  /* BARU (8 Sep 2026 v4, permintaan operator "latar belakang transparan
+     atau ada backgroundnya") -- kalau operator mencentang "Latar zona
+     teks transparan" di Studio (theme.stageTransparent, lihat
+     applyTheme() bawah), zona teks mode "Kamera Atas, Teks Bawah" ini
+     TIDAK lagi solid --p-bg, tapi tembus pandang -- kamera/gambar tetap
+     kelihatan samar di baliknya. Dipicu lewat class "stage-transparent"
+     di <body>, HANYA berpengaruh saat digabung dengan "cam-split" (di
+     mode lain tidak relevan: "full" teks memang sudah menimpa langsung,
+     "subtitle" sudah pakai gradasi transparan sendiri, "bubble" tidak
+     punya zona teks solid terpisah). */
+  body.cam-split.stage-transparent #stage { background: transparent; }
   /* Vignette (body::before) & dim (.cam-active::after) di atas tetap
      menutupi seluruh layar di mode split -- tidak masalah, opacitynya
      sangat tipis dan tetap enak dilihat di kedua zona. */
+  /* BARU (8 Sep 2026 v2, permintaan operator "seperti nonton video ada
+     subtitlenya") -- Tata Letak KE-2 (BARU): "🎬 Latar Penuh + Subtitle".
+     BEDA dari mode "split" di atas (yang MEMOTONG layar jadi 2 zona
+     terpisah, kamera cuma keliatan di zona atas) -- mode ini kamera/
+     gambar MEMENUHI SELURUH LAYAR seperti nonton video biasa, dan
+     ayat/kidung/pengumuman muncul sebagai BAR SUBTITLE menempel di
+     BAWAH (gradasi gelap tipis di belakangnya, BUKAN blok solid penuh)
+     -- persis gaya caption/subtitle film/video pada umumnya, video di
+     baliknya tetap terlihat penuh sampai ke pinggir atas. Dipicu lewat
+     class "cam-subtitle" di <body> (theme.camLayout === "subtitle"). */
+  body.cam-subtitle #camBg, body.cam-subtitle #imgBg {
+    height: 100vh; top: 0; bottom: auto;
+  }
+  body.cam-subtitle #stage {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    height: auto; max-height: 46%;
+    justify-content: flex-end;
+    /* Gradasi gelap dari bawah (hampir solid) ke atas (transparan penuh)
+       -- teks selalu kontras tanpa menutupi video secara solid. */
+    background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.58) 55%, rgba(0,0,0,0) 100%);
+    padding-top: 10vh;
+  }
+  /* BARU (8 Sep 2026 v3, permintaan operator "dibalik, teks semua ayat,
+     kamera bulat kanan-bawah") -- Tata Letak KE-3 (BARU): "🔵 Teks
+     Penuh, Kamera Bulat". KEBALIKAN dari mode "split"/"subtitle" di atas
+     (yang keduanya bikin kamera/gambar jadi UNSUR UTAMA layar) -- di
+     sini AYAT/KIDUNG/PENGUMUMAN yang jadi utama, tampil PERSIS seperti
+     kalau Kamera/Gambar Latar TIDAK aktif sama sekali (latar solid warna
+     tema, #stage tidak diubah ukuran/posisinya) -- Kamera/Gambar Latar
+     cuma jadi lingkaran KECIL mengambang di pojok kanan-bawah (gaya
+     "self-view" webcam ala Zoom/Google Meet), z-index SENGAJA lebih
+     tinggi dari #stage (2) supaya lingkarannya tidak pernah tertutup
+     teks. Ukurannya diatur slider "Ukuran lingkaran Kamera" (120px-
+     420px, bawaan 200px) -- lihat theme.camBubbleSize & --p-cam-bubble-
+     size di applyTheme() bawah/js/presentation-studio.js. */
+  body.cam-bubble #camBg, body.cam-bubble #imgBg {
+    width: var(--p-cam-bubble-size, 200px); height: var(--p-cam-bubble-size, 200px);
+    top: auto; left: auto; right: 28px; bottom: 28px;
+    border-radius: 50%; object-fit: cover;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+    border: 3px solid rgba(255,255,255,0.85);
+    z-index: 5;
+    transition: opacity .35s ease, width .3s ease, height .3s ease;
+  }
+  body.cam-bubble #stage { background: var(--p-bg); }
+  /* Dim tipis (body.cam-active::after, lihat di bawah) hanya berguna
+     saat teks DITIMPAKAN LANGSUNG di atas kamera/gambar (mode "full") --
+     di mode bubble teks berdiri di latar solid biasa, jadi dim itu
+     dimatikan supaya tidak menggelapkan seisi layar tanpa alasan. */
+  body.cam-bubble.cam-active::after { display: none; }
+  /* BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
+     Video YouTube (#ytView) & Video Lokal (#localVideoEl) mengikuti
+     UKURAN/POSISI Tata Letak yang SAMA seperti Kamera/Gambar Latar di
+     atas (split/subtitle) KETIKA operator menyalakan toggle "📝
+     Ayat/Kidung/Pengumuman TETAP tampil di atas video" (class
+     "video-overlay" di <body>, lihat theme.videoTextOverlay &
+     applyTheme() bawah) -- video jadi berperan sebagai "latar" persis
+     seperti kamera/gambar, dan #text/#ref TIDAK lagi dikosongkan saat
+     video diputar (lihat showMain() kind "youtube" & showLocalVideo()
+     di skrip bawah). Mode "bubble" SENGAJA tidak berlaku untuk video
+     (tidak ada lingkaran kamera pada video) -- video di mode itu jatuh
+     ke tampilan "full" biasa. */
+  body.video-overlay.cam-split #ytView,
+  body.video-overlay.cam-split #localVideoEl {
+    height: var(--p-cam-split-pct, 42%) !important; width: 100vw; top: 0; bottom: auto; object-fit: cover;
+  }
+  body.video-overlay.cam-subtitle #ytView,
+  body.video-overlay.cam-subtitle #localVideoEl {
+    height: 100vh !important; width: 100vw; top: 0; bottom: auto;
+  }
+  /* CATATAN: #slideView (File/PDF, kind "slide") SENGAJA TIDAK ikut
+     diresize lewat cam-split/cam-subtitle di atas -- elemen ini `position`
+     BUKAN `fixed` (beda dari #ytView/#localVideoEl), ukurannya sudah
+     otomatis pas di tengah lewat max-width/max-height (lihat #slideView
+     di bawah), jadi tetap dibiarkan seperti biasa (mode "full") --
+     ayat/kidung/pengumuman tetap muncul menimpa di tengahnya kalau
+     video-overlay menyala, cukup lewat showMain() kind "slide" TIDAK
+     mengosongkan #text lagi (lihat di bawah), tanpa perlu resize CSS. */
   /* BARU (28 Agu 2026) -- 🖼️ Latar Gambar: gambar latar yang diunggah
      operator (tab "🎥 Kamera" -> "Sumber Latar" -> "Gambar"), lapisan
      PERSIS SAMA seperti #camBg (di bawah #stage, di atas --p-bg polos)
@@ -1343,7 +1435,13 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // Video Lokal & YouTube tidak boleh berbarengan
     if (localVideoObjectUrl_) { URL.revokeObjectURL(localVideoObjectUrl_); localVideoObjectUrl_ = null; }
     idleEl.hidden = true;
-    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    // DIUBAH (8 Sep 2026, permintaan operator "video ada subtitle-nya")
+    // -- pola SAMA seperti kind "youtube" di showMain(): kalau toggle
+    // videoTextOverlayOn menyala, JANGAN kosongkan #ref/#text, biarkan
+    // ayat/kidung/pengumuman yang sedang tayang tetap terlihat di atas
+    // video lokal ini (lihat body.video-overlay di <style>).
+    if (!videoTextOverlayOn) { refEl.hidden = true; textEl.textContent = ""; }
+    logoEl.hidden = true; slideEl.hidden = true;
     localVideoObjectUrl_ = URL.createObjectURL(data.blob);
     localVideoEl.muted = false;
     localVideoEl.src = localVideoObjectUrl_;
@@ -1501,6 +1599,13 @@
   // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (lihat catatan #imgBg di
   // <style> & applyBgImagePayload() di bawah).
   let imgBgActive = false;
+  // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
+  // status toggle "📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video"
+  // (theme.videoTextOverlay, lihat applyTheme() di bawah) -- dibaca oleh
+  // showMain() kind "youtube" & showLocalVideo() supaya #text/#ref TIDAK
+  // dikosongkan/disembunyikan lagi saat video mulai diputar. MATI
+  // (false) secara bawaan = perilaku lama tidak berubah.
+  let videoTextOverlayOn = false;
 
   function buildOutlineShadow(color, widthPx) {
     const w = Math.max(0.5, Number(widthPx) || 3);
@@ -1736,8 +1841,40 @@
       fitTimerClockNumber_();
     }
     // BARU (8 Sep 2026) -- lihat catatan panjang "Kamera di Atas, Teks
-    // di Bawah" di <style> (body.cam-split) di atas.
-    if (typeof theme.camSplit === "boolean") document.body.classList.toggle("cam-split", theme.camSplit);
+    // di Bawah" / "Latar Penuh + Subtitle" di <style> (body.cam-split /
+    // body.cam-subtitle) di atas. `camLayout`: "full" (bawaan, kelas
+    // dibuang semua) | "split" | "subtitle" | "bubble" (BARU v3, lihat
+    // body.cam-bubble di <style>).
+    if (theme.camLayout) {
+      document.body.classList.toggle("cam-split", theme.camLayout === "split");
+      document.body.classList.toggle("cam-subtitle", theme.camLayout === "subtitle");
+      document.body.classList.toggle("cam-bubble", theme.camLayout === "bubble");
+    }
+    // BARU (8 Sep 2026 v4, permintaan operator "latar belakang transparan
+    // atau ada backgroundnya") -- lihat catatan panjang di <style>
+    // (body.cam-split.stage-transparent #stage).
+    if (typeof theme.stageTransparent === "boolean") {
+      document.body.classList.toggle("stage-transparent", theme.stageTransparent);
+    }
+    // BARU (8 Sep 2026 v2) -- tinggi zona kamera (mode "split") yang
+    // BISA DIATUR BEBAS lewat slider "Ukuran Zona Kamera" (10%-90%),
+    // sebelumnya terkunci 42%. Angka mentah (tanpa "%") dikirim dari
+    // Studio, ditambahkan "%" di sini.
+    if (theme.camSplitPct) root.setProperty("--p-cam-split-pct", theme.camSplitPct + "%");
+    // BARU (8 Sep 2026 v3) -- diameter lingkaran Kamera/Gambar Latar
+    // (mode "bubble", 120px-420px, bawaan 200px), lihat body.cam-bubble
+    // di <style>.
+    if (theme.camBubbleSize) root.setProperty("--p-cam-bubble-size", theme.camBubbleSize + "px");
+    // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
+    // dipakai showMain()/showLocalVideo() (lihat variabel modul
+    // `videoTextOverlayOn` & catatan panjang di sana) supaya ayat/kidung/
+    // pengumuman TIDAK dikosongkan lagi saat berpindah ke tab YouTube/
+    // Video Lokal, dan supaya video ikut mengikuti ukuran/posisi Tata
+    // Letak split/subtitle (class "video-overlay", lihat <style>).
+    if (typeof theme.videoTextOverlay === "boolean") {
+      videoTextOverlayOn = theme.videoTextOverlay;
+      document.body.classList.toggle("video-overlay", videoTextOverlayOn);
+    }
   }
 
   function applyTicker(barEl, textEl2, data) {
@@ -2104,13 +2241,22 @@
       // Gambar penuh 1 layar -- hasil konversi File tab (gambar
       // langsung, atau per-slide dari pptx/pdf yang sudah diubah jadi
       // gambar saat diunggah).
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
+      // DIUBAH (8 Sep 2026, permintaan operator "PDF + teks tulisan") --
+      // pola SAMA seperti kind "youtube"/localvideo di bawah: kalau
+      // videoTextOverlayOn menyala, JANGAN kosongkan #ref/#text --
+      // ayat/kidung/pengumuman tetap tampil DI ATAS gambar/slide/PDF ini.
+      if (!videoTextOverlayOn) { refEl.hidden = true; refEl.textContent = ""; textEl.textContent = ""; }
       if (data.imageUrl) { slideEl.src = data.imageUrl; slideEl.hidden = false; }
     } else if (kind === "youtube") {
       // Video YouTube penuh 1 layar (tab "▶️ YouTube" di Studio Presentasi).
-      refEl.hidden = true; refEl.textContent = "";
-      textEl.textContent = "";
+      // DIUBAH (8 Sep 2026, permintaan operator "video ada subtitle-nya")
+      // -- dulu #ref/#text SELALU dikosongkan di sini tanpa syarat. Kalau
+      // toggle "📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video"
+      // menyala (videoTextOverlayOn), JANGAN dikosongkan -- biarkan ayat/
+      // kidung/pengumuman yang SEDANG tayang sebelumnya tetap terlihat,
+      // videonya jadi "latar" di baliknya (lihat body.video-overlay di
+      // <style> untuk penyesuaian ukuran/posisi videonya).
+      if (!videoTextOverlayOn) { refEl.hidden = true; refEl.textContent = ""; textEl.textContent = ""; }
       // BARU (7 Sep 2026, permintaan operator) -- video YouTube TETAP
       // butuh internet (wajar, video-nya sendiri disimpan di server
       // YouTube, bukan di app ini) -- kalau SEDANG tidak ada koneksi,
@@ -2252,6 +2398,19 @@
     if (data.type === "localvideo") {
       if (data.action === "stop") { stopLocalVideo(true); }
       else { showLocalVideo(data); }
+      return;
+    }
+    // BARU (8 Sep 2026, permintaan operator "shortcut bel 1/2/3") --
+    // membunyikan salah satu CONFIG.BELL_SOUNDS SECARA LANGSUNG atas
+    // perintah operator (tombol/pintasan keyboard di Studio), TERPISAH
+    // dari bel otomatis saat ⏱️ Timer/🎯 Jam Target habis (yang sudah
+    // ada lewat {type:"timer"/"timerclock", ...bellKey di data}) --
+    // pakai fungsi ringBell() yang SAMA (lihat catatan panjang di atas)
+    // supaya jatuh-balik ke bunyi "denting" bawaan juga kalau linknya
+    // gagal diputar, PERSIS seperti bel Timer.
+    if (data.type === "bell") {
+      if (data.action === "ring") { ringBell(data.key); }
+      else if (data.action === "stop") { stopBellSound(); }
       return;
     }
     if (data.type === "localvideo_control") {
