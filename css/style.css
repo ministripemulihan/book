@@ -276,9 +276,56 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .kidung-reader-header { margin-bottom: 16px; font-family: var(--font-display); }
 .kidung-reader-header div:first-child { font-size: 1.1rem; color: var(--ink-soft); }
 .kidung-reader-header div:nth-child(2) { font-size: 1.4rem; font-weight: 700; margin: 4px 0; }
+
+/* Badge birama/pola suku kata + tombol ℹ️ -- BARU (8 Sep 2026), lihat
+   renderKidungReader() di js/kidung-ui.js. */
+.kidung-reader-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-family: var(--font-ui); }
+.kidung-badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--brass-soft); color: var(--ink); }
+.kidung-badge-muted { background: transparent; border: 1px solid var(--rule); color: var(--ink-soft); }
+.kidung-info-btn { margin-left: auto; }
+
+/* Panel ℹ️ Sejarah & Cara Baca kidung -- pola SAMA seperti
+   .info-kami-overlay/.info-kami-box (lihat di bawah) supaya konsisten,
+   tapi 1 kolom saja (isinya lebih ringkas). */
+.kidung-info-overlay {
+  position: fixed; inset: 0; z-index: 320;
+  background: rgba(20, 16, 10, 0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.kidung-info-box {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--paper); color: var(--ink);
+  border-radius: 16px; border: 2px solid var(--petrol);
+  width: 100%; max-width: 520px; max-height: 88vh;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+.kidung-info-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--rule);
+  background: var(--paper-raised);
+}
+.kidung-info-header h2 { margin: 0; font-family: var(--font-display); font-size: 19px; }
+.kidung-info-body { overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; font-size: 15px; line-height: 1.6; }
+.kidung-info-item { border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; background: var(--paper-raised); }
+.kidung-info-item h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 16px; color: var(--petrol); }
+.kidung-info-item div { white-space: pre-wrap; word-break: break-word; }
 .kidung-reader-body { line-height: 1.7; }
 .kidung-verse { margin: 0 0 10px; font-size: var(--verse-font-size, 16px); }
 .kidung-koor { margin: 0 0 14px; padding-left: 12px; border-left: 3px solid var(--brass); color: var(--ink-soft); font-size: var(--verse-font-size, 16px); }
+/* BARU (8 Sep 2026) -- judul bagian ("SYAIR KE SATU"/"SYAIR KEDUA" dst)
+   untuk kidung ber-syair-ganda, lihat sectionTitle di js/kidung.js &
+   renderKidungReader() (js/kidung-ui.js). Dibuat MIRIP gaya header
+   kidung (huruf tebal, sedikit renggang) tapi lebih kecil supaya jelas
+   ini "sub-judul", bukan judul kidung utama -- ada jarak lebih di
+   ATASnya (kecuali judul syair pertama) supaya kelihatan sebagai batas
+   awal bagian baru, bukan menempel ke bait sebelumnya. */
+.kidung-syair-title {
+  margin: 22px 0 10px; font-weight: 700; letter-spacing: 0.02em;
+  font-size: calc(var(--verse-font-size, 16px) + 1px); color: var(--ink);
+}
+.kidung-syair-title:first-child { margin-top: 0; }
 .kidung-reader-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 20px; max-width: 400px; }
 
 /* Baris atas standar di semua layar Kidung: "← Kembali" (kalau ada) +
@@ -872,7 +919,20 @@ input { font-family: inherit; }
 }
 
 .guest-modal-overlay {
-  position: fixed; inset: 0; z-index: 500;
+  /* BARU (7 Sep 2026, permintaan operator) -- akar masalah "dialog Simpan
+     ke Kumpulan Ayat tidak muncul di Studio Presentasi, harus tutup Layar
+     dulu baru kelihatan": dialog ini (z-index lama 500) sebenarnya SUDAH
+     terbuka & berfungsi normal, tapi tertutup TOTAL oleh panel
+     🎛️ Studio Presentasi (.present-studio, z-index 900, position:fixed
+     menutupi SELURUH layar) -- karena angka z-index-nya lebih kecil,
+     jadi tergambar DI BAWAH panel Studio walau sebenarnya sudah tampil.
+     Begitu Studio ditutup (panel z-index 900 hilang), dialog yang dari
+     tadi sudah terbuka itu jadi kelihatan -- persis gejala yang
+     dilaporkan. Dinaikkan ke atas .present-studio (900) supaya dialog
+     ini (dipakai utk 📝 Daftar Akun & 💾 Simpan ke Kumpulan Ayat/Media
+     Tersimpan, lihat pemakaian class ini di index.html) SELALU tampil di
+     atas Studio, tidak perlu menutup apa pun dulu. */
+  position: fixed; inset: 0; z-index: 950;
   background: rgba(20, 16, 10, 0.72);
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
@@ -1066,6 +1126,14 @@ input { font-family: inherit; }
 }
 @keyframes netOfflinePulse { 50% { opacity: .7; } }
 .brand-mark { color: var(--petrol); font-size: 20px; }
+/* BARU (8 Sep 2026) -- .brand-mark sekarang bisa berisi <img> logo asli
+   (lihat index.html) alih-alih cuma karakter teks "☩". Dibuat bulat +
+   dipas-kan tingginya dengan teks "Alkitab" di sebelahnya (align-items:
+   center di .brand induk sudah menengahkan vertikal secara otomatis). */
+.brand-mark img {
+  display: block; width: 28px; height: 28px; border-radius: 50%;
+  object-fit: contain; vertical-align: middle;
+}
 .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
 
 .search-form {
@@ -1543,6 +1611,7 @@ input { font-family: inherit; }
    latar pastel yang terang. */
 .verse-block[class*="hl-"] { color: #2b2118; }
 .verse-block[class*="hl-"] .verse-copy-btn,
+.verse-block[class*="hl-"] .verse-coll-btn,
 .verse-block[class*="hl-"] .verse-note-badge { color: #6e5c43; }
 .verse-block.hl-yellow:hover, .verse-block.hl-green:hover, .verse-block.hl-blue:hover,
 .verse-block.hl-pink:hover, .verse-block.hl-purple:hover, .verse-block.hl-orange:hover,
@@ -1670,6 +1739,23 @@ body.footnote-accent-off .footnote-entry-highlight { background: rgba(184, 134, 
 /* Di HP (tanpa hover), tombol salin tetap sedikit terlihat */
 @media (max-width: 859px) {
   .verse-copy-btn { opacity: .45; }
+}
+
+/* BARU (7 Sep 2026) -- "📚 Kumpulan Ayat" langsung di baris utama tiap
+   ayat (sejajar tombol "📋" salin), lihat collBtn di buildVerseBlock()
+   (js/app.js). Gaya sengaja disamakan persis dengan .verse-copy-btn
+   supaya kedua tombol terlihat sepasang/konsisten. */
+.verse-coll-btn {
+  flex-shrink: 0; align-self: flex-start; margin-top: 4px;
+  background: transparent; border: none; font-size: 13px;
+  opacity: 0; transition: opacity .15s ease, transform .15s ease;
+  color: var(--ink-soft); padding: 4px;
+}
+.verse-block:hover .verse-coll-btn,
+.verse-block:focus-within .verse-coll-btn { opacity: .65; }
+.verse-coll-btn:hover { opacity: 1 !important; color: var(--brass); transform: scale(1.12); }
+@media (max-width: 859px) {
+  .verse-coll-btn { opacity: .45; }
 }
 
 /* ============================================================
@@ -1921,11 +2007,46 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   text-transform: uppercase; letter-spacing: .04em; color: var(--brass);
   flex-wrap: wrap;
 }
-.reader-col-pane-title { overflow-wrap: anywhere; }
+/* PERBAIKAN (7 Sep 2026, permintaan operator) -- "min-width: 0" di sini
+   PENTING: tanpa ini, judul kolom (mis. "Indonesia (Recovery)") sebagai
+   flex-item punya "min-width: auto" bawaan browser yang MENOLAK
+   mengecil di bawah lebar teks aslinya -- akibatnya di HP dengan 3
+   kolom sempit, judul itu melebar keluar kotak kepalanya, lalu
+   "overflow: hidden" milik .reader-col-pane (di atas) memotongnya
+   jadi kelihatan terpenggal (mis. "Alkita" bukan "Alkitab"). Dengan
+   min-width:0 + flex:1 1 auto, judul boleh mengecil & PATAH BARIS
+   normal (overflow-wrap:anywhere sudah ada) kalau memang tidak muat,
+   bukan terpotong diam-diam. */
+.reader-col-pane-title { overflow-wrap: anywhere; min-width: 0; flex: 1 1 auto; }
 .reader-col-sync-toggle {
   display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: none;
   letter-spacing: 0; color: var(--ink-soft); font-weight: 600; cursor: pointer; flex-shrink: 0;
 }
+/* Tombol "⤢ Buka layar penuh" per kolom -- lihat toggleColumnPaneFullscreen()
+   di js/app.js. Dipakai ulang gaya tombol ikon kecil seperti tombol lain
+   di kepala kolom, supaya konsisten. */
+.reader-col-pane-expand-btn {
+  background: transparent; border: none; cursor: pointer; flex-shrink: 0;
+  font-size: 15px; line-height: 1; padding: 2px 4px; color: var(--ink-soft);
+  touch-action: manipulation;
+}
+.reader-col-pane-expand-btn:hover { color: var(--petrol); }
+/* Kolom yang sedang dibuka layar-penuh (tekan "⤢") -- menutupi SELURUH
+   layar (posisi fixed), supaya tulisan (Mandarin dkk, yang tanpa spasi
+   antar-kata jadi gampang kelihatan "terpotong-potong" kalau lebarnya
+   cuma sepertiga layar) bisa mengalir lebar penuh sebagai paragraf
+   biasa. Kolom lain & body di belakangnya TIDAK ikut berubah tata
+   letaknya (cuma disembunyikan sementara di belakang overlay ini) --
+   begitu ditutup lagi ("✕"), tampilan kolom-berdampingan semula kembali
+   PERSIS seperti sebelumnya, tidak ada apa pun yang perlu dirender ulang.
+   Pakai 100dvh (viewport dinamis) supaya di HP tidak kepotong bar
+   alamat/browser yang naik-turun -- browser lama yang belum kenal dvh
+   otomatis jatuh ke 100vh biasa (baris di atasnya). */
+.reader-col-pane.pane-fullscreen {
+  position: fixed; inset: 0; z-index: 1200; margin: 0; border-radius: 0;
+  height: 100vh; height: 100dvh; width: 100vw;
+}
+body.pane-fullscreen-open { overflow: hidden; }
 /* Toggle "Sync" dipakai ULANG dari .toggle-switch/.toggle-slider yang
    sudah ada di app ini (dipakai jg di Timer Studio Presentasi dst) --
    cuma dikecilkan sedikit supaya pas di kepala kolom yang sempit. */
