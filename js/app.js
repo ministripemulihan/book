@@ -4809,12 +4809,23 @@ function renderCollectionDetailInto(container, id, col) {
   // Kidung" yang diminta. "⛶ Mode Layar Penuh" TIDAK ikut dipindah
   // (tetap di titleRow di atas) karena itu aksi yang paling sering
   // langsung ditekan.
+  // PERBAIKAN (8 Sep 2026, laporan operator: "di mode HP, masuk Kumpulan
+  // Ayat, tombol tambah pengumuman tidak muncul") -- AKAR MASALAH: toolbar
+  // ini default TERLIPAT (startCollapsed defaultnya true), jadi di HP yang
+  // kelihatan cuma garis tipis + panah kecil di bawah judul, tombol "➕
+  // Teks / Pengumuman" dkk jadi tersembunyi di baliknya -- operator
+  // menyangka tombolnya hilang/terhapus. SEKARANG dibuka TERBENTANG
+  // (startCollapsed: false) begitu panel Kumpulan Ayat dibuka -- seperti
+  // sebelum toolbar-bisa-dilipat ini ada -- operator TETAP bisa
+  // melipatnya sendiri kalau mau area lebih lega (tekan panahnya), cuma
+  // tidak lagi terlipat OTOMATIS di awal.
   container.appendChild(buildCollapsibleToolbar([titleBtns], {
     title: "Sembunyikan/tampilkan tombol Kumpulan Ayat (ganti nama, tambah teks/link, salin, bagikan, dst.)",
+    startCollapsed: false,
   }));
 
   // Baris pilihan "Bahasa suara" (Google Voice) khusus panel Kumpulan Ayat --
-  // dipakai oleh tombol ▶️ Putar di tiap ayat & di Mode Layar Penuh di bawah.
+  // dipakai oleh tombol ▶️ Google Voice di tiap ayat & di Mode Layar Penuh di bawah.
   // Memakai pengaturan TTS yang SAMA (ttsSettings/pickVoice() dari bagian 13
   // di atas) supaya pilihan suara konsisten dengan menu Pembaca biasa --
   // hanya saja di sini kotak pilihnya ditaruh langsung di panel ini supaya
@@ -5098,7 +5109,7 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       <div class="result-ref">${escapeHtml(ref)}</div>
       <div class="result-text"></div>
       <div class="collection-verse-actions">
-        ${v && ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Putar</button>' : ""}
+        ${v && ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Google Voice</button>' : ""}
         <button type="button" class="chip-btn small col-move-top-btn" title="Pindahkan ke paling awal">⏮️ Awal</button>
         <button type="button" class="chip-btn small col-move-up-btn" title="Naikkan urutan">⬆️</button>
         <button type="button" class="chip-btn small col-move-down-btn" title="Turunkan urutan">⬇️</button>
@@ -5743,7 +5754,7 @@ function openCollectionFullscreen(col, startIndex) {
       const fsPlayBtn = document.createElement("button");
       fsPlayBtn.type = "button";
       fsPlayBtn.className = "chip-btn small col-play-btn";
-      fsPlayBtn.textContent = "▶️ Putar";
+      fsPlayBtn.textContent = "▶️ Google Voice";
       fsPlayBtn.addEventListener("click", () => toggleCollectionVersePlayback(v, fsPlayBtn));
       box.appendChild(fsPlayBtn);
     }
@@ -7300,6 +7311,41 @@ function updateTTSButton() {
   btn.title = ttsPlaying ? "Jeda pembacaan" : "Putar pembacaan ayat";
 }
 
+// BARU (8 Sep 2026, permintaan operator) -- kata "Ayat"/"Pasal" yang
+// diucapkan TTS sebelumnya SELALU Bahasa Indonesia walau suara yang
+// dipilih di kotak "Bahasa suara" (ttsSettings.lang) Inggris/Mandarin --
+// jadi suara Inggris tetap bilang "Ayat 5" bukan "Verse 5". Sekarang kata
+// itu (dan pengumuman nama kitab+pasal di awal pembacaan, lihat
+// spokenChapterAnnouncement() & playTTS() di bawah) ikut menyesuaikan
+// ttsSettings.lang:
+//   - id-ID -> "Ayat 5." / "Bilangan Pasal 1."
+//   - en-US -> "Verse 5." / "Numbers Chapter 1."
+//   - zh-CN -> "第5节" / "民数记第1章" (gaya baca Alkitab Mandarin: nomor
+//     didahului "第", tanpa spasi, "章"=pasal & "节"=ayat)
+// TIDAK mengubah data ayat/kitab itu sendiri -- cuma kata pembungkus yang
+// diucapkan sebelum teksnya. Dipakai oleh speakVerseList(), playTTS(), dan
+// toggleCollectionVersePlayback() supaya konsisten di semua tombol
+// "▶️ Google Voice".
+function spokenVerseLabel(verseNum) {
+  const p = (ttsSettings.lang || "id-ID").slice(0, 2).toLowerCase();
+  if (p === "zh") return `第${verseNum}节`;
+  if (p === "en") return `Verse ${verseNum}.`;
+  return `Ayat ${verseNum}.`;
+}
+
+// Pengumuman awal pasal ("Bilangan Pasal 1." / "Numbers Chapter 1." /
+// "民数记第1章") -- dipakai HANYA saat mulai membaca dari ayat 1 lewat
+// tombol ▶️/⏸️ di kepala halaman (lihat playTTS()), BUKAN saat "▶️ Baca
+// dari sini" (playTTSFromVerse()) supaya nama kitab tidak diulang-ulang
+// tiap kali operator lompat ke ayat tertentu di tengah pasal.
+function spokenChapterAnnouncement(bookName, chapterNum) {
+  if (!bookName || !chapterNum) return "";
+  const p = (ttsSettings.lang || "id-ID").slice(0, 2).toLowerCase();
+  if (p === "zh") return `${bookName}第${chapterNum}章`;
+  if (p === "en") return `${bookName} Chapter ${chapterNum}.`;
+  return `${bookName} Pasal ${chapterNum}.`;
+}
+
 // BARU (6 Sep 2026, permintaan operator) -- logika "bicarakan daftar ayat
 // ini" DIPISAH dari playTTS() supaya bisa dipakai ULANG oleh
 // playTTSFromVerse() (baca mulai dari ayat tertentu, lihat tombol
@@ -7308,12 +7354,22 @@ function updateTTSButton() {
 // berperilaku SAMA PERSIS seperti sebelumnya -- selalu dari ayat 1
 // `currentChapterVerses` -- TIDAK ada yang berubah di sana, cuma badannya
 // dipindah ke sini.
-function speakVerseList(verses) {
+// diperbarui (8 Sep 2026): terima `opts.announce` opsional -- kalau diisi,
+// diucapkan sebagai kalimat pembuka (nama kitab+pasal) SEBELUM ayat 1.
+function speakVerseList(verses, opts) {
   if (!ttsSupported || !verses || !verses.length) return;
   window.speechSynthesis.cancel();
   const voice = pickVoice();
+  const announceText = opts && opts.announce;
+  if (announceText) {
+    const introUtter = new SpeechSynthesisUtterance(announceText);
+    if (voice) introUtter.voice = voice;
+    introUtter.lang = ttsSettings.lang;
+    introUtter.rate = ttsSettings.rate;
+    window.speechSynthesis.speak(introUtter);
+  }
   verses.forEach((v, idx) => {
-    let spoken = `Ayat ${v.verse}. ${v.text}`;
+    let spoken = `${spokenVerseLabel(v.verse)} ${v.text}`;
     if (ttsSettings.readNotes && v.note && v.note.trim()) {
       let noteSpoken = noteHtmlToPlainText(v.note);
       if (ttsSettings.parseArticulation) noteSpoken = cleanArticulationForSpeech(noteSpoken);
@@ -7352,7 +7408,19 @@ function playTTS() {
   }
 
   if (!currentChapterVerses.length) return;
-  speakVerseList(currentChapterVerses);
+
+  // BARU (8 Sep 2026, permintaan operator) -- umumkan nama kitab + nomor
+  // pasal sebelum ayat 1 (lihat spokenChapterAnnouncement()). Nama kitab
+  // diambil dari v.bookName ayat pertama (mengikuti bahasa kolom yang
+  // sedang ditampilkan/dibaca -- lihat kolom "Book Name" di Google Sheet,
+  // sama seperti label "Numbers 1" yang tampil di kepala halaman), dengan
+  // fallback ke BOOKS[].name (nama Indonesia) kalau kolom itu kosong.
+  const firstVerse = currentChapterVerses[0];
+  const fallbackBook = BOOKS.find((b) => b.num === currentBookNum);
+  const announceBookName = (firstVerse && firstVerse.bookName) || (fallbackBook ? fallbackBook.name : "");
+  const announce = spokenChapterAnnouncement(announceBookName, currentChapter);
+
+  speakVerseList(currentChapterVerses, { announce });
 }
 
 // BARU (6 Sep 2026, permintaan operator) -- "▶️ Baca dari sini": mulai
@@ -7396,7 +7464,7 @@ function toggleTTS() {
 // 13a-2) PUTAR SUARA 1 AYAT (dipakai di panel Kumpulan Ayat / "SPR ...")
 //   Beda dari playTTS() di atas (yang membacakan SATU PASAL PENUH dari
 //   currentChapterVerses): fungsi ini membacakan SATU AYAT SAJA lewat
-//   tombol "▶️ Putar" di tiap kartu ayat kumpulan, sesuai suara Google
+//   tombol "▶️ Google Voice" di tiap kartu ayat kumpulan, sesuai suara Google
 //   (id-ID/en-US/zh-CN) yang dipilih di kotak "🔊 Bahasa suara" panel itu.
 //   Memakai ttsSettings & pickVoice() yang sama supaya pilihan bahasa/
 //   jenis suara/kecepatan tetap konsisten dengan menu Pembaca biasa.
@@ -7407,11 +7475,33 @@ function stopCollectionVersePlayback() {
   if (!ttsSupported) return;
   window.speechSynthesis.cancel();
   if (collectionVersePlayingBtn) {
-    collectionVersePlayingBtn.textContent = "▶️ Putar";
+    collectionVersePlayingBtn.textContent = "▶️ Google Voice";
     collectionVersePlayingBtn.classList.remove("playing");
     collectionVersePlayingBtn = null;
   }
   releaseWakeLock();
+}
+
+// BARU (8 Sep 2026, permintaan operator) -- versi LENGKAP spokenVerseLabel()
+// di atas: dipakai KHUSUS oleh toggleCollectionVersePlayback() (tombol
+// "▶️ Google Voice" per-ayat di panel Kumpulan Ayat & Mode Layar Penuh
+// 1-layar Kumpulan Ayat, lihat openCollectionFullscreen()) -- BEDA dari
+// spokenVerseLabel() biasa (cuma "Ayat 5.") karena ayat-ayat di sebuah
+// Kumpulan Ayat bisa berasal dari kitab/pasal yang BEDA-BEDA satu sama
+// lain (bukan 1 pasal berurutan seperti di Pembaca biasa yang sudah
+// diumumkan sekali oleh spokenChapterAnnouncement()), jadi nama kitab +
+// nomor pasal + nomor ayat perlu disebut LENGKAP setiap kali supaya
+// pendengar tahu sedang di mana. Contoh:
+//   - id-ID -> "2 Raja-raja Pasal 25 Ayat 27."
+//   - en-US -> "2 Kings Chapter 25 Verse 27."
+//   - zh-CN -> "列王纪下第25章第27节"
+function spokenFullVerseLabel(v) {
+  if (!v) return "";
+  const bookName = v.bookName || (BOOKS.find((b) => b.num === v.bookNumber) || {}).name || "";
+  const p = (ttsSettings.lang || "id-ID").slice(0, 2).toLowerCase();
+  if (p === "zh") return `${bookName}第${v.chapter}章第${v.verse}节`;
+  if (p === "en") return `${bookName} Chapter ${v.chapter} Verse ${v.verse}.`;
+  return `${bookName} Pasal ${v.chapter} Ayat ${v.verse}.`;
 }
 
 function toggleCollectionVersePlayback(v, btn) {
@@ -7429,7 +7519,11 @@ function toggleCollectionVersePlayback(v, btn) {
   stopCollectionVersePlayback();
 
   const voice = pickVoice();
-  const utter = new SpeechSynthesisUtterance(`Ayat ${v.verse}. ${v.text}`);
+  // diperbarui (8 Sep 2026): sekarang mengumumkan nama kitab + pasal +
+  // ayat LENGKAP di depan (lihat spokenFullVerseLabel() di atas), bukan
+  // cuma "Ayat 27." -- supaya jelas ayat ini dari mana saat dibacakan di
+  // tengah Kumpulan Ayat campuran.
+  const utter = new SpeechSynthesisUtterance(`${spokenFullVerseLabel(v)} ${v.text}`);
   if (voice) utter.voice = voice;
   utter.lang = ttsSettings.lang;
   utter.rate = ttsSettings.rate;
