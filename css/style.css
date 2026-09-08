@@ -498,19 +498,49 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 }
 
 @media (max-width: 640px) {
-  /* Di HP, toolbar menempel di bawah layar (bukan ikut men-scroll
-     bersama syair) supaya panah/bagikan/putar selalu terjangkau tanpa
-     harus gulung ke bawah dulu -- tombol "▾/▸ Tombol" tetap bisa
-     menyembunyikannya kalau dianggap mengganggu bacaan. */
+  /* PERBAIKAN (8 Sep 2026, permintaan operator: "kalau ayat sudah di
+     akhir, garis paling bawah malah naik") -- KONFIRMASI dugaan
+     operator: benar, ini BUKAN soal "slider top vs slider bottom"
+     sebagai dua jenis komponen berbeda, tapi soal DUA MEKANISME CSS
+     posisi yang beda: `position: sticky` (dipakai di sini SEBELUMNYA)
+     "menempel" ke bawah layar SELAMA masih ada isi untuk digulir, tapi
+     begitu sudah sampai ujung isi (ayat/bait TERAKHIR), sticky
+     "melepas diri" dan balik ke posisi alur normalnya (tepat di bawah
+     ayat terakhir) -- makanya kelihatan "naik" waktu sudah di akhir
+     bacaan, DAN kelihatan naik juga kalau isinya pendek dari awal
+     (persis laporan soal Kidung pendek sebelumnya). Baris toolbar di
+     Mode Layar Penuh Kumpulan Ayat (`.collection-fs-top-row
+     .collapsible-toolbar`, lihat override KHUSUS di CSS-nya sendiri)
+     TIDAK pernah kena masalah ini karena dari awal memang tidak dibuat
+     sticky/fixed sama sekali -- dia normal SELALU elemen PERTAMA di
+     atas, jadi otomatis selalu "di atas" apa pun panjang isinya.
+     SOLUSI (persis pola yang SUDAH dipakai & terbukti jalan di kotak
+     tulis AI Chat, lihat `.ai-chat-input-row` @media max-width:859px
+     di atas): ganti `position: sticky` jadi `position: fixed` --
+     `fixed` terikat ke LAYAR (viewport) itu sendiri, BUKAN ke alur
+     dokumen, jadi selalu di ujung PALING bawah layar sungguhan, apa
+     pun panjang ATAU posisi gulir isinya (sama seperti tombol "Tutup"
+     di Kumpulan Ayat yang selalu di atas). Kotak isi (#kidungPanel /
+     #reader) diberi padding-bottom tambahan di bawah (lihat aturan
+     terpisah) supaya baris terakhir TIDAK ketutupan toolbar yang kini
+     lepas dari alur halaman. */
   .kidung-toolbar, .collapsible-toolbar {
-    position: sticky; bottom: 0;
+    position: fixed; left: 0; right: 0; bottom: 0; margin: 0;
     background: var(--paper);
-    margin-left: -14px; margin-right: -14px; margin-bottom: -14px;
     padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -4px 10px rgba(0,0,0,.10);
     border-radius: 14px 14px 0 0;
     z-index: 5;
   }
+  /* Jarak bawah supaya baris/ayat TERAKHIR tidak ketutupan toolbar yang
+     kini position:fixed (tidak lagi otomatis "makan tempat" di alur
+     halaman biasa seperti sticky). Angka ini ekstra di ATAS padding
+     80px bawaan `.content-wrap` (lihat di sana) -- cukup untuk status
+     TERLIPAT (cuma garis tipis); status TERBUKA PENUH (banyak tombol)
+     bisa saja menutupi sedikit baris paling akhir sementara, operator
+     tinggal gulir sedikit atau lipat lagi toolbar-nya -- ini wajar &
+     sama seperti pola "lembar bawah" di aplikasi lain umumnya. */
+  #kidungPanel, #reader { padding-bottom: 60px; }
 }
 .notes-menu-list { display: flex; flex-direction: column; gap: 10px; }
 .notes-menu-item .result-item { width: 100%; text-align: left; }
