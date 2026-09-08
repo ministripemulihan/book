@@ -687,13 +687,17 @@
                  buildCollapsibleToolbar()/.kidung-toolbar di
                  css/style.css) supaya area baca terasa lega/"fullscreen"
                  di HP -- operator tinggal tekan garis di paling bawah
-                 kalau perlu pindah pasal atau ubah ukuran huruf. Ini
+                 kalau perlu pindah pasal. Ini
                  elemen STATIS (tidak dibangun ulang tiap renderChapter()
                  seperti punya Kidung), jadi listener-nya cukup dipasang
-                 SEKALI lewat initReaderBottomToolbar() di js/app.js --
-                 lihat juga initFontSizeControl() untuk tombol A-/A+ di
-                 sini yang berbagi pengaturan sama persis dengan A-/A+ di
-                 header atas (localStorage sama, cuma jalan pintas kedua). -->
+                 SEKALI lewat initReaderBottomToolbar() di js/app.js.
+                 (8 Sep 2026, permintaan operator: baris A-/A+ yang
+                 tadinya juga ada di sini sudah DIHAPUS -- terlalu
+                 banyak tombol A-/A+ tersebar bikin bingung; A-/A+ di
+                 header atas sekarang jadi satu-satunya & sudah
+                 diperbaiki supaya benar-benar mengubah ukuran ayat di
+                 1/2/3-kolom, lihat catatan `.verse-text-wrap` di
+                 css/style.css.) -->
             <div id="readerNavBottomWrap" class="collapsible-toolbar collapsed">
               <div class="collapsible-toolbar-body">
                 <div class="reader-nav reader-nav-bottom">
@@ -701,12 +705,21 @@
                   <h2 id="readerTitleBottom"></h2>
                   <button id="nextChapterBottom" class="chip-btn">Pasal Berikutnya →</button>
                 </div>
-                <div class="reader-columns-panes-font-row reader-nav-bottom-font-row">
-                  <button type="button" id="readerBottomFontDecrease" class="chip-btn small" title="Perkecil huruf ayat" aria-label="Perkecil huruf ayat">A-</button>
-                  <button type="button" id="readerBottomFontIncrease" class="chip-btn small" title="Perbesar huruf ayat" aria-label="Perbesar huruf ayat">A+</button>
-                </div>
+                <!-- DIHAPUS (8 Sep 2026, permintaan operator: "banyak
+                     tombol A-/A+ bikin pusing, mau pakai yang mana") --
+                     baris A-/A+ jalan-pintas kedua di sini dihapus,
+                     supaya cuma 1 pasang A-/A+ yang kelihatan (di header
+                     atas) -- sekarang SUDAH benar-benar berfungsi utk
+                     ayat 1/2/3-kolom (lihat perbaikan `.verse-text-wrap`
+                     font-size, css/style.css), jadi tombol di sini
+                     sudah tidak perlu lagi sebagai "pintasan darurat".
+                     Pengaturannya (localStorage sama) TIDAK hilang, cuma
+                     tombolnya yang dilepas dari sini -- lihat juga
+                     initFontSizeControl() (js/app.js), blok
+                     readerBottomFontIncrease/Decrease ikut dihapus di
+                     sana. -->
               </div>
-              <button type="button" id="readerNavBottomToggle" class="collapsible-toolbar-toggle" title="Sembunyikan/tampilkan navigasi pasal & ukuran huruf" aria-label="Sembunyikan/tampilkan navigasi pasal & ukuran huruf">
+              <button type="button" id="readerNavBottomToggle" class="collapsible-toolbar-toggle" title="Sembunyikan/tampilkan navigasi pasal" aria-label="Sembunyikan/tampilkan navigasi pasal">
                 <span class="collapsible-toolbar-toggle-arrow">^</span>
               </button>
             </div>
