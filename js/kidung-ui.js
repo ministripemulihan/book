@@ -711,13 +711,61 @@ function renderKidungReader(meta, baits) {
   let titleLine = (meta.judul || "").trim();
   if (meta.pengarang && meta.pengarang.trim()) titleLine += (titleLine ? " " : "") + "(" + meta.pengarang.trim() + ")";
   if (titleLine) lines.push(titleLine);
-  if (meta.birama && meta.birama.trim()) lines.push(meta.birama.trim());
   header.innerHTML = lines.map((l) => "<div>" + escapeHtml(l) + "</div>").join("");
+
+  // BARU (8 Sep 2026) -- baris badge birama (nada dasar+ketukan, mis.
+  // "D 3/4") & pola suku kata (mis. "8 8 8 8", kolom Sheet BARU
+  // "pola_suku_kata", lihat js/csv.js) TERPISAH dari `lines` di atas
+  // (dulu birama ikut ditumpuk sebagai baris polos) supaya bisa
+  // ditampilkan sebagai badge kecil berdampingan, bukan baris penuh --
+  // keduanya OPSIONAL, badge otomatis tidak muncul kalau kolomnya kosong.
+  const badgeWrap = document.createElement("div");
+  badgeWrap.className = "kidung-reader-badges";
+  if (meta.birama && meta.birama.trim()) {
+    const b = document.createElement("span");
+    b.className = "kidung-badge";
+    b.textContent = meta.birama.trim();
+    badgeWrap.appendChild(b);
+  }
+  if (meta.polaSukuKata && meta.polaSukuKata.trim()) {
+    const b = document.createElement("span");
+    b.className = "kidung-badge kidung-badge-muted";
+    b.textContent = meta.polaSukuKata.trim();
+    badgeWrap.appendChild(b);
+  }
+  // Tombol ℹ️ -- buka panel Sejarah kidung ini + Cara Membaca Kidung
+  // (umum, dari panel Info Kami/tab Setup) -- lihat openKidungInfoPanel()
+  // di bawah. Selalu ditampilkan (bukan cuma kalau meta.sejarah terisi)
+  // supaya "Cara Membaca Kidung" tetap bisa dibuka kapan saja walau
+  // kidung yang sedang dibuka belum ada catatan sejarahnya sendiri.
+  const infoBtn = document.createElement("button");
+  infoBtn.type = "button";
+  infoBtn.className = "icon-btn kidung-info-btn";
+  infoBtn.textContent = "ℹ️";
+  infoBtn.title = "Sejarah & cara baca kidung";
+  infoBtn.setAttribute("aria-label", "Sejarah & cara baca kidung");
+  infoBtn.addEventListener("click", () => openKidungInfoPanel(meta));
+  badgeWrap.appendChild(infoBtn);
+  if (badgeWrap.children.length) header.appendChild(badgeWrap);
+
   panel.appendChild(header);
 
   const body = document.createElement("div");
   body.className = "kidung-reader-body";
   baits.forEach((b) => {
+    // BARU (8 Sep 2026) -- kidung ber-SYAIR-GANDA (mis. No.388, lihat
+    // catatan panjang getKidungBaitsWithKoor() di js/kidung.js) sekarang
+    // menempel `sectionTitle` ("SYAIR KE SATU"/"SYAIR KEDUA" dst) di
+    // bait pertama tiap syair -- tampilkan sebagai JUDUL BAGIAN (bukan
+    // "Koor:") tepat SEBELUM bait itu, supaya urutannya kebaca persis
+    // seperti di Sheet: judul syair, lalu bait 1, 2, 3... syair itu,
+    // baru judul syair berikutnya, dst -- tidak lagi berselang-seling.
+    if (b.sectionTitle && b.sectionTitle.trim()) {
+      const titleP = document.createElement("p");
+      titleP.className = "kidung-syair-title";
+      titleP.textContent = b.sectionTitle.trim();
+      body.appendChild(titleP);
+    }
     const verseP = document.createElement("p");
     verseP.className = "kidung-verse";
     verseP.innerHTML = "<strong>" + b.noBait + ".</strong> " + escapeHtml(b.teks || "").replace(/\n/g, "<br>");
@@ -738,6 +786,136 @@ function renderKidungReader(meta, baits) {
   // ke panel supaya style-nya langsung kelihatan begitu layar baca
   // dibuka (bukan cuma setelah tombol ⚙️ pertama kali ditekan).
   applyKidungReaderStyle(body);
+
+  // BARU (8 Sep 2026, permintaan operator) -- swipe kiri/kanan di HP
+  // pindah nomor kidung, pakai jalur SAMA seperti tombol ◀/▶ (lihat
+  // attachKidungSwipeNav() di bawah).
+  attachKidungSwipeNav(panel, meta);
+}
+
+// ------------------------------------------------------------
+//  SWIPE KIRI/KANAN (HP) -- pindah nomor kidung sebelumnya/selanjutnya,
+//  BARU (8 Sep 2026, permintaan operator). SENGAJA dipasang di `panel`
+//  (bukan cuma `body`) supaya tetap kepakai walau jari mulai dari atas
+//  header/badge, bukan cuma dari area syair.
+//
+//  ATURAN ARAH (sesuai diminta): swipe KE KANAN (jari bergerak dari kiri
+//  ke kanan, dx > 0) = kidung SELANJUTNYA (▶); swipe KE KIRI (dx < 0) =
+//  kidung SEBELUMNYA (◀). Kalau nanti dirasa terbalik (kebanyakan galeri
+//  foto/aplikasi lain pakai arah sebaliknya), tinggal tukar nilai
+//  `direction` di 2 baris bertanda "ARAH" di bawah -- tidak perlu ubah
+//  bagian lain.
+//
+//  Lompatannya IKUT PERSIS findAdjacentKidungCrossBook() (js/kidung.js,
+//  fungsi yang SAMA dipakai tombol ◀/▶) -- jadi kalau kidung yang lagi
+//  dibuka adalah nomor TERAKHIR di buku ini (mis. Kidung No.21 alias
+//  "K21"), swipe berikutnya otomatis lompat ke nomor PERTAMA buku
+//  berikutnya sesuai CONFIG.KIDUNG_BOOK_ORDER (js/config.js) -- mis.
+//  Supplemen No.1 ("S1") kalau memang itu urutan buku berikutnya --
+//  BUKAN lompat ke "K22" yang belum tentu ada. Jadi benar seperti
+//  dugaan: tergantung urutan/baris buku yang dikonfig, bukan angka
+//  mentah +1/-1.
+//
+//  Ambang batas (THRESHOLD/MAX_OFF_AXIS/MAX_MS) sengaja dibuat longgar
+//  tapi tetap disiplin: gerak vertikal >70px dianggap SCROLL biasa
+//  (dibatalkan, bukan swipe), & swipe yang berlangsung >800ms dianggap
+//  bukan sengaja (mis. jari cuma singgah lama di layar).
+function attachKidungSwipeNav(panelEl, meta) {
+  const noInt = parseInt(meta.noKidung, 10);
+  if (!panelEl || isNaN(noInt)) return;
+  const THRESHOLD = 60;
+  const MAX_OFF_AXIS = 70;
+  const MAX_MS = 800;
+  let startX = null, startY = null, startT = 0, swiping = false;
+
+  panelEl.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+    swiping = true;
+  }, { passive: true });
+
+  panelEl.addEventListener("touchend", (e) => {
+    if (!swiping || startX == null) return;
+    swiping = false;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const dt = Date.now() - startT;
+    startX = null;
+    if (Math.abs(dy) > MAX_OFF_AXIS) return; // gerak vertikal -> scroll biasa
+    if (Math.abs(dx) < THRESHOLD) return;
+    if (dt > MAX_MS) return;
+    const direction = dx > 0 ? 1 : -1; // ARAH: dx>0 (ke kanan) = selanjutnya
+    findAdjacentKidungCrossBook(meta.buku, noInt, direction).then((target) => {
+      if (target) openKidungReader(target.buku, String(target.no));
+    });
+  }, { passive: true });
+}
+
+// ------------------------------------------------------------
+//  PANEL ℹ️ "SEJARAH & CARA BACA KIDUNG" -- BARU (8 Sep 2026). Isinya 2
+//  bagian: (1) sejarah kidung INI SAJA, dari meta.sejarah (kolom Sheet
+//  "sejarah", lihat js/csv.js) -- kosong = bagian ini disembunyikan; (2)
+//  "Cara Membaca Kidung" UMUM (berlaku semua kidung), diambil dari panel
+//  Info Kami/tab Setup lewat getInfoKamiItemSync("cara_baca_kidung")
+//  (js/infokami.js) supaya admin bisa mengubahnya kapan saja dari Sheet
+//  tanpa perlu ubah kode ini lagi -- SELALU tampil (pakai teks fallback
+//  bawaan kalau tab Setup belum diisi).
+// ------------------------------------------------------------
+function openKidungInfoPanel(meta) {
+  const old = document.getElementById("kidungInfoOverlay");
+  if (old) old.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "kidungInfoOverlay";
+  overlay.className = "kidung-info-overlay";
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+
+  const box = document.createElement("div");
+  box.className = "kidung-info-box";
+
+  const head = document.createElement("div");
+  head.className = "kidung-info-header";
+  head.innerHTML = "<h2>Sejarah &amp; Cara Baca</h2>";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "icon-btn";
+  closeBtn.textContent = "✕";
+  closeBtn.setAttribute("aria-label", "Tutup");
+  closeBtn.addEventListener("click", () => overlay.remove());
+  head.appendChild(closeBtn);
+  box.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "kidung-info-body";
+
+  const sejarah = (meta.sejarah || "").trim();
+  if (sejarah) {
+    const sec = document.createElement("section");
+    sec.className = "kidung-info-item";
+    sec.innerHTML = "<h3>Sejarah kidung No. " + escapeHtml(formatKidungNo(meta.buku, meta.noKidung)) + "</h3>" +
+      "<div>" + escapeHtml(sejarah).replace(/\n/g, "<br>") + "</div>";
+    body.appendChild(sec);
+  }
+
+  const caraBaca = (typeof getInfoKamiItemSync === "function" ? getInfoKamiItemSync("cara_baca_kidung") : "").trim();
+  if (caraBaca) {
+    const sec = document.createElement("section");
+    sec.className = "kidung-info-item";
+    sec.innerHTML = "<h3>Cara membaca kidung</h3>" +
+      "<div>" + escapeHtml(caraBaca).replace(/\n/g, "<br>") + "</div>";
+    body.appendChild(sec);
+  }
+
+  if (!body.children.length) {
+    body.innerHTML = '<p class="info-kami-empty">Belum ada info untuk ditampilkan.</p>';
+  }
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
 }
 
 // ------------------------------------------------------------
