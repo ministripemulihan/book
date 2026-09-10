@@ -1446,6 +1446,14 @@
        custom sendiri. Dimuat di sini (bukan cuma di index.html) karena
        Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
   <script src="js/config.js"></script>
+  <!-- BARU (10 Sep 2026, sesi ke-13) -- js/soundfx.js: SATU SUMBER
+       KEBENARAN daftar & sintesis efek suara "🎉 Efek Panggung", dipakai
+       bersama dengan index.html (tab Studio & menu pratinjau admin).
+       Dimuat di sini juga (jendela terpisah dari index.html) supaya
+       Layar 2 bisa memutar efeknya sendiri -- lihat SoundFX.configure()
+       dekat getEffectsMasterGain_() di bawah untuk cara efek ini tetap
+       ikut sakelar mute-semua "M". -->
+  <script src="js/soundfx.js"></script>
   <!-- BARU (7 Sep 2026) -- daftarkan Service Worker juga di Layar 2 itu
        sendiri (jendela terpisah dari index.html) supaya halaman ini pun
        bisa dibuka tanpa internet -- lihat catatan panjang di sw.js &
@@ -1606,21 +1614,21 @@
   let audioCtx = null;
   // BARU (10 Sep 2026, sesi ke-12, permintaan operator "tetap ada
   // shortcut M untuk mute SEMUA suara") -- SEMUA efek suara yang
-  // disintesis di file ini (beep() bawaan, & playNote_()/
-  // playNoiseBurst_()/playSweep_()/playFilteredNoise_() punya
-  // playEffectSound_() untuk 🎉 Efek Panggung) SEKARANG disalurkan
-  // lewat 1 GainNode bersama (getEffectsMasterGain_()) alih-alih
-  // langsung ke audioCtx.destination masing-masing -- supaya SEMUANYA
-  // bisa dibisukan SEKALIGUS lewat 1 sakelar (effectsMuted_), tanpa
-  // perlu mengubah kode tiap efek satu-satu. TIDAK menyentuh suara
-  // YouTube (`ytEl`, tetap diatur terpisah lewat mute/unMute bawaan
-  // YouTube -- sudah benar/lebih akurat lewat API resminya sendiri)
-  // maupun bel Timer/Bel Cepat (`bellAudioEl`, sudah punya
-  // stopBellSound() sendiri) -- tombol/pintasan "M" di Studio
-  // (js/presentation-studio.js) mengirim KETIGANYA sekaligus (mute
-  // YouTube + stop bel + ini) supaya dari sudut pandang operator tetap
-  // terasa sebagai "1 tombol, semua suara diam", walau di baliknya 3
-  // jalur berbeda.
+  // disintesis di file ini (beep() bawaan, playNote_()/
+  // playNoiseBurst_() di bawah, & SoundFX.play() dari js/soundfx.js
+  // untuk 🎉 Efek Panggung -- lihat SoundFX.configure() setelah
+  // setEffectsMuted_() di bawah) SEKARANG disalurkan lewat 1 GainNode
+  // bersama (getEffectsMasterGain_()) alih-alih langsung ke
+  // audioCtx.destination masing-masing -- supaya SEMUANYA bisa
+  // dibisukan SEKALIGUS lewat 1 sakelar (effectsMuted_), tanpa perlu
+  // mengubah kode tiap efek satu-satu. TIDAK menyentuh suara YouTube
+  // (`ytEl`, tetap diatur terpisah lewat mute/unMute bawaan YouTube --
+  // sudah benar/lebih akurat lewat API resminya sendiri) maupun bel
+  // Timer/Bel Cepat (`bellAudioEl`, sudah punya stopBellSound() sendiri)
+  // -- tombol/pintasan "M" di Studio (js/presentation-studio.js)
+  // mengirim KETIGANYA sekaligus (mute YouTube + stop bel + ini) supaya
+  // dari sudut pandang operator tetap terasa sebagai "1 tombol, semua
+  // suara diam", walau di baliknya 3 jalur berbeda.
   let effectsMuted_ = false;
   let effectsMasterGain_ = null;
   function getEffectsMasterGain_() {
@@ -1635,6 +1643,18 @@
   function setEffectsMuted_(muted) {
     effectsMuted_ = !!muted;
     if (effectsMasterGain_) effectsMasterGain_.gain.value = effectsMuted_ ? 0 : 1;
+  }
+  // BARU (10 Sep 2026, sesi ke-13) -- sambungkan SoundFX (js/soundfx.js)
+  // ke AudioContext & GainNode YANG SUDAH ADA di atas, supaya efek
+  // "🎉 Efek Panggung" yang diputar lewat SoundFX.play() TETAP ikut
+  // sakelar mute-semua "M" (effectsMuted_) sama seperti beep()/bel/dsb
+  // di file ini -- tanpa ini, SoundFX akan membuat AudioContext-nya
+  // sendiri yang berdiri sendiri (tidak ikut ter-mute).
+  if (typeof SoundFX !== "undefined") {
+    SoundFX.configure({
+      getAudioContext: () => (audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)()),
+      getDestination: getEffectsMasterGain_,
+    });
   }
 
   function fmtMMSS(totalSec) {
@@ -1930,155 +1950,16 @@
       src.start(t0); src.stop(t0 + dur + 0.05);
     } catch (e) {}
   }
-  // BARU (10 Sep 2026, sesi ke-11, permintaan operator "tambah suara
-  // efek: bersorak, tawa, ciuman, boing, detak jantung, wow, berteriak,
-  // ajaib, kemenangan, gagal, canggung, peluit, drum, guntur, hujan") --
-  // 2 "bahan dasar" TAMBAHAN, semangatnya SAMA seperti playNote_()/
-  // playNoiseBurst_() di atas (disintesis langsung lewat Web Audio API,
-  // BUKAN file audio, supaya tetap ringan & 100% offline):
-  //  - playSweep_(): 1 nada yang MELUNCUR dari 1 frekuensi ke frekuensi
-  //    lain (dipakai utk boing/wow/berteriak/gagal/canggung -- efek yang
-  //    intinya "naik" atau "turun" nadanya, bukan nada tetap).
-  //  - playFilteredNoise_(): sama seperti playNoiseBurst_() tapi jenis &
-  //    frekuensi filter-nya BISA DIATUR per panggilan (bukan selalu
-  //    bandpass 1200Hz) -- dipakai utk guntur (lowpass, rendah & panjang)
-  //    & hujan (highpass, mendesis pelan & panjang), beda karakter dari
-  //    noise pendek drumroll/applause yang sudah ada.
-  function playSweep_(fromFreq, toFreq, when, dur, type, peakGain) {
-    try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = type || "sine";
-      const t0 = audioCtx.currentTime + when;
-      o.frequency.setValueAtTime(fromFreq, t0);
-      o.frequency.linearRampToValueAtTime(toFreq, t0 + dur);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peakGain || 0.3, t0 + Math.min(0.05, dur / 4));
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(getEffectsMasterGain_());
-      o.start(t0); o.stop(t0 + dur + 0.05);
-    } catch (e) {}
-  }
-  function playFilteredNoise_(when, dur, peakGain, filterType, freq, Q) {
-    try {
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (!noiseBuffer_) {
-        const len = audioCtx.sampleRate * 1;
-        noiseBuffer_ = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-        const d = noiseBuffer_.getChannelData(0);
-        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      }
-      const src = audioCtx.createBufferSource();
-      src.buffer = noiseBuffer_; src.loop = dur > 1;
-      const filt = audioCtx.createBiquadFilter();
-      filt.type = filterType || "lowpass"; filt.frequency.value = freq || 400; filt.Q.value = Q || 0.7;
-      const g = audioCtx.createGain();
-      const t0 = audioCtx.currentTime + when;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peakGain || 0.2, t0 + Math.min(0.15, dur / 4));
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(filt); filt.connect(g); g.connect(getEffectsMasterGain_());
-      src.start(t0); src.stop(t0 + dur + 0.05);
-    } catch (e) {}
-  }
-  function playEffectSound_(soundKey) {
-    if (soundKey === "ding") {
-      playNote_(1318.5, 0, 0.9, "sine", 0.32); // E6, lembut -- mirip beep() tapi nada lebih tinggi/ceria
-      playNote_(1975.5, 0.05, 0.7, "sine", 0.14); // B6 tipis di atasnya, kesan "kristal"
-    } else if (soundKey === "tada") {
-      playNote_(523.25, 0, 0.18, "triangle", 0.3); // C5
-      playNote_(783.99, 0.12, 0.5, "triangle", 0.3); // G5, menahan -- kesan "ta-DA!"
-    } else if (soundKey === "fanfare") {
-      [392.0, 523.25, 659.25, 783.99].forEach((f, i) => playNote_(f, i * 0.14, 0.35, "square", 0.22)); // G4-C5-E5-G5 naik
-      playNote_(783.99, 0.56, 0.6, "square", 0.26); // nada penutup ditahan
-    } else if (soundKey === "drumroll") {
-      // ~18 ledakan noise cepat berturut-turut (rentetan drumroll),
-      // diakhiri 1 pukulan lebih keras + nada rendah (kesan "crash").
-      for (let i = 0; i < 18; i++) playNoiseBurst_(i * 0.09, 0.12, 0.22);
-      playNoiseBurst_(1.65, 0.5, 0.4);
-      playNote_(110, 1.65, 0.5, "sawtooth", 0.2);
-    } else if (soundKey === "applause") {
-      // ~30 ledakan noise dengan JEDA ACAK (bukan berjarak sama rata
-      // seperti drumroll di atas) supaya terdengar lebih "organik"
-      // menyerupai tepuk tangan banyak orang, bukan mesin.
-      let t = 0;
-      for (let i = 0; i < 30; i++) { t += 0.03 + Math.random() * 0.08; playNoiseBurst_(t, 0.06 + Math.random() * 0.05, 0.14 + Math.random() * 0.1); }
-    } else if (soundKey === "cheer") {
-      // Bersorak -- gabungan nada naik cepat (kesan "hore!") + noise
-      // yang membesar (kerumunan bersorak), BEDA dari fanfare (yang
-      // temponya lebih pelan/megah).
-      [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((f, i) => playNote_(f, i * 0.06, 0.3, "square", 0.2));
-      playFilteredNoise_(0.05, 0.9, 0.22, "bandpass", 2000, 0.6);
-    } else if (soundKey === "laugh") {
-      // Tawa -- beberapa nada pendek memantul-mantul (kesan "ha-ha-ha"),
-      // nada naik-turun bergantian, staccato.
-      [523.25, 659.25, 523.25, 659.25, 523.25].forEach((f, i) => playNote_(f, i * 0.16, 0.13, "triangle", 0.26));
-    } else if (soundKey === "kiss") {
-      // Ciuman -- "smooch": nada meluncur cepat turun lalu 1 letupan
-      // noise kecil (kesan kecupan).
-      playSweep_(900, 250, 0, 0.12, "sine", 0.28);
-      playNoiseBurst_(0.11, 0.05, 0.2);
-    } else if (soundKey === "boing") {
-      // Boing -- pegas kartun klasik: nada meluncur naik lalu turun
-      // cepat dengan gelombang sine.
-      playSweep_(180, 700, 0, 0.12, "sine", 0.3);
-      playSweep_(700, 220, 0.12, 0.22, "sine", 0.26);
-    } else if (soundKey === "heartbeat") {
-      // Detak Jantung -- "lub-dub" 2x berturut, nada rendah pendek.
-      [0, 0.32].forEach((base) => {
-        playNote_(90, base, 0.12, "sine", 0.32);
-        playNote_(70, base + 0.16, 0.14, "sine", 0.24);
-      });
-    } else if (soundKey === "wow") {
-      // Wow -- 1 nada meluncur naik (kesan takjub/terkesima).
-      playSweep_(400, 1100, 0, 0.35, "sine", 0.3);
-    } else if (soundKey === "scream") {
-      // Berteriak -- nada meluncur naik TINGGI & tajam (mirip sirene
-      // pendek) + noise tajam menyertai.
-      playSweep_(500, 1800, 0, 0.35, "sawtooth", 0.22);
-      playFilteredNoise_(0, 0.35, 0.16, "highpass", 2500, 0.8);
-    } else if (soundKey === "magic") {
-      // Ajaib -- arpeggio nada tinggi berkilau (kesan "sim salabim").
-      [1046.5, 1318.5, 1568.0, 2093.0, 2637.0].forEach((f, i) => playNote_(f, i * 0.07, 0.4, "sine", 0.18));
-    } else if (soundKey === "victory") {
-      // Kemenangan -- larik nada naik cepat diakhiri akor besar (lebih
-      // megah/panjang dari "tada", beda karakter dari fanfare yang
-      // temponya lebih lebar).
-      [392.0, 493.88, 587.33, 783.99, 987.77].forEach((f, i) => playNote_(f, i * 0.09, 0.3, "square", 0.22));
-      [783.99, 987.77, 1174.66].forEach((f) => playNote_(f, 0.5, 0.8, "square", 0.22));
-    } else if (soundKey === "fail") {
-      // Gagal -- "sad trombone": 3 nada meluncur turun berturut (wah...
-      // wah... waaah...).
-      [0, 0.42, 0.84].forEach((t, i) => playSweep_(392 - i * 40, 300 - i * 40, t, 0.4, "sawtooth", 0.24));
-    } else if (soundKey === "awkward") {
-      // Canggung -- 1 nada meluncur turun PELAN & janggal (kesan hening
-      // canggung setelah sesuatu tidak berjalan mulus).
-      playSweep_(300, 120, 0, 0.9, "triangle", 0.16);
-    } else if (soundKey === "whistle") {
-      // Peluit -- nada tinggi bersih ditahan, mirip peluit wasit, dengan
-      // sedikit getar (vibrato sederhana lewat 2 nada berdekatan).
-      playNote_(2600, 0, 0.5, "sine", 0.22);
-      playNote_(2680, 0.05, 0.4, "sine", 0.14);
-    } else if (soundKey === "drum") {
-      // Drum -- 1 pukulan tom/bass drum rendah (BEDA dari "drumroll" yang
-      // berupa rentetan panjang) -- nada rendah pendek + sedikit noise.
-      playNote_(100, 0, 0.28, "sine", 0.34);
-      playNoiseBurst_(0, 0.08, 0.18);
-    } else if (soundKey === "thunder") {
-      // Guntur -- gemuruh rendah panjang (lowpass, frekuensi rendah)
-      // diikuti 1-2 "gelegar" noise lebih tajam di tengahnya.
-      playFilteredNoise_(0, 2.2, 0.28, "lowpass", 220, 0.9);
-      playFilteredNoise_(0.4, 0.35, 0.3, "bandpass", 500, 1.2);
-      playNote_(55, 0.4, 1.2, "sawtooth", 0.18);
-    } else if (soundKey === "rain") {
-      // Hujan -- desisan lembut & cukup panjang (highpass, gain kecil),
-      // kesan gerimis/hujan turun, bukan efek "tembak sekali lalu habis".
-      playFilteredNoise_(0, 3, 0.1, "highpass", 3500, 0.5);
-    } else {
-      beep();
-    }
-  }
+  // BARU (10 Sep 2026, sesi ke-13) -- kode sintesis playSweep_()/
+  // playFilteredNoise_() & dispatcher playEffectSound_() (utk semua
+  // efek suara "🎉 Efek Panggung": bersorak, tawa, ciuman, boing, dst)
+  // SEKARANG dipusatkan di js/soundfx.js (SATU SUMBER KEBENARAN yang
+  // dipakai bersama index.html/presentation-studio.js & effectpreview.js
+  // -- lihat SoundFX.configure() dekat getEffectsMasterGain_() di atas
+  // untuk cara efek ini tetap ikut sakelar mute-semua "M"). Panggil
+  // SoundFX.play(soundKey) di bawah, BUKAN lagi playEffectSound_()
+  // lokal -- lihat listener "message" & tombol "🎊 Ta-da!" undian di
+  // bawah untuk pemanggilnya.
 
   // Klik DI MANA SAJA di Layar 2 ini menghentikan bel custom yang sedang
   // berbunyi (permintaan operator: bisa dihentikan tanpa harus balik ke
@@ -2825,7 +2706,7 @@
     }
     wheelFinishTimeout_ = setTimeout(() => {
       wheelWinnerBannerEl.textContent = "🏆 " + wheelEntries_[winnerIndex];
-      if (typeof playEffectSound_ === "function") playEffectSound_("tada");
+      if (typeof SoundFX !== "undefined") SoundFX.play("tada");
       if (typeof playConfetti_ === "function") playConfetti_();
       if (window.opener) {
         try {
@@ -3894,7 +3775,7 @@
     // action seperti tipe lain (tidak ada action "stop") karena efeknya
     // memang dirancang untuk selesai & hilang sendiri.
     if (data.type === "effect") { playEffectVisual_(data); return; }
-    if (data.type === "sound") { playEffectSound_(data.sound); return; }
+    if (data.type === "sound") { if (typeof SoundFX !== "undefined") SoundFX.play(data.sound); return; }
     // BARU (9 Sep 2026, sesi ke-9) -- lihat playShout_() & wireEffectsTab()
     // (js/presentation-studio.js).
     if (data.type === "shout") { playShout_(data.text); return; }
