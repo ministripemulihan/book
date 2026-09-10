@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260910b" />
+<link rel="stylesheet" href="css/style.css?v=20260910c" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2707,18 +2707,52 @@
             <button type="button" id="psMapRenameBtn" class="chip-btn small">✏️ Ganti Nama</button>
             <button type="button" id="psMapDeleteBtn" class="chip-btn small">🗑️ Hapus Peta</button>
           </div>
+          <!-- BARU (10 Sep 2026, permintaan operator) -- 💾 Simpan/Muat
+               Peta (file .json): peta (gambar + SEMUA pin + kalibrasi +
+               daftar titik tabel) disimpan di localStorage PERANGKAT INI
+               saja -- kalau operator ganti komputer, hapus cache
+               browser, atau mau membagikan peta yang sudah rapi ke
+               operator lain, sebelumnya tidak ada cara memindahkannya.
+               "⬇️ Unduh" mengekspor peta AKTIF jadi 1 file .json (gambar
+               ikut disertakan sebagai data di dalam file, tidak perlu
+               file terpisah); "⬆️ Unggah" membaca file itu lagi dan
+               menaruh SEMUA pin di posisi PERSIS SAMA seperti saat
+               diunduh (xPct/yPct disimpan apa adanya, tidak dihitung
+               ulang). Lihat exportActiveMap_()/importMapFile_() di bawah.
+               -->
+          <div class="ps-btn-row" style="margin-top:6px;">
+            <button type="button" id="psMapExportBtn" class="chip-btn small">⬇️ Unduh Peta (.json)</button>
+            <button type="button" id="psMapImportBtn" class="chip-btn small">⬆️ Unggah Peta (.json)</button>
+          </div>
+          <input type="file" id="psMapImportInput" accept="application/json" hidden />
+          <p class="ps-pointer-hint" id="psMapExportImportStatus" style="margin:4px 0 0 0;"></p>
           <div class="ps-dropzone" id="psMapImageDropzone">Seret gambar peta ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">jpg, png, webp — maksimal 25MB</span></div>
           <input type="file" id="psMapImageInput" accept="image/*" hidden />
           <!-- BARU (9 Sep 2026, permintaan operator) -- 🌐 Ambil Peta Dasar
                dari Online: alternatif dari unggah manual di atas, ambil
-               gambar peta Indonesia polos dari Wikimedia Commons (sumber
+               gambar peta Indonesia dari Wikimedia Commons (sumber
                terbuka/bebas lisensi) otomatis, lalu disimpan sebagai
                gambar peta SAMA seperti hasil unggah manual -- jadi sekali
                diambil (butuh internet), bisa dipakai offline terus-
                menerus di venue seperti biasa (tersimpan localStorage).
-               Lihat fetchOnlineBaseMap_() (js/presentation-studio.js). -->
-          <div class="ps-btn-row" style="margin-top:6px;">
-            <button type="button" id="psMapOnlineFetchBtn" class="chip-btn small">🌐 Ambil Peta Dasar dari Online (Wikimedia)</button>
+               DIPERBARUI (10 Sep 2026, permintaan operator) -- dulu cuma
+               ada 1 pilihan (peta polos, auto-pilih hasil pertama yang
+               berhasil dari daftar kandidat). Sekarang ditambah dropdown
+               supaya operator BISA MEMILIH LEBIH DULU peta yang mana yang
+               mau diambil, SEBELUM ditekan (bukan cuma nerima apa saja
+               yang kebetulan berhasil) -- lihat ONLINE_BASE_MAP_CHOICES_
+               & fetchOnlineBaseMap_(choiceKey) (js/presentation-studio.js).
+               "Peta + nama pulau" cocok untuk ditayangkan APA ADANYA ke
+               jemaat (mis. sambutan/perkenalan wilayah), sedangkan "Peta
+               polos" lebih cocok kalau mau ditempeli PIN kalibrasi sendiri
+               (nama pulau bawaan bisa numpuk sama pin/label pin nanti). -->
+          <div class="ps-btn-row" style="margin-top:6px; flex-wrap:wrap; align-items:center;">
+            <select id="psMapOnlineChoice" class="chip-select small" style="min-width:220px;">
+              <option value="blank">Peta polos (buat ditempeli pin sendiri)</option>
+              <option value="named_islands">Peta + nama pulau (langsung tayang)</option>
+              <option value="relief">Peta relief/kontur (langsung tayang)</option>
+            </select>
+            <button type="button" id="psMapOnlineFetchBtn" class="chip-btn small">🌐 Ambil dari Online (Wikimedia)</button>
           </div>
           <p id="psMapOnlineFetchStatus" class="ps-pointer-hint" style="margin:2px 0 0 0;"></p>
           <!-- BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Peta Dasar:
@@ -2752,9 +2786,24 @@
               <option value="3d">🔮 3D Berputar (gradient + animasi 360°)</option>
             </select>
           </div>
-          <div id="psMapEditorWrap" style="position:relative; display:none; margin-top:10px; line-height:0; user-select:none;">
-            <img id="psMapEditorImg" style="max-width:100%; display:block; border-radius:6px; cursor:crosshair;" />
-            <div id="psMapEditorPins" style="position:absolute; inset:0; pointer-events:none;"></div>
+          <!-- PERBAIKAN (10 Sep 2026, permintaan operator: "posisi pin di
+               Studio beda dengan di Layar 2" & "dibuat 16:9 semuanya") --
+               kotak pratinjau ini SEKARANG dikunci rasio 16:9 (sama
+               seperti proyektor/Layar 2 pada umumnya) dengan latar
+               hitam, dan gambar dipasang object-fit:contain di
+               dalamnya -- SAMA PERSIS caranya dengan #mapView di
+               present.html, supaya operator melihat framing yang sama
+               (termasuk garis hitam kiri-kanan/atas-bawah kalau gambar
+               peta bukan 16:9) sebelum menandai pin. #psMapEditorPins
+               TIDAK lagi otomatis inset:0 ke seluruh kotak -- ukuran &
+               posisinya dihitung ulang lewat positionEditorPinsLayer_()
+               (js/presentation-studio.js) supaya PERSIS menutupi area
+               gambar yang benar-benar terlihat, bukan kotak 16:9-nya
+               (kalau tidak, klik di gambar akan meleset persis seperti
+               bug yang dilaporkan). -->
+          <div id="psMapEditorWrap" style="position:relative; display:none; margin-top:10px; width:100%; aspect-ratio:16/9; background:#000; border-radius:6px; overflow:hidden; user-select:none;">
+            <img id="psMapEditorImg" style="position:absolute; left:0; top:0; width:100%; height:100%; object-fit:contain; display:block; cursor:crosshair;" />
+            <div id="psMapEditorPins" style="position:absolute; pointer-events:none;"></div>
           </div>
           <p class="ps-pointer-hint" id="psMapEditorHint" style="display:none;">Klik di atas gambar untuk menambah pin baru di titik itu.</p>
 
@@ -3033,7 +3082,7 @@
   <script src="js/media.js?v=20260821b"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260908b"></script>
-  <script src="js/kidung-ui.js?v=20260908a"></script>
+  <script src="js/kidung-ui.js?v=20260910a"></script>
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
@@ -3044,12 +3093,12 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
-  <script src="js/soundfx.js?v=20260910b"></script>
-  <script src="js/presentation-studio.js?v=20260910b"></script>
+  <script src="js/soundfx.js?v=20260910c"></script>
+  <script src="js/presentation-studio.js?v=20260910d"></script>
   <script src="js/effectpreview.js?v=20260910b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260909c"></script>
+  <script src="js/app.js?v=20260910a"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
