@@ -16,14 +16,37 @@
 
   Cara kerja: dibuka lewat window.open() dari js/presentation.js
   (openMonitorWindow(), dipanggil dari tombol "🖥️③ Monitor Pembicara" di
-  topbar Studio). Begitu dimuat, mengabari window.opener lewat
-  postMessage {type:"speaker_ready"} (pola SAMA persis dengan
-  "present_ready" milik Layar 2) -- Studio lalu mengirim status
-  SEKARANG/SELANJUTNYA lewat postMessage {type:"speaker_status", current,
-  next}. Kalau `next` kosong/null -- ARTINYA item aktif di Kumpulan Ayat
-  sudah yang TERAKHIR -- tampilkan layar HITAM POLOS bertuliskan
-  "END OF SLIDE" (persis kata & warna yang diminta: hitam + tulisan),
-  supaya pembicara tahu setelah ini tidak ada lagi yang disiapkan.
+  topbar Studio -- TOMBOL & PEMICUNYA HANYA ADA di js/presentation-studio.js,
+  sengaja tidak diduplikasi di menu lain mana pun). Begitu dimuat,
+  mengabari window.opener lewat postMessage {type:"speaker_ready"} (pola
+  SAMA persis dengan "present_ready" milik Layar 2) -- Studio lalu
+  mengirim status SEKARANG/SELANJUTNYA lewat postMessage
+  {type:"speaker_status", current, next}. Kalau `next` kosong/null --
+  ARTINYA item aktif di Kumpulan Ayat sudah yang TERAKHIR -- tampilkan
+  layar HITAM POLOS bertuliskan "END OF SLIDE" (persis kata & warna yang
+  diminta: hitam + tulisan), supaya pembicara tahu setelah ini tidak ada
+  lagi yang disiapkan.
+
+  BARU (10 Sep 2026, lanjutan) -- Monitor ini SEKARANG juga bisa
+  menampilkan CUPLIKAN VIDEO (YouTube/Video Lokal) dari apa yang sedang
+  tayang di Layar 2, lewat postMessage {type:"speaker_video", kind,
+  embedUrl|blob}. SELALU TANPA SUARA -- elemen <video>/<iframe> di
+  bawah ini SENGAJA dipaksa senyap (muted, param "mute=1" utk YouTube)
+  apa pun status mute/unmute Layar 2 -- suara yang sesungguhnya untuk
+  jemaat TETAP 100% lewat Layar 2/sound system venue seperti biasa,
+  logika suara itu SAMA SEKALI TIDAK disentuh oleh fitur ini. Video
+  Lokal (berkas MP4) dikirim sebagai Blob lewat postMessage yang sama
+  (didukung browser untuk jendela satu origin), jadi tetap 100% offline
+  -- tidak butuh internet sama sekali untuk jenis video ini.
+
+  BARU (10 Sep 2026, lanjutan) -- halaman ini sekarang juga mendaftarkan
+  Service Worker (sw.js) sendiri (lihat blok <script> paling bawah),
+  supaya tetap bisa DIBUKA walau sedang offline (sw.js sudah otomatis
+  meng-cache HALAMAN INI begitu pernah dimuat 1x saat online -- lihat
+  catatan di sw.js). Halaman ini sendiri sudah 100% mandiri (semua CSS/
+  JS ditulis inline di file ini, tidak memuat berkas lain), jadi begitu
+  HTML-nya sendiri tersimpan di cache, seluruh tampilan & logikanya ikut
+  tersedia offline tanpa syarat tambahan apa pun.
 -->
 <style>
   * { box-sizing: border-box; }
@@ -33,6 +56,14 @@
     font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     overflow: hidden;
   }
+  /* BARU (10 Sep 2026, lanjutan, permintaan operator "ada tombol A+/A-
+     khusus monitor pembicara") -- 1 variabel skala dipakai lewat calc()
+     di SEMUA ukuran teks di bawah (judul & isi lengkap), jadi 1 pasang
+     tombol cukup membesarkan/mengecilkan SEMUANYA sekaligus secara
+     proporsional -- TIDAK memengaruhi Layar 2 (jemaat) sama sekali,
+     murni lokal untuk jendela Monitor Pembicara ini saja (disimpan di
+     localStorage KHUSUS monitor.html, lihat skrip bawah). */
+  :root { --mon-scale: 1; }
   #wrap {
     position: fixed; inset: 0;
     display: flex; flex-direction: column;
@@ -40,19 +71,76 @@
     text-align: center; padding: 6vh 6vw;
   }
   .mon-label {
-    font-size: clamp(14px, 2.4vw, 26px); letter-spacing: .12em;
+    font-size: calc(var(--mon-scale) * clamp(14px, 2.4vw, 26px)); letter-spacing: .12em;
     opacity: .55; text-transform: uppercase; margin-bottom: 10px;
   }
   #monNow {
-    font-size: clamp(22px, 4.4vw, 56px); font-weight: 700; line-height: 1.25;
-    margin-bottom: 6vh; max-width: 100%;
+    font-size: calc(var(--mon-scale) * clamp(22px, 4.4vw, 56px)); font-weight: 700; line-height: 1.25;
+    max-width: 100%;
     overflow-wrap: break-word;
   }
+  /* BARU (10 Sep 2026, lanjutan, permintaan operator "apa bisa
+     dituliskan isinya") -- isi LENGKAP (bukan cuma judul/ref) di bawah
+     judul tiap bagian, lebih kecil dari judulnya sendiri & dibatasi
+     tinggi + bisa digulir (max-height + overflow-y:auto) supaya syair
+     kidung panjang tidak mendorong "Selanjutnya" keluar layar. Item
+     yang isinya BUKAN teks (gambar/PDF/Canva/dst) otomatis menampilkan
+     KETERANGAN jenis berkasnya di sini juga (lihat genericItemBodyText()
+     js/presentation-studio.js) -- jadi pembicara tetap tahu "selanjutnya
+     bukan teks" walau tanpa pratinjau gambar sungguhan. */
+  .mon-body {
+    font-size: calc(var(--mon-scale) * clamp(15px, 2.2vw, 26px)); font-weight: 400; line-height: 1.5;
+    opacity: .82; white-space: pre-wrap; max-width: 100%; overflow-wrap: break-word;
+    max-height: 22vh; overflow-y: auto; margin: 0 auto;
+  }
+  #monNowWrap > .mon-body { margin-top: 1.6vh; margin-bottom: 4vh; }
+  #monNextWrap > .mon-body { margin-top: 1.6vh; }
   #monNextLabel { margin-top: 4vh; }
   #monNext {
-    font-size: clamp(26px, 5.6vw, 72px); font-weight: 800; line-height: 1.25;
+    font-size: calc(var(--mon-scale) * clamp(26px, 5.6vw, 72px)); font-weight: 800; line-height: 1.25;
     color: #ffd23f; max-width: 100%; overflow-wrap: break-word;
   }
+  /* BARU (10 Sep 2026, lanjutan) -- 🔠 A-/A+ khusus Monitor Pembicara,
+     pojok kiri-atas (BEDA sisi dari jam #monClock yang di kanan-atas
+     supaya tidak bertumpuk), redup sampai disentuh (:hover/:active)
+     supaya tidak mengganggu pandangan saat presentasi berlangsung
+     normal. */
+  #monFontCtrl {
+    position: fixed; top: 14px; left: 18px; z-index: 5;
+    display: flex; gap: 8px; opacity: .35;
+  }
+  #monFontCtrl:hover { opacity: 1; }
+  #monFontCtrl button {
+    font-family: inherit; font-size: 15px; font-weight: 700; color: #f2f2f2;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  #monFontCtrl button:hover { background: rgba(255,255,255,.2); }
+  /* BARU -- area cuplikan video (YouTube/Video Lokal), tampil di ATAS
+     teks Sekarang/Selanjutnya saat ada video, SELALU tanpa suara. Saat
+     video aktif, teks Sekarang/Selanjutnya otomatis mengecil (lihat
+     aturan body.mon-video-active di bawah) supaya keduanya muat
+     bersamaan tanpa perlu digulir. */
+  #monVideoWrap { display: none; width: 86vw; max-width: 1000px; margin-bottom: 3vh; }
+  .mon-video-tag {
+    font-size: clamp(11px, 1.6vw, 15px); letter-spacing: .1em; opacity: .5;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .mon-video-box {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    background: #0a0a0a; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08);
+  }
+  .mon-video-box iframe, .mon-video-box video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border: 0; object-fit: contain; background: #000;
+  }
+  body.mon-video-active #monNowWrap { margin-top: 0; }
+  body.mon-video-active .mon-label { font-size: calc(var(--mon-scale) * clamp(11px, 1.5vw, 15px)); margin-bottom: 4px; }
+  body.mon-video-active #monNow { font-size: calc(var(--mon-scale) * clamp(15px, 2.4vw, 26px)); margin-bottom: 2vh; }
+  body.mon-video-active .mon-body { font-size: calc(var(--mon-scale) * clamp(12px, 1.7vw, 18px)); max-height: 12vh; }
+  body.mon-video-active #monNextLabel { margin-top: 1.5vh; }
+  body.mon-video-active #monNext { font-size: calc(var(--mon-scale) * clamp(13px, 1.9vw, 20px)); }
   /* Layar "END OF SLIDE" -- hitam polos + tulisan, SESUAI PERMINTAAN
      ("kalau selanjutnya habis, maka ... tertulis, end of slide, warna
      hitam"). SENGAJA teks abu-abu redup (bukan putih terang penuh) --
@@ -75,15 +163,30 @@
 </style>
 </head>
 <body>
+  <div id="monFontCtrl">
+    <button type="button" id="monFontMinus" title="Perkecil teks">A-</button>
+    <button type="button" id="monFontPlus" title="Perbesar teks">A+</button>
+  </div>
   <div id="monClock"></div>
   <div id="wrap">
     <div id="monWaiting">Menunggu Studio Presentasi mengirim status…</div>
+
+    <div id="monVideoWrap">
+      <div class="mon-video-tag">🎬 Pratinjau Video · tanpa suara</div>
+      <div class="mon-video-box">
+        <iframe id="monYtFrame" style="display:none;" allow="autoplay" title="Pratinjau YouTube"></iframe>
+        <video id="monLocalVideo" style="display:none;" muted playsinline></video>
+      </div>
+    </div>
+
     <div id="monNowWrap" style="display:none;">
       <div class="mon-label">Sekarang</div>
       <div id="monNow"></div>
+      <div id="monNowBody" class="mon-body" hidden></div>
       <div id="monNextWrap" style="display:none;">
         <div class="mon-label" id="monNextLabel">Selanjutnya</div>
         <div id="monNext"></div>
+        <div id="monNextBody" class="mon-body" hidden></div>
       </div>
     </div>
     <div id="monEnd">END OF SLIDE</div>
@@ -101,12 +204,49 @@
   setClock();
   setInterval(setClock, 15000);
 
+  // BARU (10 Sep 2026, lanjutan, permintaan operator "ada tombol A+/A-
+  // khusus monitor pembicara") -- skala teks TERSENDIRI untuk jendela
+  // ini (localStorage KHUSUS "bible_app_monitor_font_scale_v1", TIDAK
+  // memengaruhi/berbagi apa pun dengan pengaturan ukuran huruf Layar 2
+  // ataupun Alkitab utama) -- tersimpan per-perangkat, jadi kalau
+  // operator sudah menyetel besar di laptop biasa dipakai, tetap besar
+  // di sesi berikutnya tanpa perlu diatur ulang. Rentang 0.7x-1.8x,
+  // langkah 0.1 tiap klik.
+  var MON_FONT_KEY_ = "bible_app_monitor_font_scale_v1";
+  var MON_FONT_MIN_ = 0.7, MON_FONT_MAX_ = 1.8, MON_FONT_STEP_ = 0.1;
+  function loadMonFontScale_() {
+    var v = parseFloat(localStorage.getItem(MON_FONT_KEY_));
+    return isFinite(v) && v >= MON_FONT_MIN_ && v <= MON_FONT_MAX_ ? v : 1;
+  }
+  function applyMonFontScale_(scale) {
+    document.documentElement.style.setProperty("--mon-scale", String(scale));
+    try { localStorage.setItem(MON_FONT_KEY_, String(scale)); } catch (e) {}
+  }
+  var monFontScale_ = loadMonFontScale_();
+  applyMonFontScale_(monFontScale_);
+  var monFontMinusBtn_ = document.getElementById("monFontMinus");
+  var monFontPlusBtn_ = document.getElementById("monFontPlus");
+  if (monFontMinusBtn_) {
+    monFontMinusBtn_.addEventListener("click", function () {
+      monFontScale_ = Math.max(MON_FONT_MIN_, Math.round((monFontScale_ - MON_FONT_STEP_) * 10) / 10);
+      applyMonFontScale_(monFontScale_);
+    });
+  }
+  if (monFontPlusBtn_) {
+    monFontPlusBtn_.addEventListener("click", function () {
+      monFontScale_ = Math.min(MON_FONT_MAX_, Math.round((monFontScale_ + MON_FONT_STEP_) * 10) / 10);
+      applyMonFontScale_(monFontScale_);
+    });
+  }
+
   function applyStatus(data) {
     var waitingEl = document.getElementById("monWaiting");
     var nowWrap = document.getElementById("monNowWrap");
     var nextWrap = document.getElementById("monNextWrap");
     var nowEl = document.getElementById("monNow");
     var nextEl = document.getElementById("monNext");
+    var nowBodyEl = document.getElementById("monNowBody");
+    var nextBodyEl = document.getElementById("monNextBody");
     waitingEl.style.display = "none";
     nowWrap.style.display = "block";
     // PERBAIKAN/CATATAN: `data.current` kosong ("") dianggap SAMA
@@ -115,13 +255,23 @@
     // SLIDE" (itu HANYA kalau memang ada item aktif tapi `next` kosong).
     if (!data || !data.current) {
       nowEl.textContent = "(belum ada yang tayang)";
+      nowBodyEl.hidden = true;
       nextWrap.style.display = "none";
       document.body.classList.remove("mon-ended");
       return;
     }
     nowEl.textContent = data.current;
+    // BARU (10 Sep 2026, lanjutan) -- isi lengkap ("currentBody"/
+    // "nextBody"), lihat catatan panjang di pushMonitorStatus_()
+    // (js/presentation-studio.js). Disembunyikan (bukan dikosongkan
+    // saja) kalau memang tidak ada isinya, supaya tidak menyisakan
+    // kotak kosong yang aneh di layar.
+    if (data.currentBody) { nowBodyEl.textContent = data.currentBody; nowBodyEl.hidden = false; }
+    else { nowBodyEl.textContent = ""; nowBodyEl.hidden = true; }
     if (data.next) {
       nextEl.textContent = data.next;
+      if (data.nextBody) { nextBodyEl.textContent = data.nextBody; nextBodyEl.hidden = false; }
+      else { nextBodyEl.textContent = ""; nextBodyEl.hidden = true; }
       nextWrap.style.display = "block";
       document.body.classList.remove("mon-ended");
     } else {
@@ -131,10 +281,92 @@
     }
   }
 
+  // BARU (10 Sep 2026, lanjutan) -- cuplikan video (YouTube/Video Lokal),
+  // SELALU tanpa suara. `monLocalVideoUrl_` menyimpan Object URL Video
+  // Lokal yang sedang dipakai, supaya bisa dicabut (revokeObjectURL)
+  // begitu diganti/dihentikan -- mencegah kebocoran memori kalau
+  // operator berpindah-pindah video berkali-kali dalam 1 sesi.
+  var monLocalVideoUrl_ = null;
+
+  function stopLocalVideo_() {
+    var v = document.getElementById("monLocalVideo");
+    try { v.pause(); } catch (e) {}
+    try { v.removeAttribute("src"); v.load(); } catch (e) {}
+    v.style.display = "none";
+    if (monLocalVideoUrl_) {
+      try { URL.revokeObjectURL(monLocalVideoUrl_); } catch (e) {}
+      monLocalVideoUrl_ = null;
+    }
+  }
+
+  function applyVideo(data) {
+    var wrap = document.getElementById("monVideoWrap");
+    var ytFrame = document.getElementById("monYtFrame");
+    var localVideo = document.getElementById("monLocalVideo");
+    var kind = data && data.kind;
+    if (kind === "youtube" && data.embedUrl) {
+      stopLocalVideo_();
+      // "mute=1" WAJIB ada -- inilah yang membuat video ini SELALU
+      // senyap di Monitor 3, terlepas dari status suara di Layar 2.
+      var sep = data.embedUrl.indexOf("?") === -1 ? "?" : "&";
+      ytFrame.src = data.embedUrl + sep + "autoplay=1&mute=1";
+      ytFrame.style.display = "block";
+      localVideo.style.display = "none";
+      wrap.style.display = "block";
+      document.body.classList.add("mon-video-active");
+    } else if (kind === "localvideo" && data.blob) {
+      ytFrame.removeAttribute("src");
+      ytFrame.style.display = "none";
+      try {
+        if (monLocalVideoUrl_) { try { URL.revokeObjectURL(monLocalVideoUrl_); } catch (e) {} }
+        monLocalVideoUrl_ = URL.createObjectURL(data.blob);
+        localVideo.src = monLocalVideoUrl_;
+        localVideo.muted = true; // dipaksa senyap, lihat catatan header file ini
+        localVideo.volume = 0;
+        localVideo.style.display = "block";
+        localVideo.play().catch(function () {});
+      } catch (e) { /* Blob gagal dibaca -- diamkan, area video cukup kosong */ }
+      wrap.style.display = "block";
+      document.body.classList.add("mon-video-active");
+    } else {
+      // kind === "none" (atau data video tidak lengkap) -- konten yang
+      // sedang tayang bukan video (ayat/kidung/teks/gambar/peta/dst),
+      // sembunyikan area video, balik ke tampilan teks biasa.
+      ytFrame.removeAttribute("src");
+      ytFrame.style.display = "none";
+      stopLocalVideo_();
+      wrap.style.display = "none";
+      document.body.classList.remove("mon-video-active");
+    }
+  }
+
+  // Meneruskan play/pause/stop Video Lokal supaya posisi pemutaran di
+  // Monitor 3 tetap sinkron dengan Layar 2 -- TIDAK ada aksi "mute"/
+  // "unmute" di sini sama sekali (lihat js/presentation-studio.js,
+  // pesan itu sengaja tidak diteruskan ke jendela ini).
+  function applyVideoControl(data) {
+    var localVideo = document.getElementById("monLocalVideo");
+    if (!data) return;
+    if (data.action === "play") { try { localVideo.play().catch(function () {}); } catch (e) {} }
+    else if (data.action === "pause") { try { localVideo.pause(); } catch (e) {} }
+    else if (data.action === "stop") { applyVideo({ kind: "none" }); }
+  }
+
+  // Jaring pengaman terakhir -- kalau entah bagaimana elemen video
+  // sempat ter-unmute (mis. lewat kontrol bawaan browser), paksa balik
+  // senyap lagi begitu terdeteksi. Monitor Pembicara memang TIDAK
+  // pernah dimaksudkan mengeluarkan suara sama sekali.
+  document.getElementById("monLocalVideo").addEventListener("volumechange", function () {
+    var v = document.getElementById("monLocalVideo");
+    if (!v.muted) v.muted = true;
+  });
+
   window.addEventListener("message", function (ev) {
     var data = ev.data;
     if (!data || data.source !== "bibleAppPresenter") return;
     if (data.type === "speaker_status") applyStatus(data);
+    else if (data.type === "speaker_video") applyVideo(data);
+    else if (data.type === "speaker_video_control") applyVideoControl(data);
   });
 
   // Beri tahu jendela utama (Studio) bahwa monitor ini sudah siap
@@ -145,6 +377,20 @@
     try {
       window.opener.postMessage({ source: "bibleAppPresenter", type: "speaker_ready" }, location.origin);
     } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
+  }
+
+  // BARU (10 Sep 2026, lanjutan) -- daftarkan Service Worker (sw.js)
+  // dari halaman ini SENDIRI juga (pola sama persis dengan index.html &
+  // present.html), supaya Monitor Pembicara tetap bisa DIBUKA walau
+  // sedang offline -- lihat catatan panjang soal ini di komentar
+  // <head> file ini & di sw.js. Aman dipanggil berkali-kali (dari
+  // index.html/present.html/monitor.html manapun yang lebih dulu
+  // dibuka) -- browser otomatis tahu itu registrasi yang SAMA (scope
+  // sama), tidak akan terdaftar dobel.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
   }
 })();
 </script>
