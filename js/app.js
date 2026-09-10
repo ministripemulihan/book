@@ -3114,6 +3114,78 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
     }, 60);
   }
   initReadingProgressForChapter();
+
+  // BARU (10 Sep 2026, permintaan operator) -- swipe kiri/kanan di HP
+  // pindah pasal Alkitab, pola SAMA seperti attachKidungSwipeNav() di
+  // js/kidung-ui.js (dipasang SEKALI ke panel #reader yang dipakai
+  // ulang tiap renderChapter, bukan nempel listener baru tiap render --
+  // supaya tidak kena bug lama "listener numpuk" yang sudah diperbaiki
+  // di Kidung). Lihat attachReaderSwipeNav() di bawah.
+  attachReaderSwipeNav();
+}
+
+// ------------------------------------------------------------
+//  SWIPE KIRI/KANAN (HP) -- Alkitab, BARU (10 Sep 2026, permintaan
+//  operator, pola sama seperti attachKidungSwipeNav() di js/kidung-ui.js).
+//
+//  ARAH (sama seperti Kidung): swipe KE KANAN (dx > 0) = pasal/ayat
+//  SELANJUTNYA (▶); swipe KE KIRI (dx < 0) = pasal/ayat SEBELUMNYA (◀).
+//
+//  Beda dari Kidung: TIDAK ada lompat lintas-kitab otomatis -- persis
+//  meniru tombol yang sudah ada (#prevChapter/#nextChapter, atau
+//  #prevVerseBtn/#nextVerseBtn di mode "🔎 1 Ayat Saja") dengan memanggil
+//  .onclick()-nya LANGSUNG, jadi kalau tombolnya `disabled` (di batas
+//  kitab pertama/terakhir), swipe pun otomatis tidak melakukan apa-apa --
+//  tidak perlu logika batas terpisah di sini.
+//
+//  Dipasang SEKALI ke #reader (flag `_readerSwipeAttached`, panel ini
+//  dipakai ulang tiap ganti pasal, TIDAK pernah dibuang/diganti elemen)
+//  -- sama seperti pola di attachKidungSwipeNav(), supaya tidak nempel
+//  listener baru berkali-kali tiap pindah pasal.
+function attachReaderSwipeNav() {
+  const panelEl = el("reader");
+  if (!panelEl || panelEl._readerSwipeAttached) return;
+  panelEl._readerSwipeAttached = true;
+
+  const THRESHOLD = 60;
+  const MAX_OFF_AXIS = 70;
+  const MAX_MS = 800;
+  let startX = null, startY = null, startT = 0, swiping = false;
+
+  panelEl.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+    swiping = true;
+  }, { passive: true });
+
+  panelEl.addEventListener("touchend", (e) => {
+    if (!swiping || startX == null) return;
+    swiping = false;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const dt = Date.now() - startT;
+    startX = null;
+    if (Math.abs(dy) > MAX_OFF_AXIS) return; // gerak vertikal -> scroll biasa
+    if (Math.abs(dx) < THRESHOLD) return;
+    if (dt > MAX_MS) return;
+
+    const verseMode = getSetting(currentUser, "verseDisplayMode") || "chapter";
+    const next = dx > 0; // ARAH: dx>0 (ke kanan) = selanjutnya
+    if (verseMode === "verse") {
+      // Mode "🔎 1 Ayat Saja" -- ikut tombol Ayat Sebelumnya/Berikutnya
+      // (sudah otomatis lompat ke pasal tetangga di batas ayat, lihat
+      // updateVerseNavRow() di atas).
+      const btn = el(next ? "nextVerseBtn" : "prevVerseBtn");
+      if (btn && !btn.disabled) btn.onclick();
+    } else {
+      // Mode pasal penuh (bawaan) -- ikut tombol Pasal Sebelumnya/Berikutnya.
+      const btn = el(next ? "nextChapter" : "prevChapter");
+      if (btn && !btn.disabled) btn.onclick();
+    }
+  }, { passive: true });
 }
 
 // ------------------------------------------------------------
