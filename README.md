@@ -1476,3 +1476,2472 @@ ini pekerjaan terpisah & lebih besar karena:
   dari AI + tingkat keyakinan, mengikuti pola tombol "🤖 Tanya AI"
   yang sudah ada di `js/langcheck.js` untuk kasus serupa (konfirmasi
   AI per baris, bukan otomatis).
+
+---
+
+## 🆕 UPDATE 29 Agu 2026 — Menu "👶 Kidung Anak" (versi pertama/MVP)
+
+### Apa yang ditambahkan
+Menu **🎵 Kidung** yang sudah ada sekarang punya 1 tombol baru:
+**"👶 Kidung Anak"**, disebelah tombol "🔍 Cari" / "📋 Daftar Semua" di
+layar depan Kidung (`renderKidungHome()`). Menekannya membuka daftar
+lagu anak-anak (kartu accordion: Syair, Kunci+Lirik, Notasi Angka,
+Kunci+Notasi+Lirik, Video, MP3, Pengarang, Gambar Referensi — sama
+persis modelnya dengan app standalone "Kidung Anak-Anak" yang sudah
+jalan di kidungindo.blogspot.com/p/lagu-anak-anak.html), lengkap
+dengan transpose kunci, ukuran teks, cari + kategori, dan tombol
+**"← Kembali ke Kidung"** untuk balik ke menu Kidung Umum (nomor
+bernomor) seperti semula.
+
+### Filosofi perubahan: SEMUA ADITIF, TIDAK ADA YANG DIROMBAK
+- `js/kidung.js`, `js/kidung-ui.js` (KECUALI 1 blok kecil di bawah),
+  `css/style.css`, dan `apps-script/Code.gs` **TIDAK DIUBAH SAMA SEKALI**
+  bentuk/kodenya — supaya tampilan & perilaku menu Kidung yang sudah
+  bagus (HP maupun komputer) tetap 100% sama seperti sebelumnya.
+- File **BARU** (tidak pernah ada sebelumnya):
+  - `js/kidung-anak.js` — seluruh mesin (fetch Sheet, parser CSV,
+    transpose kunci, render notasi angka, kunci+lirik, kunci+notasi+
+    lirik gabungan, kartu accordion) dibungkus di `window.KidungAnak`
+    (IIFE) supaya nama fungsi seperti `parseCSV`/`escapeHtml` (yang
+    juga dipakai `js/csv.js` & `js/app.js`) **tidak bentrok sama
+    sekali**, walau kebetulan sama persis namanya.
+  - `css/kidung-anak.css` — semua kelas diberi awalan `ka-` dan
+    dibungkus `.ka-root` (class yang ditaruh di `#kidungPanel` cuma
+    saat menu ini aktif) supaya tidak pernah bentrok dengan kelas apa
+    pun di `css/style.css` (sudah dicek: 0 bentrok untuk `.chip`,
+    `.badge`, `.song`, `.panel`, `.lyrics`, `.tabbtn`, dll — makanya
+    aman dipakai ulang, tapi tetap diberi awalan `ka-` sebagai jaring
+    pengaman kalau nanti style.css berkembang dan kebetulan pakai
+    nama yang sama).
+- **HANYA 3 SUNTINGAN KECIL** ke file lama, semuanya nambah baris
+  (bukan mengganti/menghapus logika lama):
+  1. `index.html` — 1 baris `<link>` (css baru) + 1 baris `<script>`
+     (js baru), keduanya SETELAH baris lama, tidak menyentuh baris lama.
+  2. `js/kidung-ui.js` — di dalam `renderKidungHome()`, menambah 1
+     tombol baru ke `iconsRow` yang sudah ada (`if (typeof KidungAnak
+     !== "undefined" ...)`) — kalau modul baru gagal dimuat karena
+     sebab apa pun, tombolnya otomatis tidak muncul, jadi menu Kidung
+     lama tidak pernah rusak gara-gara fitur baru ini.
+  3. Tidak ada suntingan ke `apps-script/Code.gs` — sengaja, karena
+     sifatnya baca-saja (lihat di bawah).
+
+### Sumber data: 2 Google Sheet terpisah, TANPA Apps Script
+- **Kidung Umum** (sudah ada): `CONFIG.KIDUNG_SHEET_CSV_URL` di
+  `js/config.js`, di-fetch oleh `resyncKidungSheet()` di `js/kidung.js`.
+- **Kidung Anak** (baru): SHEET_ID `1tC9iSgQB34X94dBp8ZjB0PqP2mjVyWUdCGNB8DglfVg`
+  (tab `KidungAnakIndo`), di-fetch langsung oleh `loadData()` di
+  `js/kidung-anak.js` lewat URL publish-to-web CSV — pola PERSIS sama
+  dengan `resyncKidungSheet()`, cuma sheet-nya beda. **Sudah dicek
+  ulang**: `apps-script/Code.gs` (2180+ baris) tidak punya satu pun
+  endpoint baca/tulis data Kidung — jadi menambah/mengedit lagu anak
+  = edit langsung di Google Sheet-nya, sama seperti workflow Kidung
+  Umum yang sekarang. Tidak perlu deploy Apps Script apa pun.
+- Kedua sheet **tidak digabung jadi satu** karena bentuk datanya beda
+  (Kidung Umum: 1 baris = 1 bait/koor; Kidung Anak: 1 baris = 1 lagu
+  utuh dengan kolom notasi angka & kunci gitar) — memaksa gabung akan
+  menghilangkan fitur notasi/kunci/transpose yang jadi ciri khas app
+  anak. Lihat riwayat percakapan pembuatan fitur ini untuk detail
+  pertimbangannya.
+
+### 🚧 BELUM DIKERJAKAN (sengaja disederhanakan dulu untuk versi pertama)
+Ini poin-poin yang PERLU DIPERHATIKAN & rencana lanjutannya — dikerjakan
+bertahap sesuai kesepakatan ("pelan-pelan, pilah-pilah fungsi"):
+
+1. **Lightbox penuh untuk Gambar Referensi/Video/MP3** — versi
+   standalone (index.html Kidung Anak-Anak asli) punya lightbox layar
+   penuh dengan pinch-zoom, geser gambar, mode putar berantai (loop/
+   lanjut lagu berikutnya), dan tombol "layar tetap menyala" (Wake
+   Lock API). Versi MVP ini baru pakai iframe/audio/gambar polos di
+   dalam kartu (tetap BISA diputar/dilihat, cuma belum "mewah").
+   → Rencana: port `openImgLightbox`/`openVideoLightbox`/
+   `openMp3Lightbox` dari index.html asli ke `js/kidung-anak.js`,
+   pakai id yang diberi awalan `ka` (mis. `#kaImgLightbox`) supaya
+   tidak bentrok id apa pun di `index.html` (sudah dicek: 0 bentrok).
+2. **Layar Penuh per-tab (⛶)** dan **Pratinjau/Cetak PDF** — ada di
+   app asli, belum diport. Kegunaannya besar untuk dipakai pemimpin
+   pujian saat tampil (font besar) atau dicetak jadi buku fisik.
+   → Rencana: port `openFullscreen()`, `previewPDF()`, `printSong()`
+   dengan cara sama seperti notasi angka (fungsi baru di
+   `kidung-anak.js`, tidak sentuh CSS print yang mungkin sudah dipakai
+   fitur lain di app besar — perlu dicek dulu apakah app besar sudah
+   punya `@media print` sendiri untuk fitur lain, supaya tidak tabrakan).
+3. **Cache offline (IndexedDB)** — Kidung Umum tersimpan offline di
+   IndexedDB (`LocalDB`), jadi tetap bisa dibuka tanpa internet. Kidung
+   Anak versi MVP ini SELALU fetch ulang tiap dibuka menu-nya (seperti
+   app standalone aslinya) — kalau app besar ini dipakai sebagai PWA
+   offline-first, ini perlu disamakan (tambah object store baru di
+   `js/db.js`, mis. `kidungAnakCache`, tanpa mengubah store yang sudah
+   ada untuk Kidung Umum).
+4. **"Bisa mengedit & menyimpan lagu anak" dari dalam app** — saat ini
+   BELUM ada UI edit/simpan di dalam aplikasi (edit = langsung ke
+   Google Sheet, sama seperti Kidung Umum). Kalau yang dimaksud adalah
+   form tambah/edit lagu LANGSUNG dari HP/komputer tanpa buka Google
+   Sheet, ini perlu keputusan tambahan:
+   - Opsi ringan: tombol "✏️ Edit di Google Sheet" yang buka tab baru
+     langsung ke baris lagu terkait (tidak perlu Apps Script).
+   - Opsi penuh: form edit di dalam app + Apps Script baru untuk
+     tulis-balik ke Sheet (ini BARU butuh sentuh `Code.gs`, kontras
+     dengan keputusan "tidak perlu Code.gs" di atas — perlu
+     dikonfirmasi dulu ke pengguna mana yang dimaksud sebelum
+     dikerjakan, supaya tidak salah arah).
+5. **Toggle "Kidung Umum ⇄ Kidung Anak" masih 1 tombol biasa**, belum
+   berupa switch/segmented-control yang lebih rapi secara visual
+   menyatu dengan `.kidung-book-toggle` yang sudah ada untuk buku
+   Kidung Umum (Kidung/Suplemen/dst). Sengaja dipisah dulu karena
+   skema datanya beda (lihat penjelasan di atas) — bisa dirapikan
+   visualnya belakangan tanpa mengubah cara kerja intinya.
+6. **Belum ada uji coba nyata di perangkat** (HP Android/iOS & desktop
+   browser berbeda-beda) — baru dicek sintaks JS valid & tidak ada
+   bentrok id/nama kelas/nama fungsi secara statis (grep). Perlu
+   dicoba langsung sebelum dipakai jemaat/anak-anak sungguhan.
+
+### File yang berubah/ditambah pada update ini
+```
+BARU     js/kidung-anak.js
+BARU     css/kidung-anak.css
+UBAH     index.html            (+2 baris: link css baru, script js baru)
+UBAH     js/kidung-ui.js       (+±10 baris: 1 tombol baru di renderKidungHome())
+TIDAK BERUBAH  js/kidung.js, css/style.css, apps-script/Code.gs, js/db.js,
+               dan semua file lain di luar 4 baris di atas.
+```
+
+---
+
+## 🆕 UPDATE 29 Agu 2026 (lanjutan, hari sama) — Salin lengkap + Layar Penuh
+
+Melanjutkan poin TODO nomor 1–2 di update sebelumnya, dikerjakan yang
+paling mudah & risikonya paling kecil dulu:
+
+### Yang ditambahkan
+1. **Tombol salin yang tadinya belum lengkap, sekarang lengkap** —
+   sama seperti index.html asli:
+   - Tab Notasi Angka: **📋 Salin Notasi Angka** (format sama persis
+     tampilan layar, lengkap angka posisi ketukan di bawahnya).
+   - Tab Kunci+Notasi+Lirik: **📋 Salin Lirik Saja**, **📋 Salin Kode
+     Asli** (persis kolom mentah di Google Sheet, siap ditempel balik),
+     **📋 Salin untuk Notasi Angka** (menyaring notnya saja, siap
+     ditempel ke kolom `NotAngka` kalau mau lagu yang sama tampil juga
+     di tab Notasi Angka biasa).
+2. **⛶ Layar Penuh** untuk 4 tab berbasis teks (Syair, Kunci+Lirik,
+   Notasi Angka, Kunci+Notasi+Lirik) — buka tampilan baca besar 1 layar
+   penuh, ada tombol ganti kunci (kecuali tab Syair) dan ukuran teks
+   (A−/A+), tombol ✕ atau tombol Esc untuk menutup.
+
+### Kenapa ini yang dipilih duluan
+Keduanya murni **memakai ulang** fungsi render yang sudah ada
+(`renderPlainLyrics`, `renderLyricsWithChords`, `renderNotasiAngka`,
+`renderComboSheet`) — tidak ada logika baru yang rawan salah, tidak
+ada gestur sentuh (pinch/geser) atau API browser yang butuh izin
+(Wake Lock, dst) seperti lightbox gambar/video/MP3 — jadi risiko
+lebih kecil dibanding poin TODO lain.
+
+### Detail teknis (tetap aditif, tidak ada file lama yang disentuh)
+- Semua tambahan ada di **file yang sama seperti sebelumnya**:
+  `js/kidung-anak.js` (+fungsi `buildComboLyricsOnly`,
+  `buildComboRawCode`, `buildComboNotasiOnly`, `buildNotasiFrontendText`,
+  `openFullscreen`, `closeFullscreen`, `ensureFsOverlay`) dan
+  `css/kidung-anak.css` (+blok `.ka-fs-*`).
+- Overlay Layar Penuh (`#kaFsOverlay`) ditempel ke `<body>` secara
+  dinamis lewat JS (bukan ditulis di index.html), dibuat sekali saat
+  pertama kali tombol ⛶ ditekan — jadi **tidak nambah baris apa pun**
+  ke index.html untuk fitur ini.
+- z-index overlay ini `10000` — sudah dicek lebih tinggi dari z-index
+  tertinggi yang dipakai `css/style.css` (9999), supaya Layar Penuh
+  selalu tampil paling depan tanpa ketiban modal/overlay app besar
+  yang lain.
+- Sudah dicek ulang: tidak ada id `kaFs...` yang bentrok di manapun
+  di `index.html`/`js/app.js`.
+
+### Yang masih di TODO (belum berubah dari update sebelumnya)
+- Lightbox penuh Gambar Referensi/Video/MP3 (pinch-zoom, wake lock,
+  mode putar berantai)
+- Pratinjau & Cetak PDF
+- Cache offline (IndexedDB) untuk data Kidung Anak
+- Keputusan soal "edit & simpan langsung dari app" (lihat penjelasan
+  2 opsi di update sebelumnya)
+- Uji coba langsung di perangkat nyata
+
+---
+
+## 🆕 UPDATE 29 Agu 2026 (lanjutan ke-2) — Bilah ikon kecil di bawah + tombol Edit
+
+### Yang berubah
+- **Tabbar teks di atas** ("📜 Syair", "🎸 Kunci + Lirik", dst) **dipindah
+  ke BAWAH kartu lagu** dan diubah jadi **ikon bulat kecil tanpa teks**
+  (📜 🎸 🎼 🎹 🎥 🎶 👤 🖼️), meniru gaya bilah kontrol di layar Kidung
+  Umum yang sudah ada (lihat screenshot yang Anda kirim — tombol ◀ ▶
+  musik ↻ gambar dst). Nama tab tetap muncul lewat tooltip (ketuk & tahan
+  di HP, arahkan mouse di komputer) supaya tidak bingung ikon mana untuk
+  apa. Ikon yang datanya belum ada otomatis pudar/tidak bisa ditekan
+  (sama seperti tabbar teks sebelumnya).
+- **Tombol baru "✏️" (Edit)** ditambahkan di ujung bilah ikon — untuk
+  sekarang cara kerjanya SEDERHANA: cuma membuka Google Sheet sumber
+  data (`KidungAnakIndo`) di tab baru, administrator tinggal cari
+  sendiri judul lagunya di sana lalu edit seperti biasa. **Belum**
+  langsung loncat ke baris pastinya (perlu tahu nomor baris/gid tab
+  yang pasti — lihat poin TODO di bawah).
+
+### Kenapa dipindah ke bawah
+Ini konsisten dengan pola yang sudah dipakai di layar Kidung Umum
+(`buildKidungToolbar()`), supaya kalau nanti kedua menu ini dilihat
+berdampingan, rasanya "satu keluarga" — bukan dua gaya UI yang beda.
+
+### Detail teknis (tetap aditif)
+- Semua perubahan di `js/kidung-anak.js` (markup tabbar dipindah +
+  ditambah tombol edit) dan `css/kidung-anak.css` (+`.ka-bottombar`,
+  `.ka-iconbtn`, `.ka-bottombar-sep`). **index.html dan kidung-ui.js
+  tidak disentuh** di update ini.
+- Class lama `.ka-tabbtn` sengaja DIPERTAHANKAN di tombol ikon baru
+  (ditambah class `.ka-iconbtn` di sampingnya) supaya fungsi
+  `activateTab()` yang sudah ada tetap jalan tanpa perlu ditulis ulang.
+
+### 🚧 Perlu diperhatikan / diputuskan untuk versi Edit yang lebih lengkap
+Tombol ✏️ Edit versi sekarang baru "pintu masuk" ke Sheet-nya secara
+umum. Untuk bisa langsung loncat ke baris lagu yang tepat (apalagi kalau
+mau ada FORM edit di dalam app, bukan buka Google Sheet), perlu
+diputuskan salah satu:
+1. **Tetap edit di Google Sheet**, tapi loncat presisi ke barisnya —
+   butuh tahu `gid` tab `KidungAnakIndo` yang pasti (bisa dilihat dari
+   URL Sheet saat tab itu dibuka) supaya link `#gid=...&range=A5` bisa
+   dibuat otomatis per lagu.
+2. **Form edit + simpan LANGSUNG di dalam app** (tanpa buka Google
+   Sheet sama sekali) — ini BARU butuh Apps Script baru (`Code.gs`)
+   untuk terima data dari app lalu menulis ke Sheet, KONTRAS dengan
+   keputusan "tidak perlu Code.gs" di update pertama. Kalau ini yang
+   dimaksud, mohon dikonfirmasi dulu supaya saya kerjakan Code.gs-nya
+   dengan hati-hati (harus ada validasi siapa yang boleh edit, supaya
+   sembarang orang tidak bisa mengubah data lagu).
+
+### Yang masih di TODO (belum berubah)
+- Lightbox penuh Gambar Referensi/Video/MP3
+- Pratinjau & Cetak PDF
+- Cache offline (IndexedDB)
+- Uji coba langsung di perangkat nyata
+
+---
+
+## 🆕 UPDATE 29 Agu 2026 (lanjutan ke-3) — Tombol Edit dihapus (dikonfirmasi tidak perlu)
+
+Sesuai arahan: **tombol "✏️ Edit" dan pintu masuk ke Google Sheet dari
+dalam kartu lagu DIHAPUS** — dikembalikan seperti sebelumnya (edit lagu
+= edit langsung di Google Sheet dari luar app, seperti Kidung Umum,
+TANPA sentuh `apps-script/Code.gs` sama sekali). Ini menegaskan ulang
+keputusan di update pertama: modul Kidung Anak murni baca-saja dari
+app.
+
+Fokus kembali ke **tampilan musiknya** (notasi angka, kunci+lirik,
+kunci+notasi+lirik) supaya konsisten & sesuai contoh index.html asli —
+mesin render (`renderNotasiAngka`, `renderComboSheet`,
+`renderLyricsWithChords`, `transposeChordSymbol`) memang dipindah APA
+ADANYA dari index.html itu (cuma nama kelas CSS diberi awalan `ka-`),
+jadi bentuk visualnya (titik oktaf, garis birama, kunci di atas kata,
+dst) sudah sama persis, bukan ditulis ulang dari nol.
+
+### File yang berubah
+`js/kidung-anak.js` saja (hapus markup & wiring tombol Edit). Tidak ada
+file lain yang disentuh.
+
+---
+
+## 🆕 UPDATE 29 Agu 2026 (lanjutan ke-4) — Navigasi ◀ ▶ menyatu + geser (swipe) di HP
+
+### Yang ditambahkan
+1. **◀ ▶ Kidung Umum sekarang "tembus" ke Kidung Anak.** Kalau sedang
+   membaca kidung nomor terakhir di buku terakhir (mis. Suplemen No.
+   terakhir) lalu tekan ▶, otomatis pindah ke lagu anak pertama. Kalau
+   sedang di lagu anak TERAKHIR lalu tekan ▶ (atau geser kiri), otomatis
+   kembali ke No. 1 buku Kidung Umum yang pertama. Arah mundur (◀ /
+   geser kanan) juga berlaku sebaliknya.
+2. **Setiap kartu lagu anak sekarang punya baris ◀ ▶ sendiri** (di
+   bawah bilah ikon), untuk lompat ke lagu anak sebelumnya/berikutnya
+   tanpa harus tutup-buka manual satu-satu dari daftar.
+3. **Geser kiri/kanan (swipe) di HP** pada bagian isi kartu yang sedang
+   terbuka = sama seperti menekan ▶/◀ — geser ke kiri untuk lanjut,
+   geser ke kanan untuk kembali.
+
+### Cara kerja teknis (PENTING — tetap tanpa mengedit file lama)
+Fitur ini butuh "menyisipkan" Kidung Anak ke dalam alur ◀ ▶ yang
+sebelumnya cuma tahu soal buku-buku Kidung Umum. Alih-alih mengedit
+`js/kidung.js`/`js/kidung-ui.js` langsung, dipakai cara **timpa fungsi
+saat runtime** (dari `js/kidung-anak.js`, dijalankan otomatis begitu
+halaman dimuat):
+- `findAdjacentKidungCrossBook()` — replika PERSIS logika round-robin
+  aslinya, cuma daftar bukunya ditambah 1 (`"Kidung Anak"`) di paling
+  akhir urutan. Fungsi pendukungnya (`findAdjacentKidungNo`,
+  `getKidungBooksOrdered`, `getKidungList`) dipakai APA ADANYA, tidak
+  diduplikasi ulang.
+- `openKidungReader()` — kalau tujuannya buku `"Kidung Anak"`, dialihkan
+  ke fungsi baru `openReaderInList()` di `js/kidung-anak.js` (buka
+  daftar lagu anak, cari & scroll ke kartu yang tepat). Kalau bukan,
+  diteruskan ke fungsi ASLINYA (disimpan lebih dulu sebelum ditimpa)
+  tanpa perubahan perilaku sama sekali.
+- Kedua timpaan ini dibungkus `if (typeof ... === "function" && !window.__kaXxxPatched)`
+  — kalau fungsi aslinya (karena sebab apa pun) tidak ada, penimpaan
+  dilewati begitu saja dan TIDAK PERNAH melempar error; paling buruk
+  cuma fitur loncat-antar-buku ini yang tidak aktif, menu Kidung Umum
+  & Kidung Anak yang sudah ada tetap jalan normal sendiri-sendiri.
+- **File `js/kidung.js` dan `js/kidung-ui.js` sendiri: 0 baris berubah.**
+  Semua kode baru ada di `js/kidung-anak.js` (fungsi
+  `findAdjacentInKidungAnakOrJumpOut`, `openReaderInList`, `stepSong`,
+  `attachSwipeNav`, `getSortedSongs`) + `css/kidung-anak.css`
+  (`.ka-nav-row`, `.ka-nav-btn`, `.ka-nav-label`).
+
+### ⚠️ Catatan yang perlu diperhatikan
+- "Kembali ke No. 1 Kidung Umum" ini **mengandalkan urutan buku** yang
+  dikembalikan `getKidungBooksOrdered()` (fungsi asli, tidak diubah) —
+  diasumsikan buku utama "Kidung" ada di urutan PERTAMA seperti
+  lazimnya. Kalau ternyata urutannya beda (mis. "Suplemen" duluan),
+  loncatan "kembali ke awal" akan mendarat di buku itu, bukan "Kidung"
+  No.1. Perlu dicek langsung saat uji coba nyata.
+- Navigasi ◀ ▶ & geser ini urutannya berdasar **nomor lagu (`No`) di
+  Sheet Kidung Anak**, bukan urutan tampil di layar (yang bisa berubah
+  kalau ada pencarian/filter kategori aktif) — saat lompat, filter
+  otomatis direset ke "Semua" & pencarian dikosongkan supaya lagu
+  tujuan pasti ketemu.
+- Belum diuji di perangkat sungguhan (HP Android/iOS, berbagai ukuran
+  layar) — kombinasi swipe + scroll vertikal perlu dicek tidak saling
+  mengganggu saat isi lagu panjang.
+
+---
+
+## 🆕 UPDATE 29 Agu 2026 — MODE TAMU: Batasi Kitab yang Boleh Dibuka
+
+### Yang ditambahkan
+Sekarang administrator bisa membatasi **Mode Tamu** (pengunjung yang
+belum login) supaya cuma boleh membuka kitab-kitab TERTENTU dari 66
+kitab Alkitab — diatur langsung dari Google Sheet, **tanpa perlu ubah
+kode atau deploy ulang Apps Script**. Kalau setting ini tidak diisi
+sama sekali, perilakunya SAMA seperti sebelumnya (tamu boleh buka
+semua 66 kitab) — jadi aman ditambahkan, tidak mengubah apa pun untuk
+yang belum memakainya.
+
+### 📋 CARA MENGATUR DI GOOGLE SHEET (langkah-langkah)
+1. Buka Google Sheet yang sama dengan yang dipakai untuk pengaturan
+   aplikasi lain (tab **"Setup"** — tab yang sama tempat baris
+   `guest_daily_limit_per_device` dan `guest_total_daily_limit` berada).
+   Kalau tab "Setup" belum pernah ada/terlihat, cek dulu dengan tim
+   teknis yang mengelola Apps Script-nya.
+2. Tab "Setup" punya 4 kolom: **Key | Label | Isi | Tampil**.
+3. Tambah 1 baris baru PERSIS seperti ini:
+
+   | Key | Label | Isi | Tampil |
+   |---|---|---|---|
+   | `guest_allowed_books` | `(Pengaturan) Kitab yang Boleh Dibuka Tamu` | *(lihat langkah 4)* | `FALSE` |
+
+   - Kolom **Key**: ketik persis `guest_allowed_books` (huruf kecil semua,
+     pakai garis bawah `_`, bukan spasi).
+   - Kolom **Tampil**: isi `FALSE` — supaya baris ini TIDAK ikut muncul
+     di panel publik "Info Kami" (sama seperti baris pengaturan lain).
+4. Kolom **Isi**: ketik nama-nama kitab yang BOLEH dibuka tamu, **dipisah
+   koma**, ejaannya harus **PERSIS SAMA** dengan daftar resmi di bawah
+   (besar-kecil huruf tidak masalah, tapi ejaan & spasi harus sama).
+   Contoh isi kalau tamu cuma boleh buka Kejadian, Mazmur, Matius, dan
+   Yohanes:
+   ```
+   Kejadian, Mazmur, Matius, Yohanes
+   ```
+5. Simpan Sheet-nya. Perubahan akan otomatis terbaca aplikasi paling
+   lambat saat pengunjung berikutnya membuka/memuat ulang halaman (data
+   Setup diambil sekali per sesi, bukan disimpan permanen di sisi
+   aplikasi).
+6. **Kosongkan kolom Isi** (atau hapus barisnya) kapan saja untuk
+   mengembalikan ke keadaan semula: tamu boleh buka SEMUA kitab lagi.
+
+### 📖 DAFTAR RESMI 66 NAMA KITAB (salin dari sini supaya tidak salah ketik)
+Sesuai `js/books.js` — urutan kanon standar:
+
+**Perjanjian Lama (39 kitab):**
+```
+Kejadian, Keluaran, Imamat, Bilangan, Ulangan, Yosua, Hakim-hakim, Rut,
+1 Samuel, 2 Samuel, 1 Raja-raja, 2 Raja-raja, 1 Tawarikh, 2 Tawarikh,
+Ezra, Nehemia, Ester, Ayub, Mazmur, Amsal, Pengkhotbah, Kidung Agung,
+Yesaya, Yeremia, Ratapan, Yehezkiel, Daniel, Hosea, Yoel, Amos, Obaja,
+Yunus, Mikha, Nahum, Habakuk, Zefanya, Hagai, Zakharia, Maleakhi
+```
+
+**Perjanjian Baru (27 kitab):**
+```
+Matius, Markus, Lukas, Yohanes, Kisah Para Rasul, Roma, 1 Korintus,
+2 Korintus, Galatia, Efesus, Filipi, Kolose, 1 Tesalonika,
+2 Tesalonika, 1 Timotius, 2 Timotius, Titus, Filemon, Ibrani, Yakobus,
+1 Petrus, 2 Petrus, 1 Yohanes, 2 Yohanes, 3 Yohanes, Yudas, Wahyu
+```
+
+⚠️ Penulisan yang PERLU DIPERHATIKAN (sering salah ketik):
+- `1 Samuel`, `2 Raja-raja`, dst → pakai **angka + spasi**, BUKAN
+  "I Samuel" atau "Kitab 1 Samuel". Tanda hubung pada "Raja-raja"/
+  "Hakim-hakim" WAJIB ada.
+- `Kisah Para Rasul` → nama lengkap, bukan "Kisah Rasul" saja.
+- `Kidung Agung` → 2 kata, jangan sampai tertukar dengan menu "Kidung"
+  (fitur lagu) yang beda sama sekali di aplikasi ini.
+
+### Bagaimana tampilannya untuk tamu
+Kitab yang TIDAK ada di daftar akan tetap KELIHATAN di sidebar (supaya
+tamu tahu kitab itu ada), tapi diberi tanda gembok 🔒 kecil di sebelah
+namanya dan tidak bisa dibuka — kalau diketuk, muncul pesan singkat
+("Kitab ini belum dibuka untuk tamu") dengan tombol untuk masuk pakai
+akun. Kitab yang BOLEH dibuka tetap tampil & berfungsi normal seperti
+biasa.
+
+### Detail teknis (untuk yang ingin tahu/merawat kodenya nanti)
+- **TIDAK ADA endpoint Apps Script baru** yang dibuat — fitur ini
+  memakai ulang endpoint `type=app_setup` yang SUDAH ADA di
+  `apps-script/Code.gs` (mengirim semua baris tab Setup apa adanya),
+  dan fungsi `fetchRemoteAppSetup_()` yang SUDAH ADA di `js/app.js`
+  (dipakai juga untuk baca `guest_daily_limit_per_device` dkk). Jadi
+  **`apps-script/Code.gs` di paket ini 0 baris berubah**.
+- Semua logika baru ada di `js/guest.js` (fungsi baru: `loadAllowedBooks`,
+  `isBookAllowedSync`, `showBookLocked`, `applyBookGate`).
+- `js/app.js` HANYA nambah **1 baris** di akhir `buildSidebar()`:
+  `if (typeof Guest !== "undefined" && Guest.applyBookGate) Guest.applyBookGate();`
+  — dibungkus `typeof` supaya kalau `guest.js` gagal dimuat, sidebar
+  tetap jalan normal seperti sebelumnya.
+- `css/style.css` cuma DITAMBAH di paling akhir file (`.book-guest-locked`
+  dkk) — tidak ada aturan lama yang diubah/dihapus.
+
+### ⚠️ Catatan jujur soal batasan cara ini
+Karena data Alkitab (semua 66 kitab, semua bahasa) sudah diunduh PENUH
+ke perangkat pengguna sejak awal (tersimpan di IndexedDB browser untuk
+kebutuhan baca offline), pembatasan ini sifatnya **"sopan-sopanan" di
+tampilan** — mengarahkan tamu awam supaya tidak sengaja/tidak sengaja
+membuka kitab yang belum ingin ditampilkan ke publik. Ini **BUKAN**
+perlindungan data tingkat server yang mustahil ditembus — orang yang
+paham cara buka "DevTools" di browser tetap bisa mengakses data mentah
+yang sudah terunduh di perangkatnya sendiri. Untuk kebutuhan gereja/
+keluarga biasa ini biasanya lebih dari cukup, tapi perlu diketahui
+batasannya kalau isi kitab yang disembunyikan itu sifatnya benar-benar
+sensitif.
+
+### 🚧 Belum diuji
+Fitur ini baru dicek sintaksnya valid, belum dicoba langsung dengan
+Google Sheet & Apps Script sungguhan. Mohon dicoba: isi baris
+`guest_allowed_books`, masuk sebagai tamu, dan pastikan kitab di luar
+daftar benar-benar terkunci sementara yang di dalam daftar tetap normal.
+
+## Rencana fitur berikutnya: "AI Presentation" + embed Canva/SoundCloud
+
+Sedang direncanakan (belum dikerjakan): 1 kotak ketik untuk memasukkan
+banyak item sekaligus (mis. `matius 11:28, K24, markus 16:16, pengumuman
+..., S120`), langsung tersusun jadi rangkaian slide siap tayang urut &
+bisa disimpan ke Kumpulan Ayat sekaligus — plus rencana menampilkan
+presentasi Canva & memutar audio SoundCloud (Play/Pause, masuk Kumpulan
+Ayat). Lihat rencana teknis lengkap (termasuk batasan jujur soal Canva &
+SoundCloud) di **`ROADMAP-ai-presentation.md`**.
+
+## 🆕 UPDATE 8 Sep 2026 — Logo, syair ganda No.388, badge birama/pola suku kata, panel ℹ️ Sejarah & Cara Baca, swipe ◀/▶ HP
+
+1. **Logo header** — ikon pojok kiri-atas (`.brand-mark`) sekarang pakai
+   logo asli "IN CHRIST · Living Stream Ministry" (`assets/logo-inchrist.png`),
+   menggantikan avatar bulat "k" lama.
+2. **Kidung ber-syair-ganda (mis. No.388 "Mengalami Kristus")** — dulu
+   bait syair 1 & syair 2 tertarik jadi berselang-seling/dobel di layar
+   baca. Sekarang dipecah otomatis per grup (deteksi dari `no_bait` yang
+   balik ke 1) — lihat komentar panjang `getKidungBaitsWithKoor()` (js/kidung.js).
+   **Data di Sheet TIDAK perlu diubah** — pola "1 baris koor judul syair
+   tepat sebelum bait pertama syair itu" yang sudah ada sekarang justru
+   yang dipakai untuk mendeteksi batas antar-syair.
+3. **2 kolom baru (opsional) di Sheet Kidung:**
+   - `pola_suku_kata` — pola jumlah suku kata per baris syair, mis.
+     `8 8 8 8` / `7 7 7 7`. **Beda dari `birama`** (yang isinya nada
+     dasar + ketukan, mis. `D 3/4`) — sengaja kolom terpisah supaya tidak
+     menimpa data birama yang sudah ada.
+   - `sejarah` — cerita/latar belakang kidung itu SAJA. `pengarang`
+     sekarang sebaiknya HANYA diisi nama penulis (pendek), bukan lagi
+     dicampur dengan cerita panjang.
+   Kedua kolom kosong = otomatis tidak tampil di layar baca (aman untuk
+   kidung yang belum diisi).
+4. **Sejarah umum buku Kidung & panduan "Cara Membaca Kidung"** (berlaku
+   utk semua kidung, BUKAN per lagu) — ditaruh di tab **Setup** (sumber
+   data panel ℹ️ Info Kami yang sudah ada, `js/infokami.js`), baris baru
+   dengan `Key` = `sejarah_kidung` dan `cara_baca_kidung`. Admin bisa isi/
+   ubah kapan saja langsung dari Sheet, tanpa ubah kode.
+5. **Tombol ℹ️ di layar baca Kidung** — buka panel "Sejarah & Cara Baca"
+   (isi: sejarah kidung yang sedang dibuka + panduan cara baca umum di
+   atas). Badge kecil birama & pola suku kata juga ditampilkan di header
+   (lihat `.kidung-reader-badges` di css/style.css).
+6. **Swipe kiri/kanan di HP di layar baca** — pindah nomor kidung
+   selanjutnya/sebelumnya, lewat jalur yang SAMA dengan tombol ◀/▶ yang
+   sudah ada (`findAdjacentKidungCrossBook()`, js/kidung.js) — jadi kalau
+   sedang di nomor TERAKHIR suatu buku, swipe otomatis lompat ke nomor
+   PERTAMA buku berikutnya sesuai `CONFIG.KIDUNG_BOOK_ORDER`
+   (js/config.js), bukan `+1` mentah. Arah: geser ke KANAN = selanjutnya,
+   ke KIRI = sebelumnya (gampang ditukar, lihat komentar
+   `attachKidungSwipeNav()` di js/kidung-ui.js kalau ternyata dirasa
+   kebalik).
+
+**Belum diuji** end-to-end di HP/browser sungguhan — baru lolos
+`node --check` untuk semua file JS yang diubah (`js/csv.js`, `js/kidung.js`,
+`js/kidung-ui.js`, `js/infokami.js`) + tinjauan manual struktur CSS.
+
+## 🆕 UPDATE 9 Sep 2026 — 🖥️ Mode Layar, 🗺️ Peta Interaktif & Split Screen Kiri-Kanan (fondasi)
+
+Fondasi untuk kebutuhan acara besar (200 layar/1000 orang): layar sambutan,
+layar "selanjutnya" di antara sesi, peta lokasi interaktif, dan tata letak
+kamera kiri-konten kanan. Ditambahkan **tanpa mengubah** struktur Kumpulan
+Ayat yang sudah ada — semuanya numpang pola "item generik" yang sama
+(`verse`/`kidung`/`announcement`/dst di `js/collections.js`).
+
+1. **◧ Split Screen Kiri-Kanan** (tab "🎥 Kamera") — tata letak kamera baru
+   `body.cam-split-lr` (present.html), beda dari "split" lama yang
+   atas-bawah. Numpang slider "Ukuran Zona Kamera" yang sudah ada (dibaca
+   sebagai LEBAR di mode ini) + checkbox baru "🔁 Balik Sisi"
+   (`theme.camSplitReverse`) untuk menukar kamera ke kanan/konten ke kiri.
+
+2. **🖥️ Mode Layar (Welcome & Next Up)** — tab baru "🖥️ Mode & Peta".
+   Komponen tunggal `#modeScreenView` (present.html) dipakai untuk 2 jenis:
+   - **Welcome** — layar sambutan sebelum acara mulai: judul, subjudul,
+     poin-poin penting (bullets), opsional hitung mundur ke jam mulai.
+   - **Next Up** — layar "SELANJUTNYA" di antara sesi: eyebrow otomatis +
+     judul sesi berikutnya.
+   Payload: `{ type:"modescreen", kind:"welcome"|"nextup", title, subtitle,
+   bullets, endAt }`, dikirim lewat `rawPost()` seperti Timer/Stopwatch.
+   Bisa langsung "▶️ Tampilkan" (sekali pakai) ATAU "💾 Simpan ke Kumpulan
+   Ayat" (diselipkan sebagai item `type:"modescreen"` — **sengaja tanpa**
+   `endAt`, supaya tidak basi kalau kumpulan dipakai ulang di acara lain).
+   > Untuk **Jam Istirahat/Break screen**, TIDAK perlu fitur baru — pakai
+   > fitur lama "🎯 Countdown ke Jam Target" (tab "🎨 Tampilan") yang sudah
+   > punya kolom **Caption** untuk menulis acara berikutnya.
+
+3. **🗺️ Peta Interaktif** — di tab yang sama, dibuat **reusable lintas
+   acara** (bukan cuma 1 lokasi):
+   - Kelola banyak peta ("➕ Peta Baru" / ganti nama / hapus), tersimpan di
+     `localStorage` perangkat ini (`bible_app_studio_maps_v1`, BELUM
+     sinkron Drive/Sheet — lihat "Belum dikerjakan" di bawah).
+   - Unggah gambar peta apa saja (venue/kota/negara) → **klik langsung di
+     atas gambar** untuk taruh pin + nama titik (operator yang menaruh,
+     BUKAN ditebak otomatis dari file PDF/gambar aslinya).
+   - Klik "🎯 Fokus" per pin → Layar 2 zoom & geser mulus ke titik itu
+     (`focusMapPin()`, present.html — dihitung dari piksel nyata lewat
+     `getBoundingClientRect()`, bukan persentase CSS murni, supaya tetap
+     akurat di rasio layar apa pun).
+   - "💾 Simpan ke Kumpulan Ayat" — menyimpan **referensi** (`mapId`) ke
+     Map Library, pola sama seperti item `media` (referensi ke Media
+     Tersimpan, bukan salinan gambarnya).
+
+### File yang berubah
+`present.html` (CSS+HTML+JS: `#modeScreenView`, `#mapView`,
+`showModeScreen()`/`stopModeScreen()`, `showMap()`/`focusMapPin()`/
+`stopMap()`, saling-eksklusif dengan Timer/Stopwatch/Countdown Jam
+Target/Video Lokal yang sudah ada), `index.html` (tab "🖥️ Mode & Peta" +
+tombol layout kamera baru), `js/presentation-studio.js`
+(`wireModeScreenTab()`, `wireMapTab()`, `getStoredMapById()`, pratinjau
+Studio untuk 2 tipe baru), `js/collections.js`
+(`addModeScreenToCollection()`, `addMapToCollection()`), `js/app.js`
+(`collectionItemRef()`/`collectionItemBodyText()` untuk 2 tipe baru).
+
+Semua lolos `node --check` (JS) & cek struktur `<script>` embedded di
+`present.html`/`index.html`. **Belum diuji** end-to-end di browser/monitor
+sungguhan.
+
+### 🚧 Belum dikerjakan (foundation lanjutan, di luar cakupan sesi ini)
+- Map Library **belum sinkron** ke Drive/Sheet (baru `localStorage`
+  per-perangkat) — kalau dibuka di perangkat lain, peta yang tersimpan
+  tidak ikut, dan item "map" di Kumpulan Ayat yang dibagikan ke akun lain
+  tidak akan tayang (sama seperti keterbatasan item `media` untuk kasus
+  serupa).
+- Belum ada shortcut/tombol cepat khusus untuk Welcome/Next Up favorit
+  (seperti pola "🔔 Bel Cepat"/"⚡ Mode Cepat" yang sudah ada).
+
+## 🆕 UPDATE 9 Sep 2026 (lanjutan, hari sama) — 📋 Titik Peta dari Tabel, Kalibrasi 2-Titik & Kategori/Checklist (Kaki Dian, Pos Injil, dst)
+
+Lanjutan langsung dari fitur 🗺️ Peta Interaktif di atas — untuk kasus
+**ratusan titik se-Indonesia** (bukan cuma belasan titik 1 venue), klik
+satu-satu jelas tidak praktis. Sekarang bisa ketik **daftar kota + kategori
++ tahun** (mirip tabel Excel), posisinya dihitung OTOMATIS.
+
+1. **Data koordinat 514 kabupaten/kota** — `js/indonesia-regencies.js`
+   (BARU), berisi `{n:nama, lat, lng}` untuk semua kabupaten/kota
+   Indonesia. Sumber: data wilayah Indonesia publik dari GitHub
+   (`yusufsyaifudin/wilayah-indonesia`, turunan Kemendagri/BPS), diunduh &
+   disusun ulang 9 Sep 2026 — **koordinat PUSAT wilayah**, cukup akurat
+   untuk menaruh pin di peta, bukan untuk navigasi presisi.
+
+2. **📍 Kalibrasi Peta (2 titik acuan)** — sekali per peta: operator pilih
+   2 kota yang tahu persis posisinya di gambar peta itu (mis. kota paling
+   barat & paling timur pada gambar), tekan "🎯 Tandai", klik posisinya di
+   gambar. Dari 2 titik itu, `latLngToPct()` (js/presentation-studio.js)
+   menghitung transformasi linear sederhana (x dari longitude, y dari
+   latitude) untuk mengubah lat/long kota MANAPUN jadi posisi pin di
+   gambar itu — **tidak memperhitungkan proyeksi/rotasi peta yang aneh**,
+   tapi cukup akurat untuk peta Indonesia yang digambar hampir lurus
+   utara-atas (kebanyakan peta cetak/ilustrasi acara).
+
+3. **📋 Daftar Titik dari Tabel** — baris `Kota/Kabupaten | Kategori |
+   Tahun` (autocomplete nama kota dari 514 daftar di atas), disimpan
+   terpisah dari pin (`map.cityRows`) supaya bisa diedit ulang kapan saja.
+   Tombol **"🧮 Terapkan ke Peta"** memproses SEMUA baris sekaligus →
+   1 pin per baris, id pin STABIL dari kota+kategori (menjalankan ulang
+   tombol ini, mis. setelah perbaiki tahun, MEMPERBARUI pin yang sama,
+   tidak menduplikasi).
+
+4. **☑️ Kategori yang Ditampilkan** — checklist otomatis dari semua
+   kategori yang dipakai di peta itu (mis. "Kaki Dian", "Pos Injil"),
+   **jumlah titik per kategori dihitung otomatis** di sebelah nama
+   kategorinya. Centang/hilangkan kategori → `visiblePins()`
+   (js/presentation-studio.js) memfilter pin mana yang ikut dikirim ke
+   Layar 2 saat "▶️ Tampilkan Peta" ditekan.
+
+5. **🎨 Warna otomatis per kategori** — dihitung dari NAMA kategorinya
+   sendiri (hash sederhana ke 1 dari 8 warna tetap), konsisten antara dot
+   pin di panel Studio, dot di Layar 2, dan badge legenda — TIDAK berubah
+   walau kategori ditambah/dihapus dari urutan manapun.
+
+6. **🏷️ Badge legenda di Layar 2 (TAMPIL KE PENONTON)** — pojok
+   kanan-atas peta menunjukkan `● Kaki Dian 12` / `● Pos Injil 8` dst
+   (`#mapLegend`, present.html) — dikirim sebagai `categoryCounts` dalam
+   payload `{type:"map", action:"show", ...}`. Pin BERKATEGORI (kota,
+   bisa ratusan) SENGAJA tanpa label teks permanen di Layar 2 (supaya
+   peta tidak penuh sesak tulisan) — cukup titik warna + badge hitungan;
+   nama kota tetap terlihat operator lewat tooltip di panel Studio. Pin
+   MANUAL (venue, biasanya cuma belasan) tetap punya label teks permanen
+   seperti sebelumnya.
+
+### File yang berubah/ditambah
+`js/indonesia-regencies.js` (BARU, data 514 kabupaten/kota),
+`js/presentation-studio.js` (`findRegencyByName()`, `latLngToPct()`,
+`categoryColor()`, `renderCityRows()`, `renderCategoryChecklist()`,
+`renderCalibStatus()`, `visiblePins()`/`visibleMapPins_()`, wiring
+kalibrasi & tombol tabel di `wireMapTab()`), `index.html` (markup
+Kalibrasi + Daftar Titik dari Tabel + Checklist Kategori + 2 `<datalist>`
+baru), `present.html` (`#mapLegend`, `categoryColor_()`,
+`renderMapLegend_()`, pin berkategori diwarnai & tanpa label permanen).
+
+Semua lolos `node --check` (JS) & cek struktur `<script>` embedded di
+`present.html`/`index.html`. **Belum diuji** end-to-end di browser
+sungguhan — terutama akurasi kalibrasi 2-titik di atas gambar peta
+Indonesia yang sesungguhnya (bentuk kepulauan bisa membuat beberapa kota
+di pulau kecil/terpencil sedikit meleset dari posisi visual "benar" di
+gambar, karena rumus yang dipakai linear sederhana, bukan proyeksi peta
+sungguhan).
+
+### 🚧 Belum dikerjakan (lanjutan)
+- Tombol untuk MEMINDAHKAN pin hasil tabel secara manual (mis. kalau
+  posisi hasil hitung meleset sedikit di pulau kecil) — sekarang cuma
+  bisa hapus & atur ulang lewat kalibrasi/tabel.
+- Import massal dari file CSV/Excel yang diunggah (sekarang: ketik/tempel
+  baris satu-satu di tabel dalam aplikasi).
+- Sinkron Map Library (termasuk `cityRows` & kalibrasi) ke Drive/Sheet —
+  lihat catatan "Belum dikerjakan" fitur Peta Interaktif di atas, masih
+  berlaku sama untuk data kategori ini.
+
+---
+
+# 🧭 MASTER PRODUCT ROADMAP & CHECKLIST — YOUTH FLOW / COMMUNITY SYSTEM
+
+> **Tujuan bagian ini:** menjadi satu sumber kebenaran (single source of truth) untuk mengetahui apa yang **sudah benar-benar ada**, apa yang **sebagian sudah ada**, dan apa yang **belum dibuat**.
+>
+> Roadmap ini menggabungkan kemampuan aplikasi yang sudah terlihat di project saat ini dengan pengembangan yang diperlukan agar aplikasi dapat dipakai **setiap hari, setiap minggu, untuk 200+ lokal/tempat, penjengukan, penguatan, fellowship, acara 3 jam, acara 1 hari, sampai acara 3 hari 3 malam ±1.000 pemuda**.
+
+## 🔑 Aturan status
+
+- `[x]` **SELESAI** — fitur ditemukan di project dan dinyatakan sudah berjalan berdasarkan dokumentasi/status project.
+- `[~]` **SEBAGIAN** — fondasi/versi awal sudah ada, tetapi workflow lengkap belum selesai.
+- `[ ]` **BELUM** — belum dibuat atau belum ada bukti implementasi.
+- `[!]` **PERLU UJI/PERBAIKAN** — sudah ada tetapi belum diuji end-to-end atau ada masalah yang sudah diketahui.
+
+**Jangan mengubah `[ ]` menjadi `[x]` hanya karena fitur sudah direncanakan. Status harus mengikuti kode dan hasil pengujian nyata.**
+
+---
+
+---
+
+## 📌 STATUS SESI TERKINI (baca ini duluan)
+
+> Bagian ini SENGAJA ditaruh paling atas roadmap supaya siapa pun (termasuk AI
+> coding agent) langsung tahu sedang di tahap mana, tanpa harus menelusuri
+> seluruh dokumen dulu. Diperbarui tiap sesi -- lihat juga bagian 34
+> "CATATAN PEMBARUAN STATUS" untuk log rinci per tanggal, dan bagian 35
+> "ARSIP LOG DETAIL" untuk riwayat lengkap sebelum README ini digabung jadi 1.
+
+Permintaan fitur "efek panggung" (Presentation Studio, roda undian, dll) yang
+sedang berjalan **saat ini** dipecah jadi 3 bagian besar, dikerjakan berurutan:
+
+- **C — Tata Letak Kamera/Teks (split-screen, bulat, dll)** → ✅ **SELESAI**
+- **B — Gamifikasi/Reaksi Offline (Efek Panggung diperluas)** → ✅ **SELESAI**
+- **A — Menu Cepat ⚡ (wadah Offline/Online 1 layout)** → 🔶 **SEDANG DIKERJAKAN**
+  (bagian *Offline* sudah lengkap: Tata Letak/Efek/Bel/pintasan lain di 1 panel;
+  bagian *Online* masih pintasan sederhana ke tab "Mode & Peta", belum ada UI
+  tersendiri di panel ini)
+
+Selain itu, di sesi yang sama juga sudah ditambahkan (di luar urutan
+C→B→A di atas, sebagai perbaikan/permintaan terpisah):
+
+- Tombol pintasan keyboard **M** (mute/unmute YouTube + hentikan bel yang
+  sedang bunyi) dan **Alt+H** (sembunyikan/tampilkan scrollbar Studio)
+- Perbaikan bug: toolbar bawah 🎵 Kidung sekarang mengingat status buka/tutup
+  lintas swipe/navigasi (sebelumnya selalu ke-reset terbuka)
+- Perbaikan bug: kolom Alkitab mode sync (2/3-kolom) tidak lagi "kegeser ke
+  atas" saat digulir dalam mode fullscreen (tinggi kotak sekarang dihitung
+  lewat JS `window.visualViewport`, bukan cuma andalkan `vh`/`dvh`)
+- Perbaikan tampilan header saat fullscreen (ruang vertikal benar-benar
+  dihemat, bukan cuma logo disembunyikan tanpa manfaat)
+- **Monitor 3 (Monitor Pembicara)** -- jendela ke-3 baru (`monitor.html`),
+  menampilkan "Sekarang"/"Selanjutnya" dari Kumpulan Ayat untuk pembicara,
+  layar hitam "END OF SLIDE" kalau item terakhir sudah tayang
+
+**Belum dikerjakan / masih tertunda:**
+- Bagian *Online* dari Menu Cepat ⚡ belum punya UI sendiri (playlist YouTube
+  berurutan untuk layar besar, dll -- masih sebatas catatan rencana)
+- Perluasan pintasan keyboard ke huruf q-w-e-r-t-y-u-i-o-p (direncanakan,
+  belum ditugaskan ke aksi apa pun)
+- Konsolidasi README ini masih terbatas pada README.md +
+  ROADMAP-STATUS-TERKINI.md -- `ROADMAP-ai-presentation.md` &
+  `ROADMAP-drive-sync.md` BELUM ikut digabung (dokumen teknis terpisah,
+  sengaja tidak disentuh dulu sampai ada konfirmasi apakah perlu ikut
+  digabung juga)
+
+---
+
+# 1. 🧱 CORE APLIKASI
+
+- [x] Aplikasi web statis/PWA tanpa build/backend utama
+- [x] Membaca Alkitab dari data lokal browser setelah sinkronisasi awal
+- [x] IndexedDB untuk penyimpanan lokal
+- [x] Login berbasis data Google Sheet yang pernah tersinkron
+- [x] LocalStorage untuk status login
+- [x] Multi-bahasa Alkitab
+- [x] Pencarian ayat/referensi
+- [x] Pencarian kata di seluruh Alkitab
+- [x] Membaca satu pasal penuh
+- [x] Rencana baca
+- [x] Catatan ayat
+- [x] Pembacaan suara
+- [x] Tema tampilan
+- [x] Ukuran teks
+- [x] Full screen
+- [x] Sinkronisasi data tertentu ke Google Sheet
+- [x] Log aktivitas
+- [x] Level pengguna
+- [x] Pengumuman
+- [x] AI Chat
+- [x] Mode Tamu
+- [x] Akun baru + persetujuan administrator
+- [x] Notifikasi/lonceng dasar
+- [x] Pengaturan
+- [x] Media
+- [x] Kidung
+- [x] Kidung Anak
+- [x] Kumpulan Ayat / collections
+- [x] Presentation Studio
+- [x] Present screen
+- [x] Peta
+- [~] Arsitektur community management yang menyatukan semua fungsi
+- [ ] Dashboard utama yang secara eksplisit menggabungkan Daily + Weekly + Community + Visitation + Event
+- [ ] Role/permission komunitas yang lebih granular untuk data pelayanan
+
+---
+
+# 2. 💾 LOCAL-FIRST / OFFLINE ENGINE
+
+## Sudah ada
+
+- [x] IndexedDB untuk data Alkitab
+- [x] Data lokal untuk penggunaan setelah sinkronisasi
+- [x] Login offline setelah data pengguna pernah tersinkron
+- [x] Sinkronisasi ulang Alkitab
+- [x] Sinkronisasi ulang pengguna
+- [x] Antrean upload media ketika offline/gagal
+- [x] Cache/local media workflow yang sudah dibangun
+- [x] Drive sync
+- [x] Link publik Drive opt-in
+- [x] Pemakaian Drive
+
+## Yang masih perlu dibuat/ditingkatkan
+
+- [ ] Offline queue generik untuk seluruh modul Community
+- [ ] Status `LOCAL / SYNCING / SYNCED / CONFLICT / ERROR`
+- [ ] Retry queue untuk semua operasi
+- [ ] Conflict detection
+- [ ] Conflict resolution
+- [ ] `last_synced_at` per record
+- [ ] Version/revision per record
+- [ ] Audit trail perubahan
+- [ ] Export/import seluruh Community data
+- [ ] Backup lokal satu paket
+- [ ] Restore dengan validasi
+- [ ] Recovery setelah browser storage dibersihkan
+
+**Prinsip:** internet mati tidak boleh menghentikan pembacaan, presentasi, jadwal acara, game, map lokal, atau data yang sudah tersimpan secara lokal.
+
+---
+
+# 3. 📖 BIBLE ENGINE
+
+- [x] Database/Sheet Alkitab multi-bahasa
+- [x] Pembersihan markup teknis ayat
+- [x] Nama kitab untuk navigasi
+- [x] Search referensi
+- [x] Search kata
+- [x] Baca pasal penuh
+- [x] Rencana baca
+- [x] Bacaan bersuara
+- [x] Tampilan paralel/kolom
+- [x] Pencarian banyak referensi sekaligus
+- [x] Catatan ayat
+- [x] Footnote handling
+- [x] Kumpulan Ayat
+- [x] Pokok Kitab
+- [x] Garis Besar
+- [x] Sinkron Pokok/Garis Besar
+- [x] Pembatasan kitab Mode Tamu dari Sheet
+- [x] Bible dapat dipakai sebagai sumber presentation
+- [ ] Search semantik/offline berdasarkan makna/topik
+- [ ] Quick verse search khusus operator presentasi
+- [ ] Riwayat ayat yang baru ditayangkan
+- [ ] Favorites operator presentation
+- [ ] Paket Bible offline yang dapat diekspor/import antar laptop
+
+---
+
+# 4. 🎵 KIDUNG / SONG ENGINE
+
+- [x] Database Kidung
+- [x] Kidung presentation
+- [x] Kidung Anak MVP
+- [x] Salin teks
+- [x] Full screen
+- [x] Swipe HP
+- [x] Navigasi ◀/▶
+- [x] Syair ganda No. 388
+- [x] Badge birama/pola suku kata
+- [x] Sejarah & Cara Baca
+- [x] Ukuran/jenis huruf Kidung
+- [x] Kidung masuk ke workflow presentation
+- [x] Link media dari HP
+- [ ] Song setlist lengkap untuk satu event
+- [ ] Auto-follow verse/chorus/bridge saat presentation
+- [ ] Riwayat lagu yang pernah ditayangkan
+- [ ] Export/import song pack offline
+
+---
+
+# 5. 📚 COLLECTION / CONTENT ENGINE
+
+- [x] Kumpulan Ayat
+- [x] Kumpulan dapat memuat berbagai tipe konten
+- [x] Mode Layar dapat disimpan ke Kumpulan Ayat
+- [x] Media
+- [x] PDF/gambar/Word/PPT sebagai media presentation
+- [x] Link YouTube/Canva/SoundCloud
+- [x] Drive media
+- [x] Share workflow yang sudah tersedia
+- [x] Ownership tracking media
+- [x] Approval penghapusan file tertentu
+- [ ] Satu format Event Pack untuk seluruh konten
+- [ ] Template event yang dapat di-clone
+- [ ] Validasi semua asset sebelum acara
+- [ ] Laporan asset yang hilang
+- [ ] Preload/prepare media sebelum event
+
+---
+
+# 6. 🖥️ PRESENTATION STUDIO
+
+## Sudah ada
+
+- [x] Studio Presentasi
+- [x] Layar 2 / present.html
+- [x] Timer
+- [x] Stopwatch
+- [x] Lap/penanda Stopwatch
+- [x] Ukuran timer terpisah
+- [x] Ukuran teks sampai 480%
+- [x] Pen/stylus
+- [x] Warna pastel pen
+- [x] Ukuran pen
+- [x] Pointer
+- [x] Kaca pembesar
+- [x] Mode layar
+- [x] Welcome
+- [x] Next Up
+- [x] Istirahat
+- [x] Ice Breaker
+- [x] Olahraga
+- [x] Renungan Malam
+- [x] Label acara berikutnya
+- [x] Peta interaktif
+- [x] Titik peta dari tabel
+- [x] Kalibrasi 2 titik
+- [x] Kategori/checklist peta
+- [x] Kartu info lokasi
+- [x] Data luas/penduduk manual
+- [x] Peta penuh/batal fokus
+- [x] Split-screen camera/news foundation
+- [x] Efek panggung confetti
+- [x] Reaksi emoji
+- [x] Drumroll
+- [x] Tepuk tangan
+- [x] Ding
+- [x] Fanfare
+- [x] Ta-da
+
+## Masih kurang
+
+- [ ] Menu Cepat ⚡ yang benar-benar menyatukan semua mode
+- [ ] Event timeline satu klik
+- [ ] LIVE / NEXT / AFTER yang selalu terlihat operator
+- [ ] Stage timer khusus pembicara
+- [ ] Video bumper/loop pembuka
+- [ ] Logo breathing/glow
+- [ ] Split-screen Kamera + Berita terhubung penuh ke workflow
+- [ ] Split-screen dapat tukar kiri/kanan dari workflow utama
+- [ ] Live polling
+- [ ] Live Q&A
+- [ ] Kuis interaktif
+- [ ] Social wall
+- [ ] Caption otomatis
+- [ ] Multi-screen routing yang lengkap
+- [ ] Emergency mode terpusat
+- [ ] Fallback media otomatis
+
+---
+
+# 7. 🎨 ATMOSPHERE ENGINE
+
+Tujuan: layar 200 inch untuk ±1.000 pemuda harus terasa modern, tetapi tidak mengganggu doa/Firman.
+
+- [x] Preset Welcome
+- [x] Preset Next Up
+- [x] Preset Istirahat
+- [x] Preset Ice Breaker
+- [x] Preset Olahraga
+- [x] Preset Renungan Malam
+- [~] Perbedaan nuansa tiap jenis layar
+- [ ] Preset Morning
+- [ ] Preset Prayer khusus 05:30
+- [ ] Preset Word
+- [ ] Preset Worship
+- [ ] Preset Message
+- [ ] Preset Meal
+- [ ] Preset Night Reflection
+- [ ] Pengaturan brightness/opacity/motion per preset
+- [ ] Motion level: very low / low / medium / high
+- [ ] Auto atmosphere berdasarkan jam
+- [ ] Auto atmosphere berdasarkan jenis acara
+
+### Prinsip visual
+
+- [ ] Typography sangat besar
+- [ ] Safe area
+- [ ] High readability dari belakang ruangan
+- [ ] Animasi lambat untuk doa
+- [ ] Background tidak terlalu ramai saat Firman
+- [ ] Motion lebih aktif hanya saat ice breaking/worship
+- [ ] Fallback ke background statis
+
+---
+
+# 8. ⏰ EVENT ENGINE — 3 JAM / 1 HARI / 3 HARI 3 MALAM
+
+## Template event
+
+- [ ] Event 3 jam
+- [ ] Event 1 hari
+- [ ] Event 3 hari
+- [ ] Event 3 hari 3 malam
+- [ ] Custom event
+- [ ] Duplicate event
+- [ ] Save event template
+- [ ] Clone event
+
+## Timeline
+
+- [ ] Timeline visual
+- [ ] Start/end time
+- [ ] Current event
+- [ ] Next event
+- [ ] After-next event
+- [ ] Auto-start
+- [ ] Manual override
+- [ ] Delay event
+- [ ] Skip event
+- [ ] Extend event
+- [ ] Emergency break
+
+## Contoh event 3 jam
+
+- [ ] Welcome
+- [ ] Worship
+- [ ] Bible
+- [ ] Message
+- [ ] Break
+- [ ] Ice breaker
+- [ ] Prayer
+- [ ] Closing
+
+## Event 3 hari 3 malam
+
+### Day 1
+- [ ] Arrival
+- [ ] Registration
+- [ ] Welcome
+- [ ] Morning/prayer jika diperlukan
+- [ ] Session 1
+- [ ] Session 2
+- [ ] Meal
+- [ ] Break
+- [ ] Ice breaker
+- [ ] Big meeting
+- [ ] Night prayer
+
+### Day 2
+- [ ] Morning prayer
+- [ ] Bible reading
+- [ ] Breakfast
+- [ ] Sessions
+- [ ] Lunch
+- [ ] Rest
+- [ ] Games
+- [ ] Fellowship
+- [ ] Big meeting
+- [ ] Night reflection
+
+### Day 3
+- [ ] Morning prayer
+- [ ] Breakfast
+- [ ] Final sessions
+- [ ] Sharing
+- [ ] Prayer
+- [ ] Follow-up
+- [ ] Closing
+- [ ] Departure
+
+---
+
+# 9. 🌅 MORNING / PRAYER / NIGHT EXPERIENCE
+
+## 05:30 Morning Prayer
+
+- [ ] Automatic Morning Prayer mode
+- [ ] Soft sunrise background
+- [ ] Very slow motion
+- [ ] Low brightness
+- [ ] Large simple typography
+- [ ] "O LORD JESUS" / prayer phrase screen
+- [ ] Scripture screen
+- [ ] Quiet timer
+- [ ] No distracting effects
+
+## Night
+
+- [ ] Night atmosphere
+- [ ] Reflection prompt
+- [ ] Prayer
+- [ ] Tomorrow preview
+- [ ] Quiet countdown
+
+---
+
+# 10. 🍽️ MEAL / BREAK ENGINE
+
+- [ ] Breakfast mode
+- [ ] Lunch mode
+- [ ] Dinner mode
+- [ ] Coffee break mode
+- [ ] Tea break mode
+- [ ] Countdown to next session
+- [ ] Next location
+- [ ] Announcement
+- [ ] Menu/meal information
+- [ ] Safety/emergency information
+- [ ] Automatic schedule transition
+
+---
+
+# 11. 🎮 ICE BREAKING & YOUTH ENGINE
+
+## Database
+
+- [ ] Game database
+- [ ] Game categories
+- [ ] Duration
+- [ ] Difficulty
+- [ ] Number of players
+- [ ] Indoor/outdoor
+- [ ] Required equipment
+- [ ] Instructions
+
+## Games
+
+- [ ] This or That
+- [ ] Find Someone Who
+- [ ] Bible Quiz
+- [ ] True/False
+- [ ] Emoji Bible
+- [ ] Guess the Song
+- [ ] Guess Bible Character
+- [ ] 30 Second Challenge
+- [ ] Group Challenge
+- [ ] Random Question
+
+## Runtime
+
+- [ ] Random game
+- [ ] Surprise Me
+- [ ] Duration filter
+- [ ] Countdown
+- [ ] Score/vote if needed
+- [ ] Reset
+- [ ] Offline operation
+
+---
+
+# 12. 🗺️ COMMUNITY MAP — 200+ LOKAL
+
+## Fondasi yang sudah ada
+
+- [x] Peta
+- [x] Kalibrasi
+- [x] Daftar titik dari tabel
+- [x] Kategori/checklist
+- [x] Pin lokasi
+- [x] Fokus lokasi
+- [x] Peta penuh
+- [x] Kartu informasi lokasi
+- [x] Data luas
+- [x] Data penduduk
+- [x] 514 kabupaten/kota sebagai data referensi
+
+## Pengembangan berikutnya
+
+- [ ] Database resmi 200+ lokal
+- [ ] ID unik setiap lokal
+- [ ] Nama lokal
+- [ ] Kota/kabupaten
+- [ ] Provinsi
+- [ ] Koordinat
+- [ ] Alamat umum
+- [ ] Jadwal pertemuan
+- [ ] Kontak umum
+- [ ] Kategori lokal
+- [ ] Status aktif
+- [ ] Foto lokasi
+- [ ] Catatan umum
+- [ ] Filter wilayah
+- [ ] Search lokal
+- [ ] Statistik lokasi
+- [ ] Import CSV
+- [ ] Import Excel
+- [ ] Export CSV
+- [ ] Export Excel
+- [ ] Route/open external map
+- [ ] Map presentation mode
+- [ ] Map community mode
+
+---
+
+# 13. 🤝 COMMUNITY — SALING MENGUATKAN
+
+Buat modul yang fokus pada hubungan, bukan social media umum.
+
+- [ ] Send encouragement
+- [ ] Share verse
+- [ ] Share prayer
+- [ ] Thank you
+- [ ] Short update
+- [ ] Prayer request
+- [ ] Mark "I prayed"
+- [ ] Follow-up
+- [ ] Private message jika memang diperlukan
+- [ ] Group message
+- [ ] Local announcement
+- [ ] Regional announcement
+- [ ] Expiration
+- [ ] Permission
+
+Contoh:
+
+```text
+🤝 ENCOURAGE
+
+Terus maju dalam Tuhan.
+Kami mendoakanmu.
+
+📖 Scripture
+
+[ SEND ]
+```
+
+---
+
+# 14. 🙏 PRAYER NETWORK
+
+- [ ] Prayer request
+- [ ] Private prayer request
+- [ ] Group prayer request
+- [ ] Mark as prayed
+- [ ] Prayer count
+- [ ] Prayer reminder
+- [ ] Answered prayer
+- [ ] Archive
+- [ ] Expiration
+- [ ] Visibility control
+- [ ] Follow-up
+
+**Privacy:** data doa yang bersifat pribadi tidak boleh otomatis terlihat oleh semua orang.
+
+---
+
+# 15. 🚶 PENJENGUKAN / VISITATION
+
+Ini adalah salah satu modul terpenting untuk penggunaan nyata setiap minggu.
+
+## Workflow
+
+```text
+NEED FOLLOW-UP
+      ↓
+ASSIGN
+      ↓
+CONTACT
+      ↓
+VISIT
+      ↓
+RECORD
+      ↓
+FOLLOW-UP
+      ↓
+COMPLETED
+```
+
+Checklist:
+
+- [ ] Daftar perlu dijenguk
+- [ ] Prioritas
+- [ ] Assignment kepada pelayan
+- [ ] Jadwal kunjungan
+- [ ] Status planned
+- [ ] Status contacted
+- [ ] Status visited
+- [ ] Status follow-up
+- [ ] Status completed
+- [ ] Catatan singkat
+- [ ] Next follow-up date
+- [ ] Reminder
+- [ ] Riwayat kunjungan
+- [ ] Privacy per role
+
+Jangan menyimpan atau menampilkan detail pribadi yang tidak diperlukan.
+
+---
+
+# 16. 💛 FOLLOW-UP ENGINE
+
+- [ ] Today's follow-up
+- [ ] Overdue follow-up
+- [ ] Upcoming follow-up
+- [ ] Assigned person
+- [ ] Contact method
+- [ ] Last contact
+- [ ] Next contact
+- [ ] Reminder
+- [ ] Completed
+- [ ] History
+- [ ] Archive
+
+Tujuan: **tidak ada orang yang hilang dari perhatian hanya karena acara sudah selesai.**
+
+---
+
+# 17. 👥 FELLOWSHIP / GROUP
+
+- [ ] Group database
+- [ ] Group leader
+- [ ] Members
+- [ ] Meeting schedule
+- [ ] Attendance
+- [ ] Prayer
+- [ ] Bible reading
+- [ ] Follow-up
+- [ ] Announcement
+- [ ] Group location
+- [ ] Group history
+
+---
+
+# 18. 🧑‍🤝‍🧑 YOUTH 17–24
+
+Dashboard youth sebaiknya tidak terasa seperti software administrasi.
+
+- [ ] Today's Word
+- [ ] Pray
+- [ ] Connect
+- [ ] Serve
+- [ ] Grow
+- [ ] Fellowship
+- [ ] Challenge
+- [ ] Bible reading
+- [ ] Games
+- [ ] Event
+- [ ] Service/ministry
+- [ ] Follow-up
+- [ ] Encouragement
+
+---
+
+# 19. 📅 DAILY DASHBOARD
+
+Contoh:
+
+```text
+TODAY
+
+📖 WORD
+🙏 PRAY
+🤝 CONNECT
+🚶 VISIT
+💛 FOLLOW-UP
+👥 FELLOWSHIP
+📢 ANNOUNCEMENT
+📅 EVENTS
+```
+
+Checklist:
+
+- [ ] Today's Word
+- [ ] Today's prayer
+- [ ] Today's reading
+- [ ] Today's events
+- [ ] Today's follow-up
+- [ ] Today's visitation
+- [ ] Today's announcements
+- [ ] Today's fellowship
+- [ ] Today's service
+
+---
+
+# 20. 📆 WEEKLY DASHBOARD
+
+Contoh:
+
+```text
+THIS WEEK
+
+MON  📖 Reading
+TUE  🙏 Prayer
+WED  👥 Fellowship
+THU  📖 Reading
+FRI  🤝 Encouragement
+SAT  🏠 Preparation
+SUN  ⛪ Meeting
+```
+
+Checklist:
+
+- [ ] Weekly schedule
+- [ ] Weekly meeting
+- [ ] Weekly Bible reading
+- [ ] Weekly prayer
+- [ ] Weekly fellowship
+- [ ] Weekly service
+- [ ] Weekly attendance
+- [ ] Weekly follow-up
+- [ ] Weekly encouragement
+- [ ] Weekly summary
+
+---
+
+# 21. 📢 ANNOUNCEMENT / NEWS
+
+- [x] Announcement dasar sudah ada
+- [ ] Local announcement
+- [ ] Group announcement
+- [ ] Regional announcement
+- [ ] Event announcement
+- [ ] Priority
+- [ ] Start date
+- [ ] Expiration date
+- [ ] Target audience
+- [ ] Offline cache
+- [ ] Online update
+- [ ] Presentation mode
+
+---
+
+# 22. 📱 WEB REMOTE
+
+Fondasi remote perlu dikembangkan menjadi remote operator yang lengkap.
+
+- [ ] Local web server
+- [ ] QR connect
+- [ ] PIN pairing
+- [ ] Device name
+- [ ] Multiple operators
+- [ ] LIVE
+- [ ] NEXT
+- [ ] PREVIOUS
+- [ ] BLACK
+- [ ] BIBLE
+- [ ] SONG
+- [ ] VIDEO
+- [ ] GAME
+- [ ] COUNTDOWN
+- [ ] ANNOUNCEMENT
+- [ ] EMERGENCY
+- [ ] Connection status
+- [ ] Reconnect
+- [ ] Permission per operator
+
+Target arsitektur:
+
+```text
+Laptop / Presentation PC
+          │
+       Wi-Fi LAN
+          │
+ ┌────────┼─────────┐
+ ▼        ▼         ▼
+Phone 1  Phone 2   Tablet
+```
+
+Internet tidak wajib.
+
+---
+
+# 23. 📺 MULTI-SCREEN
+
+- [ ] Main projector
+- [ ] Operator preview
+- [ ] Stage monitor
+- [ ] News screen
+- [ ] Break screen
+- [ ] Map screen
+- [ ] QR interaction screen
+- [ ] Camera screen
+- [ ] Independent screen content
+- [ ] Screen routing
+
+---
+
+# 24. 🚨 EMERGENCY / FALLBACK
+
+- [ ] Emergency button
+- [ ] Black screen
+- [ ] Safe background
+- [ ] Stop video
+- [ ] Reload current
+- [ ] Restart current
+- [ ] Offline mode
+- [ ] Media fallback
+- [ ] Network fallback
+- [ ] Database fallback
+- [ ] Recovery after app restart
+
+Prinsip:
+
+> **Peserta tidak boleh melihat error teknis.**
+
+---
+
+# 25. ☁️ ONLINE + OFFLINE SYNC
+
+Internet hanya menjadi akselerator.
+
+```text
+ONLINE
+   ↓
+SYNC
+   ↓
+LOCAL COPY
+   ↓
+EVENT / DAILY USE
+```
+
+Jika internet mati:
+
+```text
+OFFLINE
+   ↓
+LOCAL COPY
+   ↓
+CONTINUE
+```
+
+Checklist:
+
+- [ ] Generic sync engine
+- [ ] Offline queue
+- [ ] Retry
+- [ ] Conflict detection
+- [ ] Conflict resolution
+- [ ] Sync status
+- [ ] Last sync
+- [ ] Manual sync
+- [ ] Automatic sync
+- [ ] Backup
+- [ ] Restore
+
+---
+
+# 26. 🔐 PRIVACY / PERMISSION
+
+Karena aplikasi mulai menyimpan data komunitas, jangan gunakan prinsip "semua orang melihat semuanya".
+
+Model yang disarankan:
+
+```text
+ADMIN
+  ↓
+REGIONAL / AREA
+  ↓
+LOCAL
+  ↓
+GROUP
+  ↓
+PERSONAL
+```
+
+Checklist:
+
+- [ ] Role permission
+- [ ] Data visibility
+- [ ] Private notes
+- [ ] Private prayer request
+- [ ] Visitation privacy
+- [ ] Follow-up privacy
+- [ ] Audit log
+- [ ] Delete policy
+- [ ] Export policy
+- [ ] Data retention policy
+
+---
+
+# 27. 📦 EVENT PACK / BACKUP
+
+- [ ] Export event
+- [ ] Import event
+- [ ] Export schedule
+- [ ] Import schedule
+- [ ] Export Bible references
+- [ ] Export song setlist
+- [ ] Export games
+- [ ] Export themes
+- [ ] Validate missing assets
+- [ ] Media checksum
+- [ ] Version number
+- [ ] Backup before event
+- [ ] Restore test before event
+
+---
+
+# 28. 🧪 TESTING — WAJIB SEBELUM ACARA BESAR
+
+## Offline
+
+- [ ] Internet dicabut
+- [ ] Bible tetap jalan
+- [ ] Kidung tetap jalan
+- [ ] Collection tetap jalan
+- [ ] Schedule tetap jalan
+- [ ] Timer tetap jalan
+- [ ] Game tetap jalan
+- [ ] Map tetap jalan
+- [ ] Presentation tetap jalan
+- [ ] Remote LAN tetap jalan
+
+## Hardware
+
+- [ ] Projector 200 inch
+- [ ] 16:9
+- [ ] HDMI
+- [ ] Sound system
+- [ ] Laptop lama
+- [ ] Laptop utama
+- [ ] Second display
+
+## Event stress test
+
+- [ ] 3-hour event simulation
+- [ ] 1-day event simulation
+- [ ] 3-day event simulation
+- [ ] 1,000-person presentation simulation
+- [ ] 200+ locations loaded
+- [ ] Large Bible database
+- [ ] Large media library
+- [ ] Multiple remote devices
+
+## Failure test
+
+- [ ] Internet disconnected
+- [ ] Wi-Fi disconnected
+- [ ] Video missing
+- [ ] Image missing
+- [ ] Browser refresh
+- [ ] App restart
+- [ ] Laptop restart
+- [ ] Projector reconnect
+- [ ] Second screen reconnect
+- [ ] Remote reconnect
+
+---
+
+# 29. 🏗️ PRIORITAS PEMBANGUNAN
+
+## PHASE 0 — AUDIT
+
+- [x] Existing project inspected/documented
+- [ ] Automated feature inventory
+- [ ] Confirm every checklist item against source code
+- [ ] Identify duplicate systems
+- [ ] Identify technical debt
+
+## PHASE 1 — STABILKAN PRESENTATION
+
+- [ ] End-to-end browser test
+- [ ] Multi-screen
+- [ ] Emergency
+- [ ] Fallback
+- [ ] Event timeline
+
+## PHASE 2 — COMMUNITY FOUNDATION
+
+- [ ] Location database
+- [ ] 200+ local records
+- [ ] Group structure
+- [ ] Search
+- [ ] Permission
+
+## PHASE 3 — DAILY
+
+- [ ] Today's Word
+- [ ] Daily Prayer
+- [ ] Reading
+- [ ] Encouragement
+- [ ] Daily Dashboard
+
+## PHASE 4 — WEEKLY
+
+- [ ] Weekly schedule
+- [ ] Attendance
+- [ ] Fellowship
+- [ ] Follow-up
+- [ ] Weekly Dashboard
+
+## PHASE 5 — VISITATION
+
+- [ ] Visitation queue
+- [ ] Assignment
+- [ ] Visit record
+- [ ] Follow-up
+- [ ] Reminder
+
+## PHASE 6 — EVENT ENGINE
+
+- [ ] 3-hour event
+- [ ] 1-day event
+- [ ] 3-day event
+- [ ] Event template
+- [ ] Schedule engine
+
+## PHASE 7 — YOUTH EXPERIENCE
+
+- [ ] Ice breaking
+- [ ] Games
+- [ ] Quiz
+- [ ] Voting
+- [ ] QR interaction
+
+## PHASE 8 — REMOTE & PROFESSIONAL AV
+
+- [ ] Web remote
+- [ ] Stage monitor
+- [ ] Multi-screen
+- [ ] Atmosphere engine
+- [ ] Emergency
+- [ ] Fallback
+
+## PHASE 9 — SYNC
+
+- [ ] Offline queue
+- [ ] Central sync
+- [ ] Conflict handling
+- [ ] Multi-device
+
+## PHASE 10 — ADVANCED
+
+- [ ] AI
+- [ ] Speech-to-Bible
+- [ ] Live caption
+- [ ] OBS
+- [ ] NDI
+- [ ] Camera
+- [ ] Analytics
+
+---
+
+# 30. 📊 MASTER STATUS — KONDISI PROJECT SAAT INI
+
+Berdasarkan dokumentasi project yang ada saat ini, gambaran kasarnya:
+
+| Area | Status | Keterangan |
+|---|---|---|
+| Alkitab | [x] | Fondasi sangat kuat |
+| Kidung | [x] | Sudah terintegrasi |
+| Kidung Anak | [x] | MVP sudah ada |
+| Kumpulan Ayat | [x] | Sudah ada |
+| Media | [x] | Sudah ada + Drive |
+| Drive Sync | [x] | Sudah cukup maju |
+| AI Chat | [x] | Sudah ada |
+| Presentation Studio | [x] | Sudah maju -- Mode Cepat 11 tata letak, Menu Cepat ⚡ (offline), Efek Panggung (confetti/seruan/bel), Monitor 3 speaker |
+| Timer | [x] | Sudah ada |
+| Stopwatch | [x] | Sudah ada |
+| Pen/Pointer | [x] | Sudah ada |
+| Magnifier | [x] | Sudah ada |
+| Mode Layar | [x] | Sudah ada beberapa preset |
+| Peta | [x] | Fondasi kuat |
+| 514 Kab/Kota | [x] | Data referensi sudah ada |
+| 200+ Lokal | [~] | Peta/fondasi ada, community database belum lengkap |
+| Split Camera/News | [x] | 8 orientasi kamera/teks + kamera-bulat & teks-bulat (5 posisi, ukuran 200-1200px) sudah bisa dipakai dari Mode Cepat |
+| Effects | [x] | Confetti/reaksi emoji/seruan teks besar/bel + pintasan Break Time, semua bisa lewat Menu Cepat ⚡ |
+| Daily | [~] | Komponen dasar ada, dashboard terpadu belum ada |
+| Weekly | [ ] | Belum menjadi workflow terpadu |
+| Prayer Network | [ ] | Belum |
+| Encouragement | [ ] | Belum |
+| Visitation | [ ] | Belum |
+| Follow-up | [ ] | Belum |
+| Fellowship/Group | [ ] | Belum |
+| Community Dashboard | [ ] | Belum |
+| Event 3 Jam | [~] | Komponen presentasi ada, event engine terpadu belum ada |
+| Event 1 Hari | [ ] | Belum menjadi template engine |
+| Event 3 Hari 3 Malam | [~] | Komponen tersedia, timeline engine belum lengkap |
+| Ice Breaking Engine | [~] | Preset sudah ada, database/runtime game belum lengkap |
+| Web Remote | [~] | Perlu audit fondasi aktual dan dilanjutkan |
+| Multi-screen | [~] | Layar 2 (jemaat) matang; Monitor 3 (Monitor Pembicara, Sekarang/Selanjutnya) baru ditambahkan; belum ada routing multi-Layar-2 (beberapa proyektor berbeda konten) |
+| Emergency | [ ] | Belum lengkap |
+| Offline Core | [x] | Sudah menjadi prinsip aplikasi |
+| Generic Sync | [~] | Drive sync sudah kuat, community sync belum ada |
+| Permission | [~] | Level pengguna ada, granular community permission belum |
+| Backup/Restore | [~] | Sebagian ada melalui data/sync, event pack belum |
+| Testing E2E | [!] | Banyak fitur baru belum diuji browser/hardware nyata |
+
+---
+
+# 31. 🚦 ATURAN UNTUK AI CODING AGENT
+
+AI coding agent yang bekerja di project ini **WAJIB** mengikuti aturan berikut.
+
+### Sebelum coding
+
+1. Baca `README.md`.
+2. Baca `ROADMAP-STATUS-TERKINI.md`.
+3. Audit source code terkait.
+4. Cari apakah fitur sudah ada.
+5. Jangan membuat fungsi duplikat.
+6. Jangan membuat database baru jika database existing dapat diperluas.
+7. Jangan menghapus fitur existing.
+8. Jangan merombak architecture tanpa alasan teknis.
+9. Jika schema database berubah, buat migration/compatibility strategy.
+10. Tentukan status fitur sebelum dan sesudah pekerjaan.
+
+### Saat coding
+
+- Kerjakan satu phase/sub-feature pada satu waktu.
+- Gunakan komponen yang sudah ada.
+- Pertahankan backward compatibility.
+- Jangan mengubah data lama tanpa migration.
+- Jangan mengandalkan internet untuk core functionality.
+- Jangan menambahkan dependency besar tanpa alasan.
+- Pastikan error handling dan fallback.
+
+### Setelah coding
+
+Laporkan:
+
+```text
+## AUDIT
+...
+
+## CHANGES
+...
+
+## COMPLETED
+[x] ...
+
+## IN PROGRESS
+[~] ...
+
+## TODO
+[ ] ...
+
+## BUGS
+[!] ...
+
+## TEST
+...
+
+## NEXT STEP
+...
+```
+
+**Jangan mengatakan `[x] COMPLETED` jika hanya kode sudah ditulis tetapi belum diuji.**
+
+---
+
+# 32. 🏆 DEFINISI SOFTWARE YANG SUDAH MATANG
+
+Software dianggap matang apabila dapat dipakai untuk:
+
+### SETIAP HARI
+
+`📖 WORD → 🙏 PRAY → 🤝 CONNECT → 🌱 GROW`
+
+### SETIAP MINGGU
+
+`📅 SCHEDULE → 👥 FELLOWSHIP → 🚶 VISIT → 💛 FOLLOW-UP`
+
+### 200+ LOKAL
+
+`🗺️ MAP → 📍 LOCAL → 👥 GROUP → 🤝 CONNECT`
+
+### ACARA 3 JAM
+
+`WELCOME → WORSHIP → WORD → BREAK → ICE BREAK → PRAYER → CLOSING`
+
+### ACARA 3 HARI 3 MALAM
+
+`DAY 1 → DAY 2 → DAY 3 → FOLLOW-UP`
+
+### INTERNET MATI
+
+`OFFLINE → CONTINUE`
+
+### PERANGKAT BERMASALAH
+
+`FALLBACK → RECOVER → CONTINUE`
+
+---
+
+# 33. ❤️ PRINSIP TERAKHIR
+
+Aplikasi ini bukan untuk menggantikan fellowship.
+
+Aplikasi ini bukan untuk menggantikan shepherding.
+
+Aplikasi ini bukan untuk menggantikan doa.
+
+Aplikasi ini bukan untuk menggantikan pembacaan Firman.
+
+Aplikasi ini adalah **alat untuk membantu orang saling memperhatikan, saling menguatkan, saling mengunjungi, membaca Firman, berdoa, berkumpul, dan melayani.**
+
+### CORE EXPERIENCE
+
+```text
+             📖 WORD
+                │
+                ▼
+             🙏 PRAY
+                │
+                ▼
+          🤝 CONNECT
+                │
+                ▼
+           🚶 VISIT
+                │
+                ▼
+          💛 ENCOURAGE
+                │
+                ▼
+           👥 FELLOWSHIP
+                │
+                ▼
+             🔥 SERVE
+                │
+                ▼
+             🌱 GROW
+```
+
+**Build once. Reuse everywhere. Offline first. People first.**
+
+---
+
+# 34. 📝 CATATAN PEMBARUAN STATUS
+
+Setiap kali development berlangsung, tambahkan tanggal dan perubahan di sini.
+
+Format:
+
+```text
+## YYYY-MM-DD — [FITUR]
+
+[x] Selesai
+[~] Sebagian
+[ ] Belum
+[!] Perlu perbaikan
+
+Files changed:
+- ...
+
+Test:
+- ...
+
+Known issues:
+- ...
+
+Next:
+- ...
+```
+
+Dengan demikian README ini dapat menjadi **dokumen hidup** dan selalu menunjukkan posisi project yang sebenarnya.
+
+---
+
+## 2026-09-09 — Presentation Studio: Tata Letak (C), Gamifikasi Offline (B)
+
+[x] Selesai
+
+Files changed:
+- present.html, index.html, js/presentation-studio.js, js/collections.js, css/style.css
+
+Test:
+- node --check semua file JS lolos; semua blok <script> di index.html/present.html
+  divalidasi lolos parse. BELUM diuji di browser/perangkat proyektor sungguhan.
+
+Known issues:
+- Bug lama "Balik Sisi" (camSplitReverse tidak pernah terkirim live ke Layar 2)
+  ditemukan & diperbaiki sekalian saat menambah orientasi baru.
+
+Next:
+- Lanjut ke Fitur A (Menu Cepat ⚡).
+
+## 2026-09-09/10 — Presentation Studio: Menu Cepat ⚡ (A, sebagian), pintasan M/Alt+H, Monitor 3
+
+[~] Sebagian (bagian Offline Menu Cepat ⚡ selesai, bagian Online baru pintasan tab)
+
+Files changed:
+- index.html, css/style.css, js/presentation-studio.js, js/presentation.js,
+  js/app.js, js/kidung-ui.js, monitor.html (baru)
+
+Test:
+- node --check semua file JS lolos; validasi <script> index.html/present.html/
+  monitor.html lolos; brace-balance css/style.css diverifikasi (1114=1114).
+  BELUM diuji end-to-end di browser/perangkat proyektor sungguhan, BELUM diuji
+  di komputer non-laptop sungguhan (laporan awal soal scroll macet).
+
+Known issues:
+- Bagian Online Menu Cepat ⚡ belum punya UI sendiri (baru pintasan ke tab
+  Mode & Peta).
+- Perluasan shortcut q-w-e-r-t-y-u-i-o-p belum ditugaskan ke aksi apa pun.
+
+Next:
+- Selesaikan bagian Online Menu Cepat ⚡.
+- Uji Monitor 3 & perbaikan scroll/fullscreen di perangkat sungguhan (laptop
+  DAN komputer non-laptop dengan mouse biasa).
+
+## 2026-09-10 — Perbaikan bug Alkitab & Kidung (dari laporan operator)
+
+[x] Selesai (kode), [!] belum diuji perangkat sungguhan
+
+Files changed:
+- js/kidung-ui.js, js/app.js, css/style.css
+
+Test:
+- node --check lolos. BELUM diuji manual di HP/komputer sungguhan.
+
+Known issues:
+- Perbaikan tinggi kolom mode sync (vh/dvh -> JS visualViewport) mengandalkan
+  asumsi soal timing browser HP yang belum bisa diverifikasi tanpa perangkat
+  sungguhan -- perlu dikonfirmasi operator apakah masalah "kegeser ke atas"
+  benar-benar hilang.
+
+Next:
+- Konfirmasi dari operator setelah dicoba di perangkat sungguhan.
+
+## 2026-09-10 (lanjutan) — Monitor Pembicara: cuplikan VIDEO tanpa suara + offline, klarifikasi status Peta 3D
+
+[x] Selesai (kode), [!] belum diuji perangkat sungguhan
+
+1. **Monitor Pembicara (Monitor 3, monitor.html) sekarang juga bisa
+   menampilkan CUPLIKAN VIDEO** (YouTube/Video Lokal) dari yang sedang
+   tayang di Layar 2 -- SELALU TANPA SUARA (video/iframe di monitor.html
+   dipaksa `muted` + param `mute=1`, apa pun status mute/unmute Layar 2).
+   **Suara sesungguhnya untuk jemaat TIDAK berubah sama sekali** -- tetap
+   100% lewat Layar 2/sound system venue seperti logika lama.
+   - Konten NON-video (ayat, kidung, teks, slide gambar/PDF, peta, mode
+     layar, canva, soundcloud, dll) otomatis menyembunyikan area video
+     di Monitor 3, balik ke tampilan teks Sekarang/Selanjutnya biasa.
+   - Video Lokal (MP4) dikirim sebagai Blob lewat postMessage (jendela
+     satu origin) -- tetap 100% offline, tidak butuh internet.
+   - Play/Pause/Stop Video Lokal diteruskan supaya posisi pemutaran di
+     Monitor 3 ikut sinkron; Mute/Unmute Layar 2 SENGAJA TIDAK
+     diteruskan (Monitor 3 memang selalu senyap).
+2. **Menu/tombol pembuka Monitor Pembicara dipastikan HANYA ada di
+   `js/presentation-studio.js`** (tombol "🖥️③ Monitor Pembicara"),
+   tidak diduplikasi ke berkas lain mana pun -- dicek ulang sesuai
+   permintaan.
+3. **monitor.html sekarang mendaftarkan Service Worker (sw.js) sendiri**
+   (pola sama seperti index.html/present.html), supaya jendela ini
+   tetap bisa DIBUKA walau sedang offline. Halaman ini sudah 100%
+   mandiri (CSS/JS inline, tidak memuat berkas lain), jadi begitu
+   HTML-nya sendiri pernah tersimpan di cache (1x dibuka saat online),
+   seluruh tampilan & logikanya ikut tersedia offline.
+4. **Klarifikasi status "Peta 3D bisa rotasi" (ditanyakan operator)** --
+   **BELUM ada** globe 3D sungguhan yang bisa diputar. Yang sudah ada
+   cuma "🔮 Gaya Pin: 3D Berputar" (efek CSS gradient+animasi pada pin,
+   peta dasarnya TETAP gambar 2D datar) -- lihat catatan keputusan
+   operator 9 Sep 2026 di bagian 35 (arsip log, sesi ke-8): globe 3D
+   sungguhan (bisa diputar, per-provinsi timbul, pakai data GeoJSON +
+   Three.js) SENGAJA DITUNDA dulu sampai mode 2D yang sudah jadi dicoba
+   di acara sungguhan -- ini pekerjaan besar terpisah (perlu data batas
+   wilayah + library 3D baru), belum dikerjakan di sesi ini. Default
+   tetap peta gambar 2D seperti sekarang; kalau operator ingin
+   melanjutkan globe 3D (dengan saklar 2D/3D, 2D tetap default, 3D bisa
+   diaktifkan tergantung kekuatan komputer), mohon konfirmasi supaya
+   dikerjakan di sesi terpisah (bukan pekerjaan kecil).
+
+Files changed:
+- js/presentation.js (`postMonitorRaw()`, `postMonitorVideo()`,
+  `postMonitorVideoControl()` -- infra pengiriman generik ke Monitor 3),
+  js/presentation-studio.js (`syncMonitorVideoForPayload_()` disadap di
+  `rawPost()`/`post()` -- 2 jalur TUNGGAL semua pengiriman ke Layar 2 --
+  plus `clearMonitorVideo_()` di titik-titik yang memanggil
+  Presentation.sendVerse/sendVerseMulti/sendKidung/sendFreeText
+  LANGSUNG), monitor.html (area `#monVideoWrap`, penanganan pesan
+  `speaker_video`/`speaker_video_control`, registrasi sw.js sendiri).
+
+Test:
+- node --check lolos untuk js/presentation.js & js/presentation-studio.js.
+  Semua blok `<script>` embedded (index.html/present.html/monitor.html)
+  lolos parse. BELUM diuji ujung-ke-ujung dengan monitor.html sungguhan
+  di jendela ke-3 (terutama: mirroring Video Lokal berukuran besar lewat
+  Blob postMessage, dan perilaku offline monitor.html setelah sw.js
+  benar-benar meng-cache-nya).
+
+Known issues:
+- Belum diuji: apakah mengirim Blob Video Lokal ke 2 jendela sekaligus
+  (Layar 2 + Monitor 3) terasa berat di laptop yang lebih tua/berkas
+  video sangat besar -- kalau terasa berat, bisa dipertimbangkan opsi
+  "jangan kirim video ke Monitor 3" sebagai toggle terpisah nanti.
+
+Next:
+- Uji end-to-end di perangkat sungguhan (buka Monitor Pembicara di
+  jendela ke-3, coba tayangkan YouTube & Video Lokal, pastikan benar-
+  benar tanpa suara & Layar 2 tidak terpengaruh).
+- Tunggu konfirmasi operator soal lanjut/tidaknya globe 3D Peta
+  Interaktif (poin 4 di atas).
+
+---
+
+# 35. 📜 ARSIP LOG DETAIL — Presentation Studio (sesi 1-8, sebelum README ini digabung jadi 1)
+
+> Ini isi ASLI `ROADMAP-STATUS-TERKINI.md` (file terpisah sebelumnya),
+> dipindahkan ke sini APA ADANYA (cuma level heading diturunkan 1 tingkat
+> supaya masuk struktur dokumen ini) supaya tidak ada riwayat yang hilang saat
+> digabung jadi 1 README. Sesi ke-9 & ke-10 (Fitur C/B/A Menu Cepat, Monitor 3,
+> perbaikan bug Alkitab/Kidung) sudah dicatat ringkas di bagian 34 di atas,
+> bukan di sini (arsip ini cuma sampai sesi ke-8).
+
+## 📋 Status Terkini — 27 Agustus 2026
+
+### 🗓️ Keputusan operator (9 Sep 2026) — Mode 3D globe DITUNDA
+Operator minta 2 model tersedia (2D & 3D, lewat saklar "🖥️ Mode Peta:
+2D/3D" yang 2D-nya tidak berubah dari yang sudah ada), TAPI diputuskan
+**ditunda dulu** -- mau coba & pakai mode 2D yang sudah jadi di acara
+sungguhan dulu sebelum invest waktu ke globe 3D (pekerjaan besar).
+Kalau nanti dilanjut: pin di mode 3D **harus tetap gaya "3D Berputar"**
+yang sudah ada (sudah dikonfirmasi operator), globe-nya pakai data
+GeoJSON batas wilayah + Three.js, pin dari lintang/bujur asli (data
+514 kota yang sudah ada bisa dipakai ulang tanpa kalibrasi manual).
+Tidak ada perubahan kode di sesi ini -- catatan keputusan saja.
+
+### 🆕 Tambahan 9 Sep 2026 (sesi ke-8) — 🌐 Peta dari Online + 🎨 Gaya Peta (Komik/Artistik/Teritorial) + 🔮 Pin 3D Berputar
+Tahap PERTAMA dari usulan "peta 3D/gaya artistik" operator (dikerjakan
+bertahap sesuai pilihan operator: mulai dari yang paling cepat dulu,
+globe 3D sungguhan BELUM dikerjakan -- lihat catatan di bawah):
+- **🌐 "Ambil Peta Dasar dari Online (Wikimedia)"** -- tombol baru di
+  atas dropzone unggah manual, cari & unduh gambar peta Indonesia polos
+  dari **Wikimedia Commons** (API publik, bebas lisensi, CORS terbuka,
+  tanpa API key) lewat `fetchOnlineBaseMap_()`. Hasilnya disimpan
+  sebagai `map.imageDataUrl` PERSIS seperti unggah manual -- jadi cuma
+  butuh internet SEKALI saat tombolnya ditekan, setelah itu tersimpan
+  di localStorage & dipakai offline seperti biasa (kalibrasi/pin/dst
+  semua tetap jalan tanpa perubahan).
+- **🎨 "Gaya Peta Dasar"** -- dropdown baru: Biasa / Komik / Artistik /
+  Teritorial (atlas tua). Diproses langsung di perangkat lewat Canvas
+  (`generateMapStyleVariant_()`, filter warna + compositing bawaan
+  browser) -- **BUKAN gambar AI baru**, cuma efek visual dari gambar
+  yang sudah ada (hasil unggah manual ATAU ambil online di atas).
+  Diproses SEKALI per gaya lalu di-cache (`map.styleVariants`), pindah
+  gaya berikutnya instan & tetap offline.
+- **🔮 "Gaya Pin: 3D Berputar"** -- dropdown baru di samping Gaya Peta:
+  Standar (bulat datar, seperti sebelumnya) atau 3D Berputar. Efeknya
+  gradient bulat mengkilap + sorot cahaya yang bergeser bolak-balik
+  (dipadu animasi denyut yang sudah ada) memberi kesan bola/kelereng
+  berputar -- **BUKAN model 3D sungguhan** (div CSS datar tidak punya
+  sisi belakang) dan **BUKAN foto 360°** (operator konfirmasi maksud
+  "360°" cuma animasi ikon, bukan foto panorama).
+- Baik Gaya Peta maupun Gaya Pin **TIDAK otomatis dorong ke Layar 2**
+  saat dipilih -- operator tetap tekan "▶️ Tampilkan Peta"/"🎯 Fokus"
+  seperti biasa (konsisten dengan unggah gambar baru yang juga tidak
+  auto-dorong), supaya penonton tidak kaget lihat operator sedang
+  coba-coba gaya.
+- Lolos `node --check` (JS) & semua blok `<script>` embedded di
+  `index.html`/`present.html`.
+- **Belum dikerjakan** (tahap berikutnya, kalau operator mau lanjut):
+  Peta 3D globe sungguhan (bisa diputar, per-provinsi timbul) --
+  operator sudah setuju ini boleh menyusul setelah tahap cepat ini;
+  akan butuh data batas wilayah (GeoJSON) + Three.js, pekerjaan jauh
+  lebih besar dari sesi ini.
+- Berkas yang berubah: `index.html` (kontrol baru: tombol Ambil Online,
+  dropdown Gaya Peta & Gaya Pin), `js/presentation-studio.js`
+  (`fetchOnlineBaseMap_()`, `generateMapStyleVariant_()`,
+  `effectiveMapImage_()`, wiring dropdown/tombol baru, `pinStyle`
+  disertakan di semua payload `action:"show"/"focus"`), `css/style.css`
+  (`.ps-pin-3d` + keyframes, dipakai pratinjau Studio),
+  `present.html` (`.map-pin-dot.pin-3d` + keyframes, dipakai Layar 2).
+
+### 🆕 Tambahan 9 Sep 2026 (sesi ke-7) — 🔄 Penduduk & Luas PER-KOTA otomatis (Wikidata), bukan manual lagi
+Sebelumnya (sesi ke-3) luas/penduduk per kota SENGAJA manual (tidak ada
+database bawaan). Operator sekarang minta ini otomatis, jadi ditambah
+tanpa menghapus jalur manualnya (tetap ada sebagai cadangan):
+- **Tombol "🔄 Wikidata" baru di tiap panel "📊 Data" pin** (Studio,
+  tab "🖥️ Mode & Peta") -- ambil penduduk (properti Wikidata P1082) &
+  luas (P2046) kota itu otomatis, isi ke 2 kotak di atasnya + catat
+  sumber & tahun datanya.
+- **Tombol massal baru "🔄 Perbarui Semua Populasi/Luas (Wikidata)"**
+  di atas daftar Pin -- proses SEMUA pin yang sedang tampil (sesuai
+  checklist kategori aktif) satu-satu dengan jeda ~0.4 detik antar-kota
+  (bukan sekaligus paralel, supaya tidak membebani/di-*rate-limit*
+  server Wikidata), status berjalan "(12/514) Kabupaten Sidoarjo... ✅11
+  ⚠️1" ditulis live di bawah tombol. Untuk 514 kota bisa makan waktu
+  beberapa menit -- ini wajar, bukan macet.
+- **Cara kerja**: cari nama pin (mis. "Kabupaten Sidoarjo") lewat API
+  publik `wbsearchentities` Wikidata (CORS terbuka, tanpa API key),
+  cocokkan ke entitas Wikidata kota itu, lalu ambil klaim P1082/P2046
+  paling baru/`preferred`, termasuk tahun datanya (qualifier "point in
+  time") & referensi asalnya kalau tercatat di Wikidata (biasanya
+  mengutip BPS/sumber resmi lain).
+- **Sumber & tahun ikut tampil ke penonton** di kartu info Layar 2
+  (baris kecil "Sumber: Wikidata (ref: ...)" di bawah baris
+  Luas/Penduduk, `present.html` -> `renderMapInfoCard_()`) -- HANYA
+  muncul kalau datanya memang dari Wikidata; kalau operator koreksi
+  manual, baris sumber otomatis hilang lagi (tidak mengarang sumber
+  untuk angka manual).
+- **BPS tetap tidak dipakai langsung** (alasan sama seperti banner
+  nasional sesi ke-6: API resminya butuh key & kemungkinan besar tidak
+  mendukung CORS dari browser tanpa server perantara). Wikidata dipilih
+  karena satu-satunya yang bisa diakses langsung, dan biasanya
+  mengutip BPS sebagai sumber aslinya lewat referensi.
+- **Isian manual TETAP ada** sebagai cadangan (kalau kota tidak
+  ditemukan di Wikidata, operator offline, atau mau pakai angka dari
+  sumber lain yang lebih dipercaya) -- tinggal ketik langsung di 2
+  kotak yang sama, sumber otomatis dikosongkan supaya tidak salah
+  atribusi.
+- ⚠️ **BELUM diuji ujung-ke-ujung di jaringan sungguhan**, terutama:
+  (1) akurasi pencocokan nama untuk kota yang labelnya di Wikidata beda
+  dari nama resmi Kemendagri (kemungkinan ada beberapa dari 514 yang
+  tidak ketemu/ketemu entitas yang salah -- makanya nama hasil
+  pencocokan ("matchedLabel") ikut ditulis di status supaya operator
+  bisa cek), dan (2) apakah rate-limit Wikidata cukup longgar untuk 500+
+  panggilan berurutan dalam sekali proses massal.
+- Lolos `node --check` (JS) & semua blok `<script>` embedded di
+  `index.html`/`present.html`.
+- Berkas yang berubah: `index.html` (tombol massal baru), 
+  `js/presentation-studio.js` (`extractBestWikidataClaim_()`,
+  `searchWikidataEntity_()`, `fetchCityDataAuto_()`, wiring tombol
+  per-pin & massal), `present.html` (baris "Sumber:" di kartu info).
+
+### 🆕 Tambahan 9 Sep 2026 (sesi ke-6) — 🌏 Banner Total Penduduk Indonesia (Nasional, auto-update)
+
+Berbeda dari data penduduk PER-KOTA (di kartu info "🎯 Fokus", sudah ada
+sebelumnya) — ini angka **nasional total Indonesia**, tampil sebagai
+banner terpisah di Layar 2 pojok kiri-atas, independen dari zoom/fokus.
+
+- **Tab "🖥️ Mode & Peta" → bagian baru "🌏 Total Penduduk Indonesia
+  (Nasional)"** (di bawah "☑️ Kategori yang Ditampilkan"): status angka
+  saat ini, toggle **"Tampilkan di Layar 2"**, tombol **"🔄 Perbarui
+  Otomatis (Wikidata)"**, dan 3 kolom isian manual (Jumlah/Tahun/Sumber)
+  + tombol **"💾 Simpan Manual"** sebagai cadangan.
+- **Perbarui Otomatis** mengambil dari **Wikidata** (entitas Q252 =
+  Indonesia, properti P1082 = populasi) — dipilih karena satu-satunya
+  sumber terbuka yang mendukung diakses LANGSUNG dari browser (CORS
+  terbuka) tanpa server tambahan (situs ini statis). Wikidata biasanya
+  mengutip BPS/PBB sebagai referensi aslinya, dan link referensi itu
+  ikut disalin sebagai "Sumber". BPS (`bps.go.id`) sendiri **tidak
+  dipakai langsung** karena API resminya butuh API key + kemungkinan
+  besar tidak mendukung CORS untuk dipanggil dari browser tanpa server
+  perantara (di luar cakupan situs statis ini).
+- **Toggle tampil/sembunyi & update angka dikirim LIVE** lewat action
+  `"natpop"` yang TERPISAH dari action `"show"`/`"focus"`/`"zoom"` —
+  supaya tidak ikut mereset zoom/posisi fokus kota yang sedang tayang
+  saat operator sekadar menyembunyikan/menampilkan banner ini.
+  Gambar peta Indonesia SENDIRI **tidak pernah ikut hilang** saat
+  banner ini disembunyikan (elemen terpisah, bukan bagian dari gambar
+  peta) — persis seperti diminta.
+- Disimpan per-peta (`map.nationalPopulation`), ikut tersimpan di
+  `localStorage` yang sama seperti data peta lain — belum ikut sinkron
+  Drive/Sheet (batasan yang sama seperti data peta lain, lihat catatan
+  "Belum dikerjakan" di fitur Peta Interaktif).
+- Berkas yang berubah: `index.html` (markup baru di tab "🖥️ Mode &
+  Peta"), `js/presentation-studio.js` (`fetchNationalPopulationAuto_()`,
+  `renderNatPopStatus()`, `pushNatPopLive_()`, wiring 3 tombol/toggle
+  baru di `wireMapTab()`, `nationalPopulation` disertakan di payload
+  `action:"show"`), `present.html` (`#mapNationalPop` + CSS,
+  `renderNationalPop_()`, dipanggil dari `showMap()`, dibersihkan di
+  `stopMap()`, routing baru `action==="natpop"`).
+- Lolos `node --check` (JS) & seluruh blok `<script>` embedded di
+  `index.html`/`present.html`.
+- ⚠️ **BELUM diuji ujung-ke-ujung di jaringan sungguhan** — terutama
+  apakah Wikidata benar-benar mengizinkan CORS dari domain hosting
+  Anda saat ini (biasanya ya, tapi bisa berubah kapan saja karena ini
+  layanan pihak ketiga di luar kendali kita) dan apakah format
+  JSON-nya masih persis sama. Kalau tombol "Perbarui Otomatis" gagal,
+  pesan error akan tampil apa adanya di bawah tombol — isian manual di
+  bawahnya tetap berfungsi sebagai cadangan tanpa perlu internet.
+
+### 🆕 Tambahan 9 Sep 2026 (sesi ke-5) — 🎨 Warna Tetap + 📷 Foto Kota + Pin Berdenyut
+- **Warna pin TETAP** untuk 2 kategori paling umum: **"Kaki Dian" =
+  emas** (`#d4af37`), **"Pos Injil" = merah** (`#c0392b`) -- persis nama
+  itu (tidak peka besar-kecil huruf), tidak lagi ikut hash acak.
+  Kategori LAIN yang operator tambah sendiri (apa pun namanya) tetap
+  dapat warna otomatis dari palet seperti sebelumnya.
+- **Pin berdenyut pelan terus-menerus** (animasi CSS, bukan sekali saat
+  muncul) di Layar 2 -- "hidup", ala penanda lokasi Google Maps, dengan
+  jeda antar-pin sedikit diacak supaya tidak berdenyut serentak semua.
+- **📷 Foto per kota (1-5 foto)** -- tombol baru "📷 Foto" di tiap pin
+  (Studio, tab "🖥️ Mode & Peta"), buka panel unggah dengan pratinjau
+  thumbnail + tombol hapus per foto. Berlaku untuk pin manual MAUPUN
+  pin kota berkategori (jadi bisa dipakai di semua 514 kabupaten/kota).
+  Foto otomatis dikecilkan (maks lebar 900px, JPEG 72%) sebelum
+  disimpan supaya hemat penyimpanan perangkat.
+  ⚠️ **Catatan jujur soal batas penyimpanan**: semua ini tersimpan di
+  `localStorage` perangkat, yang total kuotanya cuma sekitar 5-10MB di
+  kebanyakan browser (dipakai BERSAMA fitur lain: gambar peta, Kumpulan
+  Ayat, dst). Walau sudah dikompres (~50-150KB/foto), kalau SEMUA 514
+  kota diisi 5 foto sekaligus itu bisa 130-380MB -- jauh melebihi
+  kuota & akan gagal simpan/mengganggu fitur lain. **Disarankan cuma isi
+  foto untuk kota yang memang mau ditonjolkan** (biasanya puluhan, bukan
+  ratusan), bukan seluruh 514 kota sekaligus.
+- **Kartu info Layar 2 kini menampilkan foto** (strip sampai 5 gambar)
+  di bawah nama kota/luas/penduduk saat "🎯 Fokus" ditekan.
+- Label "Tahun Data" penduduk ditulis ulang jadi "sensus terakhir ..."
+  di kartu Layar 2 supaya jelas maksudnya data sensus, bukan tahun
+  sekarang.
+- **Sudah bisa (dikonfirmasi, bukan fitur baru)**: klik "🎯 Fokus" pada
+  pin TETAP menampilkan info kota itu walau kategorinya sedang TIDAK
+  dicentang di "☑️ Kategori yang Ditampilkan" -- daftar Pin di Studio
+  menampilkan SEMUA pin apa pun status centangnya.
+- Lolos `node --check`; BELUM diuji ujung-ke-ujung di browser
+  sungguhan, dan BELUM diuji soal batas nyata kuota localStorage kalau
+  diisi banyak foto sekaligus (lihat catatan ⚠️ di atas).
+- **Belum dikerjakan** (menunggu giliran): Menu Cepat ⚡ online/offline,
+  split-screen Kamera+Berita disambungkan ke workflow, gamifikasi/
+  reward anak muda 17-24 thn, video bumper, logo bernapas, stage timer
+  pembicara, live polling/Q&A, kuis interaktif, social wall, caption
+  otomatis.
+
+### 🆕 Tambahan 9 Sep 2026 (sesi ke-4) — 📏 Ukuran Pin & 🔍 Zoom Interaktif
+- **Peta pin SUDAH otomatis tersimpan & bisa dimuat ulang** (ini
+  pertanyaan operator, bukan fitur baru) -- lewat `localStorage` di
+  perangkat, dropdown "Peta Baru/Ganti Nama/Hapus Peta" (`psMapSelect`).
+  Tiap perubahan (pin, kalibrasi, kategori, dst) langsung tersimpan;
+  buka lagi besok/minggu depan di perangkat yang sama, datanya masih
+  ada. Catatan: tersimpan PER PERANGKAT (bukan otomatis sinkron ke HP
+  lain) -- kalau perlu dipakai di laptop berbeda, pakai "💾 Simpan ke
+  Kumpulan Ayat" supaya ikut fitur sinkron Drive yang sudah ada.
+- **Ukuran pin BESAR-KECIL sesuai jumlah penduduk** (kalau sudah diisi
+  lewat "📊 Data") -- pakai skala akar (sqrt), bukan linear, supaya kota
+  besar tidak menutupi separuh peta dibanding kota kecil. Pin tanpa data
+  penduduk tetap ukuran standar. Berlaku di pratinjau Studio DAN Layar 2
+  (`renderMapPins_()`, `present.html`).
+- **🔍 Zoom Peta interaktif** -- slider baru + tombol ➖/➕ di tab "🖥️
+  Mode & Peta" (100%–600%), bisa digeser KAPAN SAJA (baik sedang lihat
+  peta penuh maupun sedang fokus ke 1 kota) untuk memperbesar/
+  memperkecil tampilan di Layar 2 secara halus, TANPA perlu klik ulang
+  "🎯 Fokus" tiap mau ubah level zoom. Titik pusat zoom mengikuti kota
+  yang sedang difokuskan (atau tengah peta kalau belum fokus kemanapun).
+  Slider otomatis balik ke 100% saat "▶️ Tampilkan Peta"/"↩️ Peta Penuh"
+  ditekan, dan ke 260% saat "🎯 Fokus" ditekan (menyamai zoom bawaan
+  fitur itu).
+- Lolos `node --check`; BELUM diuji ujung-ke-ujung di browser
+  sungguhan.
+- **Belum dikerjakan** (menunggu giliran): Menu Cepat ⚡ online/offline,
+  split-screen Kamera+Berita disambungkan ke workflow, gamifikasi/
+  reward anak muda 17-24 thn, video bumper, logo bernapas, stage timer
+  pembicara, live polling/Q&A, kuis interaktif, social wall, caption
+  otomatis.
+
+### 🆕 Tambahan 9 Sep 2026 (sesi ke-3) — 📇 Kartu Info + 📊 Luas/Penduduk saat Fokus Peta
+- **Klik "🎯 Fokus" sekarang memunculkan kartu info** di pojok kiri-bawah
+  Layar 2 (`#mapInfoCard`, `present.html`): nama kota, kategori + tahun
+  (kalau pin berasal dari "📋 Daftar Titik dari Tabel"), lalu opsional
+  **Luas (km²)** & **Jumlah Penduduk (+ tahun datanya)** kalau sudah
+  diisi operator. Baris yang kosong TIDAK ditampilkan (bukan "0"/"-").
+- **Tombol "📊 Data" baru** di tiap baris daftar Pin (Studio Presentasi,
+  tab "🖥️ Mode & Peta") -- buka panel kecil 3 kotak: Luas (km²), Jumlah
+  Penduduk, Tahun Data. **Sengaja tidak ada database luas/penduduk
+  bawaan** untuk 514 kabupaten/kota -- angka itu berubah tiap tahun &
+  kalau salah isi bisa menyesatkan penonton, jadi operator mengisi
+  sendiri dari sumber yang mereka percaya (mis. BPS terbaru). Berlaku
+  untuk pin manual maupun pin berkategori (Kaki Dian/Pos Injil/dst).
+- **Tombol baru "↩️ Peta Penuh (batal fokus)"** di sebelah "▶️ Tampilkan
+  Peta" -- zoom keluar dari fokus 1 pin, balik ke peta penuh semua
+  pin+legenda yang sedang aktif, tanpa perlu menutup peta.
+- Lolos `node --check` (`js/presentation-studio.js` & `<script>`
+  embedded di `present.html`/`index.html`); BELUM diuji ujung-ke-ujung
+  di browser sungguhan.
+- **Belum dikerjakan** (dari daftar usulan "acara 1000 orang" yang
+  sama, menunggu giliran sesuai pilihan operator): Menu Cepat ⚡
+  online/offline, split-screen Kamera+Berita disambungkan ke workflow,
+  gamifikasi/reward untuk anak muda 17-24 thn, video bumper, logo
+  bernapas, stage timer pembicara, live polling/Q&A, kuis interaktif,
+  social wall, caption otomatis.
+
+### 🆕 Tambahan 9 Sep 2026 (sesi lanjutan) — Layar Istirahat Lengkap + 🎉 Efek Panggung
+- **Layar Istirahat Lengkap** — field baru "Acara berikutnya setelah ini"
+  di tab "🖥️ Mode & Peta" (`psModeScreenNextLabel`), digabung dalam SATU
+  layar bersama judul/poin-poin/hitung mundur yang sudah ada (bukan
+  layar terpisah) -- tampil sebagai baris "➡️ Selanjutnya: ..." di bagian
+  bawah (`#msNextLabel`, `present.html`). Berlaku untuk semua jenis,
+  paling relevan untuk ☕ Istirahat/🏃 Olahraga. Ikut tersimpan kalau item
+  Mode Layar diselipkan ke Kumpulan Ayat (`addModeScreenToCollection()`).
+- **🎉 Efek Panggung** (tab baru di Studio Presentasi) — 2 kelompok:
+  - Reaksi visual: **Confetti** (canvas, ~150 keping jatuh ~4.5 detik)
+    & 4 reaksi emoji terbang (👏❤️🙌🔥) -- tampil sebagai OVERLAY di atas
+    apa pun yang sedang tayang, TIDAK menghentikan/mengganti tayangan
+    yang berjalan, hilang otomatis.
+  - Efek suara: 🥁 Drumroll, 👏 Tepuk Tangan, 🔔 Ding, 📯 Fanfare, 🎊
+    Ta-da! -- SEMUA disintesis langsung lewat Web Audio API (oscillator
+    + white noise), BUKAN file MP3, jadi tidak perlu aset tambahan &
+    tetap 100% offline. Diputar dari perangkat Layar 2 (biasanya
+    tersambung sound system venue).
+  - Keduanya "tembak dan lupa" (fire-and-forget) -- tidak ada tombol
+    "Hentikan" terpisah, operator bisa pencet berkali-kali beruntun.
+- Lolos `node --check` (3 file .js) & semua `<script>` embedded di
+  `index.html`/`present.html`; BELUM diuji ujung-ke-ujung di browser
+  sungguhan (terutama volume/latency efek suara di sound system venue
+  sungguhan, dan performa confetti di laptop presentasi yang lebih tua).
+- **Belum dikerjakan** (dari daftar usulan "acara 1000 orang" yang
+  sama, menunggu giliran): Video Bumper/Loop pembuka acara, Logo
+  bernapas/glow, Stage timer khusus pembicara, live polling/Q&A, kuis
+  interaktif, social wall, caption otomatis, split-screen Kamera+Berita
+  yang bisa ditukar sisi kapan saja (fondasi `cam-split-lr` sudah ada).
+
+### 🆕 Tambahan 9 Sep 2026 (sesi terpisah) — 4 preset baru "🖥️ Jenis Layar"
+Sebelumnya tab "🖥️ Mode & Peta" cuma punya 2 jenis layar (👋 Welcome & ➡️ Next
+Up). Ditambah 4 preset lagi supaya operator tidak perlu menyusun ulang
+judul/gaya sendiri tiap acara: **☕ Istirahat**, **🎉 Ice Breaker**, **🏃
+Olahraga**, **🙏 Renungan Malam**.
+- Judul & placeholder subjudul terisi otomatis saat ganti tombol jenis
+  (mis. pilih "☕ Istirahat" -> judul otomatis "JAM ISTIRAHAT") -- tetap
+  bisa diedit bebas, dan TIDAK menimpa tulisan operator kalau sudah
+  diketik manual (lihat `lastAutoTitle` di `wireModeScreenTab()`).
+- Hitung mundur ke jam target hanya ditawarkan untuk jenis yang punya
+  "durasi" wajar: Welcome, ☕ Istirahat, 🏃 Olahraga. Next Up/Ice
+  Breaker/Renungan Malam sengaja tanpa hitung mundur.
+- Layar 2 (`present.html`) dapat nuansa warna/gaya kecil per jenis
+  (eyebrow, ketebalan judul, dsb) TANPA mengganti latar tema pilihan
+  operator -- lihat komentar panjang di CSS `#modeScreenView` &
+  `MODE_SCREEN_KIND_META` (`js/presentation-studio.js`).
+- Item "Mode Layar" yang sudah tersimpan di Kumpulan Ayat manapun (jenis
+  lama Welcome/Next Up) TIDAK terpengaruh -- cuma menambah pilihan baru
+  di daftar tombol, bukan mengubah data yang sudah ada.
+- Peta Interaktif (📍 Kalibrasi, 📋 Daftar Titik dari Tabel, ☑️ Kategori)
+  yang sudah dibangun sebelumnya TIDAK diubah sama sekali sesi ini.
+- **Belum dikerjakan** (menunggu giliran, sesuai permintaan operator):
+  split-screen Kamera + Berita bisa ditukar sisi kapan saja -- catatan:
+  fondasinya SUDAH ADA (`body.cam-split-lr` + tombol "Balik Sisi", lihat
+  `present.html`), jadi kemungkinan besar cukup dipastikan/disambungkan
+  ke workflow ini, bukan dibuat dari nol.
+- Lolos `node --check` (3 file .js) & semua `<script>` embedded di
+  `index.html`/`present.html`; BELUM diuji ujung-ke-ujung di browser
+  sungguhan.
+
+### 🆕 Tambahan 6 Sep 2026 (sesi terpisah, di luar cakupan ringkasan 27 Agu di bawah)
+- **🔗 Link Publik Drive** (opt-in per file, PDF/gambar tetap privat secara
+  default) -- detail lengkap & catatan keamanan di `ROADMAP-drive-sync.md`.
+- **🔗 Tambah Link dari HP** (YouTube/Canva/SoundCloud langsung dari panel
+  Kumpulan Ayat biasa, tanpa Studio Presentasi) -- detail di
+  `ROADMAP-ai-presentation.md`.
+- **Timer & Stopwatch (Studio Presentasi) dirombak total**: state machine
+  standby (angka berkedip) → berjalan → dijeda/selesai, tombol "▶️ Mulai/
+  Lanjut" dibuat besar, Stopwatch dapat "🚩 Penanda" (lap), Timer sekarang
+  bisa jeda/lanjut (sebelumnya cuma bisa stop total). Lihat komentar
+  panjang di `wireTimer()`/`wireStopwatch()` (js/presentation-studio.js).
+- **Ukuran Teks** (ayat/kidung/dst) dinaikkan batas atasnya 160% → 480%.
+- **Ukuran Timer/Stopwatch** -- slider BARU, terpisah dari Ukuran Teks di
+  atas, rentang 50%-1000% (10x), khusus memperbesar angka Timer/Stopwatch
+  di Layar 2 (`--p-timer-scale`, present.html) tanpa ikut membesarkan
+  ayat/teks lain.
+- Semua lolos `node --check` (JS) & cek struktur `<script>` embedded di
+  `present.html`; BELUM diuji ujung-ke-ujung di browser sungguhan.
+
+---
+
+## 📋 Status Terkini — 27 Agustus 2026
+
+Ringkasan SATU HALAMAN dari semua yang dikerjakan/belum dikerjakan sepanjang sesi
+27 Agu 2026 (roadmap sinkron Drive yang lebih panjang & mendetail ada di
+`ROADMAP-drive-sync.md` -- file ini cuma ringkasannya + fitur-fitur TAMBAHAN di
+luar sinkron Drive yang diminta belakangan di sesi yang sama).
+
+---
+
+### ✅ SUDAH SELESAI (siap dipakai, semua lolos `node --check`)
+
+#### 1. Sinkron Drive (Tahap 4–7 dari roadmap awal)
+| # | Fitur | Ringkas |
+|---|---|---|
+| 4 | Tarik media dari Drive di perangkat lain | Buka Media Tersimpan di HP/komputer baru → otomatis tahu file yang sudah disinkron dari perangkat lain, tombol "☁️ Muat dari Drive" untuk unduh on-demand |
+| 5 | 🔗 Bagikan ikut membagikan file media | Pakai Drive `makeCopy()`, penerima dapat salinan independen |
+| 6 | Panel admin "📦 Pemakaian Drive" | Total & rincian per-akun/per-file, bisa dibuka dari menu ⋮ |
+| 7 | Antrean offline/gagal-kirim | Upload gagal (offline dll) otomatis diantre & dicoba lagi saat online |
+| — | ⚙️ Pengaturan tampilan Kidung | Ukuran & jenis huruf, tersimpan per perangkat |
+
+#### 2. Housekeeping Drive lanjutan
+- Pelacakan **rantai kepemilikan** file (`MediaOwnership` sheet) -- tahu siapa pengunggah PERTAMA suatu file walau sudah dibagikan berkali-kali.
+- **Hapus permanen dari Drive** butuh persetujuan: kalau yang minta hapus BUKAN pengunggah pertama, jadi PERMINTAAN tertunda (bukan langsung terhapus) -- pengunggah pertama yang memutuskan Setuju/Tolak. Berlaku sama untuk admin (tidak diistimewakan).
+- Indikator "⏳N menunggu sinkron" di tab Media Tersimpan (badge + spanduk + tombol "🔄 Coba sekarang").
+
+#### 3. 🔔 Lonceng notifikasi bisa dilihat di HP
+- Sebelumnya kartu 🔔 persetujuan (Kiriman Kumpulan Ayat & Permintaan Hapus Media) HANYA muncul di dalam Studio Presentasi yang memang desktop-only.
+- Sekarang digabung ke lonceng header (`js/adminbell.js`) yang SUDAH tampil di HP maupun komputer -- badge angka & isi panel sekarang mencakup semua jenis notifikasi, bukan cuma statistik admin/login terakhir.
+
+#### 4. 🖊️ Warna & ukuran Pen/Stylus
+- 5 warna pastel baru: pink, biru muda, hijau muda, ungu, oranye (sebelumnya cuma merah/kuning/putih).
+- Ukuran lewat progress bar (slider) 2px–40px, default 17px, dikirim juga ke Layar 2 supaya ketebalan coretan benar-benar berubah di sana.
+
+#### 5. ⏱️ Stopwatch (fitur baru)
+- Hitung MAJU dari 0 (beda dari ⏱️ Timer yang sudah ada, yang hitung MUNDUR).
+- Dikendalikan dari Controller — tersedia di **Studio Presentasi (desktop)** *dan* **panel sederhana di HP** (⋮ → Mode Presentasi).
+- Tombol ▶️ Mulai / ⏸️ Jeda / 🔄 Ulang, kotak judul bisa diisi bebas (sama seperti Timer), tampil di Layar 2, format otomatis MM:SS atau H:MM:SS untuk sesi panjang. Tidak akan tayang berbarengan dengan Timer (keduanya berbagi 1 area tengah layar).
+
+#### 6. 🔍 Kaca Pembesar / Magnifier (fitur baru, diminta di pesan ini)
+- **Khusus untuk file yang diunggah** (PDF/gambar/Word/PPT — semuanya ditayangkan sebagai gambar per halaman di Layar 2).
+- Rentang zoom **10% – 10.000%** lewat slider di tab "Penunjuk & Pen" (Studio Presentasi), default 100%.
+- Cara pakai: aktifkan tombol "🔍 Kaca Pembesar", lalu gerakkan kursor di atas kotak pratinjau "Tayang" — posisi kursor itu jadi titik tengah lensa pembesar di Layar 2 (sama seperti cara kerja 🔴 Penunjuk yang sudah ada).
+- **Kotak/badge kecil** di atas lensa menunjukkan besar zoom saat ini (mis. "🔍 250%") — inilah "layer tambahan berupa kotak" yang diminta.
+- Lensa otomatis disembunyikan kalau bukan gambar yang sedang tayang (mis. pas ayat Alkitab/Kidung/Timer tampil), dan disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau.
+
+---
+
+### ⏳ BELUM SELESAI / BELUM DIKERJAKAN
+
+Ditulis jujur, dengan alasannya masing-masing:
+
+#### A. Pengujian 2–3 pengguna mengakses 1 Apps Script bersamaan
+**Belum dijawab sesi ini.** Ini pertanyaan yang butuh jawaban tertulis (bukan kode) soal cara kerja Google Apps Script Web App + Google Sheets saat diakses banyak orang sekaligus, termasu soal "3 Apps Script yang aktif" yang disebutkan. Akan dijawab di pesan terpisah supaya tidak tercampur dengan daftar fitur di sini.
+
+#### B. Cek tampilan Alkitab 1/2/3 kolom + kompatibilitas dengan Playlist All
+**Belum diinvestigasi.** Perlu dicek: apakah mode kolom (1/2/3, atau berbaris ke bawah) yang ada sekarang tetap bisa disimpan bersama Kidung/Pengumuman/Word/PDF/PPT/gambar dalam 1 Playlist ("Kumpulan Ayat" gabungan). Akan dijawab/diperbaiki di pesan terpisah.
+
+#### C. Pan (geser) saat Kaca Pembesar di-zoom sangat besar
+Saat ini lensa selalu mengikuti **posisi kursor** operator secara real-time (jadi geser dilakukan dengan menggerakkan mouse di kotak pratinjau) — ini sudah cukup untuk kebanyakan pemakaian. **Belum ada** mode "kunci lensa di 1 titik lalu geser terpisah dari kursor" untuk zoom ekstrem (mis. 5000%+) di mana area yang mau dilihat sangat sempit — kalau dibutuhkan, ini pekerjaan tambahan.
+
+#### D. Housekeeping Drive — pembersihan otomatis file yatim
+Panel admin "📦 Pemakaian Drive" baru **melaporkan** pemakaian, belum ada tombol "bersihkan semua file yatim sekaligus" (harus hapus manual satu-satu lewat tombol 🗑️ per file, yang sudah melalui alur persetujuan).
+
+#### E. Notifikasi real-time (push) untuk 🔔
+Lonceng sekarang disegarkan tiap dibuka + polling berkala (5 menit admin / 10 menit pengguna biasa) — BUKAN notifikasi push instan begitu ada kiriman baru. Untuk notifikasi instan dibutuhkan infrastruktur tambahan (mis. Web Push) yang di luar cakupan Google Apps Script murni.
+
+---
+
+### 📁 File yang berubah sesi ini (kumulatif, dari awal sampai fitur Kaca Pembesar)
+`apps-script/Code.gs`, `index.html`, `css/style.css`, `js/app.js`, `js/adminbell.js`,
+`js/collections.js`, `js/config.js`, `js/db.js`, `js/kidung-ui.js`,
+`js/presentation-studio.js`, `js/presentation.js`, `js/sync.js`, `present.html`,
+`ROADMAP-drive-sync.md`, `ROADMAP-STATUS-TERKINI.md` (file ini).
+
+
+---
+
+# END — MASTER ROADMAP
