@@ -1831,6 +1831,17 @@ input { font-family: inherit; }
 .chip-btn.primary { background: var(--petrol); color: #fff; border-color: var(--petrol); }
 .chip-btn.primary:hover { background: var(--petrol-dark); }
 
+/* BARU (10 Sep 2026, permintaan operator) -- dropdown pilihan peta online
+   (lihat #psMapOnlineChoice di index.html), disamakan tampilannya dengan
+   .chip-btn di sekitarnya (bentuk pil/rounded) supaya tidak terlihat beda
+   sendiri sebagai <select> polos bawaan browser. */
+select.chip-select {
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: 999px; padding: 8px 12px; font-size: 13px; color: var(--petrol);
+}
+select.chip-select.small { padding: 5px 10px; font-size: 12px; }
+select.chip-select:hover { border-color: var(--petrol); }
+
 /* ============================================================
    RENCANA BACA
    ============================================================ */
