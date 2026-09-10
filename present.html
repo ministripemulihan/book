@@ -363,10 +363,34 @@
     overflow: hidden; background: #000;
   }
   #mapView:not([hidden]) { display: block; animation: fadeInOnly .4s ease both; }
+  /* PERBAIKAN (10 Sep 2026, permintaan operator: "posisi pin beda antara
+     Studio dan Layar 2") -- #mapContent adalah pembungkus BARU yang
+     ukurannya SENGAJA dihitung lewat JS (positionMapContent_(), lihat
+     skrip bawah) supaya PERSIS SAMA dengan area gambar yang benar-benar
+     terlihat (bukan seluruh layar). SEBELUMNYA #mapImg dipasang
+     object-fit:contain langsung di kotak seluas layar penuh -- kalau
+     rasio layar (mis. proyektor 4:3) beda dari rasio gambar peta,
+     muncul "ruang kosong" (letterbox) di kiri-kanan/atas-bawah, tapi
+     pin (xPct/yPct) tetap dihitung terhadap kotak SELURUH LAYAR itu,
+     bukan terhadap gambar yang sebenarnya tampil -- makanya posisi pin
+     meleset, padahal di Studio (yang gambarnya TIDAK di-object-fit,
+     jadi tidak pernah ada letterbox) titik yang sama terlihat pas.
+     SEKARANG #mapImg & #mapPinsLayer sama-sama anak dari #mapContent,
+     dan #mapContent inilah yang diberi ukuran+posisi persis area
+     gambar (bukan #mapImg lagi) -- jadi xPct/yPct pin, yang dihitung
+     relatif ke #mapContent, otomatis pas di manapun rasio layarnya,
+     TANPA perlu memaksa semua jadi 16:9. Transform zoom/pan (translate/
+     scale) juga dipindah ke #mapContent supaya pin ikut bergerak
+     bersama gambar saat "🎯 Fokus"/slider zoom dipakai (SEBELUMNYA
+     transform cuma di #mapImg, #mapPinsLayer diam di tempat). */
+  #mapContent {
+    position: absolute; left: 0; top: 0;
+    transform-origin: 0 0;
+    transition: transform 1s ease;
+  }
   #mapImg {
     position: absolute; left: 0; top: 0; width: 100%; height: 100%;
-    object-fit: contain; transform-origin: 0 0;
-    transition: transform 1s ease;
+    display: block;
   }
   #mapPinsLayer { position: absolute; inset: 0; pointer-events: none; }
   /* BARU (9 Sep 2026, permintaan operator) -- badge legenda kategori
@@ -1301,8 +1325,10 @@
   <!-- BARU (9 Sep 2026, permintaan operator) -- 🗺️ Peta Interaktif,
        lihat catatan panjang CSS #mapView di atas. -->
   <div id="mapView" hidden>
-    <img id="mapImg" alt="" />
-    <div id="mapPinsLayer"></div>
+    <div id="mapContent">
+      <img id="mapImg" alt="" />
+      <div id="mapPinsLayer"></div>
+    </div>
     <div id="mapLegend"></div>
     <div id="mapNationalPop"></div>
     <div id="mapInfoCard"></div>
@@ -2293,8 +2319,41 @@
   // "focus"|"stop", imageUrl, pins:[{id,label,xPct,yPct}], pin }.
   // ------------------------------------------------------------
   const mapViewEl = document.getElementById("mapView");
+  const mapContentEl = document.getElementById("mapContent");
   const mapImgEl = document.getElementById("mapImg");
   const mapPinsLayerEl = document.getElementById("mapPinsLayer");
+  // PERBAIKAN (10 Sep 2026) -- hitung ukuran+posisi #mapContent supaya
+  // PERSIS menutupi area gambar yang benar-benar terlihat di layar
+  // (bekas perilaku object-fit:contain, tapi sekarang dihitung manual
+  // supaya #mapPinsLayer bisa ikut dipasang di kotak yang SAMA -- lihat
+  // catatan panjang CSS #mapContent di atas). Dipanggil ulang tiap kali
+  // gambar peta baru selesai dimuat & tiap window di-resize (mis.
+  // proyektor ganti resolusi) selama peta sedang tampil.
+  function positionMapContent_() {
+    if (!mapContentEl || !mapImgEl) return;
+    const boxW = window.innerWidth, boxH = window.innerHeight;
+    const iw = mapImgEl.naturalWidth, ih = mapImgEl.naturalHeight;
+    let left = 0, top = 0, width = boxW, height = boxH;
+    if (iw && ih && boxW && boxH) {
+      const boxRatio = boxW / boxH, imgRatio = iw / ih;
+      if (imgRatio > boxRatio) { width = boxW; height = width / imgRatio; }
+      else { height = boxH; width = height * imgRatio; }
+      left = (boxW - width) / 2;
+      top = (boxH - height) / 2;
+    }
+    mapContentEl.style.width = width + "px";
+    mapContentEl.style.height = height + "px";
+    mapContentEl.style.left = left + "px";
+    mapContentEl.style.top = top + "px";
+  }
+  // Reposisi otomatis kalau layar di-resize SELAGI peta sedang tampil
+  // (mis. jendela presentasi dipindah ke proyektor lain) -- transform
+  // zoom/fokus yang sedang aktif ikut dihitung ulang supaya tetap pas.
+  window.addEventListener("resize", () => {
+    if (!mapViewEl || mapViewEl.hidden) return;
+    positionMapContent_();
+    if (typeof applyMapTransform_ === "function") applyMapTransform_(false);
+  });
   const mapLegendEl = document.getElementById("mapLegend");
   const mapNationalPopEl = document.getElementById("mapNationalPop"); // BARU (9 Sep 2026)
   const mapInfoCardEl = document.getElementById("mapInfoCard");
@@ -2479,15 +2538,21 @@
     mapState = { imageUrl: data.imageUrl, pins: Array.isArray(data.pins) ? data.pins : [], pinStyle: data.pinStyle || "flat" };
     mapZoomCenter = { xPct: 50, yPct: 50 }; // BARU (9 Sep 2026) -- reset zoom ke peta penuh
     mapZoomScale = 1;
-    mapImgEl.style.transition = "none";
-    mapImgEl.style.transform = "translate(0px,0px) scale(1)";
+    mapContentEl.style.transition = "none";
+    mapContentEl.style.transform = "translate(0px,0px) scale(1)";
+    // PERBAIKAN (10 Sep 2026) -- posisi/ukuran #mapContent (dan karenanya
+    // posisi pin) baru bisa dihitung BENAR setelah gambar selesai dimuat
+    // (butuh naturalWidth/naturalHeight) -- dipasang lewat onload supaya
+    // tidak memakai ukuran gambar LAMA (dari peta sebelumnya) sesaat.
+    mapImgEl.onload = () => { positionMapContent_(); renderMapPins_(); };
     mapImgEl.src = mapState.imageUrl || "";
+    positionMapContent_(); // perkiraan awal (mis. gambar sudah ada di cache browser, load listener tetap jalan menyusul untuk memastikan)
     renderMapPins_();
     renderMapLegend_(data.categoryCounts);
     renderNationalPop_(data.nationalPopulation); // BARU (9 Sep 2026)
     hideMapInfoCard_(); // "▶️ Tampilkan Peta" (peta penuh) selalu menutup kartu info fokus sebelumnya
     mapViewEl.hidden = false;
-    requestAnimationFrame(() => { mapImgEl.style.transition = "transform 1s ease"; });
+    requestAnimationFrame(() => { mapContentEl.style.transition = "transform 1s ease"; });
   }
   // BARU (9 Sep 2026, permintaan operator) -- terapkan mapZoomCenter +
   // mapZoomScale saat ini ke transform gambar peta. Dipisah dari
@@ -2498,19 +2563,27 @@
   // NYATA (getBoundingClientRect di scale 1), sama seperti sebelumnya,
   // supaya akurat di rasio gambar apa pun.
   function applyMapTransform_(animate) {
-    const prevTransition = mapImgEl.style.transition;
-    mapImgEl.style.transition = "none";
-    mapImgEl.style.transform = "translate(0px,0px) scale(1)";
-    void mapImgEl.offsetWidth; // paksa reflow supaya rect di bawah terukur di scale 1
-    const rect = mapImgEl.getBoundingClientRect();
+    // PERBAIKAN (10 Sep 2026) -- transform (translate/scale untuk zoom &
+    // fokus) sekarang diterapkan ke #mapContent (bukan #mapImg lagi),
+    // supaya #mapPinsLayer yang jadi anaknya IKUT bergerak/membesar
+    // bersama gambar. rect di bawah juga rect #mapContent -- karena
+    // #mapContent SUDAH dipasang persis di area gambar yang terlihat
+    // (lihat positionMapContent_()), pinX/pinY yang dihitung dari rect
+    // ini otomatis akurat di rasio layar apa pun, tanpa letterbox ikut
+    // kehitung.
+    const prevTransition = mapContentEl.style.transition;
+    mapContentEl.style.transition = "none";
+    mapContentEl.style.transform = "translate(0px,0px) scale(1)";
+    void mapContentEl.offsetWidth; // paksa reflow supaya rect di bawah terukur di scale 1
+    const rect = mapContentEl.getBoundingClientRect();
     const scale = mapZoomScale;
     const pinX = rect.left + (mapZoomCenter.xPct / 100) * rect.width;
     const pinY = rect.top + (mapZoomCenter.yPct / 100) * rect.height;
     const tx = window.innerWidth / 2 - pinX * scale;
     const ty = window.innerHeight / 2 - pinY * scale;
     requestAnimationFrame(() => {
-      mapImgEl.style.transition = animate === false ? "none" : (prevTransition || "transform 1s ease");
-      mapImgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+      mapContentEl.style.transition = animate === false ? "none" : (prevTransition || "transform 1s ease");
+      mapContentEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
     });
   }
   function focusMapPin(data) {
@@ -2538,8 +2611,8 @@
     mapZoomCenter = { xPct: 50, yPct: 50 };
     mapZoomScale = 1;
     mapViewEl.hidden = true;
-    mapImgEl.style.transition = "none";
-    mapImgEl.style.transform = "translate(0px,0px) scale(1)";
+    mapContentEl.style.transition = "none";
+    mapContentEl.style.transform = "translate(0px,0px) scale(1)";
     if (mapLegendEl) mapLegendEl.innerHTML = ""; // BARU (9 Sep 2026)
     if (mapNationalPopEl) mapNationalPopEl.innerHTML = ""; // BARU (9 Sep 2026)
     hideMapInfoCard_(); // BARU (9 Sep 2026)
@@ -4181,7 +4254,7 @@
   // Laporkan bentuk (rasio) jendela Layar 2 yang SUNGGUH aktif ke
   // jendela utama -- dipakai untuk mengunci bentuk kotak pratinjau
   // (#psPreviewBoxWrap di Studio Presentasi / #presentPreviewBox di
-  // panel ⋮ biasa) supaya SELALU sama persis dengan Layar 2 yang 
+  // panel ⋮ biasa) supaya SELALU sama persis dengan Layar 2 yang
   // sesungguhnya, apa pun ukurannya (termasuk kalau operator
   // menggeser-ubah ukuran jendelanya secara manual, atau proyektor
   // punya resolusi yang tidak standar). Ini menggantikan pendekatan
