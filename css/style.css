@@ -1282,7 +1282,7 @@ input { font-family: inherit; }
 .search-form input:focus { outline: none; }
 .search-btn { border-radius: 999px; }
 
-.header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 
 .lang-select {
   border: 1px solid var(--rule);
@@ -2223,7 +2223,25 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
    ------------------------------------------------------------ */
 .reader-columns.reader-columns-panes {
   display: flex; gap: 10px; align-items: stretch; overflow-x: hidden;
-  height: 74vh; /* lihat catatan kenapa tinggi eksplisit dibutuhkan, di bawah -- dinaikkan dari 68vh (8 Sep 2026) supaya area baca lebih lega, sejalan dgn toolbar kontrol yang sekarang bisa dilipat di bawahnya */
+  /* PERBAIKAN (9 Sep 2026, sesi ke-9, laporan operator: "dicoba di mode
+     full screen lalu ditarik dari bawah sampai keatas akhirnya
+     dibagian bawahnya kegeser sampai agak atas") -- AKAR MASALAH: `vh`
+     (& bahkan `dvh` di sebagian browser HP) dihitung ULANG oleh
+     browser dengan JEDA -- terutama tepat setelah masuk/keluar
+     Fullscreen API (bar alamat baru saja hilang/muncul) -- jadi
+     sesaat sesudah masuk fullscreen, tinggi kotak ini masih memakai
+     angka LAMA (dari sebelum address bar hilang), lalu begitu jari
+     menggulir/menarik layar (memicu browser akhirnya menghitung ulang
+     viewport SUNGGUHAN), tinggi berubah TIBA-TIBA -- itulah yang
+     kelihatan seperti "bagian bawahnya kegeser ke atas". `vh`/`dvh` di
+     sini SEKARANG hanya jadi fallback (dipakai SESAAT sebelum JS
+     sempat jalan, atau kalau JS gagal) -- nilai SUNGGUHAN datang dari
+     `--panes-height` (satuan px pasti, dihitung recalcReaderPanesHeight()
+     di js/app.js lewat window.visualViewport, DIPICU ULANG setiap
+     fullscreenchange/resize/orientationchange) supaya selalu akurat
+     kapan pun, termasuk tepat sesaat sesudah transisi fullscreen. */
+  height: 74vh;
+  height: var(--panes-height, 74vh);
 }
 .reader-columns-panes-font-row { display: flex; gap: 8px; }
 .reader-col-pane {
@@ -2352,7 +2370,15 @@ body.pane-fullscreen-open { overflow: hidden; }
      perlu sisa tempat utk garis+panah toolbar navigasi pasal yang
      collapsed di bawahnya, kalau 100vh persis toolbar itu akan tertutup/
      terdesak keluar layar). */
-  .reader-columns.reader-columns-panes { height: 80vh; height: 88dvh; gap: 6px; }
+  .reader-columns.reader-columns-panes {
+    height: 80vh; height: 88dvh;
+    /* PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
+       aturan dasar `.reader-columns.reader-columns-panes` di atas soal
+       `--panes-height` (px pasti dari JS) menggantikan vh/dvh sebagai
+       nilai SUNGGUHAN yang dipakai -- vh/dvh di sini cuma fallback. */
+    height: var(--panes-height, 88dvh);
+    gap: 6px;
+  }
   /* BARU (8 Sep 2026, permintaan operator: "mandarin bisa keluar 3 kata")
      -- KHUSUS mode 3-kolom (data-cols="3") di HP, ukuran huruf ayat
      dikecilkan SEDIKIT (bukan diubah global -- tetap `var(--verse-font-size)`
@@ -2584,6 +2610,28 @@ body.pane-fullscreen-open { overflow: hidden; }
    NORMAL, bisa dibuka-tutup seperti biasa walau sedang layar penuh. */
 :fullscreen .app-header .brand { display: none; }
 :fullscreen .content-wrap { padding-top: 8px; }
+/* PERBAIKAN (10 Sep 2026, sesi ke-10, laporan operator: "tempat icon
+   [logo yang disembunyikan] itu tidak bisa dipakai untuk memperluas
+   screen vertikal ... jangan sampai tetap seperti sekarang terasa
+   kosong") -- 2 hal digabung jadi 1 perbaikan:
+   1) RUANG VERTIKAL SUNGGUHAN -- sebelum ini, menyembunyikan `.brand`
+      cuma menghapus lebar (horizontal), TIDAK mengurangi tinggi header
+      sama sekali -- jadi walau logo hilang, baris header tetap
+      setinggi semula, tidak ada ruang vertikal ekstra yang didapat
+      untuk area baca. Sekarang header dibuat lebih PENDEK khusus saat
+      fullscreen (padding atas-bawah dikecilkan) -- inilah yang benar-
+      benar "memperluas" ruang vertikal untuk isi bacaan, bukan cuma
+      kosmetik lebar horizontal.
+   2) CELAH KOSONG horizontal bekas `.brand` -- `.header-actions`
+      SEKARANG selalu `margin-left:auto` (bukan cuma di HP seperti
+      sebelumnya) -- di keadaan NORMAL ini tidak mengubah apa pun
+      (kotak cari `.search-form` yang `flex:1` sudah mengisi semua
+      sisa ruang duluan), tapi begitu ada elemen sebelum
+      `.header-actions` yang hilang (mis. `.brand` disembunyikan saat
+      fullscreen, ATAU `.search-form` disembunyikan saat mode Kidung
+      di HP), `.header-actions` otomatis "menempel" rapat ke kanan
+      alih-alih menyisakan celah kosong di tengah. */
+:fullscreen .app-header { padding-top: 4px; padding-bottom: 4px; }
 
 /* ============================================================
    POKOK KITAB / GARIS BESAR (nested) / PETA+GAMBAR
@@ -3122,6 +3170,66 @@ body.pane-fullscreen-open { overflow: hidden; }
 .ps-topbar-status { font-size: 12.5px; color: var(--ps-ink-soft); flex: 1; }
 .ps-topbar-actions { display: flex; align-items: center; gap: 8px; }
 
+/* BARU (9 Sep 2026, sesi ke-9, Fitur A "Menu Cepat ⚡") -- overlay
+   mengambang di ATAS seluruh Studio (z-index tinggi), TIDAK menutupi/
+   mengganggu apa yang sedang tayang di Layar 2 (ini cuma panel di
+   dalam jendela Studio operator, bukan sesuatu yang ikut ter-postMessage
+   ke Layar 2). Tombol "⚡ Menu Cepat" & "✕" cukup untuk buka/tutup --
+   klik di LUAR kotak panel (area gelap transparan) juga menutup, pola
+   sama seperti overlay lain di app ini (mis. dialog konfirmasi hapus). */
+.ps-quick-menu-overlay {
+  position: fixed; inset: 0; z-index: 950;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px 16px;
+  overflow-y: auto; overflow-x: hidden;
+}
+/* PERBAIKAN (9 Sep 2026 v2, laporan operator: "di komputer bukan
+   laptop, scroll kebawah sering macet, mouse tidak bisa scroll kiri-
+   kanan") -- SATU KOLOM SAJA (bukan 2 sisi berdampingan) di SEMUA
+   ukuran layar, tidak cuma di HP -- supaya arah gulirnya SELALU cuma
+   1 arah (bawah), tidak pernah butuh gulir/lirik ke samping sama
+   sekali, konsisten di layar sempit MAUPUN lebar. Tombol & jarak
+   antar-baris juga dibuat lebih besar/renggang (lihat aturan
+   `.ps-quick-menu-panel .chip-btn`/`.ps-btn-row` di bawah) supaya
+   lebih gampang dibaca & ditekan tanpa perlu presisi tinggi. */
+.ps-quick-menu-panel {
+  background: var(--ps-card-bg, #221b12); color: var(--ps-ink, #f1ece0);
+  border: 1px solid var(--ps-card-border, #382c1c);
+  border-radius: 14px; max-width: 640px; width: 100%;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  padding: 18px 20px 24px;
+  max-height: calc(100vh - 80px); max-height: calc(100dvh - 80px);
+  overflow-y: auto; overflow-x: hidden;
+}
+.ps-quick-menu-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px; font-size: 19px;
+  position: sticky; top: 0; background: inherit; padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.12); z-index: 1;
+}
+.ps-quick-menu-cols {
+  display: flex; flex-direction: column; gap: 26px;
+}
+.ps-quick-menu-col-title {
+  font-weight: 700; font-size: 16px; margin-bottom: 10px;
+  padding-bottom: 7px; border-bottom: 1px solid rgba(255,255,255,.15);
+}
+/* Tombol & label di DALAM panel Menu Cepat SENGAJA dibuat lebih besar
+   dari `.chip-btn.small`/`.ps-field-label` bawaan di tab-tab lain --
+   ini panel "ringkasan cepat" yang harus gampang dibaca sekilas dari
+   jarak agak jauh, bukan panel kerja detail sehari-hari. */
+.ps-quick-menu-panel .ps-btn-row { gap: 10px; margin-bottom: 14px; }
+.ps-quick-menu-panel .chip-btn.small {
+  font-size: 14.5px; padding: 10px 16px; border-radius: 10px;
+}
+.ps-quick-menu-panel .ps-field-label { font-size: 13.5px; margin-top: 14px; }
+.ps-quick-menu-panel .announcement-compose-hint { font-size: 12.5px; }
+@media (max-width: 480px) {
+  .ps-quick-menu-overlay { padding: 14px 8px 8px; }
+  .ps-quick-menu-panel { padding: 14px 14px 18px; max-height: calc(100dvh - 28px); }
+}
+
 /* Jam waktu berjalan (sesuai jam perangkat) + toggle tema bulat */
 .ps-topbar-clock {
   font-variant-numeric: tabular-nums;
@@ -3166,6 +3274,80 @@ body.pane-fullscreen-open { overflow: hidden; }
   overflow-y: auto;
   padding: 14px 16px;
   border-right: 1px solid var(--ps-col-border);
+}
+
+/* PERBAIKAN (9 Sep 2026, sesi ke-9, laporan operator: "di komputer
+   bukan laptop, scroll kebawah sering macet tidak bisa mudah" --
+   pakai mouse polos, tanpa trackpad/mouse mahal yang bisa gulir
+   samping) -- AKAR MASALAH kemungkinan besar: scrollbar BAWAAN
+   browser/OS di beberapa komputer (terutama macOS/Windows dengan
+   pengaturan "sembunyikan scrollbar kalau tidak dipakai") jadi HAMPIR
+   TAK TERLIHAT sampai mouse benar-benar pas di atasnya -- operator
+   jadi tidak sadar area itu BISA digulir/diseret, kelihatan seperti
+   "macet". SOLUSI: scrollbar SEKARANG SELALU tampil (tidak menunggu
+   hover) di semua panel yang bisa digulir di Studio Presentasi, warna
+   terang (jejak/thumb) di atas latar gelap (track) supaya BEDA warna
+   jelas kelihatan -- posisi jejak scrollbar itu sendiri jadi penanda
+   visual "sedang di bagian mana" dari isi panel, meski ukurannya
+   sengaja dibuat tipis (10px) supaya tidak makan tempat baca. Berlaku
+   utk SEMUA panel yang bisa digulir (kolom kiri/kanan/tengah Studio,
+   MAUPUN panel "⚡ Menu Cepat" yang baru) -- bukan cuma 1 tempat, biar
+   konsisten di mana pun operator sedang berada. `scrollbar-width`/
+   `scrollbar-color` menangani Firefox (browser itu tidak mengenal
+   `::-webkit-scrollbar`), baris ::-webkit-scrollbar* menangani Chrome/
+   Edge/Safari/Opera. TIDAK memengaruhi arah gulir SAMPING (horizontal)
+   sama sekali -- baris tombol (.ps-btn-row) di app ini semua sudah
+   `flex-wrap: wrap` (pindah baris kalau tidak muat), jadi TIDAK PERNAH
+   butuh digulir ke samping sama sekali, operator tidak perlu mouse
+   yang bisa gulir kiri-kanan. */
+.ps-col, .ps-col-right, .ps-preview-panel,
+.ps-quick-menu-overlay, .ps-quick-menu-panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-ink-soft, #cfc3ab) var(--ps-bg, #14100b);
+}
+.ps-col::-webkit-scrollbar, .ps-col-right::-webkit-scrollbar,
+.ps-preview-panel::-webkit-scrollbar,
+.ps-quick-menu-overlay::-webkit-scrollbar, .ps-quick-menu-panel::-webkit-scrollbar {
+  width: 10px;
+}
+.ps-col::-webkit-scrollbar-track, .ps-col-right::-webkit-scrollbar-track,
+.ps-preview-panel::-webkit-scrollbar-track,
+.ps-quick-menu-overlay::-webkit-scrollbar-track, .ps-quick-menu-panel::-webkit-scrollbar-track {
+  background: var(--ps-bg, #14100b);
+}
+.ps-col::-webkit-scrollbar-thumb, .ps-col-right::-webkit-scrollbar-thumb,
+.ps-preview-panel::-webkit-scrollbar-thumb,
+.ps-quick-menu-overlay::-webkit-scrollbar-thumb, .ps-quick-menu-panel::-webkit-scrollbar-thumb {
+  background: var(--ps-ink-soft, #cfc3ab); border-radius: 6px;
+}
+.ps-col::-webkit-scrollbar-thumb:hover, .ps-col-right::-webkit-scrollbar-thumb:hover,
+.ps-preview-panel::-webkit-scrollbar-thumb:hover,
+.ps-quick-menu-overlay::-webkit-scrollbar-thumb:hover, .ps-quick-menu-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--brass, #b8860b);
+}
+/* BARU (10 Sep 2026, sesi ke-10, permintaan operator "defaultnya show,
+   dan misal ditekan Alt+H maka hide semua") -- kelas ini ditambahkan/
+   dilepas dari <body> lewat wireScrollbarVisibilityToggle()
+   (js/presentation-studio.js), Alt+H sebagai sakelarnya. BAWAAN: kelas
+   ini TIDAK ada (scrollbar tampil, sesuai keputusan "defaultnya show").
+   Scrollbar TETAP BISA DIGULIR seperti biasa walau disembunyikan (cuma
+   jejak visualnya yang hilang, `overflow` TIDAK diubah jadi `hidden` --
+   supaya isi panel tidak ikut terpotong/tidak bisa dibaca) -- ini
+   murni soal tampilan (mis. dipakai operator yang ingin merekam layar/
+   berbagi layar tanpa jejak scrollbar ikut terlihat). */
+body.ps-scrollbars-hidden .ps-col::-webkit-scrollbar,
+body.ps-scrollbars-hidden .ps-col-right::-webkit-scrollbar,
+body.ps-scrollbars-hidden .ps-preview-panel::-webkit-scrollbar,
+body.ps-scrollbars-hidden .ps-quick-menu-overlay::-webkit-scrollbar,
+body.ps-scrollbars-hidden .ps-quick-menu-panel::-webkit-scrollbar {
+  width: 0;
+}
+body.ps-scrollbars-hidden .ps-col,
+body.ps-scrollbars-hidden .ps-col-right,
+body.ps-scrollbars-hidden .ps-preview-panel,
+body.ps-scrollbars-hidden .ps-quick-menu-overlay,
+body.ps-scrollbars-hidden .ps-quick-menu-panel {
+  scrollbar-width: none;
 }
 
 .ps-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -3365,6 +3547,27 @@ body.pane-fullscreen-open { overflow: hidden; }
 */
 .ps-timer-display.ps-timer-standby { color: var(--ps-muted); animation: psTimerBlink 1.3s ease-in-out infinite; }
 @keyframes psTimerBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.32; } }
+/* BARU (9 Sep 2026, permintaan operator) -- "🎨 Gaya Pin: 3D Berputar",
+   dipakai di pratinjau Studio (renderMapEditor(), js/presentation-studio.js)
+   DAN Layar 2 (renderMapPins_(), present.html -- salinan animasi yang sama
+   ada juga di sana karena Layar 2 adalah dokumen HTML terpisah, tidak
+   berbagi <style> dengan Studio). Efeknya BUKAN rotasi 3D sungguhan
+   (div CSS datar tidak benar-benar punya sisi belakang) -- ini "sorotan
+   cahaya" (highlight) yang bergeser bolak-balik di atas gradient bulat,
+   memberi ilusi bola/kelereng mengkilap yang berputar, dipadu animasi
+   denyut (scale) yang sudah ada sebelumnya. @property supaya browser
+   TAHU cara meng-interpolasi custom property --hl secara halus (kalau
+   browser tidak mendukung @property, animasi highlight-nya cuma tidak
+   mulus/diam -- pin tetap terlihat glossy 3D, tidak error).
+*/
+@property --hl { syntax: '<percentage>'; initial-value: 30%; inherits: false; }
+@keyframes psPin3DSpin { 0% { --hl: 15%; } 50% { --hl: 85%; } 100% { --hl: 15%; } }
+.ps-pin-3d {
+  background: radial-gradient(circle at var(--hl) 30%, #ffffff 0%, var(--pin3d-color, #e2483d) 42%, color-mix(in srgb, var(--pin3d-color, #e2483d) 65%, #000) 100%);
+  animation: psPin3DSpin 3.4s linear infinite, psPin3DBreathe 1.8s ease-in-out infinite;
+}
+@keyframes psPin3DBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+
 /* Batasi animasi berkedip untuk orang yang memilih "kurangi gerakan" di
    pengaturan OS/browser-nya (aksesibilitas) -- statis saja, tidak berbahaya
    kalau dilewati. */
