@@ -1150,6 +1150,10 @@ function updateLevelGatedMenus() {
   if (el("userManageBtn")) el("userManageBtn").hidden = !isAdministrator();
   // TAHAP 6 -- lihat showDriveUsagePanel() di bawah.
   if (el("driveUsageBtn")) el("driveUsageBtn").hidden = !isAdministrator();
+  // BARU -- "🔊 Coba Efek Suara & Visual": khusus administrator, sama
+  // seperti logViewerBtn/userManageBtn/driveUsageBtn di atas (lihat
+  // js/effectpreview.js).
+  if (el("effectPreviewBtn")) el("effectPreviewBtn").hidden = !isAdministrator();
   if (typeof AdminBell !== "undefined") AdminBell.refreshVisibility(isAdministrator());
   applyGuestModeUi();
 }
@@ -8245,6 +8249,14 @@ function initUIEvents() {
     el("driveUsageBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
       showDriveUsagePanel();
+      closeSidebarOnMobile();
+    });
+  }
+  if (el("effectPreviewBtn")) {
+    // BARU -- lihat js/effectpreview.js (EffectPreview.open()).
+    el("effectPreviewBtn").addEventListener("click", () => {
+      el("moreMenu").hidden = true;
+      if (typeof EffectPreview !== "undefined") EffectPreview.open();
       closeSidebarOnMobile();
     });
   }
