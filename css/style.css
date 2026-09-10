@@ -1194,6 +1194,107 @@ input { font-family: inherit; }
 }
 
 /* ============================================================
+   PANEL "COBA EFEK SUARA & VISUAL" (khusus administrator) --
+   lihat js/effectpreview.js. Numpang .info-kami-overlay/.info-kami-box/
+   .info-kami-header di atas supaya konsisten dengan panel admin lain,
+   cuma bagian body dibuat 1 kolom (bukan grid 2 kolom) karena isinya
+   berupa daftar tombol, bukan kartu info.
+   ============================================================ */
+.effect-preview-box { max-width: 640px; }
+.effect-preview-body {
+  overflow-y: auto;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.effect-preview-hint {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+/* Kotak "Layar 2 tiruan" -- tempat efek visual dianimasikan supaya MC
+   bisa langsung MELIHAT (bukan cuma mendengar) sebelum presentasi. */
+.effect-preview-screen {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1a1f26, #0e1116);
+  border: 2px solid var(--petrol);
+}
+.effect-preview-confetti-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.effect-preview-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.effect-preview-screen-label {
+  position: absolute; top: 8px; left: 10px;
+  font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  color: rgba(255,255,255,.45);
+}
+.effect-preview-section h3 { margin: 0 0 10px; font-size: 15px; font-family: var(--font-display); color: var(--petrol); }
+.effect-preview-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Reaksi emoji terbang di kotak pratinjau -- versi diperkecil dari
+   .ms-effect-emoji di present.html (yang dipakai untuk Layar 2
+   sungguhan), disesuaikan supaya pas di kotak setinggi ~180px, bukan
+   layar penuh. */
+.epv-effect-emoji {
+  position: absolute; bottom: -24px; line-height: 1;
+  animation: epvEffectRise 2.4s ease-in forwards;
+  text-shadow: 0 1px 6px rgba(0,0,0,.35);
+}
+@keyframes epvEffectRise {
+  0% { transform: translate(0, 0) scale(0.6) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(var(--epv-drift, 0px), -210px) scale(1.1) rotate(var(--epv-spin, 12deg)); opacity: 0; }
+}
+/* Balon naik -- versi diperkecil dari .ms-effect-balloon di present.html. */
+.epv-effect-balloon {
+  position: absolute; bottom: -30px; font-size: 26px; line-height: 1;
+  animation: epvBalloonRise 4.5s ease-out forwards;
+  text-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+@keyframes epvBalloonRise {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  8% { opacity: 1; }
+  50% { transform: translate(var(--epv-balloon-drift1, 20px), -110px) rotate(4deg); }
+  92% { opacity: 1; }
+  100% { transform: translate(var(--epv-balloon-drift2, -20px), -220px) rotate(0deg); opacity: 0; }
+}
+/* Teks seruan besar di tengah kotak -- versi diperkecil dari
+   .ms-shout-text di present.html. */
+.epv-shout-text {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: "Inter", Arial, sans-serif; font-weight: 900;
+  font-size: clamp(18px, 7vw, 36px);
+  color: #ffd23f; text-align: center; white-space: nowrap;
+  text-shadow: 0 0 14px rgba(255, 210, 63, 0.85), 0 3px 10px rgba(0,0,0,.55);
+  animation: epvShoutPop 2s cubic-bezier(.2,.8,.3,1) forwards, epvShoutGlow 0.7s ease-in-out infinite alternate;
+}
+@keyframes epvShoutPop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  10% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  18% { transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+}
+@keyframes epvShoutGlow {
+  from { text-shadow: 0 0 14px rgba(255, 210, 63, 0.85), 0 3px 10px rgba(0,0,0,.55); }
+  to { text-shadow: 0 0 26px rgba(255, 210, 63, 1), 0 3px 10px rgba(0,0,0,.55); }
+}
+
+@media (max-width: 720px) {
+  .effect-preview-body { padding: 16px; gap: 16px; }
+  .effect-preview-screen { height: 150px; }
+}
+
+/* ============================================================
    OVERLAY MEMUAT DATA
    ============================================================ */
 .loading-overlay {
@@ -3988,18 +4089,21 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 
 /* PERMINTAAN OPERATOR (28 Agu 2026): garis scrollbar tipis di tepi kanan
    (kolom "AKSI & TEMA", kolom PALING KANAN) masih terlihat seperti
-   "progress bar" vertikal yang mengganggu tampilan Studio. Sebelumnya
-   cuma ditipiskan (scrollbar-width: thin) -- sekarang DISEMBUNYIKAN
-   TOTAL secara visual untuk SEMUA kolom Studio yang bisa discroll
-   (.ps-col, .ps-preview-panel). Kolom-kolom ini TETAP BISA discroll
-   (mouse wheel / trackpad / drag) kalau isinya lebih panjang dari
-   layar -- overflow-y:auto pada elemen ini tidak diubah/dihapus, cuma
-   batang/thumb-nya yang tidak lagi digambar, jadi jauh lebih bersih
-   tanpa kehilangan fungsinya sebagai jaring pengaman. */
-.ps-col, .ps-preview-panel {
-  scrollbar-width: none;
-}
-.ps-col::-webkit-scrollbar, .ps-preview-panel::-webkit-scrollbar { width: 0; height: 0; display: none; }
+   "progress bar" vertikal yang mengganggu tampilan Studio.
+   PERBAIKAN (10 Sep 2026, sesi ke-10): aturan "selalu disembunyikan
+   total" yang tadinya ada di sini TIDAK BERSYARAT (berlaku ke SEMUA
+   .ps-col/.ps-preview-panel, tanpa peduli class apa pun di <body>) --
+   ini BENTROK dengan fitur toggle Alt+H yang ditambahkan belakangan
+   (body.ps-scrollbars-hidden, lihat blok di atas dekat .ps-tabs, BAWAAN
+   class itu TIDAK ADA = seharusnya scrollbar TAMPIL): karena tidak ada
+   aturan "TAMPIL" tandingannya, blok tak-bersyarat di sini SELALU
+   menang menyembunyikan scrollbar padahal class ps-scrollbars-hidden
+   belum tentu aktif -- akibatnya Alt+H terlihat "tidak berpengaruh"
+   (scrollbar tetap tersembunyi terus, baik ditekan atau tidak). Blok
+   tak-bersyarat ini DIHAPUS -- sekarang SATU-SATUNYA aturan sembunyi/
+   tampil scrollbar Studio ada di body.ps-scrollbars-hidden (bawaan:
+   TAMPIL, sesuai keputusan terbaru operator; Alt+H men-toggle-nya,
+   lihat toggleScrollbarVisibility_() di js/presentation-studio.js). */
 
 /* ------------------------------------------------------------
    MODE DUAL MONITOR -- hanya aktif saat Layar 2 sungguh terbuka
