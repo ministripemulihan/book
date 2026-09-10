@@ -7217,8 +7217,24 @@ function recalcReaderPanesHeight() {
   // sudah digulir, tidak perlu event scroll tambahan.
   const header = document.querySelector(".app-header");
   const headerH = header ? header.offsetHeight : 0;
-  const BOTTOM_GAP = 44; // ruang aman utk garis+panah #readerNavBottomWrap yang collapsed di bawahnya
-  const h = Math.round(vpHeight - headerH - BOTTOM_GAP);
+  // PERBAIKAN (laporan operator: "3-kolom cuma 80% tinggi layar, minta
+  // sampai 100%") -- SEBELUMNYA `BOTTOM_GAP` angka tebakan tetap (44px)
+  // yang mengasumsikan toolbar navigasi pasal (#readerNavBottomWrap)
+  // SELALU makan ruang segitu, padahal toolbar itu HANYA "docked"
+  // (position:fixed, nempel dasar layar) di layar SEMPIT (lihat @media
+  // max-width:640px di css/style.css) -- di layar lebih lebar dia
+  // normal ikut alur dokumen (TIDAK fixed), jadi sama sekali tidak
+  // perlu ruang cadangan. Sekarang diukur LANGSUNG dari elemen
+  // sungguhannya: kalau memang lagi fixed di dasar layar, cadangkan
+  // persis setinggi dia (+ sedikit jarak aman) -- kalau tidak fixed,
+  // cadangkan 0 supaya kotak kolom bisa turun sampai betul-betul dasar
+  // layar (mendekati 100%).
+  const navWrap = document.getElementById("readerNavBottomWrap");
+  let bottomGap = 0;
+  if (navWrap && getComputedStyle(navWrap).position === "fixed") {
+    bottomGap = navWrap.offsetHeight + 6;
+  }
+  const h = Math.round(vpHeight - headerH - bottomGap);
   if (h > 160) { // jaga-jaga: kalau hasil hitungnya tidak masuk akal (mis. header belum sempat terukur), jangan dipaksakan -- biarkan fallback vh/dvh CSS yang berlaku
     document.documentElement.style.setProperty("--panes-height", h + "px");
   }
