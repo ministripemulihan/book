@@ -883,7 +883,7 @@ const Presentation = (() => {
   function init() {
     initUi();
     refreshGuestGate();
-    // Terapkan proporsi huruf pratinjau dari ukuran Layar 2 TERAKHIR 
+    // Terapkan proporsi huruf pratinjau dari ukuran Layar 2 TERAKHIR
     // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak
     // "Berikutnya"/"Tayang" langsung memakai proporsi yang benar sedari
     // pertama kali Studio dibuka, tanpa menunggu Layar 2 benar-benar
