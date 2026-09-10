@@ -7195,10 +7195,31 @@ function recalcReaderPanesHeight() {
   const panes = document.querySelector(".reader-columns.reader-columns-panes");
   if (!panes) return;
   const vpHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-  const top = panes.getBoundingClientRect().top;
+  // PERBAIKAN (bug "kotak mengecil kalau sudah digulir ke bawah, tidak
+  // pernah membesar lagi"): SEBELUMNYA dihitung dari
+  // `panes.getBoundingClientRect().top` -- posisi kotak ITU SENDIRI di
+  // layar saat fungsi ini dijalankan. Masalahnya fungsi ini cuma dipicu
+  // oleh resize/orientationchange/fullscreenchange/visualViewport-
+  // resize, BUKAN oleh gulir halaman biasa -- jadi kalau saat dipicu
+  // (mis. baru masuk halaman baca, sebelum sempat digulir) posisi kotak
+  // masih jauh di bawah (banyak konten di atasnya: kartu "Pokok Kitab",
+  // dll.), angka `top` yang besar itu membuat `h` kecil, lalu "terkunci"
+  // kecil begitu untuk seterusnya -- tidak pernah dihitung ulang cuma
+  // karena user menggulir, walau kotaknya sekarang sudah ada tepat di
+  // bawah header (sticky).
+  //
+  // PERBAIKI: pakai tinggi header (--header-h / .app-header, sudah
+  // diukur & dijaga tetap akurat oleh updateHeaderHeightVar()) sebagai
+  // acuan, BUKAN posisi kotak yang berubah-ubah tergantung sudah
+  // digulir berapa jauh. Header-nya position:sticky;top:0, jadi
+  // tingginya konstan di layar kapan pun -- hasilnya, tinggi kotak
+  // SELALU = "sisa tinggi layar di bawah header", konsisten berapa pun
+  // sudah digulir, tidak perlu event scroll tambahan.
+  const header = document.querySelector(".app-header");
+  const headerH = header ? header.offsetHeight : 0;
   const BOTTOM_GAP = 44; // ruang aman utk garis+panah #readerNavBottomWrap yang collapsed di bawahnya
-  const h = Math.round(vpHeight - top - BOTTOM_GAP);
-  if (h > 160) { // jaga-jaga: kalau hasil hitungnya tidak masuk akal (mis. elemen sedang tersembunyi/belum kelihatan), jangan dipaksakan -- biarkan fallback vh/dvh CSS yang berlaku
+  const h = Math.round(vpHeight - headerH - BOTTOM_GAP);
+  if (h > 160) { // jaga-jaga: kalau hasil hitungnya tidak masuk akal (mis. header belum sempat terukur), jangan dipaksakan -- biarkan fallback vh/dvh CSS yang berlaku
     document.documentElement.style.setProperty("--panes-height", h + "px");
   }
 }
