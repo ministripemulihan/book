@@ -285,6 +285,57 @@ function addYoutubeLinkToCollection(username, name, ytItem) {
 // penuh sekaligus (semua slide hasil pemecahan), tab itu cukup
 // memanggil fungsi ini berkali-kali (1x per slide), tidak perlu bentuk
 // data baru.
+// BARU (9 Sep 2026, permintaan operator) -- item "🖥️ Mode Layar"
+// (Welcome/Next Up) yang diselipkan ke Kumpulan Ayat, mis. operator
+// taruh "Next Up" di antara ayat ke-4 & ke-5. SENGAJA TIDAK menyimpan
+// `endAt` (target hitung mundur) -- jam target hari acara PERTAMA kali
+// disimpan akan jadi BASI kalau kumpulan ini dipakai ulang di acara
+// LAIN/hari lain (lihat filosofi reusable lintas acara). Kalau operator
+// ingin hitung mundur untuk acara HARI INI, kirim langsung dari tab
+// "🖥️ Mode & Peta" (tidak lewat Kumpulan Ayat) -- lihat wireModeScreenTab()
+// di js/presentation-studio.js.
+// BARU (9 Sep 2026) -- whitelist jenis yang valid, SAMA persis dengan
+// key MODE_SCREEN_KIND_META (js/presentation-studio.js). Sengaja
+// ditulis ulang di sini (bukan window.MODE_SCREEN_KIND_META langsung)
+// supaya file ini tetap bisa berdiri sendiri kalaupun urutan <script>
+// berubah -- lihat catatan window.MODE_SCREEN_KIND_META untuk daftar
+// lengkap ikon/label per jenis (dipakai kindLabel di bawah & di
+// js/app.js, collectionItemRef()).
+// BARU (9 Sep 2026, sesi ke-9) -- "foto" (📸 Foto Bersama) ditambahkan,
+// lihat MODE_SCREEN_KIND_META.foto (js/presentation-studio.js).
+const MODE_SCREEN_VALID_KINDS = ["welcome", "nextup", "istirahat", "icebreaker", "olahraga", "renungan", "foto"];
+function addModeScreenToCollection(username, name, msItem) {
+  if (!msItem || !msItem.title) return null;
+  return addItemToCollection(username, name, {
+    type: "modescreen",
+    kind: MODE_SCREEN_VALID_KINDS.includes(msItem.kind) ? msItem.kind : "welcome",
+    title: msItem.title,
+    subtitle: msItem.subtitle || "",
+    bullets: Array.isArray(msItem.bullets) ? msItem.bullets.slice() : [],
+    nextLabel: msItem.nextLabel || "", // BARU (9 Sep 2026) -- lihat catatan "Layar Istirahat Lengkap" di wireModeScreenTab()
+  });
+}
+
+// BARU (9 Sep 2026, permintaan operator) -- item "🗺️ Peta" yang
+// diselipkan ke Kumpulan Ayat. Menyimpan REFERENSI (`mapId`) ke Map
+// Library (localStorage perangkat ini, lihat wireMapTab()), BUKAN
+// salinan gambar/pin -- pola sama seperti item "media" (referensi ke
+// Media Tersimpan). Konsekuensinya SAMA seperti item "media" juga: kalau
+// kumpulan ini dibuka di perangkat LAIN yang Map Library-nya belum
+// punya peta dengan id itu, item ini tidak akan tayang (lihat
+// getStoredMapById(), js/presentation-studio.js) -- untuk sekarang
+// dianggap cukup karena peta biasanya disiapkan & dipakai di perangkat
+// operator yang sama. Rencana lanjut: sinkron Map Library ke Drive/Sheet
+// seperti sync.js (belum dikerjakan, lihat ROADMAP-drive-sync.md).
+function addMapToCollection(username, name, mapRef) {
+  if (!mapRef || !mapRef.mapId) return null;
+  return addItemToCollection(username, name, {
+    type: "map",
+    mapId: mapRef.mapId,
+    mapName: mapRef.mapName || "",
+  });
+}
+
 function addKidungToCollection(username, name, kidungItem) {
   if (!kidungItem || !kidungItem.kidungNo) return null;
   return addItemToCollection(username, name, {
@@ -511,6 +562,11 @@ function buildCollectionShareText(col) {
       lines.push(`${i + 1}. 🖼️ Canva${it.title ? " — " + it.title : ""}`);
     } else if (it.type === "soundcloud") {
       lines.push(`${i + 1}. 🎧 SoundCloud${it.title ? " — " + it.title : ""}${it.trackUrl ? "\n" + it.trackUrl : ""}`);
+    } else if (it.type === "modescreen") {
+      const meta = (typeof window !== "undefined" && window.MODE_SCREEN_KIND_META && window.MODE_SCREEN_KIND_META[it.kind]) || { icon: "🖥️", label: "Welcome" };
+      lines.push(`${i + 1}. ${meta.icon} ${meta.label} — ${it.title || ""}${it.subtitle ? "\n" + it.subtitle : ""}`);
+    } else if (it.type === "map") {
+      lines.push(`${i + 1}. 🗺️ Peta${it.mapName ? " — " + it.mapName : ""}`);
     }
   });
   return lines.join("\n\n");
