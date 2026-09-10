@@ -1218,12 +1218,38 @@ input { font-family: inherit; }
   font-size: 13.5px;
   line-height: 1.5;
 }
+/* Kolom kontrol "contoh tulisan" -- input teks bebas yang ditampilkan DI
+   DALAM kotak pratinjau (di bagian atas), supaya MC bisa melihat efek
+   visual/suara di ATAS teks yang mirip tampilan sungguhan di Layar 2
+   (bukan cuma latar kosong). Diketik ulang live lewat #effectPreviewSampleText
+   -- lihat wireSampleTextInput_() di js/effectpreview.js. */
+.effect-preview-sample-row {
+  display: flex; flex-direction: column; gap: 5px;
+}
+.effect-preview-sample-row label {
+  font-size: 12.5px; color: var(--ink-soft);
+}
+.effect-preview-sample-input {
+  padding: 9px 12px; border-radius: 8px; border: 1px solid var(--rule);
+  font-size: 14px; font-family: inherit; background: #fff; color: var(--ink);
+}
 /* Kotak "Layar 2 tiruan" -- tempat efek visual dianimasikan supaya MC
-   bisa langsung MELIHAT (bukan cuma mendengar) sebelum presentasi. */
+   bisa langsung MELIHAT (bukan cuma mendengar) sebelum presentasi.
+   DIPERBESAR (10 Sep 2026, permintaan operator): sebelumnya tinggi tetap
+   180px/150px -- nyaris cuma 1 baris, terlalu kecil untuk menilai efek.
+   Sekarang pakai aspect-ratio 16:9 (rasio umum layar/video, sama seperti
+   .ps-preview-box-wrap yang meniru Layar 2 sungguhan di Studio Presentasi)
+   + max-width supaya bentuknya seperti "layar nonton video di HP" --
+   maksimal selebar panel ini (lihat .effect-preview-box di atas) tapi
+   tetap proporsional kalau dibuka di layar lebar (mis. tablet/desktop),
+   bukan melebar jadi pita tipis. */
 .effect-preview-screen {
   position: relative;
   width: 100%;
-  height: 180px;
+  max-width: 480px;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  margin: 0 auto;
   border-radius: 12px;
   overflow: hidden;
   background: linear-gradient(160deg, #1a1f26, #0e1116);
@@ -1231,6 +1257,18 @@ input { font-family: inherit; }
 }
 .effect-preview-confetti-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .effect-preview-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+/* Teks contoh -- DI BELAKANG canvas confetti & layer efek (ditaruh lebih
+   dulu di HTML) supaya efek terlihat TAMPIL DI ATAS teks, sama seperti
+   #text vs #effectsLayer di present.html sungguhan. */
+.effect-preview-sampletext {
+  position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
+  width: 86%; text-align: center; color: #fff; font-weight: 800;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: clamp(14px, 4.6vw, 22px);
+  line-height: 1.35;
+  text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  pointer-events: none;
+}
 .effect-preview-screen-label {
   position: absolute; top: 8px; left: 10px;
   font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
@@ -1291,7 +1329,9 @@ input { font-family: inherit; }
 
 @media (max-width: 720px) {
   .effect-preview-body { padding: 16px; gap: 16px; }
-  .effect-preview-screen { height: 150px; }
+  /* Tidak perlu override tinggi lagi -- aspect-ratio 16:9 di atas sudah
+     otomatis menyesuaikan diri ke lebar layar HP (mis. YouTube di HP). */
+  .effect-preview-screen { max-width: 100%; }
 }
 
 /* ============================================================
