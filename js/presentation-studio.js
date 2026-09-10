@@ -9073,7 +9073,7 @@ const PresentationStudio = (() => {
     }
     // Dipanggil syncYtLiveBarVisibility() (atas) tiap kali #psYtLiveBar
     // berganti tampil/sembunyi, supaya kotak Berikutnya/Tayang LANGSUNG
-    // menyusut/membesar mengikuti ruang yang sungguh tersisa, tanpa
+    // menyusut/membesar mengikuti ruang yang sungguh tersisa, tanpa 
     // perlu operator menyeret splitter sendiri atau me-resize jendela.
     window.refreshPreviewSplitterSpacing = () => apply(currentRowH());
     // PERBAIKAN (4 Sep 2026, permintaan operator): dulu kalau BELUM
