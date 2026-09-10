@@ -32,7 +32,14 @@
 //  kemampuan apa pun (data live tetap perlu server live).
 // ============================================================
 
-const CACHE_NAME = "book-vp-shell-v1";
+// DINAIKKAN (10 Sep 2026, lanjutan) -- present.html/monitor.html berubah
+// (overlay aktivasi suara, layar awal polos hitam, isi lengkap +
+// A+/A- di Monitor Pembicara) -- versi cache dinaikkan supaya
+// perangkat yang sudah pernah membuka versi LAMA offline-first tidak
+// terus menampilkan berkas lama yang ter-cache, dipaksa ambil versi
+// baru begitu online sebentar lagi (lihat blok "activate" di bawah
+// yang otomatis menghapus cache versi lama).
+const CACHE_NAME = "book-vp-shell-v2";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
