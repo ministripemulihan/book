@@ -772,8 +772,66 @@
       <div class="ps-topbar-clock" id="psTopbarClock">00:00:00</div>
       <div class="ps-topbar-actions">
         <button type="button" id="psUiThemeToggle" class="ps-ui-theme-toggle" title="Ganti ke tema terang">☀️</button>
+        <!-- BARU (9 Sep 2026, sesi ke-9, Fitur A "Menu Cepat ⚡") --
+             SENGAJA ditaruh di ps-topbar (bukan salah satu tab kiri/
+             kanan) supaya bisa dibuka dari MANA SAJA operator sedang
+             berada (Kumpulan Ayat, Efek Panggung, dst) tanpa perlu
+             pindah tab dulu -- persis "menu sisipan insidentil, bukan
+             menu utama" seperti yang diminta. Lihat #psQuickMenuOverlay
+             di bawah & wireQuickMenu() di js/presentation-studio.js. -->
+        <button type="button" id="psQuickMenuToggleBtn" class="chip-btn small" title="Menu Cepat -- aksi 1-klik yang sering dipakai, dikelompokkan Offline/Online">⚡ Menu Cepat</button>
         <button type="button" id="psOpenWindowBtn" class="chip-btn small">🖥️ Buka Layar 2</button>
+        <!-- BARU (10 Sep 2026, sesi ke-10, permintaan operator "monitor
+             3 ... untuk monitor pembicara") -- jendela KE-3, terpisah
+             dari Layar 2 (yang dilihat jemaat) -- lihat monitor.html &
+             Presentation.openMonitorWindow() (js/presentation.js). -->
+        <button type="button" id="psOpenMonitorBtn" class="chip-btn small" title="Buka jendela ke-3 (monitor.html) khusus pembicara -- menampilkan Sekarang/Selanjutnya dari Kumpulan Ayat">🖥️③ Monitor Pembicara</button>
         <button type="button" id="psCloseStudioBtn" class="chip-btn small">✖️ Tutup Studio</button>
+      </div>
+    </div>
+
+    <!-- BARU (9 Sep 2026, sesi ke-9, Fitur A "Menu Cepat ⚡") -- panel
+         mengambang (overlay), TIDAK menyentuh/mengganti apa pun yang
+         sedang tayang dari Kumpulan Ayat -- semua tombol di sini cuma
+         "menembak" pesan yang SAMA persis dengan tombol aslinya di
+         tab-tab lain (Efek Panggung/Bel Cepat/Mode Cepat/Mode Layar),
+         TIDAK ada logika baru yang terpisah -- supaya perilakunya 100%
+         konsisten & tidak ada 2 jalur kode berbeda utk aksi yang sama.
+         2 kolom SESUAI keputusan operator: Offline (tidak perlu
+         internet) di kiri, Online (perlu internet) di kanan. -->
+    <div id="psQuickMenuOverlay" class="ps-quick-menu-overlay" hidden>
+      <div class="ps-quick-menu-panel">
+        <div class="ps-quick-menu-head">
+          <strong>⚡ Menu Cepat</strong>
+          <button type="button" id="psQuickMenuCloseBtn" class="icon-btn" aria-label="Tutup Menu Cepat">✕</button>
+        </div>
+        <div class="ps-quick-menu-cols">
+          <div class="ps-quick-menu-col">
+            <div class="ps-quick-menu-col-title">📴 Offline</div>
+            <div class="ps-field-label" style="margin-top:0;">Tata Letak (Mode Cepat)</div>
+            <div class="ps-btn-row" id="psQuickModeRow"></div>
+            <div class="ps-field-label">Efek &amp; Seruan</div>
+            <div class="ps-btn-row" id="psQuickEffectRow"></div>
+            <div class="ps-field-label">Bel Cepat</div>
+            <div class="ps-btn-row" id="psQuickBellRow"></div>
+            <div class="ps-field-label">Pintasan Lain</div>
+            <div class="ps-btn-row">
+              <button type="button" class="chip-btn small" id="psQuickBreakBtn2">☕ Break Time</button>
+              <button type="button" class="chip-btn small" id="psQuickMuteBtn">🔇 Mute/Unmute (M)</button>
+              <button type="button" class="chip-btn small" id="psQuickBellStopBtn">⏹️ Stop Bel</button>
+            </div>
+          </div>
+          <div class="ps-quick-menu-col">
+            <div class="ps-quick-menu-col-title">🌐 Online</div>
+            <p class="announcement-compose-hint" style="margin-top:0;">Butuh koneksi internet -- tidak akan berfungsi kalau perangkat sedang offline.</p>
+            <div class="ps-btn-row">
+              <button type="button" class="chip-btn small" id="psQuickMapBtn">🗺️ Buka Peta Interaktif</button>
+            </div>
+            <p class="announcement-compose-hint">Membuka tab "🖥️ Mode &amp; Peta" -- dari sana bisa perbarui data sensus/luas (Wikidata) & unggah foto kota.</p>
+            <div class="ps-field-label">Belum dikerjakan</div>
+            <p class="announcement-compose-hint" style="margin-top:0;">🔜 Playlist YouTube berurutan untuk layar besar -- masih di rencana, belum ada tombolnya di sini.</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1871,7 +1929,7 @@
             <button type="button" id="psYtPlayBtn" class="chip-btn small" title="Putar video YouTube di Layar 2">▶️ Play</button>
             <button type="button" id="psYtPauseBtn" class="chip-btn small" title="Jeda video YouTube di Layar 2">⏸️ Pause</button>
             <button type="button" id="psYtStopBtn" class="chip-btn small" title="Hentikan video YouTube di Layar 2">⏹️ Stop</button>
-            <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube di Layar 2">🔇 Mute</button>
+            <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube di Layar 2 -- pintasan keyboard: M">🔇 Mute</button>
             <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
           </div>
           <!-- BARU (4 Sep 2026 v2, permintaan operator) -- progress bar +
@@ -1956,6 +2014,18 @@
           <button type="button" class="ps-tab" data-ps-right-tab="pointer">✏️ Penunjuk &amp; Pen</button>
           <button type="button" class="ps-tab" data-ps-right-tab="tampilan">🎨 Tampilan</button>
           <button type="button" class="ps-tab" data-ps-right-tab="kamera">🎥 Kamera</button>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- Welcome/Next Up
+               & Peta Interaktif, lihat catatan panjang wireModeScreenTab()
+               di js/presentation-studio.js. -->
+          <button type="button" class="ps-tab" data-ps-right-tab="mode">🖥️ Mode &amp; Peta</button>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- Efek Panggung
+               (confetti/reaksi & efek suara 1-tombol), lihat catatan
+               panjang wireEffectsTab() di js/presentation-studio.js. -->
+          <button type="button" class="ps-tab" data-ps-right-tab="efek">🎉 Efek Panggung</button>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- Roda Undian
+               (versi teks, 100% offline), lihat catatan panjang
+               wireWheelTab() di js/presentation-studio.js. -->
+          <button type="button" class="ps-tab" data-ps-right-tab="roda">🎡 Roda Undian</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="teks">
@@ -2190,6 +2260,12 @@
                  bawah (gradasi gelap tipis, video tetap kelihatan penuh
                  sampai ke atas) -- lihat body.cam-subtitle (present.html). -->
             <button type="button" class="chip-btn small" data-cam-layout="subtitle">🎬 Latar Penuh + Subtitle</button>
+            <!-- BARU (9 Sep 2026, permintaan operator "1 layar dibagi 2,
+                 kiri kamera kanan berita") -- kiri-kanan, BEDA dari
+                 "split" (atas-bawah) di atas. Lihat body.cam-split-lr
+                 (present.html). Numpang slider "Ukuran Zona Kamera" yang
+                 sama (dibaca sebagai lebar, bukan tinggi, di mode ini). -->
+            <button type="button" class="chip-btn small" data-cam-layout="split-lr">◧ Kamera Kiri, Konten Kanan</button>
             <!-- BARU (8 Sep 2026 v3, permintaan operator "dibalik, jadi
                  tulisan semua ayat, kameranya bulat taruh kanan bawah")
                  -- KEBALIKAN dari mode lain: di sini TEKS yang jadi
@@ -2199,8 +2275,30 @@
                  di pojok kanan-bawah (gaya "bubble" webcam ala Zoom/
                  Meet) -- lihat body.cam-bubble (present.html). -->
             <button type="button" class="chip-btn small" data-cam-layout="bubble">🔵 Teks Penuh, Kamera Bulat</button>
+            <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks
+                 dalam bentuk lingkaran kecil ... + kamera di belakang") --
+                 kebalikan dari tombol di atas. Lihat body.cam-textbubble
+                 (present.html) & theme.camLayout === "textbubble". -->
+            <button type="button" class="chip-btn small" data-cam-layout="textbubble">⭕ Kamera Penuh, Teks Bulat</button>
           </div>
           <div class="ps-pointer-hint">"Kamera Atas, Teks Bawah" cocok kalau ingin ayat/kidung/pengumuman SELALU jelas terbaca di zona sendiri (latar solid). "Latar Penuh + Subtitle" cocok kalau ingin kamera/gambar tetap terlihat PENUH layar seperti video, dengan teks sebagai caption/subtitle menempel di bawah. "Teks Penuh, Kamera Bulat" cocok kalau ayat/kidung/pengumuman ingin selalu jadi fokus utama layar, kamera cuma sebagai jendela kecil di pojok (gaya video call).</div>
+
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks atas
+               kamera bawah") -- HANYA berlaku di mode "📐 Kamera Atas,
+               Teks Bawah". Lihat body.cam-split-reverse-tb (present.html)
+               & theme.camSplitReverseTB. -->
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:10px;">
+            <input type="checkbox" id="psCamSplitReverseTB" style="margin:0;" />
+            🔁 Balik atas-bawah (mode "Kamera Atas, Teks Bawah") -- teks ke atas, kamera ke bawah
+          </label>
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "kamera
+               penuh + teks melayang di atas") -- HANYA berlaku di mode
+               "🎬 Latar Penuh + Subtitle". Lihat body.cam-subtitle-top
+               (present.html) & theme.camSubtitleTop. -->
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:6px;">
+            <input type="checkbox" id="psCamSubtitleTop" style="margin:0;" />
+            ⬆️ Subtitle di atas (mode "Latar Penuh + Subtitle") -- bukan di bawah
+          </label>
           <!-- BARU (8 Sep 2026 v2, permintaan operator) -- slider bebas
                untuk "Ukuran Zona Kamera" (dulu terkunci 42%), khusus
                berlaku di mode "📐 Kamera Atas, Teks Bawah". -->
@@ -2211,7 +2309,17 @@
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Zona kamera besar">▮</span>
             <span id="psCamSplitPctValue" class="ps-pen-size-value">42%</span>
           </div>
-          <div class="ps-pointer-hint">Geser ke kanan supaya Kamera/Gambar Latar mendapat porsi layar lebih besar (dan zona ayat/kidung/pengumuman mengecil) -- atau ke kiri untuk sebaliknya.</div>
+          <div class="ps-pointer-hint">Geser ke kanan supaya Kamera/Gambar Latar mendapat porsi layar lebih besar (dan zona ayat/kidung/pengumuman mengecil) -- atau ke kiri untuk sebaliknya. Di mode "Kamera Kiri, Konten Kanan" slider yang sama ini mengatur LEBAR (bukan tinggi) zona kamera.</div>
+
+          <!-- BARU (9 Sep 2026, permintaan operator "1 layar dibagi 2,
+               kiri kamera kanan berita") -- khusus mode "◧ Kamera Kiri,
+               Konten Kanan": centang ini untuk membalik sisi (kamera
+               pindah ke KANAN, konten ke KIRI). Lihat body.cam-split-lr-
+               reverse (present.html) & theme.camSplitReverse. -->
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:10px;">
+            <input type="checkbox" id="psCamSplitReverse" style="margin:0;" />
+            🔁 Balik sisi (mode "Kamera Kiri, Konten Kanan") -- kamera ke kanan, konten ke kiri
+          </label>
 
           <!-- BARU (8 Sep 2026 v4, permintaan operator "latar belakang
                transparan atau ada backgroundnya") -- zona teks di mode
@@ -2226,14 +2334,56 @@
           <div class="ps-pointer-hint">Kalau mati (bawaan): zona teks solid warna tema, paling mudah dibaca. Nyalakan kalau ingin kamera/gambar tetap terlihat samar di balik teksnya.</div>
 
           <!-- BARU (8 Sep 2026 v3, permintaan operator) -- slider ukuran
-               lingkaran, khusus mode "🔵 Teks Penuh, Kamera Bulat". -->
+               lingkaran, khusus mode "🔵 Teks Penuh, Kamera Bulat".
+               PERLUASAN (9 Sep 2026, sesi ke-9, permintaan operator
+               "dari kecil sampai besar sekali") -- max dinaikkan dari
+               420px -> 1200px. -->
           <div class="ps-field-label" style="margin-top:10px;">Ukuran lingkaran Kamera (mode "Teks Penuh, Kamera Bulat")</div>
           <div class="ps-pen-size-row">
             <span class="ps-pen-size-label" title="Lingkaran kecil">◦</span>
-            <input type="range" id="psCamBubbleSizeSlider" min="120" max="420" step="10" value="200" />
-            <span class="ps-pen-size-label ps-pen-size-label-big" title="Lingkaran besar">●</span>
+            <input type="range" id="psCamBubbleSizeSlider" min="120" max="1200" step="20" value="200" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Lingkaran sangat besar">●</span>
             <span id="psCamBubbleSizeValue" class="ps-pen-size-value">200px</span>
           </div>
+
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks
+               dalam bentuk lingkaran kecil ... + kamera di belakang") --
+               "⭕ Kamera Penuh, Teks Bulat" ditambahkan sebagai tombol
+               ke-6 di dalam #psCamLayoutRow di atas (bukan di sini) --
+               supaya ikut logika exclusive-active 1 tombol yang sudah
+               ada untuk semua Tata Letak Kamera/Gambar Latar.
+          <div class="ps-pointer-hint">Kebalikan dari "Teks Penuh, Kamera Bulat" -- di sini kamera/gambar memenuhi layar penuh, ayat/kidung/pengumuman yang jadi jendela bulat kecil mengambang.</div>
+
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "5 sisi,
+               kiri atas, kanan bawah, kiri bawah, kanan atas, tengah") --
+               posisi bubble, berlaku untuk KEDUA mode bulat di atas
+               ("Teks Penuh, Kamera Bulat" MAUPUN "Kamera Penuh, Teks
+               Bulat") -- 1 pengaturan untuk keduanya. Lihat
+               body.bubble-pos-* (present.html) & theme.bubblePos. -->
+          <div class="ps-field-label" style="margin-top:14px;">Posisi lingkaran (mode bulat manapun)</div>
+          <div class="ps-btn-row" id="psBubblePosRow">
+            <button type="button" class="chip-btn small" data-bubble-pos="tl">↖️ Kiri Atas</button>
+            <button type="button" class="chip-btn small" data-bubble-pos="tr">↗️ Kanan Atas</button>
+            <button type="button" class="chip-btn small" data-bubble-pos="c">⏺️ Tengah</button>
+            <button type="button" class="chip-btn small" data-bubble-pos="bl">↙️ Kiri Bawah</button>
+            <button type="button" class="chip-btn small active" data-bubble-pos="br">↘️ Kanan Bawah</button>
+          </div>
+
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "dari
+               kecil sampai besar sekali") -- ukuran lingkaran TEKS,
+               terpisah dari slider "Ukuran lingkaran Kamera" di atas
+               (khusus mode "Kamera Penuh, Teks Bulat"). Rentang dibuat
+               jauh lebih lebar (200px-1200px) supaya bisa benar-benar
+               "sangat besar" di layar 200 inci. Lihat --p-textbubble-size
+               (present.html) & theme.textBubbleSize. -->
+          <div class="ps-field-label" style="margin-top:14px;">Ukuran lingkaran Teks (mode "Kamera Penuh, Teks Bulat")</div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Lingkaran kecil">◦</span>
+            <input type="range" id="psTextBubbleSizeSlider" min="200" max="1200" step="20" value="420" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Lingkaran sangat besar">●</span>
+            <span id="psTextBubbleSizeValue" class="ps-pen-size-value">420px</span>
+          </div>
+          <div class="ps-pointer-hint">Catatan: teks yang sangat panjang mungkin perlu di-scroll sendiri di dalam lingkaran kalau lingkarannya diperkecil -- perbesar lingkaran atau perkecil "Ukuran Huruf" (panel 🎨) kalau ingin semua teks langsung terlihat penuh.</div>
 
           <!-- BARU (8 Sep 2026, permintaan operator "video ada
                subtitle-nya") -- kalau dicentang, ayat/kidung/pengumuman
@@ -2306,7 +2456,7 @@
           <div class="ps-btn-row">
             <button type="button" id="psBellStopBtn" class="chip-btn small">🔇 Hentikan Bel</button>
           </div>
-          <div class="ps-pointer-hint">Alt+1 s/d Alt+9 di keyboard = jalan pintas membunyikan Bel ke-1 s/d ke-9 sesuai urutan di atas. Tambah bel baru lewat CONFIG.BELL_SOUNDS (js/config.js).</div>
+          <div class="ps-pointer-hint">Alt+1 s/d Alt+9 di keyboard = jalan pintas membunyikan Bel ke-1 s/d ke-9 sesuai urutan di atas. Tambah bel baru lewat CONFIG.BELL_SOUNDS (js/config.js). Tombol <strong>M</strong> = matikan bel yang sedang bunyi SEKARANG JUGA (tidak perlu menunggu sampai habis sendiri) -- <strong>M</strong> juga sekaligus mute/unmute suara video YouTube yang sedang tayang (lihat hint di tab ▶️ YouTube).</div>
 
 
           <!-- BARU (28 Agu 2026) -- 🖼️ Gambar Latar: alternatif dari
@@ -2379,6 +2529,357 @@
           </div>
           <div class="ps-pointer-hint">Latar (Kamera/Gambar) tetap otomatis tersembunyi saat "⬛ Hitam" / "◆ Logo" / slide file / video YouTube sedang tayang -- warna/stroke/ukuran huruf di atas TETAP berlaku (tidak ikut hilang). Spasi baris & lebar kotak teks masih di tab "🎨 Tampilan".</div>
         </div>
+
+        <!-- BARU (9 Sep 2026, permintaan operator) -- "🖥️ Mode & Peta":
+             Welcome/Next Up (layar sambutan & "SELANJUTNYA" di antara
+             sesi, lihat showModeScreen()/present.html) + Peta Interaktif
+             (upload gambar peta acara, taruh pin, klik pin dari Studio
+             untuk zoom ke titik itu di Layar 2 -- REUSABLE lintas acara,
+             tinggal ganti gambar & pin, bukan cuma untuk 1 lokasi).
+             Lihat wireModeScreenTab() & wireMapTab() di
+             js/presentation-studio.js. -->
+        <div class="ps-tab-panel" data-ps-right-panel="mode" hidden>
+          <div class="ps-field-label" style="margin-top:0;">🖥️ Jenis Layar</div>
+          <div class="ps-btn-row" id="psModeScreenKindRow">
+            <button type="button" class="chip-btn small active" data-ms-kind="welcome">👋 Welcome</button>
+            <button type="button" class="chip-btn small" data-ms-kind="nextup">➡️ Next Up</button>
+            <!-- BARU (9 Sep 2026, permintaan operator) -- 4 preset tambahan
+                 supaya operator tidak perlu menyusun ulang judul/warna
+                 sendiri tiap acara: ☕ Istirahat & 🏃 Olahraga BOLEH pakai
+                 hitung mundur (ada durasi yang jelas), 🎉 Ice Breaker &
+                 🙏 Renungan Malam TIDAK ditawari hitung mundur (biasanya
+                 durasinya cair/tidak pasti) -- lihat MODE_SCREEN_KIND_META
+                 di wireModeScreenTab(), js/presentation-studio.js, untuk
+                 semua bawaan per jenis (label, judul contoh, dsb) &
+                 showModeScreen()/present.html untuk nuansa warna Layar 2. -->
+            <button type="button" class="chip-btn small" data-ms-kind="istirahat">☕ Istirahat</button>
+            <button type="button" class="chip-btn small" data-ms-kind="icebreaker">🎉 Ice Breaker</button>
+            <button type="button" class="chip-btn small" data-ms-kind="olahraga">🏃 Olahraga</button>
+            <button type="button" class="chip-btn small" data-ms-kind="renungan">🙏 Renungan Malam</button>
+            <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "info
+                 waktunya foto bersama") -- allowCountdown:true, lihat
+                 MODE_SCREEN_KIND_META.foto. -->
+            <button type="button" class="chip-btn small" data-ms-kind="foto">📸 Foto Bersama</button>
+          </div>
+          <div class="ps-field-label">Judul</div>
+          <input type="text" id="psModeScreenTitle" class="columns-lang-select" placeholder="mis. SELAMAT DATANG" style="width:100%; box-sizing:border-box;" />
+          <div class="ps-field-label">Subjudul (opsional)</div>
+          <input type="text" id="psModeScreenSubtitle" class="columns-lang-select" placeholder="mis. Retret Pemuda 2026" style="width:100%; box-sizing:border-box;" />
+          <div class="ps-field-label">Poin-poin penting (opsional, 1 baris = 1 poin)</div>
+          <textarea id="psModeScreenBullets" class="columns-lang-select" rows="3" placeholder="Dresscode: Kasual rapi&#10;WiFi: youth2026" style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- "Layar Istirahat
+               Lengkap": gabung jam mundur (checkbox di bawah) + poin
+               penting (di atas) + acara BERIKUTNYA dalam SATU layar
+               (gaya lock-screen), supaya operator tidak perlu 2 layar
+               terpisah (Countdown Target lalu Next Up manual). Field ini
+               opsional & berlaku untuk SEMUA jenis, paling sering
+               dipakai untuk ☕ Istirahat / 🏃 Olahraga. Dirender sebagai
+               baris kecil "➡️ Selanjutnya: ..." di bawah poin-poin --
+               lihat #msNextLabel di present.html & showModeScreen(). -->
+          <div class="ps-field-label">Acara berikutnya setelah ini (opsional)</div>
+          <input type="text" id="psModeScreenNextLabel" class="columns-lang-select" placeholder="mis. Sesi 2: Pujian &amp; Penyembahan, 10:30" style="width:100%; box-sizing:border-box;" />
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:8px;">
+            <input type="checkbox" id="psModeScreenCountdownOn" style="margin:0;" />
+            ⏱️ Tampilkan hitung mundur ke jam
+          </label>
+          <input type="time" id="psModeScreenCountdownTime" class="columns-lang-select" style="margin-top:6px; display:none;" />
+          <div class="ps-btn-row" style="margin-top:10px;">
+            <button type="button" id="psModeScreenShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psModeScreenStopBtn" class="chip-btn small">⏹ Hentikan</button>
+            <!-- BARU (9 Sep 2026) -- selipkan ke Kumpulan Ayat (TANPA
+                 hitung mundur, lihat catatan addModeScreenToCollection(),
+                 js/collections.js). -->
+            <button type="button" id="psModeScreenSaveBtn" class="chip-btn small">💾 Simpan ke Kumpulan Ayat</button>
+          </div>
+          <div id="psModeScreenSaveStatus" class="ps-pointer-hint" style="min-height:0;"></div>
+          <div class="ps-pointer-hint">"Welcome" cocok sebelum acara mulai, "Next Up" di antara sesi, "☕ Istirahat", "🏃 Olahraga" &amp; "📸 Foto Bersama" bisa disertai hitung mundur durasi, "🎉 Ice Breaker" &amp; "🙏 Renungan Malam" dibuat lebih tenang tanpa hitung mundur (cocok untuk suasana yang lebih hening/santai). Judul &amp; contoh subjudul terisi otomatis saat ganti jenis -- tinggal diedit atau langsung ditayangkan.</div>
+
+          <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
+
+          <div class="ps-field-label" style="margin-top:0;">🗺️ Peta Interaktif</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Unggah gambar peta (venue, kota, atau peta Indonesia), lalu klik di atas gambar untuk taruh pin. Disimpan di perangkat ini &amp; bisa dipakai ulang acara lain -- tinggal buat "Peta Baru" untuk acara berikutnya.</p>
+          <select id="psMapSelect" class="columns-lang-select" style="width:100%; box-sizing:border-box;"></select>
+          <!-- BARU (9 Sep 2026) -- diisi via JS dari window.INDONESIA_REGENCIES
+               (js/indonesia-regencies.js), dipakai input Kalibrasi &
+               Daftar Titik dari Tabel di bawah supaya operator tinggal
+               mulai mengetik nama kota (autocomplete browser bawaan). -->
+          <datalist id="psIndonesiaCities"></datalist>
+          <!-- BARU (9 Sep 2026) -- diisi via JS dari kategori yang SUDAH
+               dipakai di peta aktif (mis. "Kaki Dian", "Pos Injil"),
+               supaya baris baru tinggal pilih, tidak perlu mengetik
+               ulang & typo (typo bikin kategori "ganda" di checklist). -->
+          <datalist id="psMapCategoriesList"></datalist>
+          <div class="ps-btn-row">
+            <button type="button" id="psMapNewBtn" class="chip-btn small">➕ Peta Baru</button>
+            <button type="button" id="psMapRenameBtn" class="chip-btn small">✏️ Ganti Nama</button>
+            <button type="button" id="psMapDeleteBtn" class="chip-btn small">🗑️ Hapus Peta</button>
+          </div>
+          <div class="ps-dropzone" id="psMapImageDropzone">Seret gambar peta ke sini atau klik untuk memilih<br /><span class="ps-dropzone-sub">jpg, png, webp — maksimal 25MB</span></div>
+          <input type="file" id="psMapImageInput" accept="image/*" hidden />
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 🌐 Ambil Peta Dasar
+               dari Online: alternatif dari unggah manual di atas, ambil
+               gambar peta Indonesia polos dari Wikimedia Commons (sumber
+               terbuka/bebas lisensi) otomatis, lalu disimpan sebagai
+               gambar peta SAMA seperti hasil unggah manual -- jadi sekali
+               diambil (butuh internet), bisa dipakai offline terus-
+               menerus di venue seperti biasa (tersimpan localStorage).
+               Lihat fetchOnlineBaseMap_() (js/presentation-studio.js). -->
+          <div class="ps-btn-row" style="margin-top:6px;">
+            <button type="button" id="psMapOnlineFetchBtn" class="chip-btn small">🌐 Ambil Peta Dasar dari Online (Wikimedia)</button>
+          </div>
+          <p id="psMapOnlineFetchStatus" class="ps-pointer-hint" style="margin:2px 0 0 0;"></p>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Peta Dasar:
+               terapkan filter gambar (diproses di perangkat sendiri lewat
+               canvas, BUKAN gambar AI baru) ke gambar peta yang sedang
+               aktif (baik hasil unggah manual maupun ambil online di
+               atas). Diproses SEKALI per gaya lalu disimpan
+               (map.styleVariants) supaya pindah gaya berikutnya instan
+               & tetap offline. Lihat generateMapStyleVariant_()
+               (js/presentation-studio.js). -->
+          <div class="ps-field-label" style="margin-top:14px;">🎨 Gaya Peta Dasar</div>
+          <div class="ps-btn-row" style="align-items:center; gap:8px;">
+            <select id="psMapStyleSelect" class="columns-lang-select" style="flex:1;">
+              <option value="normal">Biasa (asli)</option>
+              <option value="comic">🖋️ Komik (garis tebal + warna blok)</option>
+              <option value="artistic">🎨 Artistik (lukisan, warna lembut)</option>
+              <option value="territorial">🗺️ Teritorial (atlas tua/vintage)</option>
+            </select>
+          </div>
+          <p id="psMapStyleStatus" class="ps-pointer-hint" style="margin:4px 0 0 0;"></p>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Pin: pin
+               flat (default, seperti sebelumnya) atau 3D Berputar (lihat
+               .ps-pin-3d/.map-pin-dot.pin-3d di css/style.css &
+               present.html -- efek sorot cahaya bergeser di atas
+               gradient bulat, memberi kesan bola mengkilap berputar,
+               BUKAN foto 360° -- animasi ikon saja, sesuai permintaan). -->
+          <div class="ps-field-label" style="margin-top:14px;">🎨 Gaya Pin</div>
+          <div class="ps-btn-row" style="align-items:center; gap:8px;">
+            <select id="psMapPinStyleSelect" class="columns-lang-select" style="flex:1;">
+              <option value="flat">Standar (bulat datar)</option>
+              <option value="3d">🔮 3D Berputar (gradient + animasi 360°)</option>
+            </select>
+          </div>
+          <div id="psMapEditorWrap" style="position:relative; display:none; margin-top:10px; line-height:0; user-select:none;">
+            <img id="psMapEditorImg" style="max-width:100%; display:block; border-radius:6px; cursor:crosshair;" />
+            <div id="psMapEditorPins" style="position:absolute; inset:0; pointer-events:none;"></div>
+          </div>
+          <p class="ps-pointer-hint" id="psMapEditorHint" style="display:none;">Klik di atas gambar untuk menambah pin baru di titik itu.</p>
+
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 📍 Kalibrasi Peta:
+               2 titik acuan (nama kota + posisi klik di gambar) supaya
+               "📋 Daftar Titik dari Tabel" di bawah bisa MENGHITUNG SENDIRI
+               posisi ratusan kota lain dari lat/long-nya (js/indonesia-regencies.js),
+               tanpa perlu diklik satu-satu. Lihat catatan panjang
+               applyCityRowsToMap()/latLngToPct() di
+               js/presentation-studio.js untuk cara hitungnya. -->
+          <div class="ps-field-label" style="margin-top:14px;">📍 Kalibrasi Peta (sekali per peta)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Pilih 2 kota yang kamu tahu persis posisinya di gambar peta ini (mis. kota paling barat & paling timur), lalu klik "🎯 Tandai" dan klik titik kota itu di gambar. Setelah 2 titik ini diisi, kota-kota LAIN di tabel bawah otomatis ditaruh posisinya -- tidak perlu diklik satu-satu.</p>
+          <div class="ps-btn-row" style="align-items:center; gap:6px;">
+            <input type="text" id="psMapCalib1City" list="psIndonesiaCities" class="columns-lang-select" placeholder="Kota acuan #1 (mis. Kota Sabang)" style="flex:1; min-width:0;" />
+            <button type="button" id="psMapCalib1Btn" class="chip-btn small">🎯 Tandai</button>
+          </div>
+          <div class="ps-btn-row" style="align-items:center; gap:6px; margin-top:6px;">
+            <input type="text" id="psMapCalib2City" list="psIndonesiaCities" class="columns-lang-select" placeholder="Kota acuan #2 (mis. Kota Jayapura)" style="flex:1; min-width:0;" />
+            <button type="button" id="psMapCalib2Btn" class="chip-btn small">🎯 Tandai</button>
+          </div>
+          <div id="psMapCalibStatus" class="ps-pointer-hint">⚠️ Belum dikalibrasi.</div>
+
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 📋 Daftar Titik
+               dari Tabel: cara BUKAN klik satu-satu, tapi ketik nama
+               kota/kabupaten + kategori + tahun per baris (mirip tabel
+               Excel), lalu "🧮 Terapkan ke Peta" menaruh SEMUA pin
+               sekaligus (posisi dihitung dari kalibrasi di atas). -->
+          <div class="ps-field-label" style="margin-top:14px;">📋 Daftar Titik dari Tabel</div>
+          <div id="psMapCityRowsHeader" style="display:flex; gap:6px; font-size:11px; opacity:.7; padding:0 2px;">
+            <span style="flex:1.4;">Kota/Kabupaten</span>
+            <span style="flex:1;">Kategori</span>
+            <span style="width:64px;">Tahun</span>
+            <span style="width:26px;"></span>
+          </div>
+          <div id="psMapCityRows" style="display:flex; flex-direction:column; gap:6px; margin-top:4px;"></div>
+          <div class="ps-btn-row" style="margin-top:8px;">
+            <button type="button" id="psMapCityRowAddBtn" class="chip-btn small">➕ Tambah Baris</button>
+            <button type="button" id="psMapCityRowApplyBtn" class="chip-btn primary">🧮 Terapkan ke Peta</button>
+          </div>
+          <div id="psMapCityRowStatus" class="ps-pointer-hint"></div>
+
+          <!-- BARU (9 Sep 2026) -- ☑ Checklist Kategori: pilih kategori
+               mana yang tampil sebagai pin saat "▶️ Tampilkan Peta"
+               ditekan, tiap kategori otomatis menunjukkan jumlah
+               titiknya. -->
+          <div class="ps-field-label" style="margin-top:14px;">☑️ Kategori yang Ditampilkan</div>
+          <div id="psMapCategoryChecklist" style="display:flex; flex-direction:column; gap:4px;"></div>
+
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 🌏 Total Penduduk
+               Indonesia (Nasional): angka + sumber + tahun ditampilkan
+               sebagai banner terpisah di Layar 2 (pojok kiri-atas),
+               independen dari zoom/fokus kota -- tetap kelihatan walau
+               operator sedang zoom ke 1 kota. Toggle "Tampilkan" bisa
+               disembunyikan/ditampilkan LIVE tanpa mengganggu peta yang
+               sedang tayang (lihat wireMapTab() -> psMapNatPopVisible).
+               Tombol "🔄 Perbarui Otomatis" mengambil data dari Wikidata
+               (entitas Q252 = Indonesia, properti P1082 = populasi) --
+               ini sumber TERBUKA yang mendukung diakses langsung dari
+               browser tanpa server tambahan, dan biasanya mengutip BPS/
+               PBB sebagai referensi aslinya. BELUM diuji ujung-ke-ujung
+               di jaringan sungguhan -- kalau gagal (offline/CORS
+               berubah/dsb), pesan error tampil & isian manual di bawah
+               tetap bisa dipakai sebagai cadangan. -->
+          <div class="ps-field-label" style="margin-top:14px;">🌏 Total Penduduk Indonesia (Nasional)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Ditampilkan sebagai banner terpisah di Layar 2 (pojok kiri-atas), gambar peta tetap ada walau tulisan ini disembunyikan. Tombol Perbarui Otomatis mengambil data dari Wikidata (mengutip sumber resmi seperti BPS/PBB) -- kalau gagal atau ingin angka lain, isi manual di bawah.</p>
+          <div id="psMapNatPopStatus" class="ps-pointer-hint">⚠️ Belum diisi.</div>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:6px 0;">
+            <input type="checkbox" id="psMapNatPopVisible" style="margin:0;" />
+            <span>Tampilkan di Layar 2</span>
+          </label>
+          <div class="ps-btn-row">
+            <button type="button" id="psMapNatPopAutoBtn" class="chip-btn small">🔄 Perbarui Otomatis (Wikidata)</button>
+          </div>
+          <div class="ps-btn-row" style="align-items:center; gap:6px; margin-top:6px;">
+            <input type="number" id="psMapNatPopManualValue" placeholder="Jumlah (mis. 282477584)" class="columns-lang-select" style="flex:1.4; min-width:0;" />
+            <input type="number" id="psMapNatPopManualYear" placeholder="Tahun" class="columns-lang-select" style="width:80px;" />
+          </div>
+          <input type="text" id="psMapNatPopManualSource" placeholder="Sumber (mis. BPS - Sensus Penduduk 2024)" class="columns-lang-select" style="width:100%; box-sizing:border-box; margin-top:6px;" />
+          <div class="ps-btn-row" style="margin-top:6px;">
+            <button type="button" id="psMapNatPopManualSaveBtn" class="chip-btn small">💾 Simpan Manual</button>
+          </div>
+
+          <div class="ps-field-label" style="margin-top:14px;">📌 Pin (klik manual)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Klik "🎯 Fokus" untuk zoom ke titik itu di Layar 2 (nama kota otomatis muncul di kartu info, walau kategorinya sedang tidak dicentang di atas). Klik "📊 Data" untuk isi luas &amp; jumlah penduduk (+ tahun sensus terakhir), klik "📷 Foto" untuk unggah 1-5 foto kota itu -- semua opsional, ikut tampil di kartu info Layar 2 saat kota itu difokuskan. Berlaku untuk seluruh 514 kabupaten/kota, tapi isi foto sewajarnya saja (kota yang mau ditonjolkan) supaya penyimpanan perangkat tidak penuh.</p>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 🔄 Perbarui Populasi/Luas
+               (Wikidata): satu tombol untuk cek ulang jumlah penduduk & luas
+               SEMUA pin kota yang sedang tampil (checklist kategori aktif),
+               otomatis dari Wikidata (bukan isi manual lagi). Kalau operator
+               masih mau isi 1 kota saja, tombol "🔄 Wikidata" per-pin (di
+               panel "📊 Data") juga tersedia -- lihat wireMapTab()
+               (js/presentation-studio.js). -->
+          <div class="ps-btn-row" style="margin-top:6px;">
+            <button type="button" id="psMapBulkAutoBtn" class="chip-btn small">🔄 Perbarui Semua Populasi/Luas (Wikidata)</button>
+          </div>
+          <p id="psMapBulkAutoStatus" class="ps-pointer-hint" style="margin:2px 0 0 0;"></p>
+          <div id="psMapPinList" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;"></div>
+          <!-- BARU (9 Sep 2026, permintaan operator) -- 🔍 Zoom Peta
+               interaktif: geser slider ini kapan saja (baik sedang lihat
+               peta penuh maupun sedang fokus ke 1 kota) untuk
+               memperbesar/memperkecil tampilan di Layar 2 secara halus,
+               TANPA perlu klik ulang "🎯 Fokus". Lihat setMapZoom()/
+               applyMapTransform_() di present.html. -->
+          <div class="ps-field-label" style="margin-top:14px;">🔍 Zoom Peta (interaktif)</div>
+          <div class="ps-btn-row" style="align-items:center; gap:8px;">
+            <button type="button" id="psMapZoomOutBtn" class="chip-btn small">➖</button>
+            <input type="range" id="psMapZoomSlider" min="100" max="600" step="10" value="100" style="flex:1;" />
+            <button type="button" id="psMapZoomInBtn" class="chip-btn small">➕</button>
+            <span id="psMapZoomValue" class="ps-pointer-hint" style="min-width:44px; text-align:right;">100%</span>
+          </div>
+
+          <div class="ps-btn-row" style="margin-top:10px;">
+            <button type="button" id="psMapShowBtn" class="chip-btn primary">▶️ Tampilkan Peta</button>
+            <!-- BARU (9 Sep 2026, permintaan operator) -- lawan dari "🎯 Fokus"
+                 per pin di daftar atas: balikin Layar 2 ke peta PENUH (zoom
+                 keluar) tanpa perlu klik ulang "▶️ Tampilkan Peta" & tanpa
+                 menutup peta. Lihat wireMapTab() (js/presentation-studio.js). -->
+            <button type="button" id="psMapUnfocusBtn" class="chip-btn small">↩️ Peta Penuh (batal fokus)</button>
+            <button type="button" id="psMapStopBtn" class="chip-btn small">⏹ Hentikan</button>
+            <!-- BARU (9 Sep 2026) -- selipkan REFERENSI peta aktif ke
+                 Kumpulan Ayat, lihat catatan addMapToCollection()
+                 (js/collections.js). -->
+            <button type="button" id="psMapSaveBtn" class="chip-btn small">💾 Simpan ke Kumpulan Ayat</button>
+          </div>
+          <div id="psMapSaveStatus" class="ps-pointer-hint" style="min-height:0;"></div>
+        </div>
+
+        <!-- BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung:
+             reaksi visual (confetti/emoji terbang) & efek suara 1-tombol,
+             dikirim ke Layar 2 sebagai OVERLAY di ATAS apa pun yang
+             sedang tayang (ayat/kidung/peta/dst) -- TIDAK menghentikan
+             atau mengganti tayangan yang sedang berjalan, cuma numpang
+             lewat beberapa detik lalu hilang sendiri. Efek suara
+             disintesis langsung di Layar 2 pakai Web Audio API (BUKAN
+             file MP3 yang diunggah) supaya tidak perlu aset tambahan &
+             tetap 100% offline -- lihat catatan panjang playEffectSound_()
+             di present.html untuk cara tiap efek "diracik". Lihat
+             wireEffectsTab() di js/presentation-studio.js. -->
+        <div class="ps-tab-panel" data-ps-right-panel="efek" hidden>
+          <div class="ps-field-label" style="margin-top:0;">🎊 Reaksi Visual</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Muncul sebagai lapisan tambahan DI ATAS tayangan yang sedang berjalan (tidak mengganggu ayat/kidung/peta yang sedang tayang), lalu hilang otomatis.</p>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" data-effect="confetti">🎉 Confetti</button>
+            <button type="button" class="chip-btn small" data-effect-emoji="👏">👏 Tepuk Tangan</button>
+            <button type="button" class="chip-btn small" data-effect-emoji="❤️">❤️ Cinta</button>
+            <button type="button" class="chip-btn small" data-effect-emoji="🙌">🙌 Semangat</button>
+            <button type="button" class="chip-btn small" data-effect-emoji="🔥">🔥 Api</button>
+            <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "reaksi
+                 ketawa") -- numpang mekanisme emoji terbang yang sudah
+                 ada (playEmojiReaction_ generik, terima emoji apa saja),
+                 TIDAK perlu kode baru di present.html. -->
+            <button type="button" class="chip-btn small" data-effect-emoji="😂">😂 Tertawa</button>
+          </div>
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama
+               Tuhan") -- BEDA dari emoji terbang di atas: teks BESAR
+               berkilau muncul di TENGAH layar lalu memudar (bukan
+               beterbangan kecil-kecil), supaya jelas terbaca dari jarak
+               jauh/layar 200 inci. Lihat data-shout & playShout_()/
+               present.html. -->
+          <div class="ps-field-label" style="margin-top:14px;">📣 Seruan (teks besar di tengah)</div>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" data-shout="PUJI TUHAN!">🙌 Puji Tuhan!</button>
+            <button type="button" class="chip-btn small" data-shout="HALELUYA!">🙌 Haleluya!</button>
+            <button type="button" class="chip-btn small" data-shout="AMIN!">🙌 Amin!</button>
+          </div>
+          <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
+          <div class="ps-field-label" style="margin-top:0;">🔊 Efek Suara</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Diputar dari perangkat Layar 2 (biasanya tersambung ke sound system venue) -- pastikan Layar 2 tidak di-mute.</p>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" data-sound="drumroll">🥁 Drumroll</button>
+            <button type="button" class="chip-btn small" data-sound="applause">👏 Tepuk Tangan</button>
+            <button type="button" class="chip-btn small" data-sound="ding">🔔 Ding</button>
+            <button type="button" class="chip-btn small" data-sound="fanfare">📯 Fanfare</button>
+            <button type="button" class="chip-btn small" data-sound="tada">🎊 Ta-da!</button>
+          </div>
+          <div class="ps-pointer-hint">Efek suara disintesis langsung (bukan file audio) -- ringan &amp; tidak perlu koneksi internet.</div>
+          <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
+          <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "break
+               time, lonceng, sebagai menu interaktif offline cepat") --
+               2 pintasan 1-klik ke fitur yang SUDAH ADA di tab lain
+               (tidak menduplikasi logikanya, cuma memicu ulang), supaya
+               operator tidak perlu pindah tab saat sedang butuh cepat
+               di tengah acara. Lihat wireEffectsTab() -- data-quick-break
+               memicu showModeScreen kind "istirahat" bawaan langsung,
+               data-quick-bell memicu bel pertama di CONFIG.BELL_SOUNDS
+               (sama seperti tombol Bel Cepat di tab lain). -->
+          <div class="ps-field-label" style="margin-top:0;">⚡ Pintasan Cepat</div>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" id="psQuickBreakBtn">☕ Break Time (langsung tayang)</button>
+            <button type="button" class="chip-btn small" id="psQuickBellBtn">🔔 Bel Cepat</button>
+          </div>
+          <div class="ps-pointer-hint">"Break Time" langsung menayangkan Layar Istirahat dengan judul bawaan "JAM ISTIRAHAT" tanpa hitung mundur -- kalau mau atur poin/hitung mundur, tetap pakai tab "🖥️ Mode &amp; Peta" seperti biasa.</div>
+        </div>
+
+        <!-- BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian
+             (versi teks per segmen -- versi 1 lingkaran = 1 foto orang
+             direncanakan tahap berikutnya). 100% OFFLINE: daftar nama
+             diketik langsung, pemenang diacak dengan Math.random() di
+             perangkat ini sendiri, animasi & suara putaran disintesis
+             lewat CSS+Web Audio API di Layar 2 -- TIDAK ADA bagian yang
+             memanggil internet sama sekali. Lihat wireWheelTab() di
+             js/presentation-studio.js & showWheel()/spinWheel() di
+             present.html untuk detail lengkap. -->
+        <div class="ps-tab-panel" data-ps-right-panel="roda" hidden>
+          <div class="ps-field-label" style="margin-top:0;">🎡 Daftar Nama (1 nama per baris)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Cocok untuk undian doorprize, pembagian kelompok ice breaker, atau "siapa maju duluan" -- 100% offline, tidak butuh HP penonton sama sekali.</p>
+          <textarea id="psWheelEntries" class="columns-lang-select" rows="8" placeholder="Contoh:&#10;Budi&#10;Sari&#10;Andi&#10;Maria&#10;..." style="width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          <div class="ps-btn-row" style="margin-top:10px;">
+            <button type="button" class="chip-btn small" id="psWheelApplyBtn">🎡 Tampilkan Roda</button>
+            <button type="button" class="chip-btn small" id="psWheelSpinBtn" disabled>🎲 Putar!</button>
+            <button type="button" class="chip-btn small" id="psWheelResetBtn">🗑️ Reset</button>
+          </div>
+          <label class="ps-pointer-hint" style="display:flex; align-items:center; gap:8px; margin-top:10px; cursor:pointer;">
+            <input type="checkbox" id="psWheelRemoveWinnerChk" style="width:auto;" />
+            Buang pemenang dari daftar setelah menang (mode gugur -- cocok untuk undi berkali-kali tanpa nama yang sama menang 2x)
+          </label>
+          <div id="psWheelWinnerBox" class="ps-pointer-hint" hidden style="margin-top:10px; font-weight:700; font-size:15px;"></div>
+          <div class="ps-pointer-hint" style="margin-top:14px;">Catatan: versi ini dipakai LANGSUNG dari sini setiap acara (belum bisa disimpan sebagai item di "📚 Kumpulan Ayat" seperti Peta/Mode Layar -- ini bisa ditambahkan di tahap berikutnya kalau diperlukan).</div>
+        </div>
       </div>
     </div>
   </div>
@@ -2395,7 +2896,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260905a"></script>
+  <script src="js/collections.js?v=20260909c"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -2411,11 +2912,16 @@
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
   <script src="js/kidung-anak.js?v=20260904a"></script>
+  <!-- BARU (9 Sep 2026) -- data koordinat 514 kabupaten/kota, lihat
+       catatan panjang di file itu sendiri. Dimuat SEBELUM
+       presentation-studio.js supaya window.INDONESIA_REGENCIES sudah
+       tersedia saat wireMapTab() jalan. -->
+  <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260907b"></script>
-  <script src="js/presentation-studio.js?v=20260908b"></script>
+  <script src="js/presentation-studio.js?v=20260909d"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260908d"></script>
+  <script src="js/app.js?v=20260909c"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
