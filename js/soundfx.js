@@ -48,6 +48,26 @@
 //      Panggung") & di menu pratinjau admin begitu halaman dimuat
 //      ulang, TANPA edit presentation-studio.js maupun
 //      effectpreview.js sama sekali.
+//
+//  EFEK BERBASIS FILE MP3 (BARU 10 Sep 2026, permintaan operator: upload
+//  suara rekaman sendiri supaya bisa dipakai juga selain suara sintesis
+//  di atas): sejak sekarang 1 entry di SOUND_FX_LIST BOLEH punya field
+//  "src" (path ke file .mp3 di assets/sounds/) SEBAGAI GANTI kode
+//  sintesis di play(). Kalau "src" ada, play() otomatis memutar file itu
+//  (lewat Web Audio API juga -- fetch + decodeAudioData -- supaya tetap
+//  lewat destination_() yang sama, jadi tetap ikut sakelar mute "M" di
+//  Layar 2, SAMA seperti efek sintesis) -- TIDAK perlu tambah apa pun di
+//  play() untuk efek jenis ini.
+//  CARA MENAMBAH EFEK MP3 BARU: taruh file .mp3 di assets/sounds/, lalu
+//  tambah 1 baris baru { key, label, emoji, src: "assets/sounds/nama.mp3" }
+//  di SOUND_FX_LIST -- SELESAI, tidak perlu sentuh play().
+//  OFFLINE: file mp3 di assets/sounds/ TIDAK dibundel/base64 ke JS --
+//  tetap diambil sebagai file biasa lewat <script>/fetch, TAPI (sama
+//  seperti semua aset statis lain di app ini -- css/js/gambar) otomatis
+//  disimpan oleh Service Worker (sw.js) begitu pernah dimuat 1x, jadi
+//  kunjungan berikutnya tanpa internet tetap bisa memutarnya. Buffer
+//  hasil decode juga di-cache di memori (lihat audioBufferCache_ di
+//  bawah) supaya file yang sama tidak di-decode ulang tiap diputar.
 // ============================================================
 
 const SoundFX = (() => {
@@ -78,7 +98,35 @@ const SoundFX = (() => {
     { key: "rain", label: "Hujan", emoji: "🌧️" },
     // ↑ Tambah baris baru DI SINI untuk efek suara baru (lihat
     // panduan "CARA MENAMBAH EFEK SUARA BARU" di komentar atas file).
+
+    // --------------------------------------------------------
+    // Efek berbasis file MP3 rekaman sendiri (BARU 10 Sep 2026, lihat
+    // komentar "EFEK BERBASIS FILE MP3" di atas). "cheer"/"drum"/
+    // "whistle"/"awkward"/"magic"/"scream"/"wow" versi sintesis SUDAH
+    // ADA di atas -- makanya versi rekaman ini dikasih key & label
+    // berbeda (akhiran "Rekaman") supaya keduanya tetap bisa dipilih
+    // terpisah, TIDAK saling menimpa.
+    // --------------------------------------------------------
+    { key: "cheerRekaman", label: "Bersorak (Rekaman)", emoji: "📣", src: "assets/sounds/cheer.mp3" },
+    { key: "ohTuhanYesus", label: "Oh Tuhan Yesus", emoji: "🙏", src: "assets/sounds/oh-tuhan-yesus.mp3" },
+    { key: "aminOhTuhanYesus", label: "Amin Oh Tuhan Yesus", emoji: "🙌", src: "assets/sounds/amin-oh-tuhan-yesus.mp3" },
+    { key: "glory", label: "Glory", emoji: "✨", src: "assets/sounds/glory.mp3" },
+    { key: "seram", label: "Seram", emoji: "👻", src: "assets/sounds/seram.mp3" },
+    { key: "drumRekaman", label: "Drum (Rekaman)", emoji: "🥁", src: "assets/sounds/drum-rekaman.mp3" },
+    { key: "peluitRekaman", label: "Peluit (Rekaman)", emoji: "📯", src: "assets/sounds/peluit-rekaman.mp3" },
+    { key: "canggungRekaman", label: "Canggung (Rekaman)", emoji: "😬", src: "assets/sounds/canggung-rekaman.mp3" },
+    { key: "terompet", label: "Terompet", emoji: "🎺", src: "assets/sounds/terompet.mp3" },
+    { key: "magicCling", label: "Magic Cling", emoji: "🔮", src: "assets/sounds/magic-cling.mp3" },
+    { key: "screamRekaman", label: "Berteriak (Rekaman)", emoji: "😱", src: "assets/sounds/scream-rekaman.mp3" },
+    { key: "wowRekaman", label: "Wow (Rekaman)", emoji: "😮", src: "assets/sounds/wow-rekaman.mp3" },
+    { key: "cling", label: "Cling", emoji: "🔔", src: "assets/sounds/cling.mp3" },
+    { key: "cieeee", label: "Cieeee", emoji: "😏", src: "assets/sounds/cieeee.mp3" },
   ];
+
+  // Lookup cepat key -> src, dibangun sekali dari SOUND_FX_LIST supaya
+  // play() tidak perlu looping tiap dipanggil.
+  const AUDIO_SRC_BY_KEY_ = {};
+  SOUND_FX_LIST.forEach((item) => { if (item.src) AUDIO_SRC_BY_KEY_[item.key] = item.src; });
 
   // --------------------------------------------------------
   // Sumber audio -- BISA DIPASANG ULANG (configure()) oleh halaman
@@ -204,6 +252,40 @@ const SoundFX = (() => {
   }
 
   // --------------------------------------------------------
+  // Pemutar efek berbasis file MP3 (lihat komentar "EFEK BERBASIS FILE
+  // MP3" di atas file). audioBufferCache_ menyimpan Promise<AudioBuffer>
+  // per src, supaya file yang sama HANYA di-fetch+decode SEKALI selama
+  // halaman terbuka -- klik berikutnya ke efek yang sama langsung pakai
+  // buffer yang sudah ada di memori (instan, tidak fetch ulang).
+  // --------------------------------------------------------
+  const audioBufferCache_ = {};
+  function loadAudioBuffer_(src) {
+    if (!audioBufferCache_[src]) {
+      audioBufferCache_[src] = fetch(src)
+        .then((res) => res.arrayBuffer())
+        .then((buf) => ctx_().decodeAudioData(buf));
+    }
+    return audioBufferCache_[src];
+  }
+  function playAudioFile_(src) {
+    loadAudioBuffer_(src)
+      .then((buffer) => {
+        try {
+          const c = ctx_();
+          const src_ = c.createBufferSource();
+          src_.buffer = buffer;
+          src_.connect(destination_()); // sama-sama lewat gain "M" mute Layar 2
+          src_.start(0);
+        } catch (e) { /* diamkan -- efek suara TIDAK BOLEH sampai mengganggu UI kalau gagal */ }
+      })
+      .catch((e) => {
+        // Gagal ambil/decode file (mis. offline & belum pernah dicache
+        // Service Worker sama sekali) -- diamkan saja, jangan sampai
+        // melempar error yang mengganggu tombol lain.
+      });
+  }
+
+  // --------------------------------------------------------
   // play(key) -- dispatcher utama. Dipanggil oleh:
   //   - present.html, saat menerima payload {type:"sound", sound:key}
   //     dari Studio (Layar 2 sungguhan).
@@ -211,6 +293,10 @@ const SoundFX = (() => {
   //     (lokal, di HP saja).
   // --------------------------------------------------------
   function play(soundKey) {
+    if (AUDIO_SRC_BY_KEY_[soundKey]) {
+      playAudioFile_(AUDIO_SRC_BY_KEY_[soundKey]);
+      return;
+    }
     if (soundKey === "ding") {
       playNote_(1318.5, 0, 0.9, "sine", 0.32); // E6, lembut -- mirip beep() tapi nada lebih tinggi/ceria
       playNote_(1975.5, 0.05, 0.7, "sine", 0.14); // B6 tipis di atasnya, kesan "kristal"
