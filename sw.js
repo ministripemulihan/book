@@ -32,17 +32,23 @@
 //  kemampuan apa pun (data live tetap perlu server live).
 // ============================================================
 
-// DINAIKKAN LAGI (10 Sep 2026, panel "Coba Efek Suara & Visual" --
-// kotak pratinjau diperbesar + input "contoh tulisan" ditambah di
-// index.html/css/style.css/js/effectpreview.js). Wajib dinaikkan tiap
-// ada perubahan css/js supaya perangkat yang sudah pernah buka versi
-// LAMA offline-first (css/js dicache dengan strategi "cache dulu,
-// perbarui diam-diam di latar belakang" -- lihat fetch handler di
-// bawah) tidak "nyangkut" 1 kali muat lagi menampilkan berkas lama --
-// menaikkan angka ini membuat SEMUA cache versi lama otomatis dihapus
-// (lihat blok "activate" di bawah) sehingga versi baru wajib diambil
-// dari server begitu online, bukan menunggu revalidasi latar belakang.
-const CACHE_NAME = "book-vp-shell-v3";
+// DINAIKKAN LAGI (10 Sep 2026, sesi ke-14 -- 14 efek suara MP3 rekaman
+// baru ditambahkan ke js/soundfx.js + folder assets/sounds/ baru).
+// DINAIKKAN LAGI (10 Sep 2026, dropdown pilihan peta online "Peta polos"
+// vs "Peta + nama pulau" di tab 🗺️ Peta Interaktif -- index.html/
+// css/style.css/js/presentation-studio.js). Wajib dinaikkan tiap ada
+// perubahan css/js supaya perangkat yang sudah pernah buka versi LAMA
+// offline-first (css/js dicache dengan strategi "cache dulu, perbarui
+// diam-diam di latar belakang" -- lihat fetch handler di bawah) tidak
+// "nyangkut" 1 kali muat lagi menampilkan berkas lama -- menaikkan angka
+// ini membuat SEMUA cache versi lama otomatis dihapus (lihat blok
+// "activate" di bawah) sehingga versi baru wajib diambil dari server
+// begitu online, bukan menunggu revalidasi latar belakang. CATATAN buat
+// operator: ini JUGA jalan keluar kalau ada laporan "fitur X sudah
+// diperbaiki di kode tapi masih belum kelihatan di HP" -- itu 9 dari 10
+// kali karena Service Worker/cache lama, BUKAN kodenya salah; menaikkan
+// angka ini tiap deploy baru adalah cara memaksa HP ambil versi terbaru.
+const CACHE_NAME = "book-vp-shell-v6";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
