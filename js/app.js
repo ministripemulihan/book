@@ -629,6 +629,31 @@ async function showBibleSyncPrompt(opts) {
     box.appendChild(msg2);
   }
 
+  // BARU (10 Sep 2026, permintaan operator: "notifikasi apa mau
+  // mendownload suara-suara, defaultnya tidak usah, hanya kalau
+  // usernya setuju, digabung dengan download alkitab offline saja")
+  // -- opsi centang TAMBAHAN, TIDAK tercentang secara default, supaya
+  // 14 file MP3 "🎉 Efek Panggung" (js/soundfx.js, ~1,1 MB total) HANYA
+  // diunduh & disimpan offline sekaligus kalau operator SADAR
+  // mencentangnya sendiri di sini -- kalau dibiarkan kosong, efek MP3
+  // tetap bisa dipakai seperti biasa (otomatis ke-cache SATU PER SATU
+  // begitu tombolnya dipencet pertama kali, lihat komentar
+  // "EFEK BERBASIS FILE MP3" di js/soundfx.js), cuma tidak disiapkan
+  // di muka. Dibaca lagi di nowBtn.addEventListener() di bawah &
+  // diteruskan ke syncFromServer(). Disembunyikan kalau SoundFX belum
+  // termuat sama sekali (mis. present.html/window lain yang tidak
+  // memuat js/soundfx.js) atau tidak ada 1 pun efek MP3 terdaftar.
+  const hasMp3Effects = typeof SoundFX !== "undefined" && SoundFX.LIST.some((it) => it.src);
+  if (hasMp3Effects) {
+    const soundRow = document.createElement("label");
+    soundRow.className = "more-menu-checkbox-row";
+    soundRow.style.marginTop = "10px";
+    soundRow.innerHTML =
+      '<input type="checkbox" id="bibleSyncIncludeSoundsBox" /> ' +
+      '<span>🔊 Sertakan juga 14 efek suara "Efek Panggung" (MP3, ~1,1 MB) supaya siap dipakai offline dari awal</span>';
+    box.appendChild(soundRow);
+  }
+
   const btnRow = document.createElement("div");
   btnRow.className = "round-media-row";
   btnRow.style.marginTop = "12px";
@@ -657,7 +682,8 @@ async function showBibleSyncPrompt(opts) {
   nowBtn.textContent = isFirstTime ? `📥 Mulai Unduh (~${sizeMB} MB)` : `📥 Lanjutkan Sekarang (~${dlInfo.totalMb} MB)`;
   nowBtn.addEventListener("click", () => {
     overlay.hidden = true;
-    syncFromServer(!!isFirstTime);
+    const includeSoundsBox = el("bibleSyncIncludeSoundsBox");
+    syncFromServer(!!isFirstTime, !!(includeSoundsBox && includeSoundsBox.checked));
   });
   btnRow.appendChild(nowBtn);
 
@@ -902,7 +928,7 @@ async function getInitialDownloadInfo() {
   };
 }
 
-async function syncFromServer(isFirstTime) {
+async function syncFromServer(isFirstTime, includeSounds) {
   const overlay = el("loadingOverlay");
   overlay.hidden = false;
   const dlInfo = await getInitialDownloadInfo();
@@ -998,6 +1024,20 @@ async function syncFromServer(isFirstTime) {
     if (typeof resyncKidungSheet === "function" && dlInfo.hasAccess) {
       setLoadingText("Menyinkronkan data Kidung…");
       await resyncKidungSheet().catch(() => {});
+    }
+
+    // BARU (10 Sep 2026, permintaan operator) -- unduh & simpan offline
+    // 14 file MP3 "🎉 Efek Panggung" (js/soundfx.js) HANYA kalau operator
+    // mencentang opsi "🔊 Sertakan juga efek suara" di dialog tadi
+    // (showBibleSyncPrompt() -- includeSounds datang dari centang itu).
+    // TIDAK menggagalkan sinkron Alkitab yang sudah berhasil kalau ada
+    // file yang gagal diunduh (mis. koneksi putus di tengah) -- lihat
+    // .catch() di dalam SoundFX.predownloadAll() sendiri (js/soundfx.js).
+    if (includeSounds && typeof SoundFX !== "undefined") {
+      await SoundFX.predownloadAll((done, total) => {
+        setLoadingText(`🔊 Mengunduh efek suara… ${done} dari ${total}`);
+      }).catch(() => {});
+      if (typeof refreshSoundFxDownloadUi_ === "function") refreshSoundFxDownloadUi_();
     }
     setLoadingProgress(100);
 
@@ -1107,6 +1147,74 @@ function wireBibleLangFilterUi() {
       commitFilter_();
     });
   });
+}
+
+// ------------------------------------------------------------
+// BARU (10 Sep 2026, permintaan operator: "cara download suara lebih
+// mudah, UI/UX menarik") -- panel mandiri "🔊 Efek Suara Offline" di
+// menu ⋮ (#soundFxDownloadSection di index.html), terpisah dari dialog
+// besar "Unduh Data Alkitab" supaya bisa dipakai kapan saja (mis.
+// operator baru menambah efek MP3 baru ke assets/sounds/) tanpa perlu
+// sinkron ulang seluruh Alkitab. Admin-only (disembunyikan utk Tamu --
+// fitur Efek Panggung sendiri sudah disembunyikan dari Tamu di Studio).
+// Status "sudah/belum diunduh" DICEK LANGSUNG dari Cache API
+// (caches.match per src) -- BUKAN dari localStorage/tebakan -- supaya
+// selalu akurat, termasuk kalau operator menghapus cache browser secara
+// manual atau membuka di perangkat lain.
+// ------------------------------------------------------------
+async function countCachedSoundEffects_() {
+  if (typeof SoundFX === "undefined" || !("caches" in window)) return { done: 0, total: 0 };
+  // Sama seperti predownloadAll() -- hanya file LOKAL yang mungkin
+  // ke-cache, link luar (Google Drive dst) sengaja tidak dihitung.
+  const items = SoundFX.LIST.filter((it) => it.src && !/^https?:\/\//i.test(it.src));
+  let done = 0;
+  for (const it of items) {
+    try { if (await caches.match(it.src)) done++; } catch (e) { /* diamkan */ }
+  }
+  return { done, total: items.length };
+}
+
+async function refreshSoundFxDownloadUi_() {
+  const section = el("soundFxDownloadSection");
+  if (!section || typeof SoundFX === "undefined") return;
+  const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
+  const { done, total } = await countCachedSoundEffects_();
+  if (isGuestNow || total === 0) { section.hidden = true; return; }
+  section.hidden = false;
+  const card = el("soundFxDlCard");
+  const icon = el("soundFxDlIcon");
+  const statusText = el("soundFxDlStatusText");
+  const btn = el("soundFxDlBtn");
+  const ready = done >= total;
+  card.classList.toggle("is-ready", ready);
+  icon.textContent = ready ? "✅" : "🎧";
+  statusText.innerHTML = ready
+    ? `<strong>Semua ${total} efek suara siap dipakai offline.</strong>`
+    : `<strong>${done} dari ${total}</strong> efek suara sudah tersimpan offline.`;
+  btn.textContent = ready ? "🔄 Periksa / Unduh Ulang Semua" : `📥 Unduh ${total - done} Efek Suara`;
+}
+
+function wireSoundFxDownloadUi_() {
+  const btn = el("soundFxDlBtn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const track = el("soundFxDlProgressTrack");
+    const fill = el("soundFxDlProgressFill");
+    const statusText = el("soundFxDlStatusText");
+    btn.disabled = true;
+    btn.textContent = "📥 Mengunduh…";
+    track.hidden = false;
+    fill.style.width = "0%";
+    await SoundFX.predownloadAll((done, total) => {
+      const pct = total ? Math.round((done / total) * 100) : 100;
+      fill.style.width = pct + "%";
+      statusText.innerHTML = `📥 Mengunduh efek suara… <strong>${done} dari ${total}</strong>`;
+    }).catch(() => {});
+    track.hidden = true;
+    btn.disabled = false;
+    await refreshSoundFxDownloadUi_();
+  });
+  refreshSoundFxDownloadUi_();
 }
 
 async function updateStatusPanel() {
@@ -8438,6 +8546,7 @@ function initUIEvents() {
     });
   }
   if (typeof wireBibleLangFilterUi === "function") wireBibleLangFilterUi();
+  if (typeof wireSoundFxDownloadUi_ === "function") wireSoundFxDownloadUi_();
   initChangePasswordUI();
   el("logoutBtn").addEventListener("click", () => {
     const guestNow = typeof Guest !== "undefined" && Guest.isGuest();
