@@ -38,6 +38,18 @@ const Presentation = (() => {
   let winRef = null;
   let lastPayload = null; // { type: "verse"|"text"|"clear", ref, text }
   let pollTimer = null;
+  // BARU (10 Sep 2026, sesi ke-10, "Monitor 3 -- Monitor Pembicara") --
+  // jendela KE-3, TERPISAH TOTAL dari winRef (Layar 2, yang dilihat
+  // jemaat). Pola ready/antrean pesannya SENGAJA disalin identik dari
+  // winRef/winReady/msgQueue di bawah (lihat sendToWindow/flushQueue) --
+  // monitor.html mengabari "speaker_ready" begitu siap (persis
+  // "present_ready" milik Layar 2), supaya status pertama yang terkirim
+  // SEBELUM halaman itu selesai dimuat tidak hilang begitu saja.
+  let monitorWinRef = null;
+  let monitorReady = false;
+  let monitorMsgQueue = [];
+  let monitorPollTimer = null;
+  const MONITOR_WIN_NAME = "bibleAppMonitorWindow3";
   // Layar 2 (present.html) butuh waktu untuk memuat skripnya sendiri
   // setelah window.open() -- kirim pesan SEBELUM itu selesai membuat
   // pesan hilang begitu saja (contoh nyata: timer "Mulai"/"X" tidak
@@ -209,6 +221,78 @@ const Presentation = (() => {
   }
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (10 Sep 2026, sesi ke-10, "Monitor 3 -- Monitor Pembicara") --
+  // buka/tutup/kirim ke jendela ke-3 (monitor.html). Polanya SENGAJA
+  // dibuat SEPARALEL dengan openWindow()/closeWindow()/startPolling()
+  // di atas (Layar 2) -- supaya siapa pun yang membaca kode ini nanti
+  // langsung kenal polanya, tinggal baca 1x saja. Jendela ini TIDAK
+  // wajib terbuka -- kalau operator tidak pernah menekan tombolnya,
+  // monitorWinRef tetap null selamanya dan postMonitor() di bawah jadi
+  // no-op murah (1 pengecekan if, tidak ada overhead berarti).
+  // ------------------------------------------------------------
+  function openMonitorWindow() {
+    if (monitorWinRef && !monitorWinRef.closed) {
+      monitorWinRef.focus();
+      return;
+    }
+    monitorReady = false;
+    monitorMsgQueue = [];
+    monitorWinRef = window.open(
+      "monitor.html",
+      MONITOR_WIN_NAME,
+      "width=900,height=560,menubar=no,toolbar=no,location=no,status=no"
+    );
+    startMonitorPolling();
+  }
+  function closeMonitorWindow() {
+    stopMonitorPolling();
+    if (monitorWinRef && !monitorWinRef.closed) {
+      try { monitorWinRef.close(); } catch (e) {}
+    }
+    monitorWinRef = null;
+    monitorReady = false;
+    monitorMsgQueue = [];
+  }
+  function isMonitorWindowOpen() {
+    return !!(monitorWinRef && !monitorWinRef.closed);
+  }
+  function startMonitorPolling() {
+    stopMonitorPolling();
+    monitorPollTimer = setInterval(() => {
+      if (monitorWinRef && monitorWinRef.closed) {
+        monitorWinRef = null;
+        monitorReady = false;
+        monitorMsgQueue = [];
+      }
+    }, 1000);
+  }
+  function stopMonitorPolling() {
+    if (monitorPollTimer) { clearInterval(monitorPollTimer); monitorPollTimer = null; }
+  }
+  // Kirim status "Sekarang"/"Selanjutnya" ke Monitor 3 -- `next: null`
+  // (atau tidak diisi) berarti item aktif di Kumpulan Ayat SUDAH yang
+  // TERAKHIR, monitor.html sendiri yang menampilkan layar hitam
+  // "END OF SLIDE" untuk kasus itu (lihat monitor.html). TIDAK membuka
+  // jendela otomatis (beda dari postRaw() Layar 2 di atas) -- Monitor 3
+  // memang opsional, cuma dipakai kalau operatornya SENGAJA membukanya
+  // lewat tombol "🖥️③ Monitor Pembicara".
+  function postMonitorStatus(current, next) {
+    if (!monitorWinRef || monitorWinRef.closed) return;
+    const payload = { source: "bibleAppPresenter", type: "speaker_status", current: current || "", next: next || null };
+    if (monitorReady) {
+      try { monitorWinRef.postMessage(payload, location.origin); } catch (e) {}
+    } else {
+      monitorMsgQueue.push(payload);
+    }
+  }
+  function flushMonitorQueue() {
+    if (!monitorWinRef || monitorWinRef.closed) { monitorMsgQueue = []; return; }
+    while (monitorMsgQueue.length) {
+      try { monitorWinRef.postMessage(monitorMsgQueue.shift(), location.origin); } catch (e) { break; }
+    }
   }
 
   // ------------------------------------------------------------
@@ -743,6 +827,12 @@ const Presentation = (() => {
         flushQueue();
         if (lastPayload) post(lastPayload);
       }
+      // BARU (10 Sep 2026, sesi ke-10) -- lihat catatan panjang
+      // openMonitorWindow()/postMonitorStatus() di atas.
+      if (data.type === "speaker_ready") {
+        monitorReady = true;
+        flushMonitorQueue();
+      }
     });
   }
 
@@ -764,5 +854,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus };
 })();
