@@ -279,9 +279,16 @@ const Presentation = (() => {
   // jendela otomatis (beda dari postRaw() Layar 2 di atas) -- Monitor 3
   // memang opsional, cuma dipakai kalau operatornya SENGAJA membukanya
   // lewat tombol "🖥️③ Monitor Pembicara".
-  function postMonitorStatus(current, next) {
+  function postMonitorStatus(current, next, currentBody, nextBody) {
     if (!monitorWinRef || monitorWinRef.closed) return;
-    const payload = { source: "bibleAppPresenter", type: "speaker_status", current: current || "", next: next || null };
+    const payload = {
+      source: "bibleAppPresenter", type: "speaker_status",
+      current: current || "", next: next || null,
+      // BARU (10 Sep 2026, lanjutan) -- isi lengkap (bukan cuma
+      // ref/judul), lihat catatan panjang di pushMonitorStatus_()
+      // js/presentation-studio.js.
+      currentBody: currentBody || "", nextBody: nextBody || "",
+    };
     if (monitorReady) {
       try { monitorWinRef.postMessage(payload, location.origin); } catch (e) {}
     } else {
@@ -293,6 +300,43 @@ const Presentation = (() => {
     while (monitorMsgQueue.length) {
       try { monitorWinRef.postMessage(monitorMsgQueue.shift(), location.origin); } catch (e) { break; }
     }
+  }
+  // BARU (10 Sep 2026, lanjutan) -- pengiriman generik ke Monitor 3,
+  // dipakai untuk hal LAIN selain status teks Sekarang/Selanjutnya di
+  // atas (postMonitorStatus). Sekarang dipakai untuk mengirim CUPLIKAN
+  // VIDEO (YouTube/Video Lokal) yang sedang tayang di Layar 2, supaya
+  // pembicara juga bisa MELIHAT videonya di Monitor 3 -- SELALU tanpa
+  // suara (lihat monitor.html: elemen video/iframe di sana dipaksa
+  // `muted`, terlepas dari status mute/unmute Layar 2) -- suara yang
+  // sesungguhnya (untuk jemaat) TETAP hanya dari Layar 2/sound system
+  // venue, logiknya SAMA SEKALI TIDAK diubah oleh fitur ini. Pola
+  // antre/kirimnya SAMA persis dengan postMonitorStatus() di atas.
+  function postMonitorRaw(payload) {
+    if (!monitorWinRef || monitorWinRef.closed) return;
+    const full = Object.assign({ source: "bibleAppPresenter" }, payload);
+    if (monitorReady) {
+      try { monitorWinRef.postMessage(full, location.origin); } catch (e) {}
+    } else {
+      monitorMsgQueue.push(full);
+    }
+  }
+  // `data`: { kind: "none" } untuk menyembunyikan area video (konten
+  // yang sedang tayang bukan video -- ayat/kidung/teks/gambar/peta/dst),
+  // { kind: "youtube", embedUrl } untuk video YouTube, atau
+  // { kind: "localvideo", blob, name } untuk Video Lokal (berkas MP4
+  // dikirim APA ADANYA lewat postMessage -- didukung browser modern
+  // untuk jendela SATU ORIGIN seperti ini, tidak perlu diunggah kemana
+  // pun, tetap 100% offline untuk berkas lokal).
+  function postMonitorVideo(data) {
+    postMonitorRaw({ type: "speaker_video", kind: (data && data.kind) || "none", embedUrl: (data && data.embedUrl) || "", blob: (data && data.blob) || null, name: (data && data.name) || "" });
+  }
+  // Meneruskan kontrol PLAY/PAUSE/STOP Video Lokal supaya pratinjau di
+  // Monitor 3 tetap SINKRON posisinya dengan Layar 2 -- SENGAJA TIDAK
+  // dipakai untuk aksi "mute"/"unmute" (monitor selalu senyap, lihat
+  // catatan di atas), jadi js/presentation-studio.js hanya memanggil ini
+  // untuk action "play"/"pause"/"stop".
+  function postMonitorVideoControl(action) {
+    postMonitorRaw({ type: "speaker_video_control", action: action || "" });
   }
 
   // ------------------------------------------------------------
@@ -854,5 +898,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
 })();
