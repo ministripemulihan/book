@@ -1194,6 +1194,27 @@
     12% { opacity: 1; }
     100% { transform: translate(var(--ms-effect-drift, 0px), -110vh) scale(1.15) rotate(var(--ms-effect-spin, 12deg)); opacity: 0; }
   }
+  /* BARU (10 Sep 2026, permintaan operator "balon dari bawah") -- balon
+     naik LEBIH LAMBAT & lebih besar dari reaksi emoji biasa (.ms-effect-
+     emoji di atas, 3 detik) supaya terasa seperti balon sungguhan
+     melayang, bukan sekadar emoji lewat cepat -- durasi 6.5 detik,
+     ayunan kiri-kanan (wobble) lewat keyframe tengah tambahan (BEDA dari
+     msEffectRise yang cuma titik awal/akhir), ease-out di ujung supaya
+     melambat wajar mendekati puncak. Numpang #effectsLayer yang sama
+     (fire-and-forget, dibuang sendiri lewat animationend). */
+  .ms-effect-balloon {
+    position: absolute; bottom: -80px; font-size: 54px; line-height: 1;
+    animation: msBalloonRise 6.5s ease-out forwards;
+    text-shadow: 0 3px 12px rgba(0,0,0,.3);
+  }
+  @keyframes msBalloonRise {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+    8% { opacity: 1; }
+    30% { transform: translate(var(--ms-balloon-drift1, 40px), -35vh) rotate(var(--ms-balloon-spin1, 6deg)); }
+    60% { transform: translate(var(--ms-balloon-drift2, -40px), -70vh) rotate(var(--ms-balloon-spin2, -6deg)); }
+    92% { opacity: 1; }
+    100% { transform: translate(var(--ms-balloon-drift1, 40px), -115vh) rotate(0deg); opacity: 0; }
+  }
   /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama Tuhan") --
      teks BESAR di TENGAH layar (BEDA dari .ms-effect-emoji di atas yang
      kecil-kecil beterbangan) -- muncul membesar sedikit + berkilau
@@ -1222,21 +1243,36 @@
     to { text-shadow: 0 0 46px rgba(255, 210, 63, 1), 0 4px 18px rgba(0,0,0,.55); }
   }
 
-  /* ---- Lapisan "aktifkan kontrol suara" (lihat komentar HTML-nya) ---- */
+  /* DIPERBAIKI (10 Sep 2026, lanjutan, permintaan operator "mengganggu,
+     harus klik, mendingan langsung aktif") -- browser (kebijakan
+     autoplay Chrome dkk) TETAP MEWAJIBKAN 1 klik ASLI di jendela ini
+     sendiri sebelum boleh diputar/dibunyikan lewat perintah dari
+     jendela lain -- ini batasan KEAMANAN BROWSER, bukan pilihan desain
+     aplikasi, jadi TIDAK BISA dilewati sepenuhnya lewat kode. Yang bisa
+     diperbaiki: dulu lapisan ini menutup SELURUH layar dengan latar
+     gelap pekat + tombol besar (terasa seperti error/penghalang) --
+     sekarang jadi pita KECIL di pojok bawah, TIDAK menutupi tayangan di
+     belakangnya (termasuk layar hitam polos awal, lihat #idle di atas),
+     teksnya diperpendek & tidak lagi menyebut "Monitor 1" (istilah
+     teknis yang membingungkan operator). Klik di MANA PUN di halaman
+     ini (bukan cuma pita ini) tetap otomatis menghitung sebagai
+     "sudah aktif" (lihat listener document di skrip bawah, TIDAK
+     diubah) -- jadi begitu operator klik apa pun sekali (termasuk pita
+     ini sendiri), langsung hilang & tidak muncul lagi selama jendela
+     ini terbuka. */
   #activateOverlay {
-    position: fixed; inset: 0; z-index: 90;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(5, 7, 12, 0.86);
-    padding: 24px; box-sizing: border-box;
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    z-index: 90; max-width: min(92vw, 560px);
   }
   #activateOverlay.hidden-activated { display: none; }
   #activateBtn {
-    font-family: "Inter", Arial, sans-serif; font-weight: 700; font-size: clamp(14px, 2vw, 20px);
-    color: #1a1206; background: #d8b45c; border: none; border-radius: 12px;
-    padding: 18px 26px; cursor: pointer; max-width: 620px; line-height: 1.4;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    font-family: "Inter", Arial, sans-serif; font-weight: 700; font-size: clamp(12px, 1.6vw, 15px);
+    color: #1a1206; background: #d8b45c; border: none; border-radius: 999px;
+    padding: 10px 18px; cursor: pointer; line-height: 1.3;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.45);
+    opacity: .92;
   }
-  #activateBtn:hover { background: #e6c374; }
+  #activateBtn:hover { background: #e6c374; opacity: 1; }
 
   /* Label "Layar 2 — Mode Presentasi" DIHAPUS (bukan cuma dipudarkan) --
      operator minta tayangan Layar 2 bersih 100%, sama persis dengan apa
@@ -1353,7 +1389,15 @@
       <div id="stopwatchLapBadge"></div>
       <div id="stopwatchStatusBadge"></div>
     </div>
-    <div id="idle">Menunggu tayangan dari layar utama…</div>
+    <!-- DIPERBAIKI (10 Sep 2026, lanjutan, permintaan operator "tulisan
+         awal tidak usah ada, hitam semua saja") -- dulu ada tulisan
+         "Menunggu tayangan dari layar utama…" di sini, sekarang
+         dikosongkan supaya layar benar-benar POLOS HITAM (sesuai tema
+         gelap bawaan) sebelum operator menayangkan apa pun -- elemen
+         #idle-nya SENGAJA tetap ada (bukan dihapus) supaya
+         idleEl.hidden = false/true di skrip bawah tidak perlu diubah
+         sama sekali, cuma isinya yang dikosongkan. -->
+    <div id="idle"></div>
   </div>
 
   <div id="footBar" class="ticker-bar" hidden><span class="ticker-inner" id="footText"></span></div>
@@ -1377,15 +1421,16 @@
     <canvas id="effectsConfettiCanvas"></canvas>
   </div>
 
-  <!-- Lapisan "aktifkan kontrol suara" -- browser (Chrome dkk) TIDAK
-       mengizinkan jendela ini diputar/dibunyikan lewat perintah dari
-       jendela lain (Studio di Monitor 1) SEBELUM jendela ini sendiri
-       pernah menerima 1 klik asli dari operator. Klik SEKALI di sini
-       saat pertama buka Layar 2 -- setelah itu tombol Play/Pause/Mute
-       dari Studio akan langsung bekerja tanpa perlu klik apa pun lagi
-       di layar ini. -->
+  <!-- DIPERBAIKI (10 Sep 2026, lanjutan) -- pita kecil di pojok bawah
+       (bukan lagi menutup seluruh layar), teks diperpendek & tidak lagi
+       menyebut "Monitor 1". Klik di MANA PUN di halaman ini tetap
+       otomatis menghilangkannya (lihat listener document di skrip
+       bawah) -- operator tidak wajib membidik pita ini secara presisi,
+       cukup 1 klik apa saja di layar ini saat pertama dibuka. Lihat
+       catatan panjang alasan teknisnya (kebijakan autoplay browser) di
+       CSS #activateOverlay di atas. -->
   <div id="activateOverlay">
-    <button type="button" id="activateBtn">🔊 Klik sekali untuk aktifkan kontrol Play/Pause/Suara dari Monitor 1</button>
+    <button type="button" id="activateBtn">🔊 Ketuk sekali di sini untuk aktifkan suara</button>
   </div>
 
   <!-- BARU (4 Sep 2026) -- SDK resmi SoundCloud untuk kontrol Play/Pause
@@ -1559,6 +1604,38 @@
   let timerState = null; // { totalSeconds, endAt, label, bell }
   let timerInterval = null;
   let audioCtx = null;
+  // BARU (10 Sep 2026, sesi ke-12, permintaan operator "tetap ada
+  // shortcut M untuk mute SEMUA suara") -- SEMUA efek suara yang
+  // disintesis di file ini (beep() bawaan, & playNote_()/
+  // playNoiseBurst_()/playSweep_()/playFilteredNoise_() punya
+  // playEffectSound_() untuk 🎉 Efek Panggung) SEKARANG disalurkan
+  // lewat 1 GainNode bersama (getEffectsMasterGain_()) alih-alih
+  // langsung ke audioCtx.destination masing-masing -- supaya SEMUANYA
+  // bisa dibisukan SEKALIGUS lewat 1 sakelar (effectsMuted_), tanpa
+  // perlu mengubah kode tiap efek satu-satu. TIDAK menyentuh suara
+  // YouTube (`ytEl`, tetap diatur terpisah lewat mute/unMute bawaan
+  // YouTube -- sudah benar/lebih akurat lewat API resminya sendiri)
+  // maupun bel Timer/Bel Cepat (`bellAudioEl`, sudah punya
+  // stopBellSound() sendiri) -- tombol/pintasan "M" di Studio
+  // (js/presentation-studio.js) mengirim KETIGANYA sekaligus (mute
+  // YouTube + stop bel + ini) supaya dari sudut pandang operator tetap
+  // terasa sebagai "1 tombol, semua suara diam", walau di baliknya 3
+  // jalur berbeda.
+  let effectsMuted_ = false;
+  let effectsMasterGain_ = null;
+  function getEffectsMasterGain_() {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (!effectsMasterGain_) {
+      effectsMasterGain_ = audioCtx.createGain();
+      effectsMasterGain_.gain.value = effectsMuted_ ? 0 : 1;
+      effectsMasterGain_.connect(audioCtx.destination);
+    }
+    return effectsMasterGain_;
+  }
+  function setEffectsMuted_(muted) {
+    effectsMuted_ = !!muted;
+    if (effectsMasterGain_) effectsMasterGain_.gain.value = effectsMuted_ ? 0 : 1;
+  }
 
   function fmtMMSS(totalSec) {
     const s = Math.max(0, Math.round(totalSec));
@@ -1576,7 +1653,7 @@
       g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.35, audioCtx.currentTime + 0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.9);
-      o.connect(g); g.connect(audioCtx.destination);
+      o.connect(g); g.connect(getEffectsMasterGain_());
       o.start(); o.stop(audioCtx.currentTime + 0.9);
     } catch (e) {}
   }
@@ -1762,8 +1839,51 @@
     });
     layer.appendChild(span);
   }
+  // BARU (10 Sep 2026, permintaan operator "balon dari bawah") -- balon
+  // naik dari bawah layar, lebih sedikit & lebih besar dari reaksi emoji
+  // biasa (14 vs 16 di sini boleh mirip, tapi durasinya 6.5 detik jadi
+  // kelihatan lebih tenang/mengambang) supaya terasa seperti balon
+  // sungguhan, bukan "hujan emoji". Campuran beberapa warna balon (emoji
+  // Unicode sudah berwarna sendiri, jadi dicampur beberapa varian) biar
+  // tidak monoton.
+  const BALLOON_EMOJIS_ = ["🎈", "🎈", "🎈", "🎈"]; // 🎈 saja (warna bawaan emoji sudah campuran merah di banyak font) -- disiapkan sbg array supaya gampang tambah varian nanti
+  function playBalloonEffect_() {
+    const layer = document.getElementById("effectsLayer");
+    if (!layer) return;
+    const count = 16;
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement("span");
+      span.className = "ms-effect-balloon";
+      span.textContent = BALLOON_EMOJIS_[i % BALLOON_EMOJIS_.length];
+      const startX = 4 + Math.random() * 90; // vw
+      span.style.left = startX + "vw";
+      span.style.setProperty("--ms-balloon-drift1", (Math.random() * 100 - 50) + "px");
+      span.style.setProperty("--ms-balloon-drift2", (Math.random() * 100 - 50) + "px");
+      span.style.setProperty("--ms-balloon-spin1", (Math.random() * 16 - 8) + "deg");
+      span.style.setProperty("--ms-balloon-spin2", (Math.random() * 16 - 8) + "deg");
+      span.style.animationDelay = (Math.random() * 1.4) + "s";
+      span.style.fontSize = (40 + Math.random() * 26) + "px";
+      span.addEventListener("animationend", () => span.remove());
+      layer.appendChild(span);
+    }
+  }
+  // BARU (10 Sep 2026, permintaan operator "efek visual bahagia") --
+  // gabungan confetti + beberapa reaksi emoji ceria sekaligus supaya
+  // terasa lebih "ramai"/meriah dibanding 1 efek tunggal -- TIDAK bikin
+  // animasi baru, cuma memanggil ULANG fungsi yang sudah ada
+  // (playConfetti_/playEmojiReaction_) dengan jeda kecil antar emoji
+  // supaya tidak numpuk persis di frame yang sama.
+  const HAPPY_EMOJIS_ = ["🎉", "😄", "🥳", "✨"];
+  function playHappyBurst_() {
+    playConfetti_();
+    HAPPY_EMOJIS_.forEach((emoji, i) => {
+      setTimeout(() => playEmojiReaction_(emoji), i * 220);
+    });
+  }
   function playEffectVisual_(data) {
     if (data.effect === "emoji") playEmojiReaction_(data.emoji);
+    else if (data.effect === "balon") playBalloonEffect_();
+    else if (data.effect === "happy") playHappyBurst_();
     else playConfetti_(); // default/"confetti"
   }
 
@@ -1780,7 +1900,7 @@
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(peakGain || 0.3, t0 + 0.02);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(audioCtx.destination);
+      o.connect(g); g.connect(getEffectsMasterGain_());
       o.start(t0); o.stop(t0 + dur + 0.05);
     } catch (e) {}
   }
@@ -1806,7 +1926,59 @@
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(peakGain || 0.28, t0 + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+      src.connect(bp); bp.connect(g); g.connect(getEffectsMasterGain_());
+      src.start(t0); src.stop(t0 + dur + 0.05);
+    } catch (e) {}
+  }
+  // BARU (10 Sep 2026, sesi ke-11, permintaan operator "tambah suara
+  // efek: bersorak, tawa, ciuman, boing, detak jantung, wow, berteriak,
+  // ajaib, kemenangan, gagal, canggung, peluit, drum, guntur, hujan") --
+  // 2 "bahan dasar" TAMBAHAN, semangatnya SAMA seperti playNote_()/
+  // playNoiseBurst_() di atas (disintesis langsung lewat Web Audio API,
+  // BUKAN file audio, supaya tetap ringan & 100% offline):
+  //  - playSweep_(): 1 nada yang MELUNCUR dari 1 frekuensi ke frekuensi
+  //    lain (dipakai utk boing/wow/berteriak/gagal/canggung -- efek yang
+  //    intinya "naik" atau "turun" nadanya, bukan nada tetap).
+  //  - playFilteredNoise_(): sama seperti playNoiseBurst_() tapi jenis &
+  //    frekuensi filter-nya BISA DIATUR per panggilan (bukan selalu
+  //    bandpass 1200Hz) -- dipakai utk guntur (lowpass, rendah & panjang)
+  //    & hujan (highpass, mendesis pelan & panjang), beda karakter dari
+  //    noise pendek drumroll/applause yang sudah ada.
+  function playSweep_(fromFreq, toFreq, when, dur, type, peakGain) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type || "sine";
+      const t0 = audioCtx.currentTime + when;
+      o.frequency.setValueAtTime(fromFreq, t0);
+      o.frequency.linearRampToValueAtTime(toFreq, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peakGain || 0.3, t0 + Math.min(0.05, dur / 4));
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(getEffectsMasterGain_());
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    } catch (e) {}
+  }
+  function playFilteredNoise_(when, dur, peakGain, filterType, freq, Q) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (!noiseBuffer_) {
+        const len = audioCtx.sampleRate * 1;
+        noiseBuffer_ = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+        const d = noiseBuffer_.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer_; src.loop = dur > 1;
+      const filt = audioCtx.createBiquadFilter();
+      filt.type = filterType || "lowpass"; filt.frequency.value = freq || 400; filt.Q.value = Q || 0.7;
+      const g = audioCtx.createGain();
+      const t0 = audioCtx.currentTime + when;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peakGain || 0.2, t0 + Math.min(0.15, dur / 4));
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(filt); filt.connect(g); g.connect(getEffectsMasterGain_());
       src.start(t0); src.stop(t0 + dur + 0.05);
     } catch (e) {}
   }
@@ -1832,6 +2004,77 @@
       // menyerupai tepuk tangan banyak orang, bukan mesin.
       let t = 0;
       for (let i = 0; i < 30; i++) { t += 0.03 + Math.random() * 0.08; playNoiseBurst_(t, 0.06 + Math.random() * 0.05, 0.14 + Math.random() * 0.1); }
+    } else if (soundKey === "cheer") {
+      // Bersorak -- gabungan nada naik cepat (kesan "hore!") + noise
+      // yang membesar (kerumunan bersorak), BEDA dari fanfare (yang
+      // temponya lebih pelan/megah).
+      [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((f, i) => playNote_(f, i * 0.06, 0.3, "square", 0.2));
+      playFilteredNoise_(0.05, 0.9, 0.22, "bandpass", 2000, 0.6);
+    } else if (soundKey === "laugh") {
+      // Tawa -- beberapa nada pendek memantul-mantul (kesan "ha-ha-ha"),
+      // nada naik-turun bergantian, staccato.
+      [523.25, 659.25, 523.25, 659.25, 523.25].forEach((f, i) => playNote_(f, i * 0.16, 0.13, "triangle", 0.26));
+    } else if (soundKey === "kiss") {
+      // Ciuman -- "smooch": nada meluncur cepat turun lalu 1 letupan
+      // noise kecil (kesan kecupan).
+      playSweep_(900, 250, 0, 0.12, "sine", 0.28);
+      playNoiseBurst_(0.11, 0.05, 0.2);
+    } else if (soundKey === "boing") {
+      // Boing -- pegas kartun klasik: nada meluncur naik lalu turun
+      // cepat dengan gelombang sine.
+      playSweep_(180, 700, 0, 0.12, "sine", 0.3);
+      playSweep_(700, 220, 0.12, 0.22, "sine", 0.26);
+    } else if (soundKey === "heartbeat") {
+      // Detak Jantung -- "lub-dub" 2x berturut, nada rendah pendek.
+      [0, 0.32].forEach((base) => {
+        playNote_(90, base, 0.12, "sine", 0.32);
+        playNote_(70, base + 0.16, 0.14, "sine", 0.24);
+      });
+    } else if (soundKey === "wow") {
+      // Wow -- 1 nada meluncur naik (kesan takjub/terkesima).
+      playSweep_(400, 1100, 0, 0.35, "sine", 0.3);
+    } else if (soundKey === "scream") {
+      // Berteriak -- nada meluncur naik TINGGI & tajam (mirip sirene
+      // pendek) + noise tajam menyertai.
+      playSweep_(500, 1800, 0, 0.35, "sawtooth", 0.22);
+      playFilteredNoise_(0, 0.35, 0.16, "highpass", 2500, 0.8);
+    } else if (soundKey === "magic") {
+      // Ajaib -- arpeggio nada tinggi berkilau (kesan "sim salabim").
+      [1046.5, 1318.5, 1568.0, 2093.0, 2637.0].forEach((f, i) => playNote_(f, i * 0.07, 0.4, "sine", 0.18));
+    } else if (soundKey === "victory") {
+      // Kemenangan -- larik nada naik cepat diakhiri akor besar (lebih
+      // megah/panjang dari "tada", beda karakter dari fanfare yang
+      // temponya lebih lebar).
+      [392.0, 493.88, 587.33, 783.99, 987.77].forEach((f, i) => playNote_(f, i * 0.09, 0.3, "square", 0.22));
+      [783.99, 987.77, 1174.66].forEach((f) => playNote_(f, 0.5, 0.8, "square", 0.22));
+    } else if (soundKey === "fail") {
+      // Gagal -- "sad trombone": 3 nada meluncur turun berturut (wah...
+      // wah... waaah...).
+      [0, 0.42, 0.84].forEach((t, i) => playSweep_(392 - i * 40, 300 - i * 40, t, 0.4, "sawtooth", 0.24));
+    } else if (soundKey === "awkward") {
+      // Canggung -- 1 nada meluncur turun PELAN & janggal (kesan hening
+      // canggung setelah sesuatu tidak berjalan mulus).
+      playSweep_(300, 120, 0, 0.9, "triangle", 0.16);
+    } else if (soundKey === "whistle") {
+      // Peluit -- nada tinggi bersih ditahan, mirip peluit wasit, dengan
+      // sedikit getar (vibrato sederhana lewat 2 nada berdekatan).
+      playNote_(2600, 0, 0.5, "sine", 0.22);
+      playNote_(2680, 0.05, 0.4, "sine", 0.14);
+    } else if (soundKey === "drum") {
+      // Drum -- 1 pukulan tom/bass drum rendah (BEDA dari "drumroll" yang
+      // berupa rentetan panjang) -- nada rendah pendek + sedikit noise.
+      playNote_(100, 0, 0.28, "sine", 0.34);
+      playNoiseBurst_(0, 0.08, 0.18);
+    } else if (soundKey === "thunder") {
+      // Guntur -- gemuruh rendah panjang (lowpass, frekuensi rendah)
+      // diikuti 1-2 "gelegar" noise lebih tajam di tengahnya.
+      playFilteredNoise_(0, 2.2, 0.28, "lowpass", 220, 0.9);
+      playFilteredNoise_(0.4, 0.35, 0.3, "bandpass", 500, 1.2);
+      playNote_(55, 0.4, 1.2, "sawtooth", 0.18);
+    } else if (soundKey === "rain") {
+      // Hujan -- desisan lembut & cukup panjang (highpass, gain kecil),
+      // kesan gerimis/hujan turun, bukan efek "tembak sekali lalu habis".
+      playFilteredNoise_(0, 3, 0.1, "highpass", 3500, 0.5);
     } else {
       beep();
     }
@@ -3655,6 +3898,11 @@
     // BARU (9 Sep 2026, sesi ke-9) -- lihat playShout_() & wireEffectsTab()
     // (js/presentation-studio.js).
     if (data.type === "shout") { playShout_(data.text); return; }
+    // BARU (10 Sep 2026, sesi ke-12) -- lihat catatan panjang
+    // setEffectsMuted_()/getEffectsMasterGain_() dekat beep() di atas --
+    // dikirim bareng tombol/pintasan "M" Mute di Studio
+    // (js/presentation-studio.js).
+    if (data.type === "effects_mute") { setEffectsMuted_(data.muted); return; }
     // BARU (9 Sep 2026) -- "Mode Layar" umum (Welcome/Next Up), lihat
     // catatan panjang showModeScreen() di atas.
     if (data.type === "modescreen") {
@@ -3775,6 +4023,22 @@
       // dari slider progress LIVE digeser, maupun dari kolom waktu yang
       // diketik manual lalu ▶️ Play ditekan). `true` (allowSeekAhead) supaya
       // tetap bisa lompat ke bagian yang belum sempat di-buffer.
+      // BARU (10 Sep 2026, sesi ke-11, permintaan operator "cara enable/
+      // disable tulisan (CC) YouTube") -- "cc": nyala/matikan modul
+      // Closed Caption BAWAAN YouTube pada video yang SEDANG tayang,
+      // lewat perintah resmi "loadModule"/"unloadModule" (bagian dari
+      // YouTube IFrame Player API, dikirim manual lewat postMessage
+      // yang sama seperti perintah lain di sini -- TIDAK butuh skrip
+      // tambahan). `data.arg` true = nyalakan, false/kosong = matikan.
+      // Video BERIKUTNYA yang baru dimuat mengikuti lewat parameter
+      // "cc_load_policy" di buildYoutubeEmbedUrl() (js/presentation-
+      // studio.js) -- perintah "cc" di sini HANYA untuk video yang
+      // SUDAH terlanjur tayang saat operator menekan tombolnya.
+      if (data.action === "cc") {
+        const ccFunc = data.arg ? "loadModule" : "unloadModule";
+        ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: ccFunc, args: ["captions"] }), "*");
+        return;
+      }
       const cmd = { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo" }[data.action];
       const args = data.action === "seek" ? [Number(data.arg) || 0, true] : [];
       if (cmd) ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args }), "*");
