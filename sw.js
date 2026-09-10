@@ -32,14 +32,17 @@
 //  kemampuan apa pun (data live tetap perlu server live).
 // ============================================================
 
-// DINAIKKAN (10 Sep 2026, lanjutan) -- present.html/monitor.html berubah
-// (overlay aktivasi suara, layar awal polos hitam, isi lengkap +
-// A+/A- di Monitor Pembicara) -- versi cache dinaikkan supaya
-// perangkat yang sudah pernah membuka versi LAMA offline-first tidak
-// terus menampilkan berkas lama yang ter-cache, dipaksa ambil versi
-// baru begitu online sebentar lagi (lihat blok "activate" di bawah
-// yang otomatis menghapus cache versi lama).
-const CACHE_NAME = "book-vp-shell-v2";
+// DINAIKKAN LAGI (10 Sep 2026, panel "Coba Efek Suara & Visual" --
+// kotak pratinjau diperbesar + input "contoh tulisan" ditambah di
+// index.html/css/style.css/js/effectpreview.js). Wajib dinaikkan tiap
+// ada perubahan css/js supaya perangkat yang sudah pernah buka versi
+// LAMA offline-first (css/js dicache dengan strategi "cache dulu,
+// perbarui diam-diam di latar belakang" -- lihat fetch handler di
+// bawah) tidak "nyangkut" 1 kali muat lagi menampilkan berkas lama --
+// menaikkan angka ini membuat SEMUA cache versi lama otomatis dihapus
+// (lihat blok "activate" di bawah) sehingga versi baru wajib diambil
+// dari server begitu online, bukan menunggu revalidasi latar belakang.
+const CACHE_NAME = "book-vp-shell-v3";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
