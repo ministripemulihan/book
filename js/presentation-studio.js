@@ -6007,6 +6007,15 @@ const PresentationStudio = (() => {
   // dipisah type-nya (bukan disatukan ke "effect") supaya nanti kalau
   // mau efek suara TANPA visual atau sebaliknya tetap gampang.
   function wireEffectsTab() {
+    // BARU (10 Sep 2026, sesi ke-13) -- bangun tombol "🔊 Efek Suara"
+    // otomatis dari SoundFX.LIST (js/soundfx.js, SATU SUMBER KEBENARAN
+    // yang dipakai bersama dengan present.html & effectpreview.js).
+    // Tombol hasil render tetap punya atribut data-sound="..." seperti
+    // sebelumnya, jadi listener [data-sound] di bawah TIDAK PERLU
+    // diubah sama sekali -- otomatis "kepasang" ke tombol baru ini.
+    if (typeof SoundFX !== "undefined" && el("psSoundEffectsGrid")) {
+      SoundFX.renderButtons(el("psSoundEffectsGrid"), { className: "chip-btn small", dataAttr: "sound" });
+    }
     document.querySelectorAll("[data-effect]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "effect", effect: btn.dataset.effect }));
     });
