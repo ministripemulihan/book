@@ -299,6 +299,23 @@ const PresentationStudio = (() => {
       box.innerHTML = `<div class="present-preview-idle">🎬 Video Lokal${payload.name ? ": " + escapeHtml(payload.name) : ""} — tayang di Layar 2</div>`;
       return;
     }
+    // BARU (9 Sep 2026) -- pratinjau ringkas untuk "🖥️ Mode & Peta"
+    // (Welcome/Next Up & Peta Interaktif) di kotak "Tayang" Studio.
+    if (payload.type === "modescreen") {
+      const kindMeta = (window.MODE_SCREEN_KIND_META && window.MODE_SCREEN_KIND_META[payload.kind]) || { icon: "👋", label: "Welcome" };
+      box.innerHTML = `<div class="present-preview-idle">${kindMeta.icon} ${kindMeta.label}${payload.title ? ": " + escapeHtml(payload.title) : ""} — tayang di Layar 2</div>`;
+      return;
+    }
+    if (payload.type === "map") {
+      box.innerHTML = `<div class="present-preview-idle">🗺️ Peta${payload.pin ? " — fokus: " + escapeHtml(payload.pin.label || "") : ""} — tayang di Layar 2</div>`;
+      return;
+    }
+    // BARU (9 Sep 2026) -- pratinjau ringkas untuk "🎡 Roda Undian" di
+    // kotak "Tayang" Studio (lihat wireWheelTab() untuk pemanggilnya).
+    if (payload.type === "wheel") {
+      box.innerHTML = `<div class="present-preview-idle">🎡 Roda Undian — tayang di Layar 2</div>`;
+      return;
+    }
     if (payload.type === "verse" || payload.type === "text") {
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
@@ -819,6 +836,24 @@ const PresentationStudio = (() => {
   function setActivePlaylist(items, index, label) {
     activePlaylist = { items: items || [], index: index || 0, label: label || "" };
     highlightActivePlaylistRow();
+    pushMonitorStatus_();
+  }
+  // BARU (10 Sep 2026, sesi ke-10, "Monitor 3 -- Monitor Pembicara") --
+  // diambil jadi 1 fungsi terpisah supaya bisa dipanggil dari SEMUA
+  // jalur perpindahan item aktif: setActivePlaylist() (klik baris
+  // pertama kali/AI Presentation) MAUPUN playlistGoTo() (panah/clicker,
+  // yang mengubah activePlaylist.index LANGSUNG tanpa lewat
+  // setActivePlaylist() lagi -- lihat playlistGoTo() di bawah). `next`
+  // sengaja null kalau item aktif adalah yang TERAKHIR di daftar -- itu
+  // yang membuat monitor.html menampilkan layar hitam "END OF SLIDE".
+  function pushMonitorStatus_() {
+    if (typeof Presentation === "undefined" || !Presentation.postMonitorStatus || !activePlaylist) return;
+    const cur = activePlaylist.items[activePlaylist.index];
+    const nxt = activePlaylist.items[activePlaylist.index + 1];
+    let curLabel = "", nxtLabel = null;
+    try { curLabel = cur ? genericItemRefText(cur) : ""; } catch (e) {}
+    try { nxtLabel = nxt ? genericItemRefText(nxt) : null; } catch (e) {}
+    Presentation.postMonitorStatus(curLabel, nxtLabel);
   }
 
   function highlightActivePlaylistRow() {
@@ -895,6 +930,28 @@ const PresentationStudio = (() => {
       // Tersimpan sama sekali).
       rawPost({ type: "youtube", embedUrl: it.embedUrl });
       renderStudioPreview({ type: "youtube", embedUrl: it.embedUrl });
+    } else if (it.type === "modescreen") {
+      // BARU (9 Sep 2026) -- item "🖥️ Mode Layar" (Welcome/Next Up)
+      // yang diselipkan ke Kumpulan Ayat, mis. sebelum sesi ke-2,
+      // operator taruh "Next Up" di antara ayat-ayat. Payload item
+      // SUDAH persis bentuk yang dipahami showModeScreen() di
+      // present.html -- lihat addModeScreenToCollection() (js/collections.js).
+      rawPost({ type: "modescreen", kind: it.kind, title: it.title, subtitle: it.subtitle, bullets: it.bullets, nextLabel: it.nextLabel || "", endAt: it.endAt || null });
+      renderStudioPreview({ type: "modescreen", kind: it.kind, title: it.title });
+    } else if (it.type === "map") {
+      // BARU (9 Sep 2026) -- item "🗺️ Peta" yang diselipkan ke
+      // Kumpulan Ayat -- menyimpan REFERENSI ke peta (mapId), gambar &
+      // pin-nya diambil dari Map Library (localStorage, lihat
+      // wireMapTab()) saat ditayangkan, pola sama seperti item "media"
+      // di atas (referensi, bukan salinan).
+      const map = (typeof getStoredMapById === "function") ? getStoredMapById(it.mapId) : null;
+      if (map && map.imageDataUrl) {
+        const pins = (typeof visibleMapPins_ === "function") ? visibleMapPins_(map) : (map.pins || []);
+        const categoryCounts = {};
+        pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
+        rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        renderStudioPreview({ type: "map" });
+      }
     }
   }
 
@@ -971,6 +1028,7 @@ const PresentationStudio = (() => {
     activePlaylist.index = idx;
     sendGenericItemLive(items[idx]);
     highlightActivePlaylistRow();
+    pushMonitorStatus_(); // BARU (10 Sep 2026, sesi ke-10) -- lihat catatan di pushMonitorStatus_()
   }
   function playlistNext() { if (activePlaylist) playlistGoTo(activePlaylist.index + 1); }
   function playlistPrev() { if (activePlaylist) playlistGoTo(activePlaylist.index - 1); }
@@ -5247,6 +5305,23 @@ const PresentationStudio = (() => {
     { id: "m4", label: "🎥 Kamera Full + Teks", camLayout: "full", videoTextOverlay: false },
     { id: "m5", label: "🔵 Kamera Bulat + Teks", camLayout: "bubble", videoTextOverlay: false },
     { id: "m6", label: "📄 File/PDF + Teks", camLayout: "full", videoTextOverlay: true },
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "semua tipe
+    // kamera/slide dimasukkan ke Menu Cepat, lanjut nomor berikutnya") --
+    // 5 kombinasi BARU yang belum terwakili di m1-m6 di atas (kiri-kanan,
+    // balik atas-bawah, subtitle atas, kamera-penuh+teks-bulat). Preset
+    // m5 (bubble) & m10/m11 (textbubble) SENGAJA pakai posisi bawaan
+    // "br" (kanan-bawah) -- kalau mau posisi/ukuran lain, tinggal atur
+    // manual lewat "Posisi lingkaran"/slider ukuran setelah preset ini
+    // ditekan (Mode Cepat cuma titik awal cepat, bukan pengganti kontrol
+    // detailnya). CATATAN PENOMORAN: badge angka/keyboard shortcut cuma
+    // sampai tombol ke-9 (lihat NUM_BADGES_ & wireModeAndBellKeyboardShortcuts()
+    // di bawah) -- m10 & m11 di sini TETAP bisa diklik seperti biasa,
+    // hanya TIDAK dapat badge angka/shortcut keyboard (tombol ke-10/11).
+    { id: "m7", label: "◧ Kamera Kiri, Teks Kanan", camLayout: "split-lr", videoTextOverlay: false, camSplitReverse: false },
+    { id: "m8", label: "◨ Kamera Kanan, Teks Kiri", camLayout: "split-lr", videoTextOverlay: false, camSplitReverse: true },
+    { id: "m9", label: "📐 Teks Atas, Kamera Bawah", camLayout: "split", videoTextOverlay: false, camSplitReverseTB: true },
+    { id: "m10", label: "🎬 Kamera Full + Subtitle Atas", camLayout: "subtitle", videoTextOverlay: true, camSubtitleTop: true },
+    { id: "m11", label: "⭕ Kamera Full, Teks Bulat", camLayout: "textbubble", videoTextOverlay: false },
   ];
   function loadModePresets_() {
     try {
@@ -5259,7 +5334,22 @@ const PresentationStudio = (() => {
     try { localStorage.setItem(MODE_PRESETS_KEY, JSON.stringify(list)); } catch (e) {}
   }
   function applyModePreset_(preset) {
-    saveAndSendTheme({ camLayout: preset.camLayout, videoTextOverlay: !!preset.videoTextOverlay });
+    // PERBAIKAN (9 Sep 2026, sesi ke-9) -- SEBELUMNYA cuma mengirim
+    // camLayout+videoTextOverlay, jadi kalau operator pindah dari preset
+    // "Kamera Kanan, Teks Kiri" (camSplitReverse:true) ke preset lain
+    // yang camLayout-nya sama tapi tidak menyebut camSplitReverse, nilai
+    // TRUE lama itu "nyangkut" (tidak pernah direset ke false). Sekarang
+    // SEMUA field orientasi/posisi disertakan eksplisit dengan fallback
+    // aman (false/"br") supaya tiap preset benar-benar bersih, tidak
+    // mewarisi sisa preset sebelumnya.
+    saveAndSendTheme({
+      camLayout: preset.camLayout,
+      videoTextOverlay: !!preset.videoTextOverlay,
+      camSplitReverse: !!preset.camSplitReverse,
+      camSplitReverseTB: !!preset.camSplitReverseTB,
+      camSubtitleTop: !!preset.camSubtitleTop,
+      bubblePos: preset.bubblePos || "br",
+    });
     // Sinkronkan ulang SEMUA kontrol terkait (tombol Tata Letak aktif,
     // slider, centang overlay) supaya panel Studio tidak "ketinggalan"
     // menampilkan gaya lama -- applyStoredTheme() membaca ulang
@@ -5275,7 +5365,17 @@ const PresentationStudio = (() => {
     let theme = {};
     try { theme = JSON.parse(localStorage.getItem(THEME_KEY) || "{}") || {}; } catch (e) {}
     row.innerHTML = list.map((p, i) => {
-      const active = (theme.camLayout || "full") === p.camLayout && !!theme.videoTextOverlay === !!p.videoTextOverlay;
+      // PERBAIKAN (9 Sep 2026, sesi ke-9) -- SEBELUMNYA cuma cocokkan
+      // camLayout+videoTextOverlay, jadi preset "Kamera Kiri, Teks Kanan"
+      // & "Kamera Kanan, Teks Kiri" (camLayout SAMA-SAMA "split-lr",
+      // beda cuma camSplitReverse) akan menyala BERSAMAAN -- sekarang
+      // ikut cocokkan semua field orientasi/posisi juga.
+      const active = (theme.camLayout || "full") === p.camLayout
+        && !!theme.videoTextOverlay === !!p.videoTextOverlay
+        && !!theme.camSplitReverse === !!p.camSplitReverse
+        && !!theme.camSplitReverseTB === !!p.camSplitReverseTB
+        && !!theme.camSubtitleTop === !!p.camSubtitleTop
+        && (theme.bubblePos || "br") === (p.bubblePos || "br");
       // BARU (8 Sep 2026 v5, permintaan operator "info tombol 1-9 apa,
       // mudah dimengerti") -- badge nomor (①②③...) ditempel LANGSUNG di
       // tombolnya (bukan cuma lewat `title`/hover, yang tidak kelihatan
@@ -5366,20 +5466,173 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
-  // BARU (8 Sep 2026, permintaan operator "pakai shortcut") -- pintasan
-  // KEYBOARD utk Mode Cepat (angka 1-9, sesuai URUTAN tombol "⚡ Mode
-  // Cepat") & Bel Cepat (Alt+1 s/d Alt+9, sesuai urutan tombol "🔔 Bel
-  // Cepat"). Pola guard SAMA seperti wirePlaylistKeyNav() di atas: HANYA
-  // aktif selagi Studio Presentasi terbuka, dan TIDAK aktif sedang
-  // fokus di kotak isian (select/input/textarea) supaya tidak
-  // mengganggu pengetikan biasa (mis. mengetik nomor kidung/menit Timer).
+  // BARU (9 Sep 2026, sesi ke-9, Fitur A "Menu Cepat ⚡") -- panel
+  // mengambang berisi aksi 1-klik yang PALING sering dipakai, dikumpulkan
+  // dari beberapa tab (Mode Cepat, Efek Panggung, Bel Cepat, Mode Layar,
+  // Peta) supaya bisa dipicu tanpa pindah tab dulu. SEMUA tombol di sini
+  // SENGAJA cuma memanggil ULANG fungsi/payload yang SUDAH ADA (applyModePreset_,
+  // rawPost effect/shout/bell, showModeScreen "istirahat", klik tab "mode")
+  // -- TIDAK ADA logika baru terpisah -- supaya perilakunya 100% konsisten
+  // dengan tombol aslinya di tab masing-masing (kalau salah satu diperbaiki
+  // nanti, yang di sini otomatis ikut benar juga, tidak perlu diperbaiki 2x).
   // ------------------------------------------------------------
+  function wireQuickMenu() {
+    const overlay = el("psQuickMenuOverlay");
+    if (!overlay) return;
+    if (el("psQuickMenuToggleBtn")) {
+      el("psQuickMenuToggleBtn").addEventListener("click", () => {
+        renderQuickMenuContents_();
+        overlay.hidden = false;
+      });
+    }
+    if (el("psQuickMenuCloseBtn")) el("psQuickMenuCloseBtn").addEventListener("click", () => { overlay.hidden = true; });
+    // Klik di area gelap (BUKAN di dalam kotak panel putih/gelap-nya)
+    // juga menutup -- pola sama seperti overlay konfirmasi lain di app ini.
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.hidden = true; });
+    document.addEventListener("keydown", (e) => {
+      if (!overlay.hidden && e.key === "Escape") overlay.hidden = true;
+    });
+    // PERBAIKAN (9 Sep 2026, sesi ke-9) -- 4 tombol statis di bawah
+    // (BUKAN dibangun ulang tiap buka menu, beda dari modeRow/effectRow/
+    // bellRow yang lewat innerHTML di renderQuickMenuContents_() --
+    // ganti innerHTML otomatis membuang listener LAMA, jadi aman
+    // dipasang ulang tiap render) HARUS dipasang SEKALI SAJA di sini
+    // (bukan di dalam renderQuickMenuContents_(), yang jalan tiap kali
+    // menu dibuka) -- kalau dipasang di sana, tiap buka-tutup-buka lagi
+    // menambah 1 listener BARU menumpuk di elemen yang SAMA (elemen
+    // statis tidak pernah dibuang), bikin 1 klik memicu aksi 2x, 3x,
+    // dst semakin sering menu ini dibuka.
+    if (el("psQuickBreakBtn2")) {
+      el("psQuickBreakBtn2").addEventListener("click", () => { if (el("psQuickBreakBtn")) el("psQuickBreakBtn").click(); });
+    }
+    if (el("psQuickMuteBtn")) {
+      el("psQuickMuteBtn").addEventListener("click", () => {
+        const muteBtn = el("psYtMuteBtn");
+        if (muteBtn) muteBtn.click();
+      });
+    }
+    if (el("psQuickBellStopBtn")) {
+      el("psQuickBellStopBtn").addEventListener("click", () => rawPost({ type: "bell", action: "stop" }));
+    }
+    if (el("psQuickMapBtn")) {
+      el("psQuickMapBtn").addEventListener("click", () => {
+        const mapTabBtn = document.querySelector('[data-ps-right-tab="mode"]');
+        if (mapTabBtn) mapTabBtn.click();
+        overlay.hidden = true;
+      });
+    }
+  }
+  function renderQuickMenuContents_() {
+    // ---- Tata Letak (Mode Cepat 1-11) -- numpang applyModePreset_() ----
+    const modeRow = el("psQuickModeRow");
+    if (modeRow) {
+      const presets = loadModePresets_();
+      modeRow.innerHTML = presets.map((p, i) =>
+        `<button type="button" class="chip-btn small" data-quick-mode-idx="${i}">${i < 9 ? "①②③④⑤⑥⑦⑧⑨"[i] + " " : ""}${escapeHtml(p.label)}</button>`
+      ).join("");
+      modeRow.querySelectorAll("[data-quick-mode-idx]").forEach((btn) => {
+        btn.addEventListener("click", () => applyModePreset_(presets[Number(btn.dataset.quickModeIdx)]));
+      });
+    }
+    // ---- Efek & Seruan -- numpang payload rawPost yang SAMA dgn tab Efek Panggung ----
+    const effectRow = el("psQuickEffectRow");
+    if (effectRow) {
+      effectRow.innerHTML = `
+        <button type="button" class="chip-btn small" data-quick-effect="confetti">🎉 Confetti</button>
+        <button type="button" class="chip-btn small" data-quick-emoji="👏">👏 Tepuk</button>
+        <button type="button" class="chip-btn small" data-quick-emoji="😂">😂 Tertawa</button>
+        <button type="button" class="chip-btn small" data-quick-shout="PUJI TUHAN!">🙌 Puji Tuhan!</button>
+        <button type="button" class="chip-btn small" data-quick-shout="HALELUYA!">🙌 Haleluya!</button>
+      `;
+      effectRow.querySelectorAll("[data-quick-effect]").forEach((btn) => {
+        btn.addEventListener("click", () => rawPost({ type: "effect", effect: btn.dataset.quickEffect }));
+      });
+      effectRow.querySelectorAll("[data-quick-emoji]").forEach((btn) => {
+        btn.addEventListener("click", () => rawPost({ type: "effect", effect: "emoji", emoji: btn.dataset.quickEmoji }));
+      });
+      effectRow.querySelectorAll("[data-quick-shout]").forEach((btn) => {
+        btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.quickShout }));
+      });
+    }
+    // ---- Bel Cepat -- numpang CONFIG.BELL_SOUNDS yang SAMA dgn tab Bel Cepat ----
+    const bellRow = el("psQuickBellRow");
+    if (bellRow) {
+      const bells = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [];
+      bellRow.innerHTML = bells.map((b, i) =>
+        `<button type="button" class="chip-btn small" data-quick-bell-key="${escapeHtml(b.key)}">${escapeHtml(b.label)}</button>`
+      ).join("") || '<span class="ps-pointer-hint">Belum ada bel dikonfigurasi.</span>';
+      bellRow.querySelectorAll("[data-quick-bell-key]").forEach((btn) => {
+        btn.addEventListener("click", () => rawPost({ type: "bell", action: "ring", key: btn.dataset.quickBellKey }));
+      });
+    }
+    // ---- Pintasan lain (☕ Break Time / 🔇 Mute / ⏹️ Stop Bel / 🗺️ Peta)
+    // -- listener-nya SUDAH dipasang SEKALI di wireQuickMenu() (elemen
+    // statis, tidak perlu dipasang ulang tiap render, lihat catatan di
+    // sana kenapa).
+  }
+
+  // BARU (10 Sep 2026, sesi ke-10) -- ingat pilihan tampil/sembunyi
+  // scrollbar lintas sesi (localStorage), bawaan TAMPIL (key belum ada
+  // = dianggap "tampil", SESUAI keputusan "defaultnya show"). Dipanggil
+  // sekali saat Studio dibuka (lihat pemanggilannya di init) supaya
+  // konsisten dengan pilihan terakhir operator, dan tiap kali Alt+H
+  // ditekan (toggleScrollbarVisibility_()).
+  const SCROLLBAR_HIDDEN_KEY = "bible_app_ps_scrollbars_hidden_v1";
+  function applyScrollbarVisibilityFromStorage_() {
+    let hidden = false;
+    try { hidden = localStorage.getItem(SCROLLBAR_HIDDEN_KEY) === "1"; } catch (e) {}
+    document.body.classList.toggle("ps-scrollbars-hidden", hidden);
+  }
+  function toggleScrollbarVisibility_() {
+    const hidden = document.body.classList.toggle("ps-scrollbars-hidden");
+    try { localStorage.setItem(SCROLLBAR_HIDDEN_KEY, hidden ? "1" : "0"); } catch (e) {}
+  }
+
   function wireModeAndBellKeyboardShortcuts() {
     document.addEventListener("keydown", (e) => {
       const studio = el("presentStudio");
       if (!studio || studio.hidden) return;
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+      // BARU (10 Sep 2026, sesi ke-10, permintaan operator "defaultnya
+      // show, dan misalnya ditekan Alt+H maka hide semua ... vertikal
+      // scroll atau horizontal scroll") -- Alt+H sengaja dipakai (bukan
+      // "H" polos) supaya tidak bentrok kalau nanti operator benar-benar
+      // memakai huruf "H" polos utk Menu Cepat q-w-e-r-t-y-u-i-o-p (lihat
+      // rencana sebelumnya). Lihat toggleScrollbarVisibility_() &
+      // body.ps-scrollbars-hidden (css/style.css).
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "h" || e.key === "H")) {
+        e.preventDefault();
+        toggleScrollbarVisibility_();
+        return;
+      }
+      // BARU (9 Sep 2026, sesi ke-9, permintaan operator "tombol M utk
+      // mute/unmute suara YouTube, & mematikan bel yang lagi bunyi
+      // sebelum durasinya habis sendiri") -- 1 tombol untuk 2 hal
+      // sekaligus, dipicu bareng setiap "M" ditekan:
+      //  (1) YouTube: TOGGLE (numpang klik tombol "🔇 Mute"/"🔇 Bersuara"
+      //      yang SUDAH ADA -- lihat wireYtControls() di atas -- supaya
+      //      SEMUA logikanya (urutan mute->play->unmute utk video yang
+      //      sempat butuh "dibangunkan" dulu, sinkron pratinjau Studio,
+      //      dst) tetap terpakai APA ADANYA, tidak ada logika baru yang
+      //      bisa beda/kurang lengkap). Kalau memang tidak ada video
+      //      yang sedang tayang, tombol ini sudah otomatis tidak
+      //      melakukan apa-apa (dijaga di wireYtControls()/present.html
+      //      sendiri) -- aman ditekan kapan saja.
+      //  (2) Bel Cepat: SELALU kirim "stop" (bukan toggle -- bel itu
+      //      1x bunyi lalu habis sendiri, tidak ada "bunyi lagi" yang
+      //      masuk akal buat ditoggle balik) -- kalau tidak ada bel
+      //      yang lagi bunyi, present.html sendiri yang mengabaikan
+      //      (aman, tidak menimbulkan efek apa pun).
+      // Ini SENGAJA dipisah dari blok angka 1-9 di bawah (bukan angka,
+      // tidak perlu Number.isInteger dst).
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "m" || e.key === "M")) {
+        e.preventDefault();
+        const muteBtn = el("psYtMuteBtn");
+        if (muteBtn) muteBtn.click();
+        rawPost({ type: "bell", action: "stop" });
+        return;
+      }
       const n = Number(e.key);
       if (!Number.isInteger(n) || n < 1 || n > 9) return;
       if (e.altKey) {
@@ -5393,6 +5646,1616 @@ const PresentationStudio = (() => {
         if (preset) { e.preventDefault(); applyModePreset_(preset); }
       }
     });
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🖥️ Mode Layar umum:
+  // Welcome (sebelum acara mulai) & Next Up ("SELANJUTNYA" di antara
+  // sesi). Kirim { type:"modescreen", kind, eyebrow, title, subtitle,
+  // bullets, endAt } ke Layar 2 -- lihat showModeScreen() di
+  // present.html. TIDAK menyentuh Kumpulan Ayat sama sekali -- tombol
+  // cepat ini berdiri sendiri, terpisah dari Collections (walau bisa
+  // JUGA diselipkan ke Kumpulan Ayat lewat item type "modescreen",
+  // lihat js/collections.js).
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- bawaan per "Jenis Layar"
+  // (dipakai wireModeScreenTab() di bawah, DAN dijadikan acuan label
+  // ikon di collectionItemRef()/js/app.js & exportCollectionAsText()/
+  // js/collections.js supaya 1 daftar ini SATU-SATUNYA sumber kebenaran
+  // -- kalau nanti mau nambah jenis lagi, cukup tambah di sini +
+  // MODE_SCREEN_KIND_META di present.html (untuk warna Layar 2), tidak
+  // perlu ubah banyak tempat lain).
+  // allowCountdown = jenis yang wajar punya "durasi" (Welcome menunggu
+  // jam mulai, Istirahat & Olahraga menunggu jam selesai) -- Next Up/Ice
+  // Breaker/Renungan Malam sengaja TIDAK ditawari supaya form tidak
+  // membingungkan untuk kasus yang durasinya biasanya cair.
+  const MODE_SCREEN_KIND_META = {
+    welcome: { icon: "👋", label: "Welcome", allowCountdown: true, defaultTitle: "SELAMAT DATANG", defaultSubtitlePh: "mis. Retret Pemuda 2026" },
+    nextup: { icon: "➡️", label: "Next Up", allowCountdown: false, defaultTitle: "", defaultSubtitlePh: "mis. Retret Pemuda 2026" },
+    istirahat: { icon: "☕", label: "Istirahat", allowCountdown: true, defaultTitle: "JAM ISTIRAHAT", defaultSubtitlePh: "mis. Kembali jam 10:30" },
+    icebreaker: { icon: "🎉", label: "Ice Breaker", allowCountdown: false, defaultTitle: "ICE BREAKER", defaultSubtitlePh: "mis. Games seru sebelum lanjut" },
+    olahraga: { icon: "🏃", label: "Olahraga", allowCountdown: true, defaultTitle: "WAKTUNYA GERAK", defaultSubtitlePh: "mis. Senam pagi bersama" },
+    renungan: { icon: "🙏", label: "Renungan Malam", allowCountdown: false, defaultTitle: "RENUNGAN MALAM", defaultSubtitlePh: "mis. Mari hening sejenak" },
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "info waktunya
+    // foto bersama") -- allowCountdown:true karena biasanya ada jeda
+    // singkat sebelum semua orang siap posisi/berkumpul untuk foto.
+    foto: { icon: "📸", label: "Foto Bersama", allowCountdown: true, defaultTitle: "WAKTUNYA FOTO BERSAMA!", defaultSubtitlePh: "mis. Kumpul di depan panggung" },
+  };
+  window.MODE_SCREEN_KIND_META = MODE_SCREEN_KIND_META; // dibaca app.js/collections.js untuk label ikon
+
+  function wireModeScreenTab() {
+    let msKind = "welcome";
+    // BARU (9 Sep 2026) -- dipakai untuk tahu apakah isi kolom Judul
+    // SAAT INI adalah bawaan otomatis (belum diedit operator) atau
+    // sudah diketik manual -- kalau masih bawaan, boleh ditimpa dengan
+    // bawaan jenis baru saat operator ganti tombol; kalau sudah diketik
+    // manual, JANGAN ditimpa (operator tidak mau tulisannya hilang).
+    let lastAutoTitle = "";
+    if (el("psModeScreenKindRow")) {
+      el("psModeScreenKindRow").querySelectorAll("[data-ms-kind]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          msKind = btn.dataset.msKind;
+          el("psModeScreenKindRow").querySelectorAll("[data-ms-kind]").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const meta = MODE_SCREEN_KIND_META[msKind] || MODE_SCREEN_KIND_META.welcome;
+          // Hitung mundur cuma ditawarkan untuk jenis yang punya "durasi"
+          // wajar (lihat allowCountdown di MODE_SCREEN_KIND_META di atas).
+          const cdRow = el("psModeScreenCountdownOn");
+          const cdWrap = cdRow ? cdRow.closest("label") : null;
+          if (cdWrap) cdWrap.style.display = meta.allowCountdown ? "flex" : "none";
+          if (el("psModeScreenCountdownTime")) el("psModeScreenCountdownTime").style.display = (meta.allowCountdown && cdRow && cdRow.checked) ? "block" : "none";
+          // Isi Judul otomatis (kalau belum diedit manual) + placeholder
+          // Subjudul contoh, supaya operator bisa langsung pencet
+          // "▶️ Tampilkan" tanpa mengetik apa-apa untuk preset ini.
+          const titleInput = el("psModeScreenTitle");
+          if (titleInput && meta.defaultTitle && (titleInput.value.trim() === "" || titleInput.value === lastAutoTitle)) {
+            titleInput.value = meta.defaultTitle;
+            lastAutoTitle = meta.defaultTitle;
+          }
+          const subtitleInput = el("psModeScreenSubtitle");
+          if (subtitleInput && meta.defaultSubtitlePh) subtitleInput.placeholder = meta.defaultSubtitlePh;
+        });
+      });
+    }
+    if (el("psModeScreenCountdownOn")) {
+      el("psModeScreenCountdownOn").addEventListener("change", () => {
+        if (el("psModeScreenCountdownTime")) el("psModeScreenCountdownTime").style.display = el("psModeScreenCountdownOn").checked ? "block" : "none";
+      });
+    }
+    function buildModeScreenPayload() {
+      const title = (el("psModeScreenTitle") && el("psModeScreenTitle").value.trim()) || "";
+      const subtitle = (el("psModeScreenSubtitle") && el("psModeScreenSubtitle").value.trim()) || "";
+      const bulletsRaw = (el("psModeScreenBullets") && el("psModeScreenBullets").value) || "";
+      const bullets = bulletsRaw.split("\n").map((s) => s.trim()).filter(Boolean);
+      // BARU (9 Sep 2026, permintaan operator) -- "Layar Istirahat
+      // Lengkap": baris "➡️ Selanjutnya: ..." digabung dalam layar yang
+      // SAMA (lihat #msNextLabel di present.html), bukan layar Next Up
+      // terpisah -- supaya operator tidak perlu bolak-balik 2 layar
+      // (jam mundur istirahat, lalu ganti manual ke Next Up) untuk 1
+      // maksud yang sama.
+      const nextLabel = (el("psModeScreenNextLabel") && el("psModeScreenNextLabel").value.trim()) || "";
+      let endAt = null;
+      const kindMeta = MODE_SCREEN_KIND_META[msKind] || MODE_SCREEN_KIND_META.welcome;
+      if (kindMeta.allowCountdown && el("psModeScreenCountdownOn") && el("psModeScreenCountdownOn").checked) {
+        const timeVal = el("psModeScreenCountdownTime") && el("psModeScreenCountdownTime").value; // "HH:MM"
+        if (timeVal) {
+          const [hh, mm] = timeVal.split(":").map(Number);
+          const target = new Date();
+          target.setHours(hh, mm, 0, 0);
+          if (target.getTime() < Date.now()) target.setDate(target.getDate() + 1); // sudah lewat hari ini -> anggap besok
+          endAt = target.getTime();
+        }
+      }
+      return { type: "modescreen", kind: msKind, title, subtitle, bullets, nextLabel, endAt };
+    }
+    if (el("psModeScreenShowBtn")) {
+      el("psModeScreenShowBtn").addEventListener("click", () => {
+        const payload = buildModeScreenPayload();
+        if (!payload.title) { alert("Isi judul dulu (mis. \"SELAMAT DATANG\" atau nama sesi berikutnya)."); return; }
+        rawPost(payload);
+      });
+    }
+    if (el("psModeScreenStopBtn")) {
+      el("psModeScreenStopBtn").addEventListener("click", () => rawPost({ type: "modescreen", action: "stop" }));
+    }
+    // BARU (9 Sep 2026) -- selipkan Welcome/Next Up ke Kumpulan Ayat
+    // (tanpa hitung mundur, lihat catatan addModeScreenToCollection()).
+    if (el("psModeScreenSaveBtn")) {
+      el("psModeScreenSaveBtn").addEventListener("click", async () => {
+        const payload = buildModeScreenPayload();
+        if (!payload.title) { alert("Isi judul dulu sebelum menyimpan."); return; }
+        if (typeof promptCollectionName !== "function" || typeof addModeScreenToCollection !== "function") return;
+        const name = await promptCollectionName();
+        if (!name) return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        addModeScreenToCollection(username, name, payload);
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        if (el("psModeScreenSaveStatus")) {
+          el("psModeScreenSaveStatus").textContent = `✅ Tersimpan ke kumpulan "${name}".`;
+          setTimeout(() => { if (el("psModeScreenSaveStatus")) el("psModeScreenSaveStatus").textContent = ""; }, 4000);
+        }
+      });
+    }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung: reaksi
+  // visual (confetti/emoji terbang) & efek suara 1-tombol. SENGAJA
+  // dibuat "tembak dan lupa" (fire-and-forget, tidak ada tombol
+  // "Hentikan" terpisah seperti Timer/Mode Layar) -- Layar 2 sendiri
+  // yang membersihkan animasinya setelah beberapa detik (lihat
+  // playEffectVisual_()/playEffectSound_() di present.html), supaya
+  // operator bisa pencet berkali-kali beruntun tanpa mikir status
+  // hidup/mati. Payload: { type:"effect", effect:"confetti" } atau
+  // { type:"effect", effect:"emoji", emoji:"👏" } untuk reaksi visual,
+  // dan { type:"sound", sound:"drumroll" } dst untuk efek suara --
+  // dipisah type-nya (bukan disatukan ke "effect") supaya nanti kalau
+  // mau efek suara TANPA visual atau sebaliknya tetap gampang.
+  function wireEffectsTab() {
+    document.querySelectorAll("[data-effect]").forEach((btn) => {
+      btn.addEventListener("click", () => rawPost({ type: "effect", effect: btn.dataset.effect }));
+    });
+    document.querySelectorAll("[data-effect-emoji]").forEach((btn) => {
+      btn.addEventListener("click", () => rawPost({ type: "effect", effect: "emoji", emoji: btn.dataset.effectEmoji }));
+    });
+    document.querySelectorAll("[data-sound]").forEach((btn) => {
+      btn.addEventListener("click", () => rawPost({ type: "sound", sound: btn.dataset.sound }));
+    });
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama Tuhan") --
+    // teks BESAR berkilau di tengah layar, "tembak dan lupa" sama seperti
+    // efek lain di atas -- payload TERPISAH ("shout", bukan "effect")
+    // supaya tidak tercampur alur emoji/confetti yang generiknya beda
+    // (lihat playShout_() di present.html).
+    document.querySelectorAll("[data-shout]").forEach((btn) => {
+      btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.shout }));
+    });
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "break time,
+    // lonceng, sebagai pintasan cepat offline") -- 2 tombol yang TIDAK
+    // menyimpan state baru, cuma memicu ULANG alur yang sudah ada:
+    // "☕ Break Time" mengirim payload "modescreen" langsung dengan judul
+    // bawaan MODE_SCREEN_KIND_META.istirahat (TIDAK menyentuh/membaca isi
+    // form di tab "🖥️ Mode & Peta" -- kalau operator sudah mengetik judul/
+    // poin sendiri di sana, itu TIDAK ikut terpakai/tertimpa di sini,
+    // sengaja dibuat berdiri sendiri supaya aman dipencet kapan saja
+    // tanpa efek samping ke tab lain). "🔔 Bel Cepat" membunyikan bel
+    // PERTAMA di CONFIG.BELL_SOUNDS (sama seperti Alt+1 di Bel Cepat).
+    if (el("psQuickBreakBtn")) {
+      el("psQuickBreakBtn").addEventListener("click", () => {
+        const meta = (typeof MODE_SCREEN_KIND_META !== "undefined" && MODE_SCREEN_KIND_META.istirahat) || { defaultTitle: "JAM ISTIRAHAT" };
+        rawPost({ type: "modescreen", kind: "istirahat", title: meta.defaultTitle, subtitle: "", bullets: [], nextLabel: "", endAt: null });
+        renderStudioPreview({ type: "modescreen", kind: "istirahat", title: meta.defaultTitle });
+      });
+    }
+    if (el("psQuickBellBtn")) {
+      el("psQuickBellBtn").addEventListener("click", () => {
+        const bells = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1" }];
+        rawPost({ type: "bell", action: "ring", key: bells[0].key });
+      });
+    }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian (versi
+  // TEKS SAJA -- versi "1 lingkaran = 1 foto orang" direncanakan tahap
+  // berikutnya, lihat jawaban chat). 100% OFFLINE: daftar nama diketik
+  // langsung di sini, pemenang diacak dengan Math.random() DI SISI INI
+  // (bukan di Layar 2) supaya Studio langsung tahu siapa pemenangnya
+  // untuk mode "buang pemenang" tanpa perlu menunggu animasi 4 detik
+  // selesai dulu. Layar 2 (present.html, lihat showWheel()/spinWheel())
+  // hanya menerima INDEKS pemenang & menganimasikan visual+suara ke
+  // sana, lalu mengonfirmasi balik lewat postMessage
+  // "present_wheel_result" (ditangani listener "message" di init(), di
+  // bawah file ini) -- dipakai untuk menyalakan lagi tombol "🎲 Putar!"
+  // & (kalau mode "buang pemenang" aktif) menghapus nama itu dari
+  // daftar supaya tidak menang 2x di sesi undian yang sama.
+  //
+  // Payload ke Layar 2: { type:"wheel", action:"show", entries } saat
+  // "🎡 Tampilkan Roda" ditekan, { type:"wheel", action:"spin",
+  // winnerIndex, spinId } saat "🎲 Putar!" ditekan.
+  // ------------------------------------------------------------
+  let wheelCurrentEntries_ = []; // daftar nama yang SEDANG ditampilkan di roda (setelah "Tampilkan Roda" ditekan) -- dipakai untuk tahu indeks pemenang & untuk mode "buang pemenang"
+  let wheelSpinning_ = false; // true di antara tombol "Putar!" ditekan sampai present_wheel_result balik -- mencegah operator memicu 2 putaran sekaligus (bisa membuat animasi Layar 2 saling tabrak)
+  function wireWheelTab() {
+    const entriesTa = el("psWheelEntries");
+    const applyBtn = el("psWheelApplyBtn");
+    const spinBtn = el("psWheelSpinBtn");
+    const resetBtn = el("psWheelResetBtn");
+    const removeWinnerChk = el("psWheelRemoveWinnerChk");
+    const winnerBox = el("psWheelWinnerBox");
+    if (!entriesTa || !applyBtn || !spinBtn) return; // panel belum ada di HTML (mis. versi lama index.html) -- diamkan
+
+    function parseEntries_() {
+      return String(entriesTa.value || "")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    applyBtn.addEventListener("click", () => {
+      const entries = parseEntries_();
+      if (entries.length < 2) { alert("Isi minimal 2 nama (1 nama per baris) dulu."); return; }
+      wheelCurrentEntries_ = entries;
+      if (winnerBox) { winnerBox.hidden = true; winnerBox.textContent = ""; }
+      spinBtn.disabled = false;
+      rawPost({ type: "wheel", action: "show", entries: wheelCurrentEntries_ });
+      renderStudioPreview({ type: "wheel" });
+    });
+
+    spinBtn.addEventListener("click", () => {
+      if (wheelSpinning_) return; // sedang berputar -- abaikan klik dobel supaya tidak memicu 2 animasi sekaligus di Layar 2
+      if (!wheelCurrentEntries_.length) { alert("Tekan \"🎡 Tampilkan Roda\" dulu sebelum memutar."); return; }
+      const winnerIndex = Math.floor(Math.random() * wheelCurrentEntries_.length);
+      const spinId = "wh_" + Date.now();
+      wheelSpinning_ = true;
+      wheelPendingSpin_ = { spinId, winnerIndex, removeWinner: !!(removeWinnerChk && removeWinnerChk.checked) };
+      spinBtn.disabled = true;
+      if (winnerBox) { winnerBox.hidden = true; winnerBox.textContent = ""; }
+      rawPost({ type: "wheel", action: "spin", winnerIndex, spinId });
+    });
+
+    resetBtn.addEventListener("click", () => {
+      wheelCurrentEntries_ = [];
+      wheelSpinning_ = false;
+      wheelPendingSpin_ = null;
+      spinBtn.disabled = true;
+      if (winnerBox) { winnerBox.hidden = true; winnerBox.textContent = ""; }
+      rawPost({ type: "wheel", action: "stop" });
+    });
+  }
+
+  // Diisi wireWheelTab() (di atas) tiap kali "🎲 Putar!" ditekan, dibaca
+  // & dikosongkan lagi oleh listener "message" (window.addEventListener
+  // di init(), lihat "present_wheel_result") begitu Layar 2 selesai
+  // menganimasikan & mengonfirmasi balik pemenangnya -- lihat catatan
+  // panjang di wireWheelTab() di atas untuk alasan pola ini (Studio
+  // yang menentukan pemenang lebih dulu, Layar 2 cuma menganimasikannya).
+  let wheelPendingSpin_ = null;
+  function handleWheelResult_(data) {
+    if (!wheelPendingSpin_ || wheelPendingSpin_.spinId !== data.spinId) return; // hasil dari putaran LAMA (mis. Reset ditekan di tengah animasi) -- abaikan
+    const { winnerIndex, removeWinner } = wheelPendingSpin_;
+    const winnerName = wheelCurrentEntries_[winnerIndex] || "?";
+    wheelSpinning_ = false;
+    wheelPendingSpin_ = null;
+    const spinBtn = el("psWheelSpinBtn");
+    const winnerBox = el("psWheelWinnerBox");
+    const entriesTa = el("psWheelEntries");
+    if (winnerBox) { winnerBox.hidden = false; winnerBox.textContent = "🏆 Pemenang: " + winnerName; }
+    if (removeWinner) {
+      // Buang nama pemenang dari daftar (mode gugur) -- textarea &
+      // roda yang tampil di Layar 2 ikut disegarkan TANPA memutar ulang,
+      // supaya siap untuk "Putar!" berikutnya tanpa nama yang sudah
+      // menang muncul lagi.
+      wheelCurrentEntries_ = wheelCurrentEntries_.filter((_, i) => i !== winnerIndex);
+      if (entriesTa) entriesTa.value = wheelCurrentEntries_.join("\n");
+      if (wheelCurrentEntries_.length >= 2) {
+        rawPost({ type: "wheel", action: "show", entries: wheelCurrentEntries_ });
+      }
+    }
+    if (spinBtn) spinBtn.disabled = wheelCurrentEntries_.length < 2;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🗺️ Peta Interaktif,
+  // dibuat REUSABLE lintas acara (bukan cuma 1 lokasi): operator
+  // mengunggah gambar peta APA SAJA (venue, kota, negara), lalu
+  // menaruh pin dengan KLIK LANGSUNG di atas gambar pratinjau (bukan
+  // saya tebak koordinat dari file) -- tiap pin cuma butuh label
+  // singkat. Kumpulan peta (tiap peta = { id, name, imageDataUrl,
+  // pins:[{id,label,xPct,yPct}] }) disimpan di localStorage perangkat
+  // ini (MAPS_KEY di bawah) supaya siap dipakai lagi acara berikutnya
+  // tanpa mengunggah ulang -- lihat ROADMAP-drive-sync.md untuk
+  // rencana lanjut memindahkannya ke Google Sheet/Drive (sinkron
+  // lintas perangkat) seperti sync.js, BELUM dikerjakan di versi ini.
+  //
+  // Dikirim ke Layar 2 sebagai { type:"map", action:"show", imageUrl,
+  // pins } (tampilkan peta) lalu { type:"map", action:"focus", pin }
+  // per klik pin di daftar (Layar 2 melakukan animasi zoom/pan ke
+  // titik itu) -- lihat showMap()/focusMapPin() di present.html.
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🌐 Ambil Peta Dasar dari
+  // Online: cari & unduh gambar peta Indonesia POLOS dari Wikimedia
+  // Commons (API publik, CORS terbuka, tanpa API key -- sumbernya
+  // bebas lisensi/domain publik, BUKAN hasil AI menggambar ulang).
+  // Hasilnya disimpan sebagai map.imageDataUrl PERSIS seperti hasil
+  // unggah manual -- jadi cuma butuh internet SEKALI saat menekan
+  // tombol ini; setelah itu tersimpan di localStorage & bisa dipakai
+  // offline terus seperti gambar peta lainnya (kalibrasi, pin, dst
+  // semuanya tetap jalan tanpa perubahan). Fungsi murni (module-level,
+  // bukan dalam closure wireMapTab()) supaya gampang dites/dipakai ulang.
+  async function fetchOnlineBaseMap_() {
+    const searchUrl = "https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=" +
+      encodeURIComponent("Indonesia blank location map") + "&srnamespace=6&srlimit=5&format=json&origin=*";
+    const searchRes = await fetch(searchUrl);
+    if (!searchRes.ok) throw new Error("Pencarian Wikimedia gagal (HTTP " + searchRes.status + ")");
+    const searchJson = await searchRes.json();
+    const hits = (searchJson.query && searchJson.query.search) || [];
+    if (!hits.length) throw new Error("Tidak ada peta ditemukan di Wikimedia Commons.");
+    const title = hits[0].title; // mis. "File:Indonesia location map.svg"
+    const infoUrl = "https://commons.wikimedia.org/w/api.php?action=query&titles=" +
+      encodeURIComponent(title) + "&prop=imageinfo&iiprop=url&iiurlwidth=2000&format=json&origin=*";
+    const infoRes = await fetch(infoUrl);
+    if (!infoRes.ok) throw new Error("Gagal ambil detail berkas (HTTP " + infoRes.status + ")");
+    const infoJson = await infoRes.json();
+    const pages = (infoJson.query && infoJson.query.pages) || {};
+    const page = Object.values(pages)[0];
+    const info = page && page.imageinfo && page.imageinfo[0];
+    const fileUrl = info && (info.thumburl || info.url);
+    if (!fileUrl) throw new Error('Berkas "' + title + '" ditemukan tapi URL gambarnya tidak terbaca.');
+    const imgRes = await fetch(fileUrl);
+    if (!imgRes.ok) throw new Error("Gagal unduh gambar peta (HTTP " + imgRes.status + ")");
+    const blob = await imgRes.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    return { dataUrl, title, fileUrl };
+  }
+  // BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Peta Dasar: filter
+  // gambar diproses LANGSUNG di perangkat lewat Canvas
+  // (CanvasRenderingContext2D.filter + compositing bawaan browser),
+  // BUKAN gambar baru bikinan AI -- jadi selalu offline & instan setelah
+  // pertama diproses (hasilnya di-cache di map.styleVariants). "comic"
+  // meniru garis tinta dengan melapisi versi grayscale-kontras-tinggi-
+  // dibalik (mendekati efek edge) di atas versi warna blok pakai blend
+  // "multiply"; "artistic"/"territorial" pakai kombinasi filter warna
+  // standar (sepia/saturate/contrast/blur) ala lukisan/atlas tua. Ini
+  // APROKSIMASI gaya lewat filter gambar, BUKAN filter AI presisi --
+  // cukup untuk suasana visual di layar besar, bukan reproduksi seni.
+  function generateMapStyleVariant_(baseDataUrl, style) {
+    return new Promise((resolve, reject) => {
+      if (style === "normal" || !baseDataUrl) { resolve(baseDataUrl); return; }
+      const img = new Image();
+      img.onerror = () => reject(new Error("Gagal memuat gambar peta untuk diproses."));
+      img.onload = () => {
+        try {
+          const w = img.naturalWidth, h = img.naturalHeight;
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          if (style === "comic") {
+            ctx.filter = "saturate(2.3) contrast(1.4) brightness(1.04)";
+            ctx.drawImage(img, 0, 0, w, h);
+            ctx.filter = "grayscale(1) contrast(3.2) brightness(0.92) invert(1)";
+            ctx.globalCompositeOperation = "multiply";
+            ctx.globalAlpha = 0.55;
+            ctx.drawImage(img, 0, 0, w, h);
+            ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; ctx.filter = "none";
+          } else if (style === "artistic") {
+            ctx.filter = "saturate(1.35) contrast(1.08) brightness(1.03) blur(1.1px) sepia(.08)";
+            ctx.drawImage(img, 0, 0, w, h);
+            ctx.filter = "none";
+          } else if (style === "territorial") {
+            ctx.filter = "sepia(.5) contrast(1.15) saturate(1.3) brightness(.97)";
+            ctx.drawImage(img, 0, 0, w, h);
+            const grad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .35, w / 2, h / 2, Math.max(w, h) * .7);
+            grad.addColorStop(0, "rgba(0,0,0,0)");
+            grad.addColorStop(1, "rgba(40,25,10,.35)");
+            ctx.filter = "none";
+            ctx.globalCompositeOperation = "multiply";
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+            ctx.globalCompositeOperation = "source-over";
+          } else {
+            ctx.drawImage(img, 0, 0, w, h);
+          }
+          resolve(canvas.toDataURL("image/jpeg", 0.87));
+        } catch (e) { reject(e); }
+      };
+      img.src = baseDataUrl;
+    });
+  }
+  // BARU (9 Sep 2026) -- dipakai sendGenericItemLive() saat menayangkan
+  // item "map" dari Kumpulan Ayat (referensi mapId -> cari gambar+pin
+  // aktualnya di Map Library, localStorage perangkat ini). Baca
+  // langsung dari localStorage (bukan lewat closure wireMapTab()) supaya
+  // tetap dapat data TERBARU walau operator baru saja mengedit peta itu
+  // di tab lain sejak halaman dimuat.
+  function getStoredMapById(mapId) {
+    if (!mapId) return null;
+    try {
+      const maps = JSON.parse(localStorage.getItem("bible_app_studio_maps_v1") || "[]");
+      return (Array.isArray(maps) ? maps : []).find((m) => m.id === mapId) || null;
+    } catch (e) { return null; }
+  }
+  // BARU (9 Sep 2026) -- versi standalone dari visiblePins() (di dalam
+  // wireMapTab()) supaya sendGenericItemLive() (Kumpulan Ayat) juga
+  // menghormati checklist kategori terakhir yang disimpan di peta itu,
+  // BUKAN selalu mengirim semua pin.
+  function visibleMapPins_(map) {
+    const active = new Set(map.activeCategories || []);
+    return (map.pins || []).filter((p) => !p.category || active.has(p.category));
+  }
+  // BARU (9 Sep 2026, permintaan operator) -- "🎨 Gaya Peta Dasar": kalau
+  // operator sedang memilih gaya selain "normal" (Komik/Artistik/
+  // Teritorial) DAN variannya sudah pernah dibuat (map.styleVariants,
+  // lihat generateMapStyleVariant_() di wireMapTab()), pakai gambar
+  // hasil filter itu; kalau belum ada (mis. baru dipilih tapi belum
+  // sempat diproses, atau memang "normal"), tetap pakai gambar ASLI
+  // (map.imageDataUrl) supaya tidak pernah kirim gambar kosong ke
+  // Layar 2. Fungsi murni (bukan dalam closure wireMapTab()) supaya
+  // bisa dipakai juga oleh sendGenericItemLive() (item "map" di
+  // Kumpulan Ayat) di atas.
+  function effectiveMapImage_(map) {
+    if (!map) return "";
+    const style = map.mapStyle || "normal";
+    if (style !== "normal" && map.styleVariants && map.styleVariants[style]) return map.styleVariants[style];
+    return map.imageDataUrl || "";
+  }
+
+  function wireMapTab() {
+    const MAPS_KEY = "bible_app_studio_maps_v1";
+    let maps = [];
+    let activeMapId = null;
+    let editingPinId = null; // sedang diedit label-nya (klik nama pin di daftar)
+    // BARU (9 Sep 2026) -- state untuk 📍 Kalibrasi Peta: null = tidak
+    // sedang menandai, 1/2 = menunggu operator klik gambar untuk titik
+    // acuan ke-1/ke-2 (lihat listener klik gambar di bawah).
+    let calibArmed = null;
+    // BARU (9 Sep 2026, permintaan operator) -- id pin yang sedang
+    // dibuka panel "📊 Data" (luas/penduduk)-nya di daftar Pin. Set
+    // module-level (bukan direset tiap renderMapEditor()) supaya panel
+    // tetap terbuka selagi operator mengetik angkanya.
+    const expandedPinDetail = new Set();
+    // BARU (9 Sep 2026, permintaan operator) -- id pin yang sedang
+    // dibuka panel "📷 Foto"-nya (upload 1-5 foto per kota).
+    const expandedPinPhotos = new Set();
+    // BARU (9 Sep 2026, permintaan operator) -- teks status tombol "🔄
+    // Wikidata" per pin ("Memuat...", "✅ ...", "⚠️ ...") -- Map bukan
+    // Set karena butuh simpan TEKS-nya, bukan cuma id-nya. Dibersihkan
+    // sendiri saat panel "📊 Data" pin itu ditutup (lihat toggle di
+    // bawah) supaya tidak nyangkut status lama kalau dibuka lagi nanti.
+    const pinAutoStatus = new Map();
+    // BARU (9 Sep 2026) -- kompres gambar sebelum disimpan sebagai
+    // dataURL (localStorage cuma muat ~5-10MB TOTAL di sebagian besar
+    // browser -- kalau foto disimpan mentah dari kamera HP (3-8MB per
+    // foto), 5 foto x beberapa kota saja sudah bisa bikin penyimpanan
+    // penuh & fitur lain yang juga pakai localStorage/perangkat ini
+    // (Kumpulan Ayat dsb) ikut gagal simpan). Diperkecil ke maks lebar
+    // 900px & kualitas JPEG 72% -- cukup jelas untuk ditampilkan di
+    // kartu info Layar 2, biasanya jadi 50-150KB/foto.
+    function compressImageFile_(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = () => reject(new Error("Gagal memuat gambar"));
+          img.onload = () => {
+            const maxW = 900;
+            const scale = Math.min(1, maxW / img.width);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.72));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // BARU (9 Sep 2026) -- cari 1 kabupaten/kota dari
+    // window.INDONESIA_REGENCIES (js/indonesia-regencies.js) berdasarkan
+    // nama yang diketik operator. Fleksibel: operator boleh ketik "Surabaya"
+    // saja (tanpa awalan "Kota"/"Kabupaten") -- dicoba beberapa varian
+    // sebelum fallback ke pencocokan sebagian (substring). Balik null
+    // kalau sama sekali tidak ada yang cocok.
+    function findRegencyByName(query) {
+      const list = (typeof window !== "undefined" && Array.isArray(window.INDONESIA_REGENCIES)) ? window.INDONESIA_REGENCIES : [];
+      const q = (query || "").trim().toLowerCase();
+      if (!q || !list.length) return null;
+      const exact = list.find((r) => r.n.toLowerCase() === q);
+      if (exact) return exact;
+      const withKota = list.find((r) => r.n.toLowerCase() === "kota " + q);
+      if (withKota) return withKota;
+      const withKab = list.find((r) => r.n.toLowerCase() === "kabupaten " + q);
+      if (withKab) return withKab;
+      // fallback: kota/kabupaten yang namanya MENGANDUNG kata yang diketik
+      // (mis. "Surabaya Timur" -> tetap ketemu "Kota Surabaya" kalau ada
+      // kecocokan kata utuh). Diambil yang PALING PENDEK namanya supaya
+      // hasil paling spesifik/masuk akal duluan.
+      const partial = list.filter((r) => r.n.toLowerCase().includes(q));
+      if (!partial.length) return null;
+      partial.sort((a, b) => a.n.length - b.n.length);
+      return partial[0];
+    }
+
+    // BARU (9 Sep 2026) -- ubah (lat,lng) jadi (xPct,yPct) di gambar peta
+    // AKTIF, pakai kalibrasi 2-titik linear SEDERHANA (x hanya bergantung
+    // longitude, y hanya bergantung latitude -- cukup akurat untuk peta
+    // Indonesia yang biasanya digambar hampir lurus utara-atas, TIDAK
+    // memperhitungkan rotasi/proyeksi peta yang aneh-aneh). Balik null
+    // kalau peta belum dikalibrasi (calibration.p1/p2 belum lengkap) atau
+    // ke-2 titik acuan kebetulan segaris (pembagi nol).
+    function latLngToPct(map, lat, lng) {
+      const c = map && map.calibration;
+      if (!c || !c.p1 || !c.p2) return null;
+      const { p1, p2 } = c;
+      if (p2.lng === p1.lng || p2.lat === p1.lat) return null;
+      const xPct = p1.xPct + ((lng - p1.lng) * (p2.xPct - p1.xPct)) / (p2.lng - p1.lng);
+      const yPct = p1.yPct + ((lat - p1.lat) * (p2.yPct - p1.yPct)) / (p2.lat - p1.lat);
+      return { xPct, yPct };
+    }
+
+    // BARU (9 Sep 2026) -- 1 warna KONSISTEN per nama kategori (dihitung
+    // dari teksnya sendiri, bukan urutan tambah -- supaya kalau map
+    // dibuka ulang / kategori ditambah dari baris manapun, warnanya tidak
+    // berubah-ubah). Dipakai titik/pin & badge legenda di Layar 2.
+    // BARU (9 Sep 2026, permintaan operator) -- 2 kategori yang paling
+    // sering dipakai dapat warna TETAP/khusus (bukan hash) supaya selalu
+    // sama tiap acara: "Kaki Dian" = emas, "Pos Injil" = merah. Kategori
+    // LAIN (apa pun namanya, operator bebas menambah) tetap pakai warna
+    // hash seperti biasa supaya tidak perlu didaftarkan manual satu-satu.
+    const MAP_CATEGORY_PALETTE = ["#3d8ee2", "#3de27a", "#a83de2", "#e2793d", "#3de2d4", "#e23d9e"];
+    const MAP_CATEGORY_FIXED_COLORS = { "kaki dian": "#d4af37", "pos injil": "#c0392b" };
+    function categoryColor(category) {
+      const s = String(category || "");
+      const fixed = MAP_CATEGORY_FIXED_COLORS[s.trim().toLowerCase()];
+      if (fixed) return fixed;
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return MAP_CATEGORY_PALETTE[h % MAP_CATEGORY_PALETTE.length];
+    }
+
+    // BARU (9 Sep 2026, permintaan operator) -- 🌏 Total Penduduk
+    // Indonesia (angka nasional, bukan per-kota): ambil dari Wikidata
+    // (entitas Q252 = Indonesia, properti P1082 = jumlah penduduk),
+    // yang mendukung diakses LANGSUNG dari browser (CORS terbuka) tanpa
+    // perlu server tambahan -- cocok untuk situs statis seperti ini.
+    // Dipilih klaim rank "preferred" kalau ada; kalau tidak, klaim
+    // dengan kualifier "titik waktu" (P585) PALING BARU. Sumber
+    // ditelusuri dari referensi klaim itu (P854 = URL referensi), kalau
+    // tidak ada fallback ke halaman Wikidata itu sendiri.
+    // ⚠️ Catatan jujur: BELUM diuji ujung-ke-ujung di jaringan
+    // sungguhan (lingkungan pembuatan kode ini tidak bisa mengakses
+    // wikidata.org untuk mencoba). Kalau format data Wikidata berubah,
+    // atau situs operator memblokir domain luar (CSP), fungsi ini akan
+    // melempar error yang ditangkap & ditampilkan apa adanya ke
+    // operator -- TIDAK pernah diam-diam gagal.
+    async function fetchNationalPopulationAuto_() {
+      const res = await fetch("https://www.wikidata.org/wiki/Special:EntityData/Q252.json");
+      if (!res.ok) throw new Error("Gagal mengambil data (HTTP " + res.status + ")");
+      const json = await res.json();
+      const claims = (json.entities && json.entities.Q252 && json.entities.Q252.claims && json.entities.Q252.claims.P1082) || [];
+      if (!claims.length) throw new Error("Data populasi tidak ditemukan di Wikidata.");
+      function claimTimeMs_(c) {
+        const q = c.qualifiers && c.qualifiers.P585 && c.qualifiers.P585[0];
+        const t = q && q.datavalue && q.datavalue.value && q.datavalue.value.time;
+        if (!t) return 0;
+        const parsed = Date.parse(String(t).replace(/^\+/, ""));
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      let best = claims.find((c) => c.rank === "preferred");
+      if (!best) best = claims.slice().sort((a, b) => claimTimeMs_(b) - claimTimeMs_(a))[0];
+      const amountStr = best && best.mainsnak && best.mainsnak.datavalue && best.mainsnak.datavalue.value && best.mainsnak.datavalue.value.amount;
+      const value = amountStr ? Math.round(Number(String(amountStr).replace("+", ""))) : null;
+      if (!value) throw new Error("Format data populasi tidak dikenali.");
+      const qTime = best.qualifiers && best.qualifiers.P585 && best.qualifiers.P585[0];
+      const timeStr = qTime && qTime.datavalue && qTime.datavalue.value && qTime.datavalue.value.time;
+      const year = timeStr ? String(timeStr).replace(/^\+/, "").slice(0, 4) : "";
+      let source = "Wikidata (Q252)";
+      let sourceUrl = "https://www.wikidata.org/wiki/Q252";
+      if (Array.isArray(best.references) && best.references.length) {
+        const ref = best.references.find((r) => r.snaks && (r.snaks.P854 || r.snaks.P248)) || best.references[0];
+        const urlSnak = ref.snaks && ref.snaks.P854 && ref.snaks.P854[0];
+        if (urlSnak && urlSnak.datavalue && urlSnak.datavalue.value) {
+          sourceUrl = urlSnak.datavalue.value;
+          source = "Wikidata (referensi: " + sourceUrl + ")";
+        }
+      }
+      return { value, year, source, sourceUrl };
+    }
+
+    // BARU (9 Sep 2026, permintaan operator) -- versi UMUM dari logika
+    // "ambil klaim terbaik dari Wikidata" yang tadinya cuma dipakai untuk
+    // penduduk NASIONAL (fetchNationalPopulationAuto_() di atas). Dipakai
+    // di sini lagi untuk data PER-KOTA (penduduk P1082 & luas P2046),
+    // supaya tidak ditulis ulang. fetchNationalPopulationAuto_() sendiri
+    // SENGAJA tidak diubah/disatukan ke fungsi ini (biar fitur yang sudah
+    // jalan tidak ikut berisiko rusak) -- kalau nanti mau dirapikan jadi
+    // benar-benar 1 fungsi, aman dikerjakan terpisah.
+    function extractBestWikidataClaim_(claims) {
+      if (!Array.isArray(claims) || !claims.length) return null;
+      function claimTimeMs_(c) {
+        const q = c.qualifiers && c.qualifiers.P585 && c.qualifiers.P585[0];
+        const t = q && q.datavalue && q.datavalue.value && q.datavalue.value.time;
+        if (!t) return 0;
+        const parsed = Date.parse(String(t).replace(/^\+/, ""));
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      let best = claims.find((c) => c.rank === "preferred");
+      if (!best) best = claims.slice().sort((a, b) => claimTimeMs_(b) - claimTimeMs_(a))[0];
+      const amountStr = best && best.mainsnak && best.mainsnak.datavalue && best.mainsnak.datavalue.value && best.mainsnak.datavalue.value.amount;
+      const value = amountStr ? Number(String(amountStr).replace("+", "")) : null;
+      if (!value) return null;
+      const qTime = best.qualifiers && best.qualifiers.P585 && best.qualifiers.P585[0];
+      const timeStr = qTime && qTime.datavalue && qTime.datavalue.value && qTime.datavalue.value.time;
+      const year = timeStr ? String(timeStr).replace(/^\+/, "").slice(0, 4) : "";
+      let source = "Wikidata";
+      if (Array.isArray(best.references) && best.references.length) {
+        const ref = best.references.find((r) => r.snaks && (r.snaks.P854 || r.snaks.P248)) || best.references[0];
+        const urlSnak = ref.snaks && ref.snaks.P854 && ref.snaks.P854[0];
+        if (urlSnak && urlSnak.datavalue && urlSnak.datavalue.value) {
+          source = "Wikidata (ref: " + urlSnak.datavalue.value + ")";
+        }
+      }
+      return { value, year, source };
+    }
+    // Cari QID Wikidata dari nama kota/kabupaten (mis. "Kabupaten
+    // Sidoarjo" / "Kota Surabaya") lewat wbsearchentities (API publik,
+    // CORS terbuka, tidak butuh API key). Diutamakan hasil yang label-nya
+    // PERSIS sama (case-insensitive); kalau tidak ada, pakai hasil
+    // teratas -- disebut apa adanya di pesan error/sukses supaya operator
+    // bisa cek manual kalau salah kota.
+    async function searchWikidataEntity_(name) {
+      const url = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" +
+        encodeURIComponent(name) + "&language=id&uselang=id&format=json&origin=*&type=item&limit=6";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Pencarian Wikidata gagal (HTTP " + res.status + ")");
+      const json = await res.json();
+      const list = json.search || [];
+      if (!list.length) throw new Error('Tidak ditemukan di Wikidata: "' + name + '"');
+      const exact = list.find((s) => (s.label || "").toLowerCase() === name.toLowerCase());
+      return { id: (exact || list[0]).id, label: (exact || list[0]).label || name };
+    }
+    // Ambil penduduk (P1082) & luas (P2046) 1 kota dari Wikidata. Dipakai
+    // baik oleh tombol "🔄 Wikidata" per-pin maupun tombol massal "🔄
+    // Perbarui Semua Populasi/Luas". Sama seperti banner nasional, kalau
+    // Wikidata mengubah format/menutup CORS di kemudian hari, ini akan
+    // gagal dengan pesan error apa adanya -- isian manual ("📊 Data") tetap
+    // berfungsi sebagai cadangan tanpa internet.
+    async function fetchCityDataAuto_(cityName) {
+      const found = await searchWikidataEntity_(cityName);
+      const res = await fetch("https://www.wikidata.org/wiki/Special:EntityData/" + found.id + ".json");
+      if (!res.ok) throw new Error("Gagal mengambil data (HTTP " + res.status + ")");
+      const json = await res.json();
+      const ent = json.entities && json.entities[found.id];
+      const claims = (ent && ent.claims) || {};
+      const population = extractBestWikidataClaim_(claims.P1082);
+      const area = extractBestWikidataClaim_(claims.P2046);
+      if (!population && !area) {
+        throw new Error('Data penduduk/luas tidak ditemukan di Wikidata untuk "' + found.label + '" (' + found.id + ').');
+      }
+      return { qid: found.id, matchedLabel: found.label, population, area };
+    }
+
+    // BARU (9 Sep 2026) -- tampilkan status angka penduduk nasional yang
+    // sedang tersimpan di peta aktif (map.nationalPopulation) + set
+    // ulang toggle "Tampilkan di Layar 2" supaya cocok dengan datanya.
+    function renderNatPopStatus() {
+      const statusEl = el("psMapNatPopStatus");
+      const visibleCb = el("psMapNatPopVisible");
+      if (!statusEl) return;
+      const map = activeMap();
+      const np = map && map.nationalPopulation;
+      if (!np || !np.value) {
+        statusEl.textContent = "⚠️ Belum diisi.";
+        if (visibleCb) visibleCb.checked = false;
+        return;
+      }
+      const valueText = Number(np.value).toLocaleString("id-ID");
+      statusEl.textContent = `✅ ${valueText} jiwa${np.year ? " (" + np.year + ")" : ""} -- ${np.source || "sumber tidak dicatat"}`;
+      if (visibleCb) visibleCb.checked = !!np.visible;
+    }
+
+    // BARU (9 Sep 2026) -- kirim data penduduk nasional TERKINI (peta
+    // aktif) ke Layar 2 secara LIVE lewat action "natpop" -- dipisah dari
+    // action "show"/"focus"/"zoom" supaya toggle Tampilkan/Sembunyikan
+    // atau update angka TIDAK ikut mereset zoom/posisi fokus kota yang
+    // sedang tayang (lihat present.html -> renderNationalPop_()).
+    function pushNatPopLive_() {
+      const map = activeMap();
+      rawPost({ type: "map", action: "natpop", nationalPopulation: (map && map.nationalPopulation) || null });
+    }
+
+    function loadMaps() {
+      try { maps = JSON.parse(localStorage.getItem(MAPS_KEY) || "[]"); } catch (e) { maps = []; }
+      if (!Array.isArray(maps)) maps = [];
+    }
+    function saveMaps() {
+      try { localStorage.setItem(MAPS_KEY, JSON.stringify(maps)); } catch (e) {}
+    }
+    function activeMap() { return maps.find((m) => m.id === activeMapId) || null; }
+
+    function renderMapSelect() {
+      const sel = el("psMapSelect");
+      if (!sel) return;
+      sel.innerHTML = maps.length
+        ? maps.map((m) => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join("")
+        : '<option value="">(Belum ada peta -- buat "Peta Baru")</option>';
+      if (activeMapId) sel.value = activeMapId;
+    }
+    function renderMapEditor() {
+      const map = activeMap();
+      const wrap = el("psMapEditorWrap");
+      const hint = el("psMapEditorHint");
+      const img = el("psMapEditorImg");
+      const pinsLayer = el("psMapEditorPins");
+      const list = el("psMapPinList");
+      if (!wrap || !img || !pinsLayer || !list) return;
+      if (!map || !map.imageDataUrl) {
+        wrap.style.display = "none";
+        if (hint) hint.style.display = "none";
+        list.innerHTML = "";
+        renderCityRows();
+        renderCategoryChecklist();
+        renderCalibStatus();
+        renderNatPopStatus();
+        return;
+      }
+      // BARU (9 Sep 2026, permintaan operator) -- pratinjau Studio ikut
+      // memakai varian "🎨 Gaya Peta Dasar" yang sedang aktif (kalau
+      // sudah pernah diproses), bukan selalu gambar asli, supaya
+      // operator lihat persis apa yang akan tayang di Layar 2.
+      img.src = effectiveMapImage_(map);
+      // BARU (9 Sep 2026, permintaan operator) -- sinkronkan dropdown
+      // "🎨 Gaya Peta Dasar"/"🎨 Gaya Pin" dengan data peta AKTIF (penting
+      // saat operator pindah-pindah peta lewat "Peta Baru/Ganti Nama",
+      // supaya dropdown tidak "nyangkut" ke pilihan peta sebelumnya).
+      if (el("psMapStyleSelect")) el("psMapStyleSelect").value = map.mapStyle || "normal";
+      if (el("psMapPinStyleSelect")) el("psMapPinStyleSelect").value = map.pinStyle || "flat";
+      wrap.style.display = "block";
+      if (hint) hint.style.display = "block";
+      pinsLayer.innerHTML = "";
+      const pinStyle3D = map.pinStyle === "3d"; // BARU (9 Sep 2026, permintaan operator)
+      (map.pins || []).forEach((pin, idx) => {
+        const dot = document.createElement("div");
+        const color = pin.category ? categoryColor(pin.category) : "#e2483d";
+        // BARU (9 Sep 2026) -- pratinjau ukuran pin di Studio ikut
+        // membesar sesuai penduduk, sama seperti di Layar 2
+        // (renderMapPins_(), present.html), supaya operator lihat kira-kira
+        // hasilnya sebelum ditayangkan.
+        const size = pin.population ? Math.max(20, Math.min(56, 14 + Math.sqrt(Number(pin.population)) / 6)) : 20;
+        dot.title = (pin.label || ("Pin " + (idx + 1))) + (pin.category ? ` (${pin.category}${pin.year ? ", " + pin.year : ""})` : "");
+        // BARU (9 Sep 2026, permintaan operator) -- "🎨 Gaya Pin: 3D
+        // Berputar" (map.pinStyle === "3d") pakai class .ps-pin-3d (lihat
+        // css/style.css) yang menggantikan background flat dengan
+        // gradient + animasi sorot berputar, warna dioper lewat custom
+        // property --pin3d-color (bukan style.background) supaya
+        // gradient-nya tetap jalan.
+        if (pinStyle3D) {
+          dot.className = "ps-pin-3d";
+          dot.style.cssText = `position:absolute; left:${pin.xPct}%; top:${pin.yPct}%; width:${size}px; height:${size}px; margin:${-size / 2}px 0 0 ${-size / 2}px; border-radius:50%; --pin3d-color:${color}; border:2px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,.55); font:700 11px/${size}px sans-serif; color:#fff; text-align:center; pointer-events:auto; cursor:pointer;`;
+        } else {
+          dot.style.cssText = `position:absolute; left:${pin.xPct}%; top:${pin.yPct}%; width:${size}px; height:${size}px; margin:${-size / 2}px 0 0 ${-size / 2}px; border-radius:50%; background:${color}; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.5); font:700 11px/${size}px sans-serif; color:#fff; text-align:center; pointer-events:auto; cursor:pointer;`;
+        }
+        dot.textContent = String(idx + 1);
+        pinsLayer.appendChild(dot);
+      });
+      list.innerHTML = "";
+      (map.pins || []).forEach((pin) => {
+        const row = document.createElement("div");
+        row.className = "ps-btn-row";
+        row.style.cssText = "align-items:center; gap:6px;";
+        // BARU (9 Sep 2026) -- kalau pin ini berasal dari "📋 Daftar Titik
+        // dari Tabel" (punya kategori), nama & kategorinya diedit lewat
+        // TABEL itu (satu sumber, supaya tidak dobel-edit di 2 tempat)
+        // -- di sini cuma ditampilkan sebagai keterangan + tombol
+        // Fokus/Hapus. Pin manual (tanpa kategori) tetap bisa diedit
+        // langsung di sini seperti sebelumnya.
+        // BARU (9 Sep 2026) -- badge kecil kalau pin ini SUDAH punya data
+        // luas/penduduk, supaya operator tahu tanpa perlu buka panelnya.
+        const hasDetail = !!(pin.areaKm2 || pin.population);
+        const detailBtnLabel = hasDetail ? "📊 Data ✓" : "📊 Data";
+        const photoCount = Array.isArray(pin.photos) ? pin.photos.length : 0;
+        const photoBtnLabel = photoCount ? `📷 Foto (${photoCount})` : "📷 Foto";
+        if (pin.category) {
+          row.innerHTML = `
+            <span style="flex:1; min-width:0; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:${categoryColor(pin.category)}; margin-right:5px;"></span>
+              ${escapeHtml(pin.label || "")} <span style="opacity:.65;">— ${escapeHtml(pin.category)}${pin.year ? ", " + escapeHtml(String(pin.year)) : ""}</span>
+            </span>
+            <button type="button" class="chip-btn small" data-pin-detail-toggle="${pin.id}" title="Isi luas &amp; jumlah penduduk kota ini (opsional)">${detailBtnLabel}</button>
+            <button type="button" class="chip-btn small" data-pin-photo-toggle="${pin.id}" title="Unggah 1-5 foto kota ini (opsional)">${photoBtnLabel}</button>
+            <button type="button" class="chip-btn small" data-pin-focus="${pin.id}" title="Tampilkan &amp; zoom ke titik ini di Layar 2">🎯 Fokus</button>
+            <button type="button" class="chip-btn small" data-pin-del="${pin.id}" title="Hapus pin ini">🗑️</button>
+          `;
+        } else {
+          row.innerHTML = `
+            <input type="text" value="${escapeHtml(pin.label || "")}" data-pin-label="${pin.id}" class="columns-lang-select" style="flex:1; min-width:0;" placeholder="Nama titik (mis. Gazebo Musa)" />
+            <button type="button" class="chip-btn small" data-pin-detail-toggle="${pin.id}" title="Isi luas &amp; jumlah penduduk (opsional)">${detailBtnLabel}</button>
+            <button type="button" class="chip-btn small" data-pin-photo-toggle="${pin.id}" title="Unggah 1-5 foto (opsional)">${photoBtnLabel}</button>
+            <button type="button" class="chip-btn small" data-pin-focus="${pin.id}" title="Tampilkan &amp; zoom ke titik ini di Layar 2">🎯 Fokus</button>
+            <button type="button" class="chip-btn small" data-pin-del="${pin.id}" title="Hapus pin ini">🗑️</button>
+          `;
+        }
+        list.appendChild(row);
+        // BARU (9 Sep 2026, permintaan operator) -- panel "📊 Data" (luas
+        // km² & jumlah penduduk + tahun datanya), TERSEMBUNYI secara
+        // default supaya daftar 500-an titik tidak penuh sesak input --
+        // baru muncul kalau operator klik tombol "📊 Data" pin itu
+        // (state-nya di expandedPinDetail, lihat deklarasi di atas).
+        // SENGAJA tidak ada database luas/penduduk bawaan untuk 514
+        // kabupaten/kota -- angka itu berubah tiap tahun & kalau salah
+        // isi bisa menyesatkan penonton, jadi operator yang mengisi
+        // sendiri dari sumber yang mereka percaya (mis. data BPS
+        // terbaru), lengkap dengan tahun datanya supaya jelas sumbernya.
+        if (expandedPinDetail.has(pin.id)) {
+          const detailRow = document.createElement("div");
+          detailRow.className = "ps-btn-row";
+          detailRow.style.cssText = "gap:6px; align-items:center; margin:-2px 0 4px 0; padding-left:14px;";
+          detailRow.innerHTML = `
+            <input type="number" min="0" step="0.01" value="${pin.areaKm2 || ""}" data-pin-area="${pin.id}" class="columns-lang-select" style="flex:1; min-width:0;" placeholder="Luas (km²)" />
+            <input type="number" min="0" step="1" value="${pin.population || ""}" data-pin-pop="${pin.id}" class="columns-lang-select" style="flex:1; min-width:0;" placeholder="Jumlah penduduk" />
+            <input type="number" min="1900" max="2100" value="${pin.populationYear || ""}" data-pin-pop-year="${pin.id}" class="columns-lang-select" style="width:78px;" placeholder="Sensus thn" />
+            <button type="button" class="chip-btn small" data-pin-auto="${pin.id}" title="Ambil ulang penduduk &amp; luas dari Wikidata (otomatis)">🔄 Wikidata</button>
+          `;
+          list.appendChild(detailRow);
+          // BARU (9 Sep 2026, permintaan operator) -- baris sumber data,
+          // dipisah dari baris input di atas supaya angkanya tetap gampang
+          // diedit manual kalau operator mau koreksi setelah diisi
+          // otomatis. Sama seperti banner nasional: baris ini SENGAJA
+          // kosong (tidak ditampilkan) kalau belum pernah diisi apapun.
+          const sourceRow = document.createElement("div");
+          sourceRow.style.cssText = "padding-left:14px; margin:-4px 0 6px 0;";
+          const statusText = pinAutoStatus.get(pin.id);
+          const parts = [];
+          if (statusText) parts.push(statusText);
+          else {
+            if (pin.populationSource) parts.push("👥 " + pin.populationSource + (pin.populationYear ? " (" + pin.populationYear + ")" : ""));
+            if (pin.areaSource) parts.push("📐 " + pin.areaSource);
+          }
+          sourceRow.innerHTML = parts.length
+            ? `<span class="ps-pointer-hint" style="margin:0; display:block;">${escapeHtml(parts.join(" · "))}</span>`
+            : `<span class="ps-pointer-hint" style="margin:0; display:block;">Belum ada sumber tercatat -- isi manual di atas, atau tekan "🔄 Wikidata".</span>`;
+          list.appendChild(sourceRow);
+        }
+        // BARU (9 Sep 2026, permintaan operator) -- panel "📷 Foto":
+        // pratinjau thumbnail (maks 5) + tombol hapus per foto + input
+        // unggah baru (disembunyikan kalau sudah 5). Berlaku untuk
+        // SEMUA pin, baik pin manual maupun pin kota berkategori (Kaki
+        // Dian/Pos Injil/dst) -- jadi bisa dipakai di 514 kabupaten/kota
+        // sekalipun, TAPI lihat catatan penyimpanan di
+        // compressImageFile_() di atas: dipakai sewajarnya (kota yang
+        // memang mau ditonjolkan saja), bukan untuk semua 514 kota
+        // sekaligus, supaya localStorage perangkat tidak penuh.
+        if (expandedPinPhotos.has(pin.id)) {
+          const photos = Array.isArray(pin.photos) ? pin.photos : [];
+          const photoPanel = document.createElement("div");
+          photoPanel.style.cssText = "margin:-2px 0 6px 0; padding-left:14px; display:flex; flex-direction:column; gap:6px;";
+          const thumbsHtml = photos.map((src, i) => `
+            <span style="position:relative; display:inline-block;">
+              <img src="${src}" alt="" style="width:52px; height:52px; object-fit:cover; border-radius:6px; border:1px solid rgba(255,255,255,.25);" />
+              <button type="button" data-pin-photo-del="${pin.id}" data-photo-idx="${i}" title="Hapus foto ini" style="position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; border:none; background:#c0392b; color:#fff; font-size:11px; line-height:18px; padding:0; cursor:pointer;">✕</button>
+            </span>
+          `).join("");
+          photoPanel.innerHTML = `
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">${thumbsHtml || '<span class="ps-pointer-hint" style="margin:0;">Belum ada foto.</span>'}</div>
+            ${photos.length < 5 ? `<div class="ps-btn-row" style="gap:6px;">
+              <input type="file" accept="image/*" multiple data-pin-photo-add="${pin.id}" style="flex:1; min-width:0; font-size:12px;" />
+            </div>
+            <span class="ps-pointer-hint" style="margin:0;">Maks 5 foto/kota, otomatis dikecilkan supaya hemat penyimpanan.</span>` : `<span class="ps-pointer-hint" style="margin:0;">Sudah 5 foto (maksimal). Hapus salah satu untuk unggah yang baru.</span>`}
+          `;
+          list.appendChild(photoPanel);
+        }
+      });
+      list.querySelectorAll("[data-pin-label]").forEach((inp) => {
+        inp.addEventListener("change", () => {
+          const pin = (map.pins || []).find((p) => p.id === inp.dataset.pinLabel);
+          if (pin) { pin.label = inp.value.trim(); saveMaps(); renderMapEditor(); }
+        });
+      });
+      list.querySelectorAll("[data-pin-focus]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const pin = (map.pins || []).find((p) => p.id === btn.dataset.pinFocus);
+          if (pin) {
+            rawPost({ type: "map", action: "focus", pin, imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins: visiblePins(map) });
+            // BARU (9 Sep 2026) -- "🎯 Fokus" pakai zoom tetap 2.6x (260%)
+            // di Layar 2 (lihat focusMapPin(), present.html) -- samakan
+            // posisi slider supaya operator bisa lanjut menggeser dari
+            // situ, bukan dari 100% yang salah/menyesatkan.
+            if (el("psMapZoomSlider")) el("psMapZoomSlider").value = 260;
+            if (el("psMapZoomValue")) el("psMapZoomValue").textContent = "260%";
+          }
+        });
+      });
+      list.querySelectorAll("[data-pin-del]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          map.pins = (map.pins || []).filter((p) => p.id !== btn.dataset.pinDel);
+          expandedPinDetail.delete(btn.dataset.pinDel);
+          saveMaps();
+          renderMapEditor();
+        });
+      });
+      // BARU (9 Sep 2026) -- buka/tutup panel "📊 Data" per pin.
+      list.querySelectorAll("[data-pin-detail-toggle]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.pinDetailToggle;
+          if (expandedPinDetail.has(id)) { expandedPinDetail.delete(id); pinAutoStatus.delete(id); } else expandedPinDetail.add(id);
+          renderMapEditor();
+        });
+      });
+      // BARU (9 Sep 2026, permintaan operator) -- tombol "🔄 Wikidata"
+      // per-pin: ambil penduduk+luas OTOMATIS (bukan isi manual lagi),
+      // langsung isi kotak "📊 Data" di atasnya + catat sumber & tahunnya
+      // supaya bisa ditampilkan ke penonton di Layar 2 (lihat
+      // renderMapInfoCard_(), present.html). Nama yang dicari = label pin
+      // (untuk pin dari "📋 Daftar Titik dari Tabel" ini nama kota/
+      // kabupaten resmi, mis. "Kabupaten Sidoarjo" -- cocok dengan label
+      // Wikidata Indonesia).
+      list.querySelectorAll("[data-pin-auto]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.pinAuto;
+          const pin = (map.pins || []).find((p) => p.id === id);
+          if (!pin) return;
+          pinAutoStatus.set(id, "⏳ Mengambil dari Wikidata…");
+          renderMapEditor();
+          try {
+            const data = await fetchCityDataAuto_(pin.label || "");
+            const gotParts = [];
+            if (data.population && data.population.value) {
+              pin.population = Math.round(data.population.value);
+              pin.populationYear = data.population.year || "";
+              pin.populationSource = data.population.source;
+              gotParts.push("penduduk " + pin.population.toLocaleString("id-ID"));
+            }
+            if (data.area && data.area.value) {
+              pin.areaKm2 = data.area.value;
+              pin.areaSource = data.area.source;
+              gotParts.push("luas " + pin.areaKm2.toLocaleString("id-ID") + " km²");
+            }
+            saveMaps();
+            pinAutoStatus.set(id, gotParts.length ? "✅ Terisi: " + gotParts.join(", ") + " (" + data.matchedLabel + ")" : "⚠️ Tidak ada angka yang cocok ditemukan.");
+          } catch (e) {
+            pinAutoStatus.set(id, "⚠️ Gagal: " + (e && e.message ? e.message : "kesalahan tidak dikenal"));
+          }
+          renderMapEditor();
+        });
+      });
+      // BARU (9 Sep 2026) -- buka/tutup panel "📷 Foto" per pin.
+      list.querySelectorAll("[data-pin-photo-toggle]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.pinPhotoToggle;
+          if (expandedPinPhotos.has(id)) expandedPinPhotos.delete(id); else expandedPinPhotos.add(id);
+          renderMapEditor();
+        });
+      });
+      // BARU (9 Sep 2026) -- unggah foto baru (dikompres dulu lewat
+      // compressImageFile_() di atas), dibatasi total 5/pin -- kalau
+      // operator pilih lebih dari sisa slot, kelebihannya dilewati saja
+      // (bukan error) supaya tidak mengagetkan operator saat live.
+      list.querySelectorAll("[data-pin-photo-add]").forEach((inp) => {
+        inp.addEventListener("change", async () => {
+          const pin = (map.pins || []).find((p) => p.id === inp.dataset.pinPhotoAdd);
+          if (!pin || !inp.files || !inp.files.length) return;
+          if (!Array.isArray(pin.photos)) pin.photos = [];
+          const slots = Math.max(0, 5 - pin.photos.length);
+          const files = Array.from(inp.files).slice(0, slots);
+          for (const file of files) {
+            try {
+              const dataUrl = await compressImageFile_(file);
+              pin.photos.push(dataUrl);
+            } catch (e) {
+              // Gagal kompres 1 foto (mis. file rusak) -- lewati saja,
+              // tidak menggagalkan foto lain yang sedang diunggah.
+            }
+          }
+          saveMaps();
+          renderMapEditor();
+        });
+      });
+      // BARU (9 Sep 2026) -- hapus 1 foto dari pin (index dalam array).
+      list.querySelectorAll("[data-pin-photo-del]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const pin = (map.pins || []).find((p) => p.id === btn.dataset.pinPhotoDel);
+          if (!pin || !Array.isArray(pin.photos)) return;
+          pin.photos.splice(Number(btn.dataset.photoIdx), 1);
+          saveMaps();
+          renderMapEditor();
+        });
+      });
+      // BARU (9 Sep 2026) -- simpan luas/penduduk/tahun data ke pin.
+      // Field kosong disimpan sebagai "" (BUKAN 0) supaya kartu info di
+      // Layar 2 tahu untuk TIDAK menampilkan baris itu (lihat
+      // renderMapInfoCard_(), present.html).
+      // BARU (9 Sep 2026) -- kalau operator ketik ULANG angka manual
+      // (baik pertama kali maupun buat KOREKSI hasil "🔄 Wikidata"),
+      // catatan "sumber: Wikidata"-nya ikut dihapus -- supaya tidak
+      // salah tampil ke penonton seolah angka koreksi manual itu masih
+      // dari Wikidata. Belum ada cara memberi label "sumber manual"
+      // eksplisit (operator bisa isi lewat catatan lain kalau perlu).
+      list.querySelectorAll("[data-pin-area]").forEach((inp) => {
+        inp.addEventListener("change", () => {
+          const pin = (map.pins || []).find((p) => p.id === inp.dataset.pinArea);
+          if (pin) { pin.areaKm2 = inp.value ? Number(inp.value) : ""; pin.areaSource = ""; saveMaps(); renderMapEditor(); }
+        });
+      });
+      list.querySelectorAll("[data-pin-pop]").forEach((inp) => {
+        inp.addEventListener("change", () => {
+          const pin = (map.pins || []).find((p) => p.id === inp.dataset.pinPop);
+          if (pin) { pin.population = inp.value ? Number(inp.value) : ""; pin.populationSource = ""; saveMaps(); renderMapEditor(); }
+        });
+      });
+      list.querySelectorAll("[data-pin-pop-year]").forEach((inp) => {
+        inp.addEventListener("change", () => {
+          const pin = (map.pins || []).find((p) => p.id === inp.dataset.pinPopYear);
+          if (pin) { pin.populationYear = inp.value ? Number(inp.value) : ""; saveMaps(); }
+        });
+      });
+      renderCityRows();
+      renderCategoryChecklist();
+      renderCalibStatus();
+      renderNatPopStatus();
+    }
+
+    // BARU (9 Sep 2026) -- pin yang IKUT DIKIRIM ke Layar 2: pin TANPA
+    // kategori (pin manual, selalu tampil) + pin BERKATEGORI yang
+    // kategorinya sedang DICENTANG di "☑️ Kategori yang Ditampilkan".
+    function visiblePins(map) {
+      const active = new Set(map.activeCategories || []);
+      return (map.pins || []).filter((p) => !p.category || active.has(p.category));
+    }
+
+    function renderCalibStatus() {
+      const statusEl = el("psMapCalibStatus");
+      if (!statusEl) return;
+      const map = activeMap();
+      const c = map && map.calibration;
+      if (c && c.p1 && c.p2) {
+        statusEl.textContent = `✅ Terkalibrasi (acuan: ${c.p1.name} & ${c.p2.name}).`;
+      } else if (calibArmed) {
+        statusEl.textContent = `🎯 Klik di gambar peta untuk titik acuan #${calibArmed}...`;
+      } else {
+        statusEl.textContent = "⚠️ Belum dikalibrasi -- \"Terapkan ke Peta\" di bawah belum bisa menghitung posisi otomatis.";
+      }
+    }
+
+    // BARU (9 Sep 2026) -- ☑️ daftar kategori (dari SEMUA pin berkategori
+    // di peta aktif) + jumlah titiknya, checkbox mengatur
+    // map.activeCategories (dipakai visiblePins() di atas & badge legenda
+    // Layar 2, lihat showMap()/present.html).
+    function renderCategoryChecklist() {
+      const wrap = el("psMapCategoryChecklist");
+      if (!wrap) return;
+      const map = activeMap();
+      if (!map) { wrap.innerHTML = ""; return; }
+      const counts = {};
+      (map.pins || []).forEach((p) => { if (p.category) counts[p.category] = (counts[p.category] || 0) + 1; });
+      const categories = Object.keys(counts).sort();
+      if (!map.activeCategories) map.activeCategories = categories.slice(); // default: semua nyala
+      if (!categories.length) {
+        wrap.innerHTML = '<div class="ps-pointer-hint" style="margin:0;">(belum ada kategori -- isi dari "📋 Daftar Titik dari Tabel" di atas)</div>';
+        return;
+      }
+      wrap.innerHTML = categories.map((cat) => {
+        const checked = map.activeCategories.includes(cat) ? "checked" : "";
+        const color = categoryColor(cat);
+        return `<label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" data-map-cat="${escapeHtml(cat)}" ${checked} style="margin:0;" />
+          <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${color};"></span>
+          <span style="flex:1;">${escapeHtml(cat)}</span>
+          <span style="opacity:.7;">(${counts[cat]})</span>
+        </label>`;
+      }).join("");
+      wrap.querySelectorAll("[data-map-cat]").forEach((cb) => {
+        cb.addEventListener("change", () => {
+          const cat = cb.dataset.mapCat;
+          const set = new Set(map.activeCategories || []);
+          if (cb.checked) set.add(cat); else set.delete(cat);
+          map.activeCategories = Array.from(set);
+          saveMaps();
+        });
+      });
+    }
+
+    // BARU (9 Sep 2026) -- 📋 baris tabel "Kota/Kabupaten | Kategori |
+    // Tahun" -- disimpan di map.cityRows (TERPISAH dari map.pins) supaya
+    // baris yang belum sempat "🧮 Terapkan ke Peta" tidak hilang & tetap
+    // bisa diedit ulang kapan saja (mis. perbaiki typo nama kota) tanpa
+    // kehilangan pin yang SUDAH ditaruh dari baris lain.
+    function renderCityRows() {
+      const wrap = el("psMapCityRows");
+      if (!wrap) return;
+      const map = activeMap();
+      if (!map) { wrap.innerHTML = ""; return; }
+      if (!Array.isArray(map.cityRows)) map.cityRows = [];
+      wrap.innerHTML = map.cityRows.map((row, i) => `
+        <div class="ps-btn-row" style="gap:6px; align-items:center;" data-city-row="${i}">
+          <input type="text" list="psIndonesiaCities" value="${escapeHtml(row.city || "")}" data-row-field="city" placeholder="mis. Surabaya" class="columns-lang-select" style="flex:1.4; min-width:0;" />
+          <input type="text" list="psMapCategoriesList" value="${escapeHtml(row.category || "")}" data-row-field="category" placeholder="mis. Kaki Dian" class="columns-lang-select" style="flex:1; min-width:0;" />
+          <input type="number" value="${row.year || ""}" data-row-field="year" placeholder="Tahun" class="columns-lang-select" style="width:64px;" />
+          <button type="button" class="chip-btn small" data-row-del="${i}" title="Hapus baris">🗑️</button>
+        </div>
+      `).join("");
+      wrap.querySelectorAll("[data-row-field]").forEach((inp) => {
+        inp.addEventListener("change", () => {
+          const i = Number(inp.closest("[data-city-row]").dataset.cityRow);
+          if (!map.cityRows[i]) return;
+          map.cityRows[i][inp.dataset.rowField] = inp.dataset.rowField === "year" ? (inp.value ? Number(inp.value) : "") : inp.value;
+          saveMaps();
+        });
+      });
+      wrap.querySelectorAll("[data-row-del]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          map.cityRows.splice(Number(btn.dataset.rowDel), 1);
+          saveMaps();
+          renderCityRows();
+        });
+      });
+      // Perbarui daftar autocomplete kategori supaya baris BARU bisa
+      // langsung memilih kategori yang SUDAH dipakai baris lain/pin lain
+      // (menghindari typo -> kategori "ganda" tidak sengaja).
+      const catList = el("psMapCategoriesList");
+      if (catList) {
+        const cats = new Set((map.pins || []).map((p) => p.category).filter(Boolean));
+        (map.cityRows || []).forEach((r) => { if (r.category) cats.add(r.category); });
+        catList.innerHTML = Array.from(cats).sort().map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
+      }
+    }
+
+
+    loadMaps();
+    if (maps.length) activeMapId = maps[0].id;
+    renderMapSelect();
+    renderMapEditor();
+    // BARU (9 Sep 2026) -- isi datalist nama kota SEKALI saja (data
+    // statis, tidak berubah per peta) -- lihat js/indonesia-regencies.js.
+    if (el("psIndonesiaCities") && typeof window !== "undefined" && Array.isArray(window.INDONESIA_REGENCIES)) {
+      el("psIndonesiaCities").innerHTML = window.INDONESIA_REGENCIES.map((r) => `<option value="${escapeHtml(r.n)}"></option>`).join("");
+    }
+
+    if (el("psMapSelect")) {
+      el("psMapSelect").addEventListener("change", () => {
+        activeMapId = el("psMapSelect").value;
+        renderMapEditor();
+      });
+    }
+    if (el("psMapNewBtn")) {
+      el("psMapNewBtn").addEventListener("click", () => {
+        const name = prompt("Nama peta baru (mis. nama acara/venue):", "Peta Baru");
+        if (!name || !name.trim()) return;
+        const map = { id: "map_" + Date.now().toString(36), name: name.trim(), imageDataUrl: null, pins: [] };
+        maps.unshift(map);
+        activeMapId = map.id;
+        saveMaps();
+        renderMapSelect();
+        renderMapEditor();
+      });
+    }
+    if (el("psMapRenameBtn")) {
+      el("psMapRenameBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map) return;
+        const name = prompt("Nama baru:", map.name);
+        if (!name || !name.trim()) return;
+        map.name = name.trim();
+        saveMaps();
+        renderMapSelect();
+      });
+    }
+    if (el("psMapDeleteBtn")) {
+      el("psMapDeleteBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map) return;
+        if (!confirm(`Hapus peta "${map.name}"? Semua pin di dalamnya ikut terhapus.`)) return;
+        maps = maps.filter((m) => m.id !== map.id);
+        activeMapId = maps.length ? maps[0].id : null;
+        saveMaps();
+        renderMapSelect();
+        renderMapEditor();
+      });
+    }
+    const mapDz = el("psMapImageDropzone");
+    const mapInput = el("psMapImageInput");
+    function handleMapImageFile(file) {
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { alert("Pilih file gambar (jpg/png/webp)."); return; }
+      if (file.size > 25 * 1024 * 1024) { alert(`${file.name}: melebihi 25MB.`); return; }
+      let map = activeMap();
+      if (!map) {
+        map = { id: "map_" + Date.now().toString(36), name: file.name.replace(/\.[a-z0-9]+$/i, ""), imageDataUrl: null, pins: [] };
+        maps.unshift(map);
+        activeMapId = map.id;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        map.imageDataUrl = reader.result;
+        saveMaps();
+        renderMapSelect();
+        renderMapEditor();
+      };
+      reader.readAsDataURL(file);
+    }
+    if (mapDz && mapInput) {
+      mapDz.addEventListener("click", () => mapInput.click());
+      mapDz.addEventListener("dragover", (e) => { e.preventDefault(); mapDz.classList.add("dragover"); });
+      mapDz.addEventListener("dragleave", () => mapDz.classList.remove("dragover"));
+      mapDz.addEventListener("drop", (e) => { e.preventDefault(); mapDz.classList.remove("dragover"); handleMapImageFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
+      mapInput.addEventListener("change", () => handleMapImageFile(mapInput.files && mapInput.files[0]));
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🌐 Ambil Peta Dasar dari
+    // Online: pengganti unggah manual, hasilnya jadi map.imageDataUrl
+    // yang sama (lihat fetchOnlineBaseMap_() di atas). Varian gaya lama
+    // (map.styleVariants) DIHAPUS karena gambar dasarnya berubah --
+    // kalau tidak, operator bisa lihat gaya "Komik" versi peta yang
+    // LAMA menempel di gambar yang BARU (bug halus tapi membingungkan).
+    if (el("psMapOnlineFetchBtn")) {
+      el("psMapOnlineFetchBtn").addEventListener("click", async () => {
+        const btn = el("psMapOnlineFetchBtn");
+        const statusEl = el("psMapOnlineFetchStatus");
+        btn.disabled = true;
+        if (statusEl) statusEl.textContent = "⏳ Mencari & mengunduh peta dari Wikimedia Commons...";
+        try {
+          const result = await fetchOnlineBaseMap_();
+          let map = activeMap();
+          if (!map) {
+            map = { id: "map_" + Date.now().toString(36), name: "Indonesia (online)", imageDataUrl: null, pins: [] };
+            maps.unshift(map);
+            activeMapId = map.id;
+          }
+          map.imageDataUrl = result.dataUrl;
+          map.mapStyle = "normal";
+          map.styleVariants = {};
+          saveMaps();
+          renderMapSelect();
+          renderMapEditor();
+          if (el("psMapStyleSelect")) el("psMapStyleSelect").value = "normal";
+          if (statusEl) statusEl.textContent = `✅ Berhasil ambil "${result.title}" dari Wikimedia Commons.`;
+        } catch (err) {
+          if (statusEl) statusEl.textContent = "⚠️ Gagal: " + (err && err.message ? err.message : "kesalahan tidak dikenal") + " -- coba lagi, atau unggah manual di atas.";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Peta Dasar: ganti
+    // dropdown -> proses (kalau belum ada di cache) lewat
+    // generateMapStyleVariant_(), simpan ke map.styleVariants supaya
+    // pindah gaya berikutnya instan. TIDAK auto-dorong ke Layar 2 --
+    // operator tetap tekan "▶️ Tampilkan Peta"/"🎯 Fokus" seperti biasa
+    // supaya tidak mengagetkan penonton saat operator baru coba-coba
+    // gaya (sama seperti unggah gambar baru yang juga tidak auto-dorong).
+    if (el("psMapStyleSelect")) {
+      el("psMapStyleSelect").addEventListener("change", async (e) => {
+        const map = activeMap();
+        if (!map || !map.imageDataUrl) { alert("Unggah/ambil gambar peta dulu."); e.target.value = "normal"; return; }
+        const style = e.target.value;
+        map.mapStyle = style;
+        const statusEl = el("psMapStyleStatus");
+        if (style !== "normal" && (!map.styleVariants || !map.styleVariants[style])) {
+          if (statusEl) statusEl.textContent = "⏳ Memproses gaya " + style + "...";
+          try {
+            const variant = await generateMapStyleVariant_(map.imageDataUrl, style);
+            if (!map.styleVariants) map.styleVariants = {};
+            map.styleVariants[style] = variant;
+            if (statusEl) statusEl.textContent = "✅ Gaya diterapkan (tersimpan, bisa dipakai offline mulai sekarang).";
+          } catch (err) {
+            if (statusEl) statusEl.textContent = "⚠️ Gagal memproses gaya: " + (err && err.message ? err.message : "kesalahan tidak dikenal");
+            map.mapStyle = "normal"; e.target.value = "normal";
+          }
+        } else if (statusEl) {
+          statusEl.textContent = style === "normal" ? "" : "✅ Gaya sudah tersimpan sebelumnya (instan, offline).";
+        }
+        saveMaps();
+        renderMapEditor();
+      });
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Pin: flat (lama)
+    // atau 3D Berputar (.pin-3d, lihat css/style.css & present.html).
+    // Sama seperti Gaya Peta di atas, TIDAK auto-dorong ke Layar 2.
+    if (el("psMapPinStyleSelect")) {
+      el("psMapPinStyleSelect").addEventListener("change", (e) => {
+        const map = activeMap();
+        if (!map) return;
+        map.pinStyle = e.target.value;
+        saveMaps();
+        renderMapEditor();
+      });
+    }
+    // Klik di atas gambar peta = tambah pin BARU di titik itu (persen
+    // relatif terhadap ukuran gambar, supaya tetap pas walau Layar 2
+    // beda resolusi/rasio dari pratinjau Studio ini) -- KECUALI sedang
+    // dalam mode "🎯 Tandai" kalibrasi (calibArmed), yang menaruh titik
+    // acuan BUKAN pin biasa (lihat catatan panjang latLngToPct() di atas).
+    if (el("psMapEditorImg")) {
+      el("psMapEditorImg").addEventListener("click", (e) => {
+        const map = activeMap();
+        if (!map) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+        const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+        if (calibArmed) {
+          const cityInputId = calibArmed === 1 ? "psMapCalib1City" : "psMapCalib2City";
+          const cityName = (el(cityInputId) && el(cityInputId).value.trim()) || "";
+          const reg = findRegencyByName(cityName);
+          if (!reg) { alert(`Kota "${cityName}" tidak ditemukan di daftar. Coba nama lain (mis. tambahkan "Kota"/"Kabupaten" di depannya).`); return; }
+          map.calibration = map.calibration || {};
+          map.calibration["p" + calibArmed] = { name: reg.n, lat: reg.lat, lng: reg.lng, xPct, yPct };
+          calibArmed = null;
+          saveMaps();
+          renderMapEditor();
+          return;
+        }
+        const label = prompt("Nama titik ini (mis. \"Gazebo Musa\", \"Toilet\", \"Pintu Masuk\"):", "");
+        if (label === null) return; // dibatalkan
+        map.pins = map.pins || [];
+        map.pins.push({ id: "pin_" + Date.now().toString(36), label: label.trim() || ("Titik " + (map.pins.length + 1)), xPct, yPct });
+        saveMaps();
+        renderMapEditor();
+      });
+    }
+    // BARU (9 Sep 2026) -- tombol "🎯 Tandai" kalibrasi: mempersenjatai
+    // calibArmed, operator lanjut klik di gambar (listener di atas).
+    if (el("psMapCalib1Btn")) {
+      el("psMapCalib1Btn").addEventListener("click", () => {
+        if (!el("psMapCalib1City") || !el("psMapCalib1City").value.trim()) { alert("Ketik nama kota acuan #1 dulu."); return; }
+        calibArmed = 1;
+        renderCalibStatus();
+      });
+    }
+    if (el("psMapCalib2Btn")) {
+      el("psMapCalib2Btn").addEventListener("click", () => {
+        if (!el("psMapCalib2City") || !el("psMapCalib2City").value.trim()) { alert("Ketik nama kota acuan #2 dulu."); return; }
+        calibArmed = 2;
+        renderCalibStatus();
+      });
+    }
+    // BARU (9 Sep 2026) -- 📋 Daftar Titik dari Tabel.
+    if (el("psMapCityRowAddBtn")) {
+      el("psMapCityRowAddBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map) { alert("Buat/pilih peta dulu."); return; }
+        map.cityRows = map.cityRows || [];
+        map.cityRows.push({ city: "", category: "", year: "" });
+        saveMaps();
+        renderCityRows();
+      });
+    }
+    if (el("psMapCityRowApplyBtn")) {
+      el("psMapCityRowApplyBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map) return;
+        if (!map.calibration || !map.calibration.p1 || !map.calibration.p2) {
+          alert("Kalibrasi peta dulu (2 titik acuan) sebelum menerapkan daftar tabel.");
+          return;
+        }
+        const rows = map.cityRows || [];
+        let applied = 0;
+        const notFound = [];
+        map.pins = map.pins || [];
+        rows.forEach((row) => {
+          const cityName = (row.city || "").trim();
+          const category = (row.category || "").trim();
+          if (!cityName || !category) return; // baris belum lengkap -- dilewati, bukan gagal semua
+          const reg = findRegencyByName(cityName);
+          if (!reg) { notFound.push(cityName); return; }
+          const pos = latLngToPct(map, reg.lat, reg.lng);
+          if (!pos) return;
+          // BARU -- id STABIL dari kota+kategori supaya "🧮 Terapkan ke
+          // Peta" yang ditekan ULANG (mis. setelah edit tahun) MEMPERBARUI
+          // pin yang sama, bukan menduplikasi.
+          const pinId = "city_" + cityName.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + category.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          const existing = map.pins.find((p) => p.id === pinId);
+          const pinData = { id: pinId, label: reg.n, category, year: row.year || "", xPct: pos.xPct, yPct: pos.yPct };
+          if (existing) Object.assign(existing, pinData); else map.pins.push(pinData);
+          applied++;
+        });
+        saveMaps();
+        renderMapEditor();
+        const status = el("psMapCityRowStatus");
+        if (status) {
+          status.textContent = notFound.length
+            ? `✅ ${applied} titik diterapkan. ⚠️ Tidak ditemukan: ${notFound.join(", ")}.`
+            : `✅ ${applied} titik diterapkan ke peta.`;
+        }
+      });
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🔍 Zoom Peta interaktif.
+    // Slider kirim {type:"map", action:"zoom", scale} tiap digeser (input
+    // event, bukan cuma "change", supaya terasa langsung/live saat
+    // ditayangkan). Tombol ➖/➕ = langkah 25% per klik, ikut menggerakkan
+    // posisi slider supaya operator tahu persis angka zoom saat ini.
+    function sendMapZoom(pct) {
+      const scale = pct / 100;
+      rawPost({ type: "map", action: "zoom", scale });
+      if (el("psMapZoomValue")) el("psMapZoomValue").textContent = pct + "%";
+    }
+    if (el("psMapZoomSlider")) {
+      el("psMapZoomSlider").addEventListener("input", () => {
+        sendMapZoom(Number(el("psMapZoomSlider").value));
+      });
+    }
+    if (el("psMapZoomOutBtn")) {
+      el("psMapZoomOutBtn").addEventListener("click", () => {
+        const slider = el("psMapZoomSlider");
+        if (!slider) return;
+        slider.value = Math.max(100, Number(slider.value) - 25);
+        sendMapZoom(Number(slider.value));
+      });
+    }
+    if (el("psMapZoomInBtn")) {
+      el("psMapZoomInBtn").addEventListener("click", () => {
+        const slider = el("psMapZoomSlider");
+        if (!slider) return;
+        slider.value = Math.min(600, Number(slider.value) + 25);
+        sendMapZoom(Number(slider.value));
+      });
+    }
+    // Kecilkan helper -- dipakai psMapShowBtn/psMapUnfocusBtn di bawah
+    // supaya slider zoom selalu balik ke "100%" saat operator kembali ke
+    // peta penuh (biar tidak membingungkan -- slider yang nyasar di 300%
+    // padahal peta sudah di-reset ke penuh).
+    function resetMapZoomSlider() {
+      if (el("psMapZoomSlider")) el("psMapZoomSlider").value = 100;
+      if (el("psMapZoomValue")) el("psMapZoomValue").textContent = "100%";
+    }
+    if (el("psMapShowBtn")) {
+      el("psMapShowBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map || !map.imageDataUrl) { alert("Unggah gambar peta dulu."); return; }
+        const pins = visiblePins(map);
+        // BARU (9 Sep 2026) -- hitungan per kategori yang SEDANG tampil,
+        // dikirim sebagai categoryCounts supaya Layar 2 bisa menunjukkan
+        // badge "Kaki Dian: 12  Pos Injil: 8" ke penonton (lihat
+        // showMap()/present.html).
+        const categoryCounts = {};
+        pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
+        rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        resetMapZoomSlider();
+      });
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- lawan dari "🎯 Fokus":
+    // balikin Layar 2 dari mode zoom ke peta PENUH lagi (semua pin yang
+    // sedang aktif tetap tampil, legenda tetap tampil), TANPA menutup
+    // peta seperti "⏹ Hentikan". Sama persis payload-nya dengan
+    // psMapShowBtn di atas (showMap() di present.html mereset transform
+    // ke scale 1 setiap dipanggil), cuma tombolnya diletakkan berdekatan
+    // dengan "🎯 Fokus" di daftar Pin supaya gampang ditemukan operator
+    // saat live.
+    if (el("psMapUnfocusBtn")) {
+      el("psMapUnfocusBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map || !map.imageDataUrl) return;
+        const pins = visiblePins(map);
+        const categoryCounts = {};
+        pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
+        rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        resetMapZoomSlider();
+      });
+    }
+    if (el("psMapStopBtn")) {
+      el("psMapStopBtn").addEventListener("click", () => rawPost({ type: "map", action: "stop" }));
+    }
+    // BARU (9 Sep 2026) -- selipkan REFERENSI peta aktif ke Kumpulan
+    // Ayat (lihat catatan addMapToCollection(), js/collections.js).
+    if (el("psMapSaveBtn")) {
+      el("psMapSaveBtn").addEventListener("click", async () => {
+        const map = activeMap();
+        if (!map || !map.imageDataUrl) { alert("Unggah gambar peta dulu."); return; }
+        if (typeof promptCollectionName !== "function" || typeof addMapToCollection !== "function") return;
+        const name = await promptCollectionName();
+        if (!name) return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        addMapToCollection(username, name, { mapId: map.id, mapName: map.name });
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        if (el("psMapSaveStatus")) {
+          el("psMapSaveStatus").textContent = `✅ Tersimpan ke kumpulan "${name}".`;
+          setTimeout(() => { if (el("psMapSaveStatus")) el("psMapSaveStatus").textContent = ""; }, 4000);
+        }
+      });
+    }
+
+    // BARU (9 Sep 2026, permintaan operator) -- 🌏 Total Penduduk
+    // Indonesia (Nasional): toggle tampil/sembunyi LIVE (tidak mereset
+    // zoom/pin yang sedang tayang, lihat pushNatPopLive_() di atas).
+    if (el("psMapNatPopVisible")) {
+      el("psMapNatPopVisible").addEventListener("change", (e) => {
+        const map = activeMap();
+        if (!map) return;
+        if (!map.nationalPopulation) map.nationalPopulation = { value: null, year: "", source: "", sourceUrl: "", visible: false };
+        map.nationalPopulation.visible = !!e.target.checked;
+        saveMaps();
+        pushNatPopLive_();
+      });
+    }
+    // BARU (9 Sep 2026) -- 🔄 Perbarui Otomatis: ambil angka penduduk
+    // Indonesia terbaru dari Wikidata (lihat fetchNationalPopulationAuto_()
+    // di atas untuk catatan sumber & batasannya), lalu simpan ke peta
+    // aktif & langsung dorong ke Layar 2 kalau togglenya sedang nyala.
+    if (el("psMapNatPopAutoBtn")) {
+      el("psMapNatPopAutoBtn").addEventListener("click", async () => {
+        const map = activeMap();
+        if (!map) { alert("Pilih/buat peta dulu."); return; }
+        const btn = el("psMapNatPopAutoBtn");
+        const statusEl = el("psMapNatPopStatus");
+        const prevLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "⏳ Mencari...";
+        try {
+          const result = await fetchNationalPopulationAuto_();
+          const wasVisible = map.nationalPopulation ? !!map.nationalPopulation.visible : true;
+          map.nationalPopulation = {
+            value: result.value, year: result.year, source: result.source, sourceUrl: result.sourceUrl,
+            updatedAt: new Date().toISOString(), visible: wasVisible,
+          };
+          saveMaps();
+          renderNatPopStatus();
+          pushNatPopLive_();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = "❌ Gagal mengambil data otomatis: " + (err && err.message ? err.message : String(err)) + " -- coba lagi atau isi manual di bawah.";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = prevLabel;
+        }
+      });
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🔄 Perbarui Semua
+    // Populasi/Luas (Wikidata): loop semua pin yang SEDANG TAMPIL (pin
+    // manual + pin berkategori yang kategorinya dicentang -- sama seperti
+    // visiblePins()), panggil fetchCityDataAuto_() SATU-SATU dengan jeda
+    // singkat antar-panggilan (bukan sekaligus paralel) supaya sopan ke
+    // server Wikidata & tidak kena rate-limit yang bikin semuanya gagal.
+    // Bisa makan waktu lumayan lama kalau pin-nya ratusan (mis. 500 pin x
+    // ~0.4 detik jeda = ±3-4 menit, belum termasuk waktu jaringan) --
+    // status berjalan ditulis life di bawah tombol supaya operator tahu
+    // ini masih bekerja, bukan macet.
+    function sleep_(ms) { return new Promise((r) => setTimeout(r, ms)); }
+    if (el("psMapBulkAutoBtn")) {
+      el("psMapBulkAutoBtn").addEventListener("click", async () => {
+        const map = activeMap();
+        if (!map) { alert("Pilih/buat peta dulu."); return; }
+        const btn = el("psMapBulkAutoBtn");
+        const statusEl = el("psMapBulkAutoStatus");
+        const pins = visiblePins(map);
+        if (!pins.length) { if (statusEl) statusEl.textContent = "⚠️ Tidak ada pin yang sedang tampil (centang kategori dulu, atau tambah pin)."; return; }
+        if (!confirm(`Ambil ulang penduduk & luas ${pins.length} kota dari Wikidata sekarang? Bisa makan waktu beberapa menit untuk jumlah besar.`)) return;
+        btn.disabled = true;
+        let ok = 0, fail = 0;
+        for (let i = 0; i < pins.length; i++) {
+          const pin = pins[i];
+          if (statusEl) statusEl.textContent = `⏳ (${i + 1}/${pins.length}) ${pin.label || ""}…  ✅${ok} ⚠️${fail}`;
+          try {
+            const data = await fetchCityDataAuto_(pin.label || "");
+            if (data.population && data.population.value) {
+              pin.population = Math.round(data.population.value);
+              pin.populationYear = data.population.year || "";
+              pin.populationSource = data.population.source;
+            }
+            if (data.area && data.area.value) {
+              pin.areaKm2 = data.area.value;
+              pin.areaSource = data.area.source;
+            }
+            ok++;
+          } catch (e) {
+            fail++;
+          }
+          saveMaps();
+          await sleep_(400); // jeda sopan antar-panggilan ke Wikidata
+        }
+        if (statusEl) statusEl.textContent = `✅ Selesai: ${ok} kota terisi, ${fail} gagal/tidak ditemukan (dari ${pins.length}). Cek daftar Pin di atas untuk detailnya.`;
+        btn.disabled = false;
+        renderMapEditor();
+      });
+    }
+    // BARU (9 Sep 2026) -- 💾 Simpan Manual: cadangan kalau "Perbarui
+    // Otomatis" gagal (offline/CORS/dsb), atau operator memang mau
+    // memakai angka dari sumber lain (mis. BPS langsung).
+    if (el("psMapNatPopManualSaveBtn")) {
+      el("psMapNatPopManualSaveBtn").addEventListener("click", () => {
+        const map = activeMap();
+        if (!map) { alert("Pilih/buat peta dulu."); return; }
+        const valueInp = el("psMapNatPopManualValue");
+        const yearInp = el("psMapNatPopManualYear");
+        const sourceInp = el("psMapNatPopManualSource");
+        const value = valueInp && valueInp.value ? Math.round(Number(valueInp.value)) : null;
+        if (!value) { alert("Isi jumlah penduduk dulu (angka)."); return; }
+        const wasVisible = map.nationalPopulation ? !!map.nationalPopulation.visible : true;
+        map.nationalPopulation = {
+          value, year: (yearInp && yearInp.value) || "", source: (sourceInp && sourceInp.value) || "(manual)",
+          sourceUrl: "", updatedAt: new Date().toISOString(), visible: wasVisible,
+        };
+        saveMaps();
+        renderNatPopStatus();
+        pushNatPopLive_();
+        if (valueInp) valueInp.value = "";
+        if (yearInp) yearInp.value = "";
+        if (sourceInp) sourceInp.value = "";
+      });
+    }
   }
 
   function wireLocalVideoTab() {
@@ -5812,6 +7675,29 @@ const PresentationStudio = (() => {
         saveAndSendTheme({ camBubbleSize: v });
       });
     }
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "lingkaran kecil
+    // di 5 sisi") -- posisi bubble, berlaku untuk mode "Teks Penuh,
+    // Kamera Bulat" MAUPUN "Kamera Penuh, Teks Bulat". Pola SAMA seperti
+    // psCamLayoutRow di atas (1 aktif, sisanya lepas "active").
+    if (el("psBubblePosRow")) {
+      document.querySelectorAll("#psBubblePosRow [data-bubble-pos]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#psBubblePosRow [data-bubble-pos]").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          saveAndSendTheme({ bubblePos: btn.dataset.bubblePos });
+        });
+      });
+    }
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "dari kecil sampai
+    // besar sekali") -- slider "Ukuran lingkaran Teks" (200px-1200px,
+    // bawaan 420px), khusus mode "⭕ Kamera Penuh, Teks Bulat".
+    if (el("psTextBubbleSizeSlider")) {
+      el("psTextBubbleSizeSlider").addEventListener("input", () => {
+        const v = Number(el("psTextBubbleSizeSlider").value) || 420;
+        if (el("psTextBubbleSizeValue")) el("psTextBubbleSizeValue").textContent = v + "px";
+        saveAndSendTheme({ textBubbleSize: v });
+      });
+    }
     // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
     // toggle "📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video".
     if (el("psVideoTextOverlay")) {
@@ -5830,12 +7716,35 @@ const PresentationStudio = (() => {
         saveAndSendTheme({ stageTransparent: el("psStageTransparent").checked });
       });
     }
+    // BARU (9 Sep 2026) -- "🔁 Balik sisi" khusus mode "Kamera Kiri,
+    // Konten Kanan", lihat body.cam-split-lr-reverse (present.html).
+    if (el("psCamSplitReverse")) {
+      el("psCamSplitReverse").addEventListener("change", () => {
+        saveAndSendTheme({ camSplitReverse: el("psCamSplitReverse").checked });
+      });
+    }
+    // BARU (9 Sep 2026, sesi ke-9) -- 2 orientasi tambahan yang diminta
+    // operator ("teks atas kamera bawah" & "subtitle di atas"). Lihat
+    // catatan panjang body.cam-split-reverse-tb & body.cam-subtitle-top
+    // di present.html.
+    if (el("psCamSplitReverseTB")) {
+      el("psCamSplitReverseTB").addEventListener("change", () => {
+        saveAndSendTheme({ camSplitReverseTB: el("psCamSplitReverseTB").checked });
+      });
+    }
+    if (el("psCamSubtitleTop")) {
+      el("psCamSubtitleTop").addEventListener("change", () => {
+        saveAndSendTheme({ camSubtitleTop: el("psCamSubtitleTop").checked });
+      });
+    }
     // BARU (8 Sep 2026, permintaan operator "tombol shortcut mode & bel")
     // -- lihat definisi fungsi lengkap & catatan panjang di dekat
     // MODE_PRESETS_KEY (bawah, sebelum wireLocalVideoTab()).
     wireModeShortcuts();
     wireBellShortcuts();
     wireModeAndBellKeyboardShortcuts();
+    wireQuickMenu(); // BARU (9 Sep 2026, sesi ke-9) -- Fitur A "Menu Cepat ⚡"
+    applyScrollbarVisibilityFromStorage_(); // BARU (10 Sep 2026, sesi ke-10)
 
     // BARU -- 🖼️ Unggah Gambar Latar (dropzone sama pola dengan tab
     // File, tapi 1 gambar saja -- gambar BARU menggantikan yang lama).
@@ -6102,7 +8011,7 @@ const PresentationStudio = (() => {
   // video, teks tampil sebagai BAR SUBTITLE menempel di bawah, lihat
   // body.cam-subtitle). `camSplitPct`: tinggi zona kamera (%) untuk
   // mode "split", bisa diatur bebas lewat slider (bawaan 42).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420 };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -6204,11 +8113,29 @@ const PresentationStudio = (() => {
       el("psCamSplitPctSlider").value = String(savedPct);
       if (el("psCamSplitPctValue")) el("psCamSplitPctValue").textContent = savedPct + "%";
     }
+    // BARU (9 Sep 2026) -- pulihkan centang "Balik Sisi".
+    if (el("psCamSplitReverse")) el("psCamSplitReverse").checked = !!theme.camSplitReverse;
+    // BARU (9 Sep 2026, sesi ke-9) -- pulihkan 2 centang orientasi baru.
+    if (el("psCamSplitReverseTB")) el("psCamSplitReverseTB").checked = !!theme.camSplitReverseTB;
+    if (el("psCamSubtitleTop")) el("psCamSubtitleTop").checked = !!theme.camSubtitleTop;
     // BARU (8 Sep 2026 v3) -- pulihkan slider "Ukuran lingkaran Kamera".
     if (el("psCamBubbleSizeSlider")) {
       const savedBubble = theme.camBubbleSize || 200;
       el("psCamBubbleSizeSlider").value = String(savedBubble);
       if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").textContent = savedBubble + "px";
+    }
+    // BARU (9 Sep 2026, sesi ke-9) -- pulihkan tombol posisi bubble aktif
+    // & slider "Ukuran lingkaran Teks" (mode textbubble).
+    if (el("psBubblePosRow")) {
+      const savedPos = theme.bubblePos || "br";
+      Array.from(el("psBubblePosRow").querySelectorAll("[data-bubble-pos]")).forEach((b) => {
+        b.classList.toggle("active", b.dataset.bubblePos === savedPos);
+      });
+    }
+    if (el("psTextBubbleSizeSlider")) {
+      const savedTextBubble = theme.textBubbleSize || 420;
+      el("psTextBubbleSizeSlider").value = String(savedTextBubble);
+      if (el("psTextBubbleSizeValue")) el("psTextBubbleSizeValue").textContent = savedTextBubble + "px";
     }
     // BARU (8 Sep 2026) -- pulihkan status centang "Ayat/Kidung/Pengumuman
     // TETAP tampil di atas video".
@@ -6217,7 +8144,16 @@ const PresentationStudio = (() => {
     // transparan" (mode "Kamera Atas, Teks Bawah").
     if (el("psStageTransparent")) el("psStageTransparent").checked = !!theme.stageTransparent;
     applyThemeToStudioPreview(theme);
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent } });
+    // PERBAIKAN (9 Sep 2026, sesi ke-9) -- `camSplitReverse` ("🔁 Balik
+    // Sisi" mode split kiri-kanan) SEBELUMNYA tidak pernah ikut daftar
+    // field yang dikirim ke Layar 2 di sini (cuma tersimpan & dipakai
+    // pratinjau Studio sendiri lewat applyThemeToStudioPreview di atas)
+    // -- jadi kalau operator centang/hilangkan itu SAAT peta/kumpulan
+    // ayat sudah tayang, Layar 2 (yang dilihat jemaat) tidak ikut
+    // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
+    // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
+    // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
   }
 
   function saveAndSendTheme(partial) {
@@ -6238,7 +8174,10 @@ const PresentationStudio = (() => {
     // warna di Layar 2 (present.html diam-diam jatuh ke warna aksen tema
     // bawaan, lihat --p-timerclock-color, karena variabelnya memang tidak
     // pernah dikirim/diset).
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay } });
+    // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
+    // applyThemeToStudioPreview()/rawPost pertama di atas soal
+    // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -6630,6 +8569,10 @@ const PresentationStudio = (() => {
     wireYtPlaylistTab();
     wireYtControls();
     wireLocalVideoTab(); // BARU (7 Sep 2026) -- tab "🎬 Video Lokal" (MP4 offline, tanpa upload)
+    wireModeScreenTab(); // BARU (9 Sep 2026) -- tab "🖥️ Mode & Peta": Welcome/Next Up
+    wireMapTab(); // BARU (9 Sep 2026) -- tab "🖥️ Mode & Peta": Peta Interaktif
+    wireEffectsTab(); // BARU (9 Sep 2026) -- tab "🎉 Efek Panggung": confetti/reaksi & efek suara
+    wireWheelTab(); // BARU (9 Sep 2026) -- tab "🎡 Roda Undian" (versi teks, 100% offline)
     wireKidungTab();
     wireLinkTab(); // BARU (4 Sep 2026) -- tab "🔗 Link" (Canva & SoundCloud)
     wireAiPresentationTab(); // BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation"
@@ -6645,6 +8588,19 @@ const PresentationStudio = (() => {
     // buka menu "⋮" dulu untuk sampai ke tombol "Buka Studio Presentasi".
     if (el("headerStudioBtn")) el("headerStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
+    // BARU (10 Sep 2026, sesi ke-10) -- "🖥️③ Monitor Pembicara".
+    if (el("psOpenMonitorBtn")) {
+      el("psOpenMonitorBtn").addEventListener("click", () => {
+        if (typeof Presentation !== "undefined" && Presentation.openMonitorWindow) {
+          Presentation.openMonitorWindow();
+          // Kirim status TERKINI segera setelah dibuka (kalau sudah ada
+          // playlist aktif SEBELUM Monitor 3 ini dibuka) -- flushMonitorQueue()
+          // di presentation.js sudah menahannya sampai monitor.html
+          // mengabari siap, jadi aman dipanggil langsung di sini.
+          pushMonitorStatus_();
+        }
+      });
+    }
     if (el("psCloseStudioBtn")) el("psCloseStudioBtn").addEventListener("click", closeStudio);
 
     wirePreviewResize();
@@ -6658,6 +8614,12 @@ const PresentationStudio = (() => {
       if (data.source === "bibleAppPresenter" && data.type === "present_ready") {
         refreshStatusUi();
         applyStoredTheme();
+      }
+      // BARU (9 Sep 2026) -- 🎡 Roda Undian: Layar 2 mengonfirmasi balik
+      // begitu animasi putaran selesai, lihat catatan panjang
+      // wireWheelTab()/handleWheelResult_() di atas.
+      if (data.source === "bibleAppPresenter" && data.type === "present_wheel_result") {
+        handleWheelResult_(data);
       }
     });
   }
