@@ -1356,6 +1356,32 @@ input { font-family: inherit; }
     height: min(48vh, 340px);
     height: min(48dvh, 340px);
   }
+  /* PERBAIKAN (lanjutan lagi -- permintaan operator: "di komputer sudah
+     bagus, apa tampilan (di HP) tidak perlu layar tambahan, langsung
+     menyatu dengan yang dibelakangnya, biar kotaknya bisa lebih besar")
+     -- SEBELUM ini, panel "Coba Efek Suara & Visual" numpang tampilan
+     `.info-kami-overlay`/`.info-kami-box` (kartu MELAYANG di tengah
+     layar dengan padding overlay 20px di semua sisi + sudut membulat +
+     max-height 92vh) -- gaya "kartu dialog" itu sendiri yang makan
+     ruang (jadi terasa "ada layar tambahan" di ATAS layar baca). Khusus
+     panel INI (pakai id #effectPreviewOverlay supaya TIDAK ikut
+     mengubah info-kami-overlay/box lain yang masih dipakai panel admin
+     lain) di HP dibuat LAYAR PENUH edge-to-edge (tanpa padding overlay,
+     tanpa sudut membulat, tanpa batas 92vh) -- jadi kelihatan "menyatu"
+     langsung dengan layar HP, bukan kartu terpisah. Sisa tinggi yang
+     didapat dari situ dipakai memperbesar kotak pratinjau lagi (dari
+     48dvh/340px jadi 56dvh/420px). */
+  #effectPreviewOverlay.info-kami-overlay { padding: 0; align-items: stretch; }
+  .effect-preview-box.info-kami-box {
+    max-width: 100%; width: 100%;
+    max-height: 100vh; max-height: 100dvh;
+    height: 100vh; height: 100dvh;
+    border-radius: 0; border-width: 0; box-shadow: none;
+  }
+  .effect-preview-box .effect-preview-screen {
+    height: min(56vh, 420px);
+    height: min(56dvh, 420px);
+  }
 }
 
 /* ============================================================
