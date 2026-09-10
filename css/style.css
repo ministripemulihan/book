@@ -1254,6 +1254,19 @@ input { font-family: inherit; }
   overflow: hidden;
   background: linear-gradient(160deg, #1a1f26, #0e1116);
   border: 2px solid var(--petrol);
+  /* PERBAIKAN (bug "kotak pratinjau jadi segaris"): elemen ini flex item
+     di dalam .effect-preview-body (flex-direction:column) sekaligus
+     punya overflow:hidden -- menurut spek flexbox, overflow selain
+     "visible" membuat automatic minimum size (min-height:auto) elemen
+     ini dihitung 0, BUKAN dari aspect-ratio-nya. Digabung flex-shrink
+     default (1), begitu total tinggi konten .effect-preview-body
+     melebihi ruang yang tersisa di .info-kami-box (max-height:88vh),
+     browser meremas kotak INI duluan sampai nyaris 0px karena dialah
+     satu-satunya item yang "boleh" diremas sampai 0. flex-shrink:0
+     mengunci supaya kotak ini TIDAK pernah diremas -- kalau kontennya
+     kepanjangan, .effect-preview-body (overflow-y:auto) yang akan
+     discroll, bukan kotak ini yang menyusut. */
+  flex-shrink: 0;
 }
 .effect-preview-confetti-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .effect-preview-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
