@@ -149,9 +149,20 @@
           dikirim ke Layar 2 jemaat.
         </p>
 
+        <!-- Contoh tulisan -- supaya efek tidak dicoba di atas latar kosong,
+             tapi di atas teks yang mirip tampilan sungguhan di Layar 2.
+             Diketik bebas, langsung tampil live di kotak pratinjau di
+             bawah lewat wireSampleTextInput_() (js/effectpreview.js). -->
+        <div class="effect-preview-sample-row">
+          <label for="effectPreviewSampleInput">Contoh tulisan di layar (opsional, buat lihat efeknya di atas teks beneran)</label>
+          <input type="text" id="effectPreviewSampleInput" class="effect-preview-sample-input"
+                 value="Yohanes 3:16 — Karena begitu besar kasih Allah akan dunia ini..." />
+        </div>
+
         <!-- Kotak pratinjau efek visual -- meniru "#effectsLayer" di present.html,
              tapi diperkecil & dikunci di dalam kotak ini saja (overflow:hidden). -->
         <div class="effect-preview-screen" id="effectPreviewScreen">
+          <div class="effect-preview-sampletext" id="effectPreviewSampleText">Yohanes 3:16 — Karena begitu besar kasih Allah akan dunia ini...</div>
           <canvas id="effectPreviewConfettiCanvas" class="effect-preview-confetti-canvas"></canvas>
           <div id="effectPreviewLayer" class="effect-preview-layer"></div>
           <span class="effect-preview-screen-label">Pratinjau layar</span>
@@ -183,28 +194,14 @@
 
         <div class="effect-preview-section">
           <h3>🔊 Efek Suara</h3>
-          <div class="effect-preview-grid">
-            <button type="button" class="chip-btn small" data-preview-sound="drumroll">🥁 Drumroll</button>
-            <button type="button" class="chip-btn small" data-preview-sound="applause">👏 Tepuk Tangan</button>
-            <button type="button" class="chip-btn small" data-preview-sound="ding">🔔 Ding</button>
-            <button type="button" class="chip-btn small" data-preview-sound="fanfare">📯 Fanfare</button>
-            <button type="button" class="chip-btn small" data-preview-sound="tada">🎊 Ta-da!</button>
-            <button type="button" class="chip-btn small" data-preview-sound="cheer">📣 Bersorak</button>
-            <button type="button" class="chip-btn small" data-preview-sound="laugh">😂 Tawa</button>
-            <button type="button" class="chip-btn small" data-preview-sound="kiss">😘 Ciuman</button>
-            <button type="button" class="chip-btn small" data-preview-sound="boing">🤪 Boing</button>
-            <button type="button" class="chip-btn small" data-preview-sound="heartbeat">💓 Detak Jantung</button>
-            <button type="button" class="chip-btn small" data-preview-sound="wow">😮 Wow</button>
-            <button type="button" class="chip-btn small" data-preview-sound="scream">😱 Berteriak</button>
-            <button type="button" class="chip-btn small" data-preview-sound="magic">✨ Ajaib</button>
-            <button type="button" class="chip-btn small" data-preview-sound="victory">🏆 Kemenangan</button>
-            <button type="button" class="chip-btn small" data-preview-sound="fail">😅 Gagal</button>
-            <button type="button" class="chip-btn small" data-preview-sound="awkward">😬 Canggung</button>
-            <button type="button" class="chip-btn small" data-preview-sound="whistle">📯 Peluit</button>
-            <button type="button" class="chip-btn small" data-preview-sound="drum">🥁 Drum</button>
-            <button type="button" class="chip-btn small" data-preview-sound="thunder">⛈️ Guntur</button>
-            <button type="button" class="chip-btn small" data-preview-sound="rain">🌧️ Hujan</button>
-          </div>
+          <!-- BARU (10 Sep 2026, sesi ke-13) -- dibangun otomatis oleh
+               SoundFX.renderButtons() (js/soundfx.js, dipanggil dari
+               js/effectpreview.js) dari daftar SoundFX.LIST -- SAMA
+               PERSIS dengan daftar di tab "🎉 Efek Panggung" (Studio) &
+               yang bisa diputar sungguhan di Layar 2 (present.html).
+               Tambah efek baru di js/soundfx.js = otomatis muncul di
+               sini juga, tidak perlu edit file ini. -->
+          <div class="effect-preview-grid" id="effectPreviewSoundGrid"></div>
         </div>
       </div>
     </div>
@@ -2954,31 +2951,17 @@
           <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
           <div class="ps-field-label" style="margin-top:0;">🔊 Efek Suara</div>
           <p class="announcement-compose-hint" style="margin-top:0;">Diputar dari perangkat Layar 2 (biasanya tersambung ke sound system venue) -- pastikan Layar 2 tidak di-mute.</p>
-          <div class="ps-btn-row">
-            <button type="button" class="chip-btn small" data-sound="drumroll">🥁 Drumroll</button>
-            <button type="button" class="chip-btn small" data-sound="applause">👏 Tepuk Tangan</button>
-            <button type="button" class="chip-btn small" data-sound="ding">🔔 Ding</button>
-            <button type="button" class="chip-btn small" data-sound="fanfare">📯 Fanfare</button>
-            <button type="button" class="chip-btn small" data-sound="tada">🎊 Ta-da!</button>
-            <!-- BARU (10 Sep 2026, sesi ke-11, permintaan operator) --
-                 lihat playEffectSound_() di present.html untuk cara
-                 tiap efek baru ini "diracik" (disintesis, bukan file). -->
-            <button type="button" class="chip-btn small" data-sound="cheer">📣 Bersorak</button>
-            <button type="button" class="chip-btn small" data-sound="laugh">😂 Tawa</button>
-            <button type="button" class="chip-btn small" data-sound="kiss">😘 Ciuman</button>
-            <button type="button" class="chip-btn small" data-sound="boing">🤪 Boing</button>
-            <button type="button" class="chip-btn small" data-sound="heartbeat">💓 Detak Jantung</button>
-            <button type="button" class="chip-btn small" data-sound="wow">😮 Wow</button>
-            <button type="button" class="chip-btn small" data-sound="scream">😱 Berteriak</button>
-            <button type="button" class="chip-btn small" data-sound="magic">✨ Ajaib</button>
-            <button type="button" class="chip-btn small" data-sound="victory">🏆 Kemenangan</button>
-            <button type="button" class="chip-btn small" data-sound="fail">😅 Gagal</button>
-            <button type="button" class="chip-btn small" data-sound="awkward">😬 Canggung</button>
-            <button type="button" class="chip-btn small" data-sound="whistle">📯 Peluit</button>
-            <button type="button" class="chip-btn small" data-sound="drum">🥁 Drum</button>
-            <button type="button" class="chip-btn small" data-sound="thunder">⛈️ Guntur</button>
-            <button type="button" class="chip-btn small" data-sound="rain">🌧️ Hujan</button>
-          </div>
+          <!-- BARU (10 Sep 2026, sesi ke-13, permintaan operator "supaya
+               tambahan efek suara nanti otomatis nyambung ke menu
+               pratinjau admin") -- tombol-tombol di bawah TIDAK LAGI
+               ditulis manual di HTML ini, tapi dibangun otomatis oleh
+               SoundFX.renderButtons() (js/soundfx.js, dipanggil dari
+               wireEffectsTab() di presentation-studio.js) dari daftar
+               SoundFX.LIST -- SATU SUMBER KEBENARAN yang dipakai bersama
+               oleh Layar 2 (present.html) & menu "🔊 Coba Efek Suara &
+               Visual" (effectpreview.js). Tambah efek baru = cukup edit
+               js/soundfx.js, tombolnya otomatis muncul di sini juga. -->
+          <div class="ps-btn-row" id="psSoundEffectsGrid"></div>
           <div class="ps-pointer-hint">Efek suara disintesis langsung (bukan file audio) -- ringan &amp; tidak perlu koneksi internet.</div>
           <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
           <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "break
@@ -3061,6 +3044,7 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
+  <script src="js/soundfx.js?v=20260910a"></script>
   <script src="js/presentation-studio.js?v=20260910b"></script>
   <script src="js/effectpreview.js?v=20260910a"></script>
   <script src="js/signup.js?v=20260818b"></script>
