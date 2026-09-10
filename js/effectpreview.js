@@ -10,10 +10,10 @@
 //  Panel ini (dibuka dari menu ⋮ -> "🔊 Coba Efek Suara & Visual",
 //  tombol #effectPreviewBtn, HANYA tampil untuk administrator -- lihat
 //  updateLevelGatedMenus() di js/app.js) SENGAJA 100% LOKAL:
-//   - Efek suara disintesis LANGSUNG lewat Web Audio API (oscillator +
-//     noise), BUKAN file audio -- kode & karakter suaranya SAMA PERSIS
-//     dengan playEffectSound_() di present.html (Layar 2), cuma dipakai
-//     ulang di sini dengan AudioContext-nya sendiri.
+//   - Efek suara diputar lewat js/soundfx.js (SATU SUMBER KEBENARAN
+//     yang dipakai bersama present.html & presentation-studio.js --
+//     disintesis lewat Web Audio API, BUKAN file audio, jadi 100%
+//     OFFLINE, tidak perlu koneksi internet sama sekali).
 //   - Efek visual (confetti/emoji terbang/balon/teks seruan) dianimasikan
 //     di dalam kotak "Pratinjau layar" (#effectPreviewScreen) di panel
 //     ini saja -- BUKAN di Layar 2 sungguhan, meniru gaya CSS
@@ -28,174 +28,24 @@
 // ============================================================
 
 const EffectPreview = (() => {
-  let audioCtx = null;
-  let masterGain_ = null;
-  let noiseBuffer_ = null;
   let confettiRAF_ = null;
 
-  function getMasterGain_() {
-    if (!masterGain_) {
-      masterGain_ = audioCtx.createGain();
-      masterGain_.gain.value = 1;
-      masterGain_.connect(audioCtx.destination);
-    }
-    return masterGain_;
-  }
-
-  function ensureCtx_() {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    // Kalau sempat "suspended" (mis. panel dibuka tapi belum ada
-    // interaksi lain di halaman ini), kebangkitkan lagi -- klik tombol
-    // efek yang memanggil ini SENDIRI sudah termasuk gestur pengguna
-    // yang sah untuk browser.
-    if (audioCtx.state === "suspended") audioCtx.resume();
-  }
-
-  // ---- "Bahan dasar" sintesis suara -- SAMA seperti present.html ----
-  function playNote_(freq, when, dur, type, peakGain) {
-    try {
-      ensureCtx_();
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = type || "sine"; o.frequency.value = freq;
-      const t0 = audioCtx.currentTime + when;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peakGain || 0.3, t0 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(getMasterGain_());
-      o.start(t0); o.stop(t0 + dur + 0.05);
-    } catch (e) { /* diamkan -- pratinjau saja, tidak boleh sampai mengganggu UI */ }
-  }
-  function playNoiseBurst_(when, dur, peakGain) {
-    try {
-      ensureCtx_();
-      if (!noiseBuffer_) {
-        const len = audioCtx.sampleRate * 1;
-        noiseBuffer_ = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-        const d = noiseBuffer_.getChannelData(0);
-        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      }
-      const src = audioCtx.createBufferSource();
-      src.buffer = noiseBuffer_;
-      const bp = audioCtx.createBiquadFilter();
-      bp.type = "bandpass"; bp.frequency.value = 1200; bp.Q.value = 0.7;
-      const g = audioCtx.createGain();
-      const t0 = audioCtx.currentTime + when;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peakGain || 0.28, t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(bp); bp.connect(g); g.connect(getMasterGain_());
-      src.start(t0); src.stop(t0 + dur + 0.05);
-    } catch (e) {}
-  }
-  function playSweep_(fromFreq, toFreq, when, dur, type, peakGain) {
-    try {
-      ensureCtx_();
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = type || "sine";
-      const t0 = audioCtx.currentTime + when;
-      o.frequency.setValueAtTime(fromFreq, t0);
-      o.frequency.linearRampToValueAtTime(toFreq, t0 + dur);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peakGain || 0.3, t0 + Math.min(0.05, dur / 4));
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(getMasterGain_());
-      o.start(t0); o.stop(t0 + dur + 0.05);
-    } catch (e) {}
-  }
-  function playFilteredNoise_(when, dur, peakGain, filterType, freq, Q) {
-    try {
-      ensureCtx_();
-      if (!noiseBuffer_) {
-        const len = audioCtx.sampleRate * 1;
-        noiseBuffer_ = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-        const d = noiseBuffer_.getChannelData(0);
-        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      }
-      const src = audioCtx.createBufferSource();
-      src.buffer = noiseBuffer_; src.loop = dur > 1;
-      const filt = audioCtx.createBiquadFilter();
-      filt.type = filterType || "lowpass"; filt.frequency.value = freq || 400; filt.Q.value = Q || 0.7;
-      const g = audioCtx.createGain();
-      const t0 = audioCtx.currentTime + when;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peakGain || 0.2, t0 + Math.min(0.15, dur / 4));
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      src.connect(filt); filt.connect(g); g.connect(getMasterGain_());
-      src.start(t0); src.stop(t0 + dur + 0.05);
-    } catch (e) {}
-  }
-
-  // ---- Efek suara -- SAMA PERSIS karakter/nada dengan playEffectSound_()
-  //      di present.html (lihat komentar aslinya di sana untuk penjelasan
-  //      tiap efek). ----
-  function playEffectSound(soundKey) {
-    if (soundKey === "ding") {
-      playNote_(1318.5, 0, 0.9, "sine", 0.32);
-      playNote_(1975.5, 0.05, 0.7, "sine", 0.14);
-    } else if (soundKey === "tada") {
-      playNote_(523.25, 0, 0.18, "triangle", 0.3);
-      playNote_(783.99, 0.12, 0.5, "triangle", 0.3);
-    } else if (soundKey === "fanfare") {
-      [392.0, 523.25, 659.25, 783.99].forEach((f, i) => playNote_(f, i * 0.14, 0.35, "square", 0.22));
-      playNote_(783.99, 0.56, 0.6, "square", 0.26);
-    } else if (soundKey === "drumroll") {
-      for (let i = 0; i < 18; i++) playNoiseBurst_(i * 0.09, 0.12, 0.22);
-      playNoiseBurst_(1.65, 0.5, 0.4);
-      playNote_(110, 1.65, 0.5, "sawtooth", 0.2);
-    } else if (soundKey === "applause") {
-      let t = 0;
-      for (let i = 0; i < 30; i++) { t += 0.03 + Math.random() * 0.08; playNoiseBurst_(t, 0.06 + Math.random() * 0.05, 0.14 + Math.random() * 0.1); }
-    } else if (soundKey === "cheer") {
-      [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((f, i) => playNote_(f, i * 0.06, 0.3, "square", 0.2));
-      playFilteredNoise_(0.05, 0.9, 0.22, "bandpass", 2000, 0.6);
-    } else if (soundKey === "laugh") {
-      [523.25, 659.25, 523.25, 659.25, 523.25].forEach((f, i) => playNote_(f, i * 0.16, 0.13, "triangle", 0.26));
-    } else if (soundKey === "kiss") {
-      playSweep_(900, 250, 0, 0.12, "sine", 0.28);
-      playNoiseBurst_(0.11, 0.05, 0.2);
-    } else if (soundKey === "boing") {
-      playSweep_(180, 700, 0, 0.12, "sine", 0.3);
-      playSweep_(700, 220, 0.12, 0.22, "sine", 0.26);
-    } else if (soundKey === "heartbeat") {
-      [0, 0.32].forEach((base) => {
-        playNote_(90, base, 0.12, "sine", 0.32);
-        playNote_(70, base + 0.16, 0.14, "sine", 0.24);
-      });
-    } else if (soundKey === "wow") {
-      playSweep_(400, 1100, 0, 0.35, "sine", 0.3);
-    } else if (soundKey === "scream") {
-      playSweep_(500, 1800, 0, 0.35, "sawtooth", 0.22);
-      playFilteredNoise_(0, 0.35, 0.16, "highpass", 2500, 0.8);
-    } else if (soundKey === "magic") {
-      [1046.5, 1318.5, 1568.0, 2093.0, 2637.0].forEach((f, i) => playNote_(f, i * 0.07, 0.4, "sine", 0.18));
-    } else if (soundKey === "victory") {
-      [392.0, 493.88, 587.33, 783.99, 987.77].forEach((f, i) => playNote_(f, i * 0.09, 0.3, "square", 0.22));
-      [783.99, 987.77, 1174.66].forEach((f) => playNote_(f, 0.5, 0.8, "square", 0.22));
-    } else if (soundKey === "fail") {
-      [0, 0.42, 0.84].forEach((t, i) => playSweep_(392 - i * 40, 300 - i * 40, t, 0.4, "sawtooth", 0.24));
-    } else if (soundKey === "awkward") {
-      playSweep_(300, 120, 0, 0.9, "triangle", 0.16);
-    } else if (soundKey === "whistle") {
-      playNote_(2600, 0, 0.5, "sine", 0.22);
-      playNote_(2680, 0.05, 0.4, "sine", 0.14);
-    } else if (soundKey === "drum") {
-      playNote_(100, 0, 0.28, "sine", 0.34);
-      playNoiseBurst_(0, 0.08, 0.18);
-    } else if (soundKey === "thunder") {
-      playFilteredNoise_(0, 2.2, 0.28, "lowpass", 220, 0.9);
-      playFilteredNoise_(0.4, 0.35, 0.3, "bandpass", 500, 1.2);
-      playNote_(55, 0.4, 1.2, "sawtooth", 0.18);
-    } else if (soundKey === "rain") {
-      playFilteredNoise_(0, 3, 0.1, "highpass", 3500, 0.5);
-    } else {
-      playNote_(880, 0, 0.15, "sine", 0.3); // fallback (mirip beep())
-    }
+  // ---- Efek suara -- SEKARANG dipusatkan di js/soundfx.js (SATU SUMBER
+  //      KEBENARAN yang dipakai bersama present.html & presentation-
+  //      studio.js -- lihat komentar panjang di js/soundfx.js). Modul ini
+  //      TIDAK PUNYA lagi kode sintesis suaranya sendiri -- cukup panggil
+  //      SoundFX.play(key). Menambah efek suara baru cukup dilakukan SATU
+  //      KALI di js/soundfx.js, otomatis nyambung ke sini juga TANPA
+  //      perlu ubah file ini sama sekali. ----
+  function playSoundPreview(key) {
+    if (typeof SoundFX !== "undefined") SoundFX.play(key);
   }
 
   // ---- Efek visual -- animasi yang sama gayanya dengan #effectsLayer di
-  //      present.html, tapi dikunci di dalam #effectPreviewScreen saja. ----
+  //      present.html, tapi dikunci di dalam #effectPreviewScreen saja.
+  //      (Efek visual jumlahnya sedikit & jarang berubah, jadi belum
+  //      dipusatkan seperti efek suara -- bisa disamakan nanti kalau
+  //      daftarnya mulai berkembang juga.) ----
   const CONFETTI_COLORS_ = ["#e2483d", "#3d8ee2", "#3de27a", "#e2c23d", "#a83de2", "#e2793d", "#3de2d4", "#e23d9e", "#ffffff"];
   const BALLOON_EMOJIS_ = ["🎈", "🎈", "🎈", "🎈"];
   const HAPPY_EMOJIS_ = ["🎉", "😄", "🥳", "✨"];
@@ -312,14 +162,38 @@ const EffectPreview = (() => {
     else playConfettiPreview();
   }
 
+  // ---- "Contoh tulisan" -- live-preview teks bebas yang diketik admin ke
+  //      #effectPreviewSampleInput, ditampilkan di #effectPreviewSampleText
+  //      DI BELAKANG canvas confetti & layer efek (lihat urutan HTML di
+  //      index.html + z-order via DOM order di CSS), supaya efek terlihat
+  //      tampil DI ATAS teks -- sama seperti tampilan sungguhan Layar 2. ----
+  function wireSampleTextInput_() {
+    const input = document.getElementById("effectPreviewSampleInput");
+    const sample = document.getElementById("effectPreviewSampleText");
+    if (!input || !sample) return;
+    input.addEventListener("input", () => { sample.textContent = input.value; });
+  }
+
   // ---- Buka/tutup panel + pasang listener tombol ----
   let wired_ = false;
   function wireButtonsOnce_() {
     if (wired_) return;
     wired_ = true;
-    document.querySelectorAll("[data-preview-sound]").forEach((btn) => {
-      btn.addEventListener("click", () => playEffectSound(btn.dataset.previewSound));
-    });
+    wireSampleTextInput_();
+    // BARU (10 Sep 2026, sesi ke-13) -- tombol "🔊 Efek Suara" dibangun
+    // otomatis dari SoundFX.LIST (js/soundfx.js) ke dalam
+    // #effectPreviewSoundGrid, dengan onClick langsung memanggil
+    // SoundFX.play() -- lihat komentar panjang di js/soundfx.js untuk
+    // kenapa ini dipusatkan (supaya efek baru otomatis nyambung ke
+    // tab Studio & Layar 2 juga, tanpa edit file ini).
+    const soundGrid = document.getElementById("effectPreviewSoundGrid");
+    if (typeof SoundFX !== "undefined" && soundGrid) {
+      SoundFX.renderButtons(soundGrid, {
+        className: "chip-btn small",
+        dataAttr: "previewSound",
+        onClick: (key) => playSoundPreview(key),
+      });
+    }
     document.querySelectorAll("[data-preview-effect]").forEach((btn) => {
       btn.addEventListener("click", () => playVisualEffect(btn.dataset.previewEffect));
     });
