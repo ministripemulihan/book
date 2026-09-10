@@ -31,6 +31,23 @@ const DEFAULT_SETTINGS = {
   // "2", "3b" -- lihat js/footnotes.js). Defaultnya AKTIF (biru);
   // dimatikan lewat menu ⋮ -> "🔵 Warna biru pada tanda catatan kaki".
   footnoteAccentBlue: true,
+  // BARU (7 Sep 2026, permintaan operator: "download alkitab tertentu
+  // yang tidak aktif" / hemat penyimpanan perangkat) -- daftar KODE
+  // bahasa (cocok dengan CONFIG.LANGUAGES, mis. "ind","kjv") yang MAU
+  // disimpan ke IndexedDB perangkat ini saat sinkron. Array KOSONG =
+  // SEMUA bahasa (perilaku lama/default, tidak ada yang berubah untuk
+  // siapa pun yang belum pernah mengatur ini). Kalau diisi (mis.
+  // ["ind","rvind"]), baris CSV berbahasa LAIN dari yang dipilih
+  // dilewati (tidak ikut disimpan) saat syncFromServer() (js/app.js) --
+  // lihat catatan panjang di sana. CATATAN PENTING: ini MENGURANGI
+  // pemakaian penyimpanan & waktu proses di perangkat, TAPI TIDAK
+  // mengurangi ukuran UNDUHAN itu sendiri -- server (Google Sheet CSV)
+  // mengirim SEMUA baris sekaligus (1 sheet, banyak bahasa jadi satu),
+  // jadi kuota data yang terpakai saat unduh tetap sama besar. Karena
+  // ini pengaturan PER AKUN (bukan per perangkat), otomatis ikut sama
+  // di HP lain yang login dengan akun yang sama (lihat setSetting()/
+  // refreshSettingsFromRemote() di file ini).
+  bibleLangFilter: [],
 };
 
 function settingsStorageKey(username) {
