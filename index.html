@@ -122,6 +122,94 @@
     </div>
   </div>
 
+  <!-- ===================== PANEL "COBA EFEK SUARA & VISUAL" (BARU, khusus
+       administrator) =====================
+       Dibuka dari menu ⋮ -> "🔊 Coba Efek Suara & Visual" (tombol
+       #effectPreviewBtn, hanya tampil untuk administrator, lihat
+       updateLevelGatedMenus() di js/app.js). Daftar efek SAMA PERSIS
+       dengan tab "🎉 Efek Panggung" di Studio Presentasi
+       (presentation-studio.js) -- lihat js/effectpreview.js untuk kode
+       suara (disintesis lewat Web Audio API, sama seperti present.html)
+       & animasi visualnya. SENGAJA 100% LOKAL di HP ini saja (tidak
+       memanggil rawPost()/tidak menyentuh Layar 2 sama sekali) supaya MC
+       bisa bebas mencoba-coba sebelum presentasi sungguhan, tanpa takut
+       kepencet ke jemaat. -->
+  <div id="effectPreviewOverlay" class="info-kami-overlay" hidden>
+    <div class="info-kami-box effect-preview-box">
+      <div class="info-kami-header">
+        <h2>🔊 Coba Efek Suara & Visual</h2>
+        <div class="info-kami-header-actions">
+          <button type="button" id="effectPreviewCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+        </div>
+      </div>
+      <div class="effect-preview-body">
+        <p class="effect-preview-hint">
+          Menu ini untuk MC/operator MENCOBA DULU suara &amp; efek visual di HP ini sebelum presentasi.
+          Efek yang dipencet di sini <strong>HANYA terdengar/terlihat di HP ini</strong> — <strong>tidak</strong>
+          dikirim ke Layar 2 jemaat.
+        </p>
+
+        <!-- Kotak pratinjau efek visual -- meniru "#effectsLayer" di present.html,
+             tapi diperkecil & dikunci di dalam kotak ini saja (overflow:hidden). -->
+        <div class="effect-preview-screen" id="effectPreviewScreen">
+          <canvas id="effectPreviewConfettiCanvas" class="effect-preview-confetti-canvas"></canvas>
+          <div id="effectPreviewLayer" class="effect-preview-layer"></div>
+          <span class="effect-preview-screen-label">Pratinjau layar</span>
+        </div>
+
+        <div class="effect-preview-section">
+          <h3>🎬 Efek Visual</h3>
+          <div class="effect-preview-grid">
+            <button type="button" class="chip-btn small" data-preview-effect="confetti">🎉 Confetti</button>
+            <button type="button" class="chip-btn small" data-preview-effect="balon">🎈 Balon</button>
+            <button type="button" class="chip-btn small" data-preview-effect="happy">🥳 Bahagia</button>
+            <button type="button" class="chip-btn small" data-preview-emoji="👏">👏 Tepuk Tangan</button>
+            <button type="button" class="chip-btn small" data-preview-emoji="❤️">❤️ Cinta</button>
+            <button type="button" class="chip-btn small" data-preview-emoji="🙌">🙌 Semangat</button>
+            <button type="button" class="chip-btn small" data-preview-emoji="🔥">🔥 Api</button>
+            <button type="button" class="chip-btn small" data-preview-emoji="😂">😂 Tertawa</button>
+            <button type="button" class="chip-btn small" data-preview-emoji="👍">👍 Jempol</button>
+          </div>
+        </div>
+
+        <div class="effect-preview-section">
+          <h3>📣 Seruan Teks</h3>
+          <div class="effect-preview-grid">
+            <button type="button" class="chip-btn small" data-preview-shout="PUJI TUHAN!">🙌 Puji Tuhan!</button>
+            <button type="button" class="chip-btn small" data-preview-shout="HALELUYA!">🙌 Haleluya!</button>
+            <button type="button" class="chip-btn small" data-preview-shout="AMIN!">🙌 Amin!</button>
+          </div>
+        </div>
+
+        <div class="effect-preview-section">
+          <h3>🔊 Efek Suara</h3>
+          <div class="effect-preview-grid">
+            <button type="button" class="chip-btn small" data-preview-sound="drumroll">🥁 Drumroll</button>
+            <button type="button" class="chip-btn small" data-preview-sound="applause">👏 Tepuk Tangan</button>
+            <button type="button" class="chip-btn small" data-preview-sound="ding">🔔 Ding</button>
+            <button type="button" class="chip-btn small" data-preview-sound="fanfare">📯 Fanfare</button>
+            <button type="button" class="chip-btn small" data-preview-sound="tada">🎊 Ta-da!</button>
+            <button type="button" class="chip-btn small" data-preview-sound="cheer">📣 Bersorak</button>
+            <button type="button" class="chip-btn small" data-preview-sound="laugh">😂 Tawa</button>
+            <button type="button" class="chip-btn small" data-preview-sound="kiss">😘 Ciuman</button>
+            <button type="button" class="chip-btn small" data-preview-sound="boing">🤪 Boing</button>
+            <button type="button" class="chip-btn small" data-preview-sound="heartbeat">💓 Detak Jantung</button>
+            <button type="button" class="chip-btn small" data-preview-sound="wow">😮 Wow</button>
+            <button type="button" class="chip-btn small" data-preview-sound="scream">😱 Berteriak</button>
+            <button type="button" class="chip-btn small" data-preview-sound="magic">✨ Ajaib</button>
+            <button type="button" class="chip-btn small" data-preview-sound="victory">🏆 Kemenangan</button>
+            <button type="button" class="chip-btn small" data-preview-sound="fail">😅 Gagal</button>
+            <button type="button" class="chip-btn small" data-preview-sound="awkward">😬 Canggung</button>
+            <button type="button" class="chip-btn small" data-preview-sound="whistle">📯 Peluit</button>
+            <button type="button" class="chip-btn small" data-preview-sound="drum">🥁 Drum</button>
+            <button type="button" class="chip-btn small" data-preview-sound="thunder">⛈️ Guntur</button>
+            <button type="button" class="chip-btn small" data-preview-sound="rain">🌧️ Hujan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== PANEL "INFO KAMI" =====================
        Bisa dibuka SEBELUM login (tombol di layar Masuk di atas) MAUPUN
        SETELAH login (menu ⋮ -> "ℹ️ Info Kami"). Isinya diambil dari tab
@@ -295,6 +383,14 @@
            Penyimpanan Drive", khusus administrator, sama seperti logViewerBtn/
            userManageBtn di atas. -->
       <button id="driveUsageBtn" class="more-menu-btn" hidden>📦 Pemakaian Drive</button>
+      <!-- BARU -- "🔊 Coba Efek Suara & Visual", khusus administrator (lihat
+           js/effectpreview.js). Dipakai MC/operator untuk MENDENGAR & MELIHAT
+           LEBIH DULU di HP-nya sendiri semua efek suara & visual yang ada di
+           tab "🎉 Efek Panggung" (presentation-studio.js), SEBELUM memutuskan
+           mana yang mau dipencet nanti saat presentasi sungguhan. Efek di
+           sini HANYA lokal di HP ini (Web Audio + animasi di kotak
+           pratinjau) -- TIDAK dikirim ke Layar 2. -->
+      <button id="effectPreviewBtn" class="more-menu-btn" hidden>🔊 Coba Efek Suara & Visual</button>
       <!-- Satu tombol untuk unduh pertama kali MAUPUN sinkron ulang -- teks
            tombol disesuaikan otomatis lewat updateResyncBtnLabel() di
            js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
@@ -1929,7 +2025,7 @@
             <button type="button" id="psYtPlayBtn" class="chip-btn small" title="Putar video YouTube di Layar 2">▶️ Play</button>
             <button type="button" id="psYtPauseBtn" class="chip-btn small" title="Jeda video YouTube di Layar 2">⏸️ Pause</button>
             <button type="button" id="psYtStopBtn" class="chip-btn small" title="Hentikan video YouTube di Layar 2">⏹️ Stop</button>
-            <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube di Layar 2 -- pintasan keyboard: M">🔇 Mute</button>
+            <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube & efek suara Panggung di Layar 2 -- pintasan keyboard: M">🔇 Mute</button>
             <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
           </div>
           <!-- BARU (4 Sep 2026 v2, permintaan operator) -- progress bar +
@@ -2703,6 +2799,23 @@
           </div>
           <div id="psMapCityRowStatus" class="ps-pointer-hint"></div>
 
+          <!-- BARU (10 Sep 2026, permintaan operator "isi 514 kabupaten lewat
+               excel") -- alternatif ketik satu-satu di atas: unduh 1 file
+               CSV (dibuka langsung di Excel) yang SUDAH BERISI ke-514 nama
+               kabupaten/kota (kolom Kategori & Tahun sengaja kosong),
+               operator isi kolom Kategori (mis. "Kaki Dian"/"Pos Injil")
+               untuk baris yang relevan di Excel, simpan, lalu unggah lagi
+               lewat tombol di sebelahnya -- menggantikan SELURUH daftar
+               tabel di atas dengan isi file itu. Lihat
+               downloadCityRowsTemplate_()/handleCityRowsUpload_() di
+               js/presentation-studio.js. -->
+          <div class="ps-btn-row" style="margin-top:6px;">
+            <button type="button" id="psMapCityRowDownloadBtn" class="chip-btn small">⬇️ Unduh Template Excel (514 Kab/Kota)</button>
+            <button type="button" id="psMapCityRowUploadBtn" class="chip-btn small">⬆️ Unggah dari Excel/CSV</button>
+            <input type="file" id="psMapCityRowUploadInput" accept=".csv,.txt" style="display:none;" />
+          </div>
+          <p class="announcement-compose-hint" style="margin-top:4px;">Unduh dulu, buka di Excel/Spreadsheet, isi kolom "Kategori" (mis. Kaki Dian / Pos Injil) untuk kota yang dipakai, kosongkan sisanya, simpan sebagai CSV, lalu unggah lagi -- baris yang Kategorinya kosong otomatis dilewati.</p>
+
           <!-- BARU (9 Sep 2026) -- ☑ Checklist Kategori: pilih kategori
                mana yang tampil sebagai pin saat "▶️ Tampilkan Peta"
                ditekan, tiap kategori otomatis menunjukkan jumlah
@@ -2813,6 +2926,18 @@
                  ada (playEmojiReaction_ generik, terima emoji apa saja),
                  TIDAK perlu kode baru di present.html. -->
             <button type="button" class="chip-btn small" data-effect-emoji="😂">😂 Tertawa</button>
+            <!-- BARU (10 Sep 2026, permintaan operator) -- 🎈 Balon: numpang
+                 #effectsLayer yang sama tapi pakai animasi msBalloonRise
+                 sendiri (lebih lambat/besar, lihat playBalloonEffect_() di
+                 present.html) supaya kelihatan seperti balon sungguhan
+                 mengambang naik, bukan emoji lewat cepat. 👍 Jempol numpang
+                 mekanisme emoji terbang generik yang sudah ada (SAMA seperti
+                 😂 Tertawa di atas -- naik dari bawah ke atas layar).
+                 🥳 Bahagia = confetti + beberapa emoji ceria sekaligus
+                 (playHappyBurst_()) untuk momen yang terasa lebih meriah. -->
+            <button type="button" class="chip-btn small" data-effect="balon">🎈 Balon</button>
+            <button type="button" class="chip-btn small" data-effect-emoji="👍">👍 Jempol</button>
+            <button type="button" class="chip-btn small" data-effect="happy">🥳 Bahagia</button>
           </div>
           <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama
                Tuhan") -- BEDA dari emoji terbang di atas: teks BESAR
@@ -2835,6 +2960,24 @@
             <button type="button" class="chip-btn small" data-sound="ding">🔔 Ding</button>
             <button type="button" class="chip-btn small" data-sound="fanfare">📯 Fanfare</button>
             <button type="button" class="chip-btn small" data-sound="tada">🎊 Ta-da!</button>
+            <!-- BARU (10 Sep 2026, sesi ke-11, permintaan operator) --
+                 lihat playEffectSound_() di present.html untuk cara
+                 tiap efek baru ini "diracik" (disintesis, bukan file). -->
+            <button type="button" class="chip-btn small" data-sound="cheer">📣 Bersorak</button>
+            <button type="button" class="chip-btn small" data-sound="laugh">😂 Tawa</button>
+            <button type="button" class="chip-btn small" data-sound="kiss">😘 Ciuman</button>
+            <button type="button" class="chip-btn small" data-sound="boing">🤪 Boing</button>
+            <button type="button" class="chip-btn small" data-sound="heartbeat">💓 Detak Jantung</button>
+            <button type="button" class="chip-btn small" data-sound="wow">😮 Wow</button>
+            <button type="button" class="chip-btn small" data-sound="scream">😱 Berteriak</button>
+            <button type="button" class="chip-btn small" data-sound="magic">✨ Ajaib</button>
+            <button type="button" class="chip-btn small" data-sound="victory">🏆 Kemenangan</button>
+            <button type="button" class="chip-btn small" data-sound="fail">😅 Gagal</button>
+            <button type="button" class="chip-btn small" data-sound="awkward">😬 Canggung</button>
+            <button type="button" class="chip-btn small" data-sound="whistle">📯 Peluit</button>
+            <button type="button" class="chip-btn small" data-sound="drum">🥁 Drum</button>
+            <button type="button" class="chip-btn small" data-sound="thunder">⛈️ Guntur</button>
+            <button type="button" class="chip-btn small" data-sound="rain">🌧️ Hujan</button>
           </div>
           <div class="ps-pointer-hint">Efek suara disintesis langsung (bukan file audio) -- ringan &amp; tidak perlu koneksi internet.</div>
           <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
@@ -2917,8 +3060,9 @@
        presentation-studio.js supaya window.INDONESIA_REGENCIES sudah
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
-  <script src="js/presentation.js?v=20260907b"></script>
-  <script src="js/presentation-studio.js?v=20260909d"></script>
+  <script src="js/presentation.js?v=20260910a"></script>
+  <script src="js/presentation-studio.js?v=20260910b"></script>
+  <script src="js/effectpreview.js?v=20260910a"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260909c"></script>
