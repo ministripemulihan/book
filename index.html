@@ -534,6 +534,30 @@
         <div id="bibleLangFilterList" class="more-menu-checkbox-list"></div>
       </div>
 
+      <!-- BARU (10 Sep 2026, permintaan operator: "cara download suara
+           lebih mudah, UI/UX menarik", terpisah dari dialog Unduh Data
+           Alkitab supaya bisa dipakai kapan saja tanpa sinkron ulang
+           seluruh Alkitab). Diisi/disembunyikan otomatis oleh
+           refreshSoundFxDownloadUi_() (js/app.js). Hanya untuk efek
+           suara FILE LOKAL (assets/sounds/, lihat js/soundfx.js) --
+           efek dari link luar (mis. Google Drive) tidak bisa disiapkan
+           offline dengan cara ini, jadi tidak dihitung di sini. -->
+      <div class="more-menu-section" id="soundFxDownloadSection" hidden>
+        <div class="more-menu-section-title">🔊 Efek Suara Offline</div>
+        <p class="announcement-compose-hint" style="margin-top:0;">Efek "🎉 Efek Panggung" di Studio Presentasi bisa disiapkan sekali di sini supaya langsung siap dipakai tanpa internet saat acara berlangsung.</p>
+        <div class="soundfx-dl-card" id="soundFxDlCard">
+          <div class="soundfx-dl-status-row">
+            <span class="soundfx-dl-icon" id="soundFxDlIcon">🎧</span>
+            <span class="soundfx-dl-text" id="soundFxDlStatusText">Memeriksa status unduhan…</span>
+          </div>
+          <div class="progress-track" id="soundFxDlProgressTrack" hidden><div id="soundFxDlProgressFill" class="progress-fill"></div></div>
+          <div class="soundfx-dl-btn-row">
+            <button type="button" id="soundFxDlBtn" class="chip-btn primary small">📥 Unduh Semua Efek Suara</button>
+          </div>
+        </div>
+      </div>
+
+
       <!-- ===================== MODE PRESENTASI 2 LAYAR (baru) =====================
            Disembunyikan untuk Mode Tamu lewat Presentation.refreshGuestGate()
            (dipanggil dari applyGuestModeUi() di js/app.js). Lihat js/presentation.js. -->
@@ -3093,12 +3117,12 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
-  <script src="js/soundfx.js?v=20260910c1"></script>
+  <script src="js/soundfx.js?v=20260910d"></script>
   <script src="js/presentation-studio.js?v=20260910d"></script>
   <script src="js/effectpreview.js?v=20260910b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260910a"></script>
+  <script src="js/app.js?v=20260910c"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
