@@ -6208,6 +6208,35 @@ const PresentationStudio = (() => {
     "File:Blank map of Indonesia.svg",
     "File:Indonesia (plain).svg",
   ];
+  // BARU (10 Sep 2026, permintaan operator) -- pilihan KE-2: peta yang
+  // SUDAH ada nama pulaunya (bukan peta polos), cocok kalau mau langsung
+  // ditayangkan apa adanya tanpa perlu ditempeli pin/label sendiri.
+  // Diambil dari Wikimedia Commons juga (sumber terbuka, sama seperti
+  // kandidat "blank" di atas) -- BUKAN dari Pinterest: 2 link Pinterest
+  // yang sebelumnya dicek operator TIDAK BISA dipakai di sini karena (1)
+  // Pinterest memblokir pengambilan otomatis dari luar situsnya, dan (2)
+  // gambarnya adalah stock illustration/poster berbayar, bukan sumber
+  // bebas lisensi seperti Wikimedia -- jadi berisiko hak cipta kalau
+  // ditempel permanen ke aplikasi. Kalau operator tetap mau tampilan
+  // ala Pinterest itu, unduh manual gambarnya sendiri lalu pakai tombol
+  // "Unggah Peta" (drag & drop) di atas -- itu menerima gambar apa saja
+  // dari perangkat, tidak lewat jalur online ini.
+  const ONLINE_BASE_MAP_CANDIDATES_NAMED_ = [
+    "File:Indonesia map with name of islands.png",
+  ];
+  // BARU (10 Sep 2026, permintaan operator) -- pilihan KE-3: peta gaya
+  // "relief" (kontur gunung/warna ketinggian, MIRIP tampilan yang
+  // operator suka dari referensi Pinterest/Dreamstime), TAPI diambil
+  // dari Wikimedia Commons yang berlisensi bebas (CC BY-SA 3.0) --
+  // BUKAN dari Dreamstime/Pinterest: gambar yang operator kirim sendiri
+  // (lihat obrolan) punya watermark "dreamstime" tercetak di gambarnya
+  // sendiri -- itu foto stok berbayar, TIDAK bisa dijadikan aset tetap
+  // aplikasi (selain soal hak cipta, watermark-nya akan ikut tampil ke
+  // jemaat di layar). File Wikimedia ini kualitas/gayanya setara, cuma
+  // beda sumber saja, dan aman dipakai berulang.
+  const ONLINE_BASE_MAP_CANDIDATES_RELIEF_ = [
+    "File:Indonesia relief location map.jpg",
+  ];
   async function fetchWikimediaFileByTitle_(title) {
     const infoUrl = "https://commons.wikimedia.org/w/api.php?action=query&titles=" +
       encodeURIComponent(title) + "&prop=imageinfo&iiprop=url&iiurlwidth=2000&format=json&origin=*";
@@ -6232,9 +6261,21 @@ const PresentationStudio = (() => {
     });
     return { dataUrl, title: page.title || title, fileUrl };
   }
-  async function fetchOnlineBaseMap_() {
+  // DIPERBARUI (10 Sep 2026, permintaan operator) -- sekarang menerima
+  // `choiceKey` ("blank" | "named_islands") supaya operator bisa MEMILIH
+  // LEBIH DULU (lewat dropdown #psMapOnlineChoice di index.html) peta
+  // yang mana yang mau diambil, bukan cuma auto-pilih hasil pertama yang
+  // kebetulan berhasil dari daftar "blank" seperti sebelumnya. Kosong/
+  // tidak dikenal -> tetap default ke "blank" (perilaku lama, aman untuk
+  // pemanggilan lama yang belum kirim parameter ini).
+  async function fetchOnlineBaseMap_(choiceKey) {
+    const candidates = choiceKey === "named_islands"
+      ? ONLINE_BASE_MAP_CANDIDATES_NAMED_
+      : choiceKey === "relief"
+      ? ONLINE_BASE_MAP_CANDIDATES_RELIEF_
+      : ONLINE_BASE_MAP_CANDIDATES_;
     const attempts = [];
-    for (const title of ONLINE_BASE_MAP_CANDIDATES_) {
+    for (const title of candidates) {
       try {
         return await fetchWikimediaFileByTitle_(title);
       } catch (e) {
@@ -6242,10 +6283,16 @@ const PresentationStudio = (() => {
       }
     }
     // Cadangan terakhir: pencarian teks bebas, coba SEMUA hasil (bukan
-    // cuma yang pertama) sampai ada yang berhasil diunduh utuh.
+    // cuma yang pertama) sampai ada yang berhasil diunduh utuh. Kata
+    // kunci pencarian ikut menyesuaikan pilihan operator.
     try {
+      const searchTerm = choiceKey === "named_islands"
+        ? "Indonesia map name of islands"
+        : choiceKey === "relief"
+        ? "Indonesia relief location map"
+        : "Indonesia blank location map";
       const searchUrl = "https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=" +
-        encodeURIComponent("Indonesia blank location map") + "&srnamespace=6&srlimit=5&format=json&origin=*";
+        encodeURIComponent(searchTerm) + "&srnamespace=6&srlimit=5&format=json&origin=*";
       const searchRes = await fetch(searchUrl);
       if (!searchRes.ok) throw new Error("pencarian gagal (HTTP " + searchRes.status + ")");
       const searchJson = await searchRes.json();
@@ -6639,6 +6686,45 @@ const PresentationStudio = (() => {
         : '<option value="">(Belum ada peta -- buat "Peta Baru")</option>';
       if (activeMapId) sel.value = activeMapId;
     }
+    // PERBAIKAN (10 Sep 2026, permintaan operator: "posisi pin di Studio
+    // beda dengan di Layar 2") -- kotak pratinjau #psMapEditorWrap
+    // sekarang dikunci 16:9 (lihat index.html) dengan gambar
+    // object-fit:contain di dalamnya, PERSIS seperti #mapView di
+    // present.html -- jadi kalau rasio gambar peta BUKAN 16:9, akan ada
+    // "letterbox" (garis hitam) di kiri-kanan atau atas-bawah, SAMA
+    // ukurannya dengan yang akan tampil di Layar 2. Fungsi ini menghitung
+    // kotak gambar yang BENAR-BENAR terlihat (bukan kotak 16:9-nya) --
+    // dipakai baik untuk memposisikan #psMapEditorPins maupun untuk
+    // menghitung xPct/yPct saat diklik, SAMA PERSIS rumusnya dengan
+    // positionMapContent_() di present.html, supaya kedua sisi selalu
+    // sepakat -- pin yang ditandai di Studio dijamin jatuh di titik yang
+    // SAMA PERSIS saat ditayangkan ke Layar 2, di rasio layar apa pun.
+    function mapEditorImgContainRect_(imgEl) {
+      const rect = imgEl.getBoundingClientRect();
+      const iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
+      if (!iw || !ih || !rect.width || !rect.height) return rect;
+      const boxRatio = rect.width / rect.height, imgRatio = iw / ih;
+      let width, height;
+      if (imgRatio > boxRatio) { width = rect.width; height = width / imgRatio; }
+      else { height = rect.height; width = height * imgRatio; }
+      return { left: rect.left + (rect.width - width) / 2, top: rect.top + (rect.height - height) / 2, width, height };
+    }
+    function positionEditorPinsLayer_() {
+      const wrap = el("psMapEditorWrap");
+      const img = el("psMapEditorImg");
+      const pinsLayer = el("psMapEditorPins");
+      if (!wrap || !img || !pinsLayer || wrap.style.display === "none") return;
+      const wrapRect = wrap.getBoundingClientRect();
+      const cr = mapEditorImgContainRect_(img);
+      pinsLayer.style.left = (cr.left - wrapRect.left) + "px";
+      pinsLayer.style.top = (cr.top - wrapRect.top) + "px";
+      pinsLayer.style.width = cr.width + "px";
+      pinsLayer.style.height = cr.height + "px";
+    }
+    // Reposisi otomatis kalau jendela/panel di-resize selagi peta
+    // sedang ditampilkan di editor (mis. operator melebarkan jendela
+    // browser Studio).
+    window.addEventListener("resize", () => positionEditorPinsLayer_());
     function renderMapEditor() {
       const map = activeMap();
       const wrap = el("psMapEditorWrap");
@@ -6661,7 +6747,16 @@ const PresentationStudio = (() => {
       // memakai varian "🎨 Gaya Peta Dasar" yang sedang aktif (kalau
       // sudah pernah diproses), bukan selalu gambar asli, supaya
       // operator lihat persis apa yang akan tayang di Layar 2.
+      // PERBAIKAN (10 Sep 2026) -- positionEditorPinsLayer_() BUTUH
+      // naturalWidth/naturalHeight gambar, yang baru pasti tersedia
+      // setelah <img> selesai memuat -- dipasang lewat onload (dipanggil
+      // ulang tiap renderMapEditor() supaya selalu memakai gambar yang
+      // sedang aktif). requestAnimationFrame tambahan untuk kasus gambar
+      // sudah ada di cache browser (onload bisa saja tidak sempat
+      // terpasang sebelum event-nya lewat).
+      img.onload = () => positionEditorPinsLayer_();
       img.src = effectiveMapImage_(map);
+      requestAnimationFrame(() => positionEditorPinsLayer_());
       // BARU (9 Sep 2026, permintaan operator) -- sinkronkan dropdown
       // "🎨 Gaya Peta Dasar"/"🎨 Gaya Pin" dengan data peta AKTIF (penting
       // saat operator pindah-pindah peta lewat "Peta Baru/Ganti Nama",
@@ -6826,8 +6921,24 @@ const PresentationStudio = (() => {
       });
       list.querySelectorAll("[data-pin-del]").forEach((btn) => {
         btn.addEventListener("click", () => {
+          const pin = (map.pins || []).find((p) => p.id === btn.dataset.pinDel);
           map.pins = (map.pins || []).filter((p) => p.id !== btn.dataset.pinDel);
           expandedPinDetail.delete(btn.dataset.pinDel);
+          // PERBAIKAN (10 Sep 2026, permintaan operator: "pin tidak bisa
+          // dihapus") -- pin BERKATEGORI lahir dari baris "📋 Daftar
+          // Titik dari Tabel" -- kalau baris itu dibiarkan, klik
+          // "🧮 Terapkan ke Peta" berikutnya akan MELAHIRKAN LAGI pin
+          // yang baru saja dihapus (bukan bug penghapusan gagal, tapi
+          // baris sumbernya belum ikut dihapus) -- di sini baris
+          // sumbernya ikut dikosongkan supaya penghapusan pin benar-benar
+          // permanen sampai operator mengetik ulang baris itu sendiri.
+          if (pin && pin.category && Array.isArray(map.cityRows)) {
+            map.cityRows = map.cityRows.filter((row) => {
+              const reg = findRegencyByName((row.city || "").trim());
+              const rowLabel = reg ? reg.n : (row.city || "").trim();
+              return !(rowLabel === pin.label && (row.category || "").trim() === pin.category);
+            });
+          }
           saveMaps();
           renderMapEditor();
         });
@@ -7110,6 +7221,67 @@ const PresentationStudio = (() => {
         renderMapEditor();
       });
     }
+    // BARU (10 Sep 2026, permintaan operator) -- 💾 Simpan/Muat Peta.
+    // "⬇️ Unduh" mengekspor peta AKTIF (gambar dataURL + pins + kalibrasi
+    // + cityRows + gaya) apa adanya jadi 1 file .json -- SENGAJA tidak
+    // menghitung ulang apa pun, supaya isi file = isi peta di layar
+    // persis, tidak mungkin "geser" gara-gara proses ekspor/impor.
+    if (el("psMapExportBtn")) {
+      el("psMapExportBtn").addEventListener("click", () => {
+        const map = activeMap();
+        const status = el("psMapExportImportStatus");
+        if (!map) { if (status) status.textContent = "⚠️ Pilih/buat peta dulu sebelum diunduh."; return; }
+        const payload = { fileType: "bible-app-studio-map", fileVersion: 1, exportedAt: new Date().toISOString(), map };
+        const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        const safeName = (map.name || "peta").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "peta";
+        a.download = `peta-${safeName}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        if (status) status.textContent = `✅ "${map.name}" diunduh (${(blob.size / 1024).toFixed(0)} KB) -- simpan filenya, bisa diunggah lagi ke perangkat mana pun.`;
+      });
+    }
+    // "⬆️ Unggah" membaca file .json itu kembali, MENAMBAHKAN sebagai
+    // peta BARU (bukan menimpa peta yang sedang aktif) supaya operator
+    // tidak sengaja kehilangan peta yang sedang dikerjakan -- kalau mau
+    // mengganti peta lama, hapus manual sendiri lewat "🗑️ Hapus Peta"
+    // setelah memastikan hasil unggahan benar. id peta & id tiap pin
+    // DIBUAT BARU (bukan dipakai ulang dari file) supaya tidak pernah
+    // bentrok dengan peta yang sudah ada di perangkat ini, TAPI
+    // xPct/yPct/label/category/dst tiap pin disalin APA ADANYA -- jadi
+    // posisinya di gambar tidak berubah sedikit pun dari saat diunduh.
+    if (el("psMapImportBtn") && el("psMapImportInput")) {
+      el("psMapImportBtn").addEventListener("click", () => el("psMapImportInput").click());
+      el("psMapImportInput").addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = ""; // supaya bisa unggah file yang SAMA lagi kalau perlu (mis. setelah dibatalkan)
+        if (!file) return;
+        const status = el("psMapExportImportStatus");
+        const reader = new FileReader();
+        reader.onerror = () => { if (status) status.textContent = "⚠️ Gagal membaca file."; };
+        reader.onload = () => {
+          let payload;
+          try { payload = JSON.parse(reader.result); } catch (err) { if (status) status.textContent = "⚠️ File bukan .json peta yang valid."; return; }
+          const src = payload && payload.map ? payload.map : payload; // BARU -- tetap terima file lama tanpa pembungkus {fileType,map}
+          if (!src || typeof src !== "object" || !src.imageDataUrl) { if (status) status.textContent = "⚠️ File ini bukan hasil \"⬇️ Unduh Peta\" yang dikenali."; return; }
+          const newMap = JSON.parse(JSON.stringify(src)); // salinan lepas, aman diubah tanpa menyentuh objek asal
+          newMap.id = "map_" + Date.now().toString(36);
+          newMap.name = (newMap.name || "Peta") + " (diunggah)";
+          newMap.everShown = false; // peta hasil unggahan belum pernah ditayangkan DI PERANGKAT INI -- ikuti aturan auto-dorong gaya pin yang sama seperti peta baru lainnya
+          (newMap.pins || []).forEach((p) => { p.id = p.id || ("pin_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7)); });
+          maps.unshift(newMap);
+          activeMapId = newMap.id;
+          saveMaps();
+          renderMapSelect();
+          renderMapEditor();
+          if (status) status.textContent = `✅ "${newMap.name}" berhasil dimuat -- ${(newMap.pins || []).length} pin ada di posisi yang sama seperti saat diunduh.`;
+        };
+        reader.readAsText(file);
+      });
+    }
     const mapDz = el("psMapImageDropzone");
     const mapInput = el("psMapImageInput");
     function handleMapImageFile(file) {
@@ -7148,10 +7320,16 @@ const PresentationStudio = (() => {
       el("psMapOnlineFetchBtn").addEventListener("click", async () => {
         const btn = el("psMapOnlineFetchBtn");
         const statusEl = el("psMapOnlineFetchStatus");
+        // BARU (10 Sep 2026) -- baca pilihan dropdown #psMapOnlineChoice
+        // ("blank" | "named_islands") SEBELUM mulai mengambil, supaya
+        // operator sudah menentukan peta yang mana yang mau dipakai.
+        const choiceEl = el("psMapOnlineChoice");
+        const choiceKey = choiceEl ? choiceEl.value : "blank";
+        const choiceLabel = choiceKey === "named_islands" ? "peta + nama pulau" : choiceKey === "relief" ? "peta relief" : "peta polos";
         btn.disabled = true;
-        if (statusEl) statusEl.textContent = "⏳ Mencari & mengunduh peta dari Wikimedia Commons...";
+        if (statusEl) statusEl.textContent = `⏳ Mencari & mengunduh ${choiceLabel} dari Wikimedia Commons...`;
         try {
-          const result = await fetchOnlineBaseMap_();
+          const result = await fetchOnlineBaseMap_(choiceKey);
           let map = activeMap();
           if (!map) {
             map = { id: "map_" + Date.now().toString(36), name: "Indonesia (online)", imageDataUrl: null, pins: [] };
@@ -7165,7 +7343,7 @@ const PresentationStudio = (() => {
           renderMapSelect();
           renderMapEditor();
           if (el("psMapStyleSelect")) el("psMapStyleSelect").value = "normal";
-          if (statusEl) statusEl.textContent = `✅ Berhasil ambil "${result.title}" dari Wikimedia Commons.`;
+          if (statusEl) statusEl.textContent = `✅ Berhasil ambil "${result.title}" (${choiceLabel}) dari Wikimedia Commons.`;
         } catch (err) {
           if (statusEl) statusEl.textContent = "⚠️ Gagal: " + (err && err.message ? err.message : "kesalahan tidak dikenal") + " -- coba lagi, atau unggah manual di atas.";
         } finally {
@@ -7243,9 +7421,17 @@ const PresentationStudio = (() => {
       el("psMapEditorImg").addEventListener("click", (e) => {
         const map = activeMap();
         if (!map) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const xPct = ((e.clientX - rect.left) / rect.width) * 100;
-        const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+        // PERBAIKAN (10 Sep 2026) -- xPct/yPct SEKARANG dihitung relatif
+        // ke kotak gambar yang BENAR-BENAR terlihat (mapEditorImgContainRect_(),
+        // bukan seluruh kotak 16:9 termasuk letterbox) -- rumus SAMA
+        // PERSIS dengan positionMapContent_()/renderMapPins_() di
+        // present.html, supaya titik yang diklik di sini pasti jatuh di
+        // titik yang SAMA PERSIS saat ditayangkan ke Layar 2.
+        const cr = mapEditorImgContainRect_(e.currentTarget);
+        if (!cr.width || !cr.height) return;
+        const xPct = ((e.clientX - cr.left) / cr.width) * 100;
+        const yPct = ((e.clientY - cr.top) / cr.height) * 100;
+        if (xPct < 0 || xPct > 100 || yPct < 0 || yPct > 100) return; // klik di area kosong (letterbox) di luar gambar -- abaikan
         if (calibArmed) {
           const cityInputId = calibArmed === 1 ? "psMapCalib1City" : "psMapCalib2City";
           const cityName = (el(cityInputId) && el(cityInputId).value.trim()) || "";
@@ -7316,11 +7502,40 @@ const PresentationStudio = (() => {
           // BARU -- id STABIL dari kota+kategori supaya "🧮 Terapkan ke
           // Peta" yang ditekan ULANG (mis. setelah edit tahun) MEMPERBARUI
           // pin yang sama, bukan menduplikasi.
-          const pinId = "city_" + cityName.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + category.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          // PERBAIKAN (10 Sep 2026, permintaan operator: "pin tidak bisa
+          // dihapus"/pin dobel di titik yang sama) -- id SEBELUMNYA
+          // dibuat dari TEKS MENTAH yang diketik operator (cityName,
+          // row.city) -- kalau kota yang SAMA diketik beda-beda di 2
+          // baris tabel (mis. "Surabaya" di satu baris & "Kota Surabaya"
+          // di baris lain, keduanya cocok ke regency yang sama lewat
+          // findRegencyByName()), akan lahir 2 id BERBEDA yang menaruh 2
+          // pin bertumpuk PERSIS di titik yang sama -- kelihatannya "satu
+          // pin tidak bisa dihapus" padahal yang terhapus cuma pin paling
+          // atas, sisanya (dari baris lain) tetap ada di bawahnya.
+          // SEKARANG id dibuat dari NAMA RESMI HASIL PENCARIAN (reg.n),
+          // bukan teks mentahnya -- kota yang sama, seberapa pun beda
+          // cara mengetiknya, selalu berakhir di id (dan pin) yang SAMA.
+          const pinId = "city_" + reg.n.toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + category.toLowerCase().replace(/[^a-z0-9]+/g, "_");
           const existing = map.pins.find((p) => p.id === pinId);
           const pinData = { id: pinId, label: reg.n, category, year: row.year || "", xPct: pos.xPct, yPct: pos.yPct };
           if (existing) Object.assign(existing, pinData); else map.pins.push(pinData);
           applied++;
+        });
+        // PERBAIKAN (10 Sep 2026) -- bersihkan pin DUPLIKAT LAMA yang
+        // sempat kebuat dari skema id lama (teks mentah, lihat catatan
+        // panjang di atas) -- kota+kategori yang SAMA (label & category
+        // sama persis, keduanya sudah nama resmi/reg.n) disisakan HANYA
+        // pin yang id-nya sesuai skema BARU (city_<nama resmi>_<kategori>);
+        // duplikatnya (id skema lama) dibuang otomatis di sini supaya
+        // operator tidak perlu hapus manual satu-satu.
+        const seenCatLabel = new Set();
+        map.pins = map.pins.filter((p) => {
+          if (!p.category) return true; // pin manual, tidak terkait fitur tabel ini, biarkan
+          const key = p.category.toLowerCase() + "|" + (p.label || "").toLowerCase();
+          const expectedId = "city_" + String(p.label || "").toLowerCase().replace(/[^a-z0-9]+/g, "_") + "_" + p.category.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          if (seenCatLabel.has(key)) return p.id === expectedId; // sudah ada satu -- simpan cuma kalau ini yang skema BARU
+          seenCatLabel.add(key);
+          return true;
         });
         saveMaps();
         renderMapEditor();
