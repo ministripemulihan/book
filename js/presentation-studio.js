@@ -1015,6 +1015,7 @@ const PresentationStudio = (() => {
         const categoryCounts = {};
         pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
         rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        map.everShown = true; // lihat catatan panjang di listener psMapPinStyleSelect di atas
         renderStudioPreview({ type: "map" });
       }
     }
@@ -6813,6 +6814,7 @@ const PresentationStudio = (() => {
           const pin = (map.pins || []).find((p) => p.id === btn.dataset.pinFocus);
           if (pin) {
             rawPost({ type: "map", action: "focus", pin, imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins: visiblePins(map) });
+            map.everShown = true; // lihat catatan panjang di listener psMapPinStyleSelect di atas
             // BARU (9 Sep 2026) -- "🎯 Fokus" pakai zoom tetap 2.6x (260%)
             // di Layar 2 (lihat focusMapPin(), present.html) -- samakan
             // posisi slider supaya operator bisa lanjut menggeser dari
@@ -7205,7 +7207,18 @@ const PresentationStudio = (() => {
     }
     // BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Pin: flat (lama)
     // atau 3D Berputar (.pin-3d, lihat css/style.css & present.html).
-    // Sama seperti Gaya Peta di atas, TIDAK auto-dorong ke Layar 2.
+    // PERBAIKAN (10 Sep 2026, permintaan operator: "gambar titik peta di
+    // Studio beda dengan di Layar 2") -- SEBELUMNYA disamakan dengan
+    // "Gaya Peta Dasar" (sengaja TIDAK auto-dorong, karena gaya peta
+    // perlu diproses/API dulu sebelum layak dikirim). Tapi "Gaya Pin"
+    // beda kasus: cuma ganti class CSS, instan, tidak ada proses berat
+    // apa pun -- jadi TIDAK ada alasan menahannya manual. SEKARANG auto-
+    // dorong ke Layar 2 langsung begitu diganti -- TAPI HANYA kalau peta
+    // ini SUDAH PERNAH ditayangkan sebelumnya (map.everShown, ditandai
+    // oleh psMapShowBtn/psMapUnfocusBtn/tombol "🎯 Fokus"/item "🗺️ Peta"
+    // di Kumpulan Ayat) -- supaya peta yang MASIH DIEDIT & BELUM PERNAH
+    // ditayangkan (mis. baru diunggah, belum siap) TIDAK tiba-tiba
+    // muncul ke jemaat cuma gara-gara operator lagi coba-coba gaya pin.
     if (el("psMapPinStyleSelect")) {
       el("psMapPinStyleSelect").addEventListener("change", (e) => {
         const map = activeMap();
@@ -7213,6 +7226,12 @@ const PresentationStudio = (() => {
         map.pinStyle = e.target.value;
         saveMaps();
         renderMapEditor();
+        if (map.everShown && map.imageDataUrl) {
+          const pins = visiblePins(map);
+          const categoryCounts = {};
+          pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
+          rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        }
       });
     }
     // Klik di atas gambar peta = tambah pin BARU di titik itu (persen
@@ -7462,6 +7481,7 @@ const PresentationStudio = (() => {
         const categoryCounts = {};
         pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
         rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        map.everShown = true; // lihat catatan panjang di listener psMapPinStyleSelect di atas
         resetMapZoomSlider();
       });
     }
@@ -7481,11 +7501,20 @@ const PresentationStudio = (() => {
         const categoryCounts = {};
         pins.forEach((p) => { if (p.category) categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1; });
         rawPost({ type: "map", action: "show", imageUrl: effectiveMapImage_(map), pinStyle: map.pinStyle || "flat", pins, categoryCounts, nationalPopulation: map.nationalPopulation || null });
+        map.everShown = true; // lihat catatan panjang di listener psMapPinStyleSelect di atas
         resetMapZoomSlider();
       });
     }
     if (el("psMapStopBtn")) {
-      el("psMapStopBtn").addEventListener("click", () => rawPost({ type: "map", action: "stop" }));
+      el("psMapStopBtn").addEventListener("click", () => {
+        rawPost({ type: "map", action: "stop" });
+        // Reset everShown supaya kalau operator ganti "Gaya Pin" SETELAH
+        // menghentikan peta (tapi SEBELUM menekan "Tampilkan" lagi),
+        // perubahan gaya TIDAK auto-membuka lagi petanya ke Layar 2 --
+        // lihat catatan panjang di listener psMapPinStyleSelect di atas.
+        const map = activeMap();
+        if (map) map.everShown = false;
+      });
     }
     // BARU (9 Sep 2026) -- selipkan REFERENSI peta aktif ke Kumpulan
     // Ayat (lihat catatan addMapToCollection(), js/collections.js).
