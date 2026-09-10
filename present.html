@@ -115,6 +115,66 @@
      "subtitle" sudah pakai gradasi transparan sendiri, "bubble" tidak
      punya zona teks solid terpisah). */
   body.cam-split.stage-transparent #stage { background: transparent; }
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks atas kamera
+     bawah, dan seterusnya") -- BALIK ATAS-BAWAH untuk mode "split" (yang
+     bawaannya kamera-atas/teks-bawah): kalau dicentang "🔁 Balik Atas-
+     Bawah" di Studio, kamera pindah ke BAWAH, zona teks (#stage) pindah
+     ke ATAS. Pola classnya SENGAJA disamakan dengan "cam-split-lr-
+     reverse" yang sudah ada (kombinasi class, bukan mode baru terpisah)
+     supaya tidak perlu slider/opsi camLayout baru -- cukup 1 checkbox
+     tambahan yang HANYA berlaku saat camLayout === "split". Dipicu lewat
+     class "cam-split-reverse-tb" (theme.camSplitReverseTB), lihat
+     applyTheme() di bawah. */
+  body.cam-split.cam-split-reverse-tb #camBg,
+  body.cam-split.cam-split-reverse-tb #imgBg {
+    top: auto; bottom: 0;
+  }
+  body.cam-split.cam-split-reverse-tb #stage {
+    top: 0; bottom: auto;
+  }
+  body.video-overlay.cam-split.cam-split-reverse-tb #ytView,
+  body.video-overlay.cam-split.cam-split-reverse-tb #localVideoEl {
+    top: auto; bottom: 0;
+  }
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "1 layar dibagi 2, kiri kamera
+     kanan berita") -- Tata Letak KE-4 (BARU): "◧ Kamera Kiri, Konten
+     Kanan" (kiri-kanan, BEDA dari "split" di atas yang atas-bawah).
+     Dipicu lewat class "cam-split-lr" di <body> (theme.camLayout ===
+     "split-lr"). Numpang slider "Ukuran Zona Kamera" yang SAMA
+     (--p-cam-split-pct) supaya operator tidak perlu slider baru --
+     di sini persentase itu dibaca sebagai LEBAR (bukan tinggi). Kalau
+     operator ingin sisi kamera di KANAN bukan kiri, cukup tambah
+     centang "Balik Sisi" (class "cam-split-lr-reverse", lihat
+     applyTheme() bawah & theme.camSplitReverse). */
+  body.cam-split-lr #camBg, body.cam-split-lr #imgBg {
+    width: var(--p-cam-split-pct, 42%); height: 100vh;
+    top: 0; left: 0; right: auto; bottom: auto;
+  }
+  body.cam-split-lr #stage {
+    position: fixed; top: 0; bottom: 0; right: 0;
+    left: var(--p-cam-split-pct, 42%);
+    width: auto; height: auto;
+    background: var(--p-bg);
+    justify-content: center;
+  }
+  body.cam-split-lr.stage-transparent #stage { background: transparent; }
+  /* Balik sisi: kamera pindah ke KANAN, konten (#stage) ke KIRI. */
+  body.cam-split-lr.cam-split-lr-reverse #camBg,
+  body.cam-split-lr.cam-split-lr-reverse #imgBg {
+    left: auto; right: 0;
+  }
+  body.cam-split-lr.cam-split-lr-reverse #stage {
+    left: 0; right: var(--p-cam-split-pct, 42%);
+  }
+  body.video-overlay.cam-split-lr #ytView,
+  body.video-overlay.cam-split-lr #localVideoEl {
+    width: var(--p-cam-split-pct, 42%) !important; height: 100vh !important;
+    top: 0; left: 0; right: auto; bottom: auto; object-fit: cover;
+  }
+  body.video-overlay.cam-split-lr.cam-split-lr-reverse #ytView,
+  body.video-overlay.cam-split-lr.cam-split-lr-reverse #localVideoEl {
+    left: auto; right: 0;
+  }
   /* Vignette (body::before) & dim (.cam-active::after) di atas tetap
      menutupi seluruh layar di mode split -- tidak masalah, opacitynya
      sangat tipis dan tetap enak dilihat di kedua zona. */
@@ -140,6 +200,18 @@
     background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.58) 55%, rgba(0,0,0,0) 100%);
     padding-top: 10vh;
   }
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "kamera penuh + teks
+     melayang di atas") -- Subtitle DI ATAS, kebalikan bar bawaan mode
+     "subtitle" (yang menempel bawah). Dipicu lewat class kombinasi
+     "cam-subtitle-top" (theme.camSubtitleTop), HANYA berlaku bareng
+     "cam-subtitle" -- gradasi & posisi bar dibalik total (flex-start,
+     gradasi gelap dari ATAS memudar ke bawah). */
+  body.cam-subtitle.cam-subtitle-top #stage {
+    top: 0; bottom: auto;
+    justify-content: flex-start;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.58) 55%, rgba(0,0,0,0) 100%);
+    padding-top: 0; padding-bottom: 10vh;
+  }
   /* BARU (8 Sep 2026 v3, permintaan operator "dibalik, teks semua ayat,
      kamera bulat kanan-bawah") -- Tata Letak KE-3 (BARU): "🔵 Teks
      Penuh, Kamera Bulat". KEBALIKAN dari mode "split"/"subtitle" di atas
@@ -153,16 +225,77 @@
      teks. Ukurannya diatur slider "Ukuran lingkaran Kamera" (120px-
      420px, bawaan 200px) -- lihat theme.camBubbleSize & --p-cam-bubble-
      size di applyTheme() bawah/js/presentation-studio.js. */
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "lingkaran kecil di
+     5 sisi, dari kecil sampai besar sekali") -- posisi bubble SEKARANG
+     bisa dipilih (dulu terkunci pojok kanan-bawah), dipicu lewat 1 dari
+     5 class kombinasi "bubble-pos-*" di <body> (theme.bubblePos, lihat
+     applyTheme() bawah). TIDAK ada class = bawaan lama (kanan-bawah,
+     backward-compatible kalau ada tema lama tersimpan tanpa field ini).
+     Dipakai BERSAMA "cam-bubble" (kamera bulat) MAUPUN "cam-textbubble"
+     (BARU di bawah -- teks yang bulat) -- 1 set posisi untuk keduanya. */
+  body.bubble-pos-tl #camBg, body.bubble-pos-tl #imgBg,
+  body.bubble-pos-tl #stage.stage-bubble-el {
+    top: 28px; left: 28px; right: auto; bottom: auto;
+  }
+  body.bubble-pos-tr #camBg, body.bubble-pos-tr #imgBg,
+  body.bubble-pos-tr #stage.stage-bubble-el {
+    top: 28px; right: 28px; left: auto; bottom: auto;
+  }
+  body.bubble-pos-bl #camBg, body.bubble-pos-bl #imgBg,
+  body.bubble-pos-bl #stage.stage-bubble-el {
+    bottom: 28px; left: 28px; right: auto; top: auto;
+  }
+  body.bubble-pos-br #camBg, body.bubble-pos-br #imgBg,
+  body.bubble-pos-br #stage.stage-bubble-el {
+    bottom: 28px; right: 28px; left: auto; top: auto;
+  }
+  body.bubble-pos-c #camBg, body.bubble-pos-c #imgBg,
+  body.bubble-pos-c #stage.stage-bubble-el {
+    top: 50%; left: 50%; right: auto; bottom: auto;
+    transform: translate(-50%, -50%);
+  }
   body.cam-bubble #camBg, body.cam-bubble #imgBg {
     width: var(--p-cam-bubble-size, 200px); height: var(--p-cam-bubble-size, 200px);
-    top: auto; left: auto; right: 28px; bottom: 28px;
+    top: auto; left: auto; right: 28px; bottom: 28px; /* bawaan kanan-bawah, ditimpa bubble-pos-* di atas kalau operator pilih posisi lain */
     border-radius: 50%; object-fit: cover;
     box-shadow: 0 6px 24px rgba(0,0,0,0.55);
     border: 3px solid rgba(255,255,255,0.85);
     z-index: 5;
-    transition: opacity .35s ease, width .3s ease, height .3s ease;
+    transition: opacity .35s ease, width .3s ease, height .3s ease, top .3s ease, left .3s ease, right .3s ease, bottom .3s ease;
   }
   body.cam-bubble #stage { background: var(--p-bg); }
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks dalam bentuk
+     lingkaran kecil ... + kamera di belakang") -- KEBALIKAN dari
+     "cam-bubble" di atas: di sini KAMERA/GAMBAR yang memenuhi SELURUH
+     LAYAR sebagai latar (persis seperti mode "full" tanpa split), dan
+     AYAT/KIDUNG/PENGUMUMAN (#stage) yang jadi lingkaran KECIL mengambang
+     -- gaya kebalikan dari webcam bubble ala Zoom (di sini "teks" yang
+     jadi jendela kecilnya). Dipicu lewat class "cam-textbubble"
+     (theme.camLayout === "textbubble"). Ukuran diatur slider terpisah
+     "Ukuran Lingkaran Teks" (--p-textbubble-size, 200px-1200px, bawaan
+     420px) -- terpisah dari --p-cam-bubble-size supaya operator bisa
+     pindah dari mode kamera-bulat ke teks-bulat tanpa ukurannya ikut
+     berubah tak terduga. Class "stage-bubble-el" HARUS ditambahkan ke
+     #stage lewat JS (lihat applyTheme() bawah) supaya selector posisi
+     "bubble-pos-*" di atas (yang generik untuk #camBg/#imgBg/#stage)
+     tidak sengaja mengubah #stage di mode LAIN yang tidak memintanya. */
+  body.cam-textbubble #camBg, body.cam-textbubble #imgBg {
+    width: 100vw; height: 100vh; top: 0; left: 0; right: auto; bottom: auto;
+    border-radius: 0; border: none; box-shadow: none;
+  }
+  body.cam-textbubble #stage.stage-bubble-el {
+    position: fixed; height: auto;
+    width: var(--p-textbubble-size, 420px); min-height: var(--p-textbubble-size, 420px);
+    right: 28px; bottom: 28px; /* bawaan kanan-bawah, ditimpa bubble-pos-* di atas */
+    border-radius: 50%; overflow: auto;
+    background: var(--p-bg);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+    border: 3px solid rgba(255,255,255,0.85);
+    padding: 6vh 5vh; /* padding lebih kecil dari #stage biasa (6vw) supaya teks tidak mepet tepi lingkaran */
+    z-index: 5;
+    transition: opacity .35s ease, width .3s ease, height .3s ease, top .3s ease, left .3s ease, right .3s ease, bottom .3s ease;
+  }
+  body.cam-textbubble.cam-active::after { display: none; } /* sama alasan seperti cam-bubble -- tidak perlu dim seisi layar */
   /* Dim tipis (body.cam-active::after, lihat di bawah) hanya berguna
      saat teks DITIMPAKAN LANGSUNG di atas kamera/gambar (mode "full") --
      di mode bubble teks berdiri di latar solid biasa, jadi dim itu
@@ -215,6 +348,161 @@
     position: fixed; inset: 0; z-index: 1; pointer-events: none;
     background: rgba(0,0,0,0.18);
   }
+  /* BARU (9 Sep 2026, permintaan operator) -- 🗺️ Peta Interaktif:
+     gambar peta penuh layar (object-fit:contain, tidak terpotong) +
+     lapisan pin di atasnya. Operator klik "🎯 Fokus" per pin di Studio
+     -> gambar di sini di-zoom & di-geser (CSS transform, animasi halus)
+     supaya titik itu pas di TENGAH layar -- lihat focusMapPin() di
+     skrip bawah untuk perhitungan translate/scale-nya (berbasis piksel
+     nyata lewat getBoundingClientRect(), BUKAN persentase CSS murni,
+     supaya tetap akurat di rasio layar apa pun). z-index SAMA dengan
+     #stage (2) -- keduanya saling meniadakan (TIDAK pernah tampil
+     berbarengan), lihat showMap()/stopMap(). */
+  #mapView {
+    display: none; position: fixed; inset: 0; z-index: 2;
+    overflow: hidden; background: #000;
+  }
+  #mapView:not([hidden]) { display: block; animation: fadeInOnly .4s ease both; }
+  #mapImg {
+    position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+    object-fit: contain; transform-origin: 0 0;
+    transition: transform 1s ease;
+  }
+  #mapPinsLayer { position: absolute; inset: 0; pointer-events: none; }
+  /* BARU (9 Sep 2026, permintaan operator) -- badge legenda kategori
+     ("Kaki Dian: 12", "Pos Injil: 8") di pojok kanan-atas peta, TAMPIL
+     KE PENONTON (bukan cuma panel Studio) -- lihat showMap()/
+     renderMapLegend_() di skrip bawah & categoryCounts yang dikirim dari
+     wireMapTab() (js/presentation-studio.js). */
+  #mapLegend {
+    position: absolute; top: 4vh; right: 4vh; z-index: 1;
+    display: flex; flex-direction: column; gap: 0.6vh;
+    background: rgba(0,0,0,.55); padding: 1.4vh 1.8vh; border-radius: 10px;
+    backdrop-filter: blur(3px);
+  }
+  #mapLegend:empty { display: none; }
+  /* BARU (9 Sep 2026, permintaan operator) -- 🌏 banner Total Penduduk
+     Indonesia (Nasional), pojok kiri-atas (sisi kosong -- legenda
+     kategori sudah pakai kanan-atas, kartu info kota pakai kiri-bawah).
+     Independen dari transform zoom peta (sibling dari #mapImg, bukan di
+     dalamnya) supaya TETAP kelihatan walau operator zoom/fokus ke 1
+     kota -- lihat renderNationalPop_() & showMap() di skrip bawah. */
+  #mapNationalPop {
+    position: absolute; top: 4vh; left: 4vh; z-index: 1;
+    background: rgba(0,0,0,.55); padding: 1.2vh 1.8vh; border-radius: 10px;
+    backdrop-filter: blur(3px); color: #fff; max-width: 44vw;
+  }
+  #mapNationalPop:empty { display: none; }
+  #mapNationalPop .natpop-main {
+    font: 800 clamp(15px, 1.9vw, 26px)/1.3 "Inter", Arial, sans-serif;
+  }
+  #mapNationalPop .natpop-sub {
+    font: 500 clamp(11px, 1.2vw, 16px)/1.4 "Inter", Arial, sans-serif;
+    opacity: .82; margin-top: .3vh;
+  }
+  .map-legend-row {
+    display: flex; align-items: center; gap: 0.8vh;
+    font: 700 clamp(13px, 1.5vw, 22px)/1.3 "Inter", Arial, sans-serif; color: #fff;
+    white-space: nowrap;
+  }
+  .map-legend-dot { width: 1vw; height: 1vw; min-width: 10px; min-height: 10px; border-radius: 50%; border: 2px solid #fff; flex: none; }
+  .map-pin-dot {
+    position: absolute; width: 1.4vw; height: 1.4vw; min-width: 14px; min-height: 14px;
+    margin: -0.7vw 0 0 -0.7vw; border-radius: 50%;
+    background: #e2483d; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.55);
+    animation: mapPinPulse_ 1.8s ease-in-out infinite;
+  }
+  /* BARU (9 Sep 2026, permintaan operator) -- "animasi besar kecil
+     seperti Google Maps menunjuk tempat": pin bernapas pelan terus-
+     menerus (bukan cuma sekali muncul) supaya peta terasa hidup/
+     interaktif, bukan gambar statis. Delay per-pin diacak sedikit lewat
+     nth-child supaya semua pin TIDAK berdenyut serentak (terlihat lebih
+     alami, seperti kelap-kelip kota). */
+  .map-pin-dot:nth-child(3n) { animation-delay: .3s; }
+  .map-pin-dot:nth-child(3n+1) { animation-delay: .6s; }
+  .map-pin-dot:nth-child(5n) { animation-delay: .9s; }
+  @keyframes mapPinPulse_ {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.22); }
+  }
+  /* BARU (9 Sep 2026, permintaan operator) -- "🎨 Gaya Pin: 3D Berputar"
+     di Layar 2. Sama seperti .ps-pin-3d di css/style.css (Studio) --
+     disalin di sini karena present.html adalah dokumen HTML terpisah,
+     tidak memuat css/style.css. Lihat komentar panjang di
+     css/style.css untuk penjelasan kenapa ini "sorot bergeser" bukan
+     rotasi 3D sungguhan, dan kenapa @property dipakai. */
+  @property --hl { syntax: '<percentage>'; initial-value: 30%; inherits: false; }
+  .map-pin-dot.pin-3d {
+    background: radial-gradient(circle at var(--hl) 30%, #ffffff 0%, var(--pin3d-color, #e2483d) 42%, color-mix(in srgb, var(--pin3d-color, #e2483d) 65%, #000) 100%);
+    animation: mapPinPulse_ 1.8s ease-in-out infinite, mapPin3DSpin_ 3.4s linear infinite;
+  }
+  @keyframes mapPin3DSpin_ { 0% { --hl: 15%; } 50% { --hl: 85%; } 100% { --hl: 15%; } }
+  .map-pin-label {
+    position: absolute; transform: translate(-50%, -150%);
+    background: rgba(0,0,0,.72); color: #fff; padding: 4px 12px; border-radius: 6px;
+    font: 700 clamp(12px, 1.4vw, 22px)/1.3 "Inter", Arial, sans-serif; white-space: nowrap;
+  }
+  /* BARU (9 Sep 2026, permintaan operator) -- 📇 Kartu Info Kota, muncul
+     HANYA saat "🎯 Fokus" ditekan (zoom ke 1 pin) -- lihat
+     focusMapPin()/renderMapInfoCard_() di skrip bawah. Sengaja bukan
+     label permanen di atas pin (beda dari .map-pin-label) supaya peta
+     yang ratusan titik tetap bersih; kartu ini cuma tampil untuk 1 titik
+     yang sedang difokuskan, di pojok kiri-bawah supaya tidak menutupi
+     titik yang lagi di-zoom (yang selalu digeser ke TENGAH layar). */
+  #mapInfoCard {
+    position: absolute; left: 4vh; bottom: 4vh; z-index: 1;
+    background: rgba(0,0,0,.62); backdrop-filter: blur(3px);
+    padding: 1.6vh 2.2vh; border-radius: 12px;
+    max-width: 46vw; color: #fff;
+    font: 500 clamp(13px, 1.5vw, 20px)/1.4 "Inter", Arial, sans-serif;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  #mapInfoCard.show { opacity: 1; transform: translateY(0); }
+  #mapInfoCard .map-info-name {
+    font: 800 clamp(18px, 2.4vw, 30px)/1.25 "Inter", Arial, sans-serif;
+    margin-bottom: .4vh;
+  }
+  #mapInfoCard .map-info-cat { opacity: .85; margin-bottom: .6vh; }
+  #mapInfoCard .map-info-row { opacity: .92; }
+  #mapInfoCard .map-info-dot {
+    display: inline-block; width: .8vw; height: .8vw; min-width: 9px; min-height: 9px;
+    border-radius: 50%; margin-right: 6px; border: 2px solid #fff;
+  }
+  /* BARU (9 Sep 2026, permintaan operator) -- strip foto (maks 5) di
+     bawah kartu info, kalau operator sudah unggah lewat "📷 Foto" di
+     Studio -- lihat renderMapInfoCard_() di bawah. */
+  #mapInfoCard .map-info-photos { display: flex; gap: .6vh; margin-top: .8vh; }
+  #mapInfoCard .map-info-photos img {
+    width: 8vh; height: 8vh; object-fit: cover; border-radius: 6px;
+    border: 2px solid rgba(255,255,255,.85);
+  }
+
+  /* BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian (versi teks
+     saja -- versi foto per-segmen direncanakan tahap berikutnya). z-index
+     SAMA dengan #stage/#mapView (2) -- saling meniadakan, tidak pernah
+     tampil berbarengan, lihat showWheel()/spinWheel() di skrip bawah.
+     Putaran dianimasikan lewat CSS transform+transition pada #wheelCanvas
+     itu sendiri (bukan menggambar ulang tiap frame) -- ringan & mulus. */
+  #wheelView {
+    display: none; position: fixed; inset: 0; z-index: 2;
+    background: #17110d; overflow: hidden;
+    align-items: center; justify-content: center; flex-direction: column;
+  }
+  #wheelView:not([hidden]) { display: flex; animation: fadeInOnly .4s ease both; }
+  #wheelCanvasWrap { position: relative; width: min(72vh, 72vw); height: min(72vh, 72vw); }
+  #wheelCanvas { width: 100%; height: 100%; display: block; transform-origin: 50% 50%; filter: drop-shadow(0 6px 22px rgba(0,0,0,.5)); }
+  #wheelPointer {
+    position: absolute; top: -1.6vh; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 2vh solid transparent; border-right: 2vh solid transparent;
+    border-top: 3.4vh solid #fff; filter: drop-shadow(0 2px 5px rgba(0,0,0,.55)); z-index: 3;
+  }
+  #wheelWinnerBanner {
+    margin-top: 3.4vh; font: 800 clamp(24px, 4.2vw, 58px)/1.2 "Inter", Arial, sans-serif;
+    color: #ffd23d; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,.6);
+    min-height: 1em;
+  }
+
   #stage {
     position: relative; z-index: 2;
     height: 100%;
@@ -650,6 +938,99 @@
   }
   #timerClockCaption[hidden] { display: none; }
 
+  /* BARU (9 Sep 2026, permintaan operator) -- "Mode Layar" umum: dipakai
+     untuk 2 jenis layar baru, "welcome" (layar sambutan sebelum acara
+     mulai, isi: judul + subjudul + poin-poin penting + opsional
+     hitung mundur ke jam mulai) & "nextup" (layar "SELANJUTNYA" di
+     antara sesi, isi: judul kecil "SELANJUTNYA" + nama sesi + opsional
+     hitung mundur singkat). SATU komponen (#modeScreenView), beda isi
+     saja lewat class ms-welcome/ms-nextup di <body> -- lihat
+     showModeScreen() di skrip bawah & wireModeScreenTab() di
+     js/presentation-studio.js. Dipusatkan PERSIS pola #timerClockWrap
+     di atas (translate -50%/-50%) supaya konsisten di semua tema/skala. */
+  #modeScreenView {
+    display: none; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.6vh; z-index: 3; text-align: center; max-width: 88vw;
+  }
+  #modeScreenView:not([hidden]) { display: flex; animation: fadeInOnly .4s ease both; }
+  #msEyebrow {
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.12em;
+    font-size: calc(clamp(14px, 2vw, 26px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-accent, #d8b45c));
+    text-transform: uppercase;
+  }
+  #msEyebrow[hidden], #msSubtitle[hidden], #msCountdown[hidden], #msBullets[hidden], #msNextLabel[hidden] { display: none; }
+  #msTitle {
+    font-family: "Inter", Arial, sans-serif; font-weight: 800;
+    font-size: calc(clamp(28px, 5.4vw, 84px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-ink));
+    text-shadow: var(--p-timerclock-stroke, none);
+    line-height: 1.15;
+  }
+  #msSubtitle {
+    font-family: "Inter", Arial, sans-serif; font-weight: 600;
+    font-size: calc(clamp(18px, 2.6vw, 38px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-ink)); opacity: 0.92;
+  }
+  #msCountdown {
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    font-size: calc(clamp(30px, 6vw, 96px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-ink));
+    text-shadow: var(--p-timerclock-stroke, none);
+    margin-top: 0.4vh;
+  }
+  #msBullets {
+    list-style: none; margin: 1vh 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 0.9vh;
+    font-family: "Inter", Arial, sans-serif; font-weight: 600;
+    font-size: calc(clamp(16px, 1.8vw, 30px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-ink)); opacity: 0.95;
+  }
+  #msBullets li::before { content: "•  "; opacity: 0.7; }
+  /* BARU (9 Sep 2026, permintaan operator) -- baris "➡️ Selanjutnya: ..."
+     (Layar Istirahat Lengkap), dibuat SENGAJA lebih kecil & redup dari
+     #msTitle/#msSubtitle supaya jelas ini keterangan TAMBAHAN, bukan
+     fokus utama layar (fokus utama tetap jam mundur/#msCountdown atau
+     judul). Sedikit dipisah jarak (margin-top) & diberi garis tipis di
+     atasnya supaya terlihat sebagai "bagian lain" dari layar yang sama. */
+  #msNextLabel {
+    font-family: "Inter", Arial, sans-serif; font-weight: 700;
+    font-size: calc(clamp(15px, 1.7vw, 26px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-ink)); opacity: 0.85;
+    margin-top: 1.2vh; padding-top: 1.2vh;
+    border-top: 1px solid color-mix(in srgb, var(--p-timerclock-color, var(--p-ink)) 30%, transparent);
+  }
+  /* Layar "SELANJUTNYA" (nextup) dibuat lebih ringkas -- judul sesi
+     jadi fokus utama, eyebrow "SELANJUTNYA" kecil di atasnya. */
+  body.ms-nextup #msTitle { font-size: calc(clamp(24px, 4.4vw, 68px) * var(--p-scale)); }
+
+  /* BARU (9 Sep 2026, permintaan operator) -- 4 preset "Jenis Layar"
+     tambahan (☕ Istirahat, 🎉 Ice Breaker, 🏃 Olahraga, 🙏 Renungan
+     Malam), lihat MODE_SCREEN_KIND_META di js/presentation-studio.js
+     untuk teks bawaan & showModeScreen() di skrip bawah untuk class
+     body-nya. SENGAJA hanya menyentuh warna eyebrow/aksen (BUKAN
+     background penuh) supaya "Ikut Tema" (warna latar pilihan operator,
+     var(--p-bg)/var(--p-accent)) tetap dihormati -- cukup jadi nuansa
+     kecil yang membedakan suasana tiap jenis tanpa terasa kaku/seragam. */
+  body.ms-istirahat #msEyebrow { color: #e0a458; } /* hangat, secangkir kopi */
+  body.ms-icebreaker #msEyebrow { color: #ff6f91; } /* ceria */
+  body.ms-icebreaker #msTitle { letter-spacing: 0.01em; }
+  body.ms-olahraga #msEyebrow { color: #ff6a45; } /* energik */
+  body.ms-olahraga #msTitle { font-weight: 900; }
+  /* Renungan Malam dibuat lebih TENANG/hening: eyebrow redup, subjudul
+     miring, transisi lebih lambat -- kebalikan dari Ice Breaker/Olahraga
+     yang tegas & energik di atas. */
+  body.ms-renungan #msEyebrow { color: color-mix(in srgb, var(--p-timerclock-color, var(--p-ink)) 55%, transparent); letter-spacing: 0.18em; }
+  body.ms-renungan #msSubtitle { font-style: italic; opacity: 0.75; }
+  body.ms-renungan #modeScreenView { animation-duration: 1.4s; }
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "info waktunya foto
+     bersama") -- eyebrow kuning ceria khas momen foto/kamera. */
+  body.ms-foto #msEyebrow { color: #ffd23f; }
+  body.ms-foto #msTitle { letter-spacing: 0.01em; }
+
   #timerClockTime {
     font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
     /* Sama seperti #stopwatchTime -- pakai --p-timer-scale sendiri (lihat
@@ -794,6 +1175,53 @@
     white-space: nowrap;
   }
 
+  /* ---- BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung ----
+     Satu lapisan TETAP (tidak pernah hidden/dilepas) yang menumpuk di
+     ATAS segalanya (z-index 70, di bawah #activateOverlay 90 supaya
+     gerbang izin suara tetap paling depan) TAPI pointer-events:none
+     supaya sama sekali tidak menghalangi klik/gesture apa pun di bawah
+     -- confetti/emoji cuma numpang lewat beberapa detik lalu hilang
+     sendiri (lihat playEffectVisual_() di skrip bawah). */
+  #effectsLayer { position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden; }
+  #effectsConfettiCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ms-effect-emoji {
+    position: absolute; bottom: -60px; font-size: 48px; line-height: 1;
+    animation: msEffectRise 3s ease-in forwards;
+    text-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  @keyframes msEffectRise {
+    0% { transform: translate(0, 0) scale(0.6) rotate(0deg); opacity: 0; }
+    12% { opacity: 1; }
+    100% { transform: translate(var(--ms-effect-drift, 0px), -110vh) scale(1.15) rotate(var(--ms-effect-spin, 12deg)); opacity: 0; }
+  }
+  /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama Tuhan") --
+     teks BESAR di TENGAH layar (BEDA dari .ms-effect-emoji di atas yang
+     kecil-kecil beterbangan) -- muncul membesar sedikit + berkilau
+     (text-shadow berdenyut lewat animasi kedua "msShoutGlow"), tahan
+     sebentar di tengah, lalu memudar & sedikit membesar lagi saat hilang.
+     Total durasi ~2.6s, dibersihkan otomatis oleh playShout_() di skrip
+     bawah (sama pola "tembak dan lupa" seperti efek lain). */
+  .ms-shout-text {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: "Inter", Arial, sans-serif; font-weight: 900;
+    font-size: clamp(40px, 9vw, 140px);
+    color: #ffd23f; text-align: center; white-space: nowrap;
+    text-shadow: 0 0 24px rgba(255, 210, 63, 0.85), 0 4px 18px rgba(0,0,0,.55);
+    animation: msShoutPop 2.6s cubic-bezier(.2,.8,.3,1) forwards, msShoutGlow 0.7s ease-in-out infinite alternate;
+  }
+  @keyframes msShoutPop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    10% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+    18% { transform: translate(-50%, -50%) scale(1); }
+    82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.18); }
+  }
+  @keyframes msShoutGlow {
+    from { text-shadow: 0 0 24px rgba(255, 210, 63, 0.85), 0 4px 18px rgba(0,0,0,.55); }
+    to { text-shadow: 0 0 46px rgba(255, 210, 63, 1), 0 4px 18px rgba(0,0,0,.55); }
+  }
+
   /* ---- Lapisan "aktifkan kontrol suara" (lihat komentar HTML-nya) ---- */
   #activateOverlay {
     position: fixed; inset: 0; z-index: 90;
@@ -833,6 +1261,26 @@
        versi LAMA yang salah kirim {type:"text"} untuk posisi Tengah
        (itu MENIMPA isi utama, bukan bikin lapisan baru di atasnya). -->
   <div id="msgMidBar" class="ticker-bar" hidden><span class="ticker-inner" id="msgMidText"></span></div>
+
+  <!-- BARU (9 Sep 2026, permintaan operator) -- 🗺️ Peta Interaktif,
+       lihat catatan panjang CSS #mapView di atas. -->
+  <div id="mapView" hidden>
+    <img id="mapImg" alt="" />
+    <div id="mapPinsLayer"></div>
+    <div id="mapLegend"></div>
+    <div id="mapNationalPop"></div>
+    <div id="mapInfoCard"></div>
+  </div>
+
+  <!-- BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian, lihat
+       catatan panjang CSS #wheelView di atas. -->
+  <div id="wheelView" hidden>
+    <div id="wheelCanvasWrap">
+      <div id="wheelPointer"></div>
+      <canvas id="wheelCanvas"></canvas>
+    </div>
+    <div id="wheelWinnerBanner"></div>
+  </div>
 
   <div id="stage">
     <div id="ref" hidden></div>
@@ -882,6 +1330,21 @@
       <div id="timerClockTime">00:00:00</div>
       <div id="timerClockStatusBadge"></div>
     </div>
+    <!-- BARU (9 Sep 2026, permintaan operator) -- "Mode Layar" umum
+         (Welcome/Next Up), lihat catatan panjang CSS #modeScreenView
+         di atas & showModeScreen() di skrip bawah. -->
+    <div id="modeScreenView" hidden>
+      <div id="msEyebrow" hidden></div>
+      <div id="msTitle"></div>
+      <div id="msSubtitle" hidden></div>
+      <div id="msCountdown" hidden></div>
+      <ul id="msBullets" hidden></ul>
+      <!-- BARU (9 Sep 2026, permintaan operator) -- "Layar Istirahat
+           Lengkap": baris kecil "➡️ Selanjutnya: ..." di bagian paling
+           bawah, lihat catatan panjang CSS #msNextLabel di atas &
+           showModeScreen() di skrip bawah. -->
+      <div id="msNextLabel" hidden></div>
+    </div>
     <!-- BARU (27 Agu 2026) -- lihat catatan CSS #stopwatchWrap di atas. -->
     <div id="stopwatchWrap" hidden>
       <div id="stopwatchLabel"></div>
@@ -900,6 +1363,19 @@
   <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
   <div id="magnifierLens"></div>
   <div id="magnifierBadge"></div>
+
+  <!-- BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung (confetti
+       & reaksi emoji terbang). SATU lapisan di ATAS SEMUANYA (z-index
+       tertinggi di halaman ini, lihat CSS #effectsLayer di atas),
+       pointer-events:none supaya tidak menghalangi klik apa pun di
+       bawahnya. #effectsConfettiCanvas dipakai HANYA untuk confetti
+       (di-resize & dikosongkan lagi tiap dipanggil, lihat
+       playEffectVisual_() di skrip bawah); reaksi emoji cukup <span>
+       biasa yang dibuang otomatis setelah animasinya selesai (tidak
+       menumpuk di DOM). -->
+  <div id="effectsLayer">
+    <canvas id="effectsConfettiCanvas"></canvas>
+  </div>
 
   <!-- Lapisan "aktifkan kontrol suara" -- browser (Chrome dkk) TIDAK
        mengizinkan jendela ini diputar/dibunyikan lewat perintah dari
@@ -1176,6 +1652,191 @@
     } catch (e) { beep(); }
   }
 
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung: reaksi
+  // visual (confetti/emoji terbang) & efek suara 1-tombol. Lihat
+  // wireEffectsTab() (js/presentation-studio.js) untuk tombol di
+  // Studio & CSS #effectsLayer/.ms-effect-emoji di atas untuk gaya
+  // visualnya. SEMUA efek suara di bawah disintesis LANGSUNG lewat
+  // Web Audio API (oscillator + noise, numpang `audioCtx` yang sama
+  // dengan beep() di atas) -- BUKAN file MP3 -- supaya tidak perlu
+  // aset tambahan & tetap 100% offline seperti fitur lain di app ini.
+  // ------------------------------------------------------------
+  const effectsConfettiCanvas_ = document.getElementById("effectsConfettiCanvas");
+  const CONFETTI_COLORS_ = ["#e2483d", "#3d8ee2", "#3de27a", "#e2c23d", "#a83de2", "#e2793d", "#3de2d4", "#e23d9e", "#ffffff"];
+  let confettiRAF_ = null;
+  function playConfetti_() {
+    const canvas = effectsConfettiCanvas_;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const W = window.innerWidth, H = window.innerHeight;
+    // 150 keping confetti jatuh dari atas, tiap keping punya kecepatan
+    // jatuh, ayunan horizontal (wobble), & putaran sendiri-sendiri --
+    // dibuat SEDERHANA (persegi kecil berwarna, bukan gambar/sprite)
+    // supaya ringan dijalankan bahkan di laptop presentasi biasa.
+    const pieces = Array.from({ length: 150 }, () => ({
+      x: Math.random() * W,
+      y: -20 - Math.random() * H * 0.5,
+      w: 6 + Math.random() * 6,
+      h: 10 + Math.random() * 8,
+      color: CONFETTI_COLORS_[Math.floor(Math.random() * CONFETTI_COLORS_.length)],
+      vy: 2.2 + Math.random() * 2.6,
+      wobble: Math.random() * Math.PI * 2,
+      wobbleSpeed: 0.04 + Math.random() * 0.06,
+      rot: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 12,
+    }));
+    if (confettiRAF_) cancelAnimationFrame(confettiRAF_);
+    const start = performance.now();
+    function tick(now) {
+      const elapsed = now - start;
+      ctx.clearRect(0, 0, W, H);
+      pieces.forEach((p) => {
+        p.y += p.vy;
+        p.wobble += p.wobbleSpeed;
+        p.rot += p.rotSpeed;
+        const x = p.x + Math.sin(p.wobble) * 22;
+        ctx.save();
+        ctx.translate(x, p.y);
+        ctx.rotate((p.rot * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      // Berhenti setelah 4.5 detik ATAU semua keping sudah lewat bawah
+      // layar (mana yang lebih dulu) -- dibersihkan (clearRect) supaya
+      // tidak meninggalkan bingkai kosong yang tetap menumpuk di depan.
+      if (elapsed < 4500 && pieces.some((p) => p.y < H + 30)) {
+        confettiRAF_ = requestAnimationFrame(tick);
+      } else {
+        ctx.clearRect(0, 0, W, H);
+        confettiRAF_ = null;
+      }
+    }
+    confettiRAF_ = requestAnimationFrame(tick);
+  }
+  // Reaksi emoji terbang (👏/❤️/🙌/🔥 dst) -- beberapa <span> muncul dari
+  // bawah layar dengan waktu mulai & arah melayang acak, lalu MEMBUANG
+  // dirinya sendiri dari DOM begitu animasi CSS-nya selesai (event
+  // "animationend") supaya tidak menumpuk kalau operator pencet
+  // berkali-kali beruntun.
+  function playEmojiReaction_(emoji) {
+    const layer = document.getElementById("effectsLayer");
+    if (!layer) return;
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement("span");
+      span.className = "ms-effect-emoji";
+      span.textContent = emoji || "👏";
+      const startX = 8 + Math.random() * 84; // vw
+      span.style.left = startX + "vw";
+      span.style.setProperty("--ms-effect-drift", (Math.random() * 160 - 80) + "px");
+      span.style.setProperty("--ms-effect-spin", (Math.random() * 50 - 25) + "deg");
+      span.style.animationDelay = (Math.random() * 0.6) + "s";
+      span.style.fontSize = (34 + Math.random() * 30) + "px";
+      span.addEventListener("animationend", () => span.remove());
+      layer.appendChild(span);
+    }
+  }
+  // BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama Tuhan") --
+  // BEDA dari playEmojiReaction_() di atas (banyak elemen kecil
+  // beterbangan): 1 elemen teks BESAR di tengah layar, dipakai untuk
+  // seruan singkat ("PUJI TUHAN!", "HALELUYA!", dst) supaya jelas
+  // terbaca dari jarak jauh di layar besar. "Tembak dan lupa" (fire-
+  // and-forget) sama seperti efek lain -- dibersihkan sendiri lewat
+  // animationend, aman dipencet berkali-kali beruntun (tiap panggilan
+  // bikin elemen baru, tidak saling mengganggu kalau operator memencet
+  // lagi sebelum animasi sebelumnya selesai).
+  function playShout_(text) {
+    const layer = document.getElementById("effectsLayer");
+    if (!layer || !text) return;
+    const span = document.createElement("span");
+    span.className = "ms-shout-text";
+    span.textContent = text;
+    span.addEventListener("animationend", (e) => {
+      if (e.animationName === "msShoutPop") span.remove();
+    });
+    layer.appendChild(span);
+  }
+  function playEffectVisual_(data) {
+    if (data.effect === "emoji") playEmojiReaction_(data.emoji);
+    else playConfetti_(); // default/"confetti"
+  }
+
+  // Nada tunggal pendek, dipakai sebagai "bahan dasar" fanfare/ta-da di
+  // bawah (beda dari beep() di atas yang frekuensinya tetap 880Hz --
+  // di sini frekuensi & bentuk gelombang bisa diatur per panggilan).
+  function playNote_(freq, when, dur, type, peakGain) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      const t0 = audioCtx.currentTime + when;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peakGain || 0.3, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    } catch (e) {}
+  }
+  // Ledakan noise pendek (dipakai drumroll/applause di bawah) -- white
+  // noise dibuat SEKALI lewat AudioBuffer lalu "diputar ulang" tiap
+  // panggilan (bukan generate ulang tiap kali, lebih ringan).
+  let noiseBuffer_ = null;
+  function playNoiseBurst_(when, dur, peakGain) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (!noiseBuffer_) {
+        const len = audioCtx.sampleRate * 1; // 1 detik noise, cukup untuk dipotong-potong
+        noiseBuffer_ = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+        const d = noiseBuffer_.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer_;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass"; bp.frequency.value = 1200; bp.Q.value = 0.7;
+      const g = audioCtx.createGain();
+      const t0 = audioCtx.currentTime + when;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peakGain || 0.28, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+      src.start(t0); src.stop(t0 + dur + 0.05);
+    } catch (e) {}
+  }
+  function playEffectSound_(soundKey) {
+    if (soundKey === "ding") {
+      playNote_(1318.5, 0, 0.9, "sine", 0.32); // E6, lembut -- mirip beep() tapi nada lebih tinggi/ceria
+      playNote_(1975.5, 0.05, 0.7, "sine", 0.14); // B6 tipis di atasnya, kesan "kristal"
+    } else if (soundKey === "tada") {
+      playNote_(523.25, 0, 0.18, "triangle", 0.3); // C5
+      playNote_(783.99, 0.12, 0.5, "triangle", 0.3); // G5, menahan -- kesan "ta-DA!"
+    } else if (soundKey === "fanfare") {
+      [392.0, 523.25, 659.25, 783.99].forEach((f, i) => playNote_(f, i * 0.14, 0.35, "square", 0.22)); // G4-C5-E5-G5 naik
+      playNote_(783.99, 0.56, 0.6, "square", 0.26); // nada penutup ditahan
+    } else if (soundKey === "drumroll") {
+      // ~18 ledakan noise cepat berturut-turut (rentetan drumroll),
+      // diakhiri 1 pukulan lebih keras + nada rendah (kesan "crash").
+      for (let i = 0; i < 18; i++) playNoiseBurst_(i * 0.09, 0.12, 0.22);
+      playNoiseBurst_(1.65, 0.5, 0.4);
+      playNote_(110, 1.65, 0.5, "sawtooth", 0.2);
+    } else if (soundKey === "applause") {
+      // ~30 ledakan noise dengan JEDA ACAK (bukan berjarak sama rata
+      // seperti drumroll di atas) supaya terdengar lebih "organik"
+      // menyerupai tepuk tangan banyak orang, bukan mesin.
+      let t = 0;
+      for (let i = 0; i < 30; i++) { t += 0.03 + Math.random() * 0.08; playNoiseBurst_(t, 0.06 + Math.random() * 0.05, 0.14 + Math.random() * 0.1); }
+    } else {
+      beep();
+    }
+  }
+
   // Klik DI MANA SAJA di Layar 2 ini menghentikan bel custom yang sedang
   // berbunyi (permintaan operator: bisa dihentikan tanpa harus balik ke
   // Studio dulu). Tidak mengganggu listener "activateOverlay" di atas --
@@ -1216,6 +1877,8 @@
     stopStopwatch(false); // BARU -- Timer & Stopwatch berbagi ruang tengah yang sama, tidak boleh berbarengan
     stopTimerClock(false); // BARU (7 Sep 2026) -- ikut Countdown Jam Target di ruang tengah yang sama
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
+    stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
+    stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     hideMagnify(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
     timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerLabelEl.textContent = timerState.label;
@@ -1269,6 +1932,8 @@
     stopStopwatch(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
+    stopModeScreen(false); // BARU (9 Sep 2026)
+    stopMap(false); // BARU (9 Sep 2026)
     hideMagnify();
     timerState = null; // BUKAN sedang menghitung -- tickTimer() sengaja TIDAK dipanggil/di-interval-kan di sini
     timerLabelEl.textContent = data.label || "";
@@ -1375,6 +2040,8 @@
   function showTimerClock(data) {
     stopTimer(false);
     stopStopwatch(false); // BARU -- Timer/Stopwatch/Countdown Jam Target berbagi ruang tengah yang sama, tidak boleh berbarengan
+    stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
+    stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     hideMagnify();
     timerClockState = { endAt: data.endAt, caption: data.caption || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerClockCaptionEl.textContent = timerClockState.caption;
@@ -1397,6 +2064,547 @@
     timerClockWrap.hidden = true;
     timerClockWrap.classList.remove("ps-standby");
     if (timerClockStatusBadgeEl) timerClockStatusBadgeEl.textContent = "";
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- "Mode Layar" umum:
+  // Welcome (layar sambutan sebelum acara mulai) & Next Up (layar
+  // "SELANJUTNYA" di antara sesi). Lihat catatan panjang CSS
+  // #modeScreenView & HTML-nya di atas. Payload: { type:"modescreen",
+  // kind:"welcome"|"nextup", eyebrow, title, subtitle, bullets:[...],
+  // endAt (opsional, hitung mundur) }. Numpang persis pola
+  // showTimerClock() di atas untuk saling-eksklusif dgn Timer lain.
+  // BARU (9 Sep 2026) -- HARUS sama persis dengan key MODE_SCREEN_KIND_META
+  // (js/presentation-studio.js): eyebrow bawaan (dipakai kalau operator
+  // TIDAK mengisi field "eyebrow" khusus -- saat ini semua jalur yang
+  // ada tidak pernah mengisi field itu, jadi bawaan inilah yang selalu
+  // dipakai) + daftar SEMUA class body per jenis supaya stopModeScreen()
+  // bisa membersihkan semuanya sekaligus tanpa daftar terpisah yang
+  // gampang lupa disinkronkan kalau nanti nambah jenis lagi.
+  // BARU (9 Sep 2026, sesi ke-9) -- "foto" (📸 Foto Bersama) ditambahkan
+  // ke daftar, HARUS sama persis dengan key MODE_SCREEN_KIND_META
+  // (js/presentation-studio.js) -- lihat catatan panjang di atas.
+  const MODE_SCREEN_KINDS_ = ["welcome", "nextup", "istirahat", "icebreaker", "olahraga", "renungan", "foto"];
+  const MODE_SCREEN_DEFAULT_EYEBROW_ = { nextup: "SELANJUTNYA", istirahat: "☕ ISTIRAHAT SEBENTAR", icebreaker: "🎉 ICE BREAKER", olahraga: "🏃 OLAHRAGA", renungan: "🙏 RENUNGAN MALAM", foto: "📸 FOTO BERSAMA" };
+  const modeScreenViewEl = document.getElementById("modeScreenView");
+  const msEyebrowEl = document.getElementById("msEyebrow");
+  const msTitleEl = document.getElementById("msTitle");
+  const msSubtitleEl = document.getElementById("msSubtitle");
+  const msCountdownEl = document.getElementById("msCountdown");
+  const msBulletsEl = document.getElementById("msBullets");
+  let modeScreenInterval = null;
+  let modeScreenState = null;
+  function fmtModeCountdown_(totalSeconds) {
+    const s = Math.max(0, Math.round(totalSeconds));
+    const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return hh > 0 ? `${pad(hh)}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`;
+  }
+  function tickModeScreen_() {
+    if (!modeScreenState || !modeScreenState.endAt) return;
+    const remain = (modeScreenState.endAt - Date.now()) / 1000;
+    msCountdownEl.textContent = fmtModeCountdown_(remain);
+    if (remain <= 0 && modeScreenInterval) { clearInterval(modeScreenInterval); modeScreenInterval = null; }
+  }
+  function showModeScreen(data) {
+    stopTimer(false);
+    stopStopwatch(false);
+    stopTimerClock(false);
+    stopLocalVideo(false);
+    if (typeof stopMap === "function") stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
+    if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
+    hideMagnify();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; refEl.textContent = "";
+    refSubEl.hidden = true; refSubEl.textContent = "";
+    textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    modeScreenState = { endAt: data.endAt || null };
+    MODE_SCREEN_KINDS_.forEach((k) => document.body.classList.toggle("ms-" + k, data.kind === k));
+    msEyebrowEl.textContent = data.eyebrow || MODE_SCREEN_DEFAULT_EYEBROW_[data.kind] || "";
+    msEyebrowEl.hidden = !msEyebrowEl.textContent;
+    msTitleEl.textContent = data.title || "";
+    msSubtitleEl.textContent = data.subtitle || "";
+    msSubtitleEl.hidden = !data.subtitle;
+    msBulletsEl.innerHTML = "";
+    const bullets = Array.isArray(data.bullets) ? data.bullets.filter((b) => b && String(b).trim()) : [];
+    bullets.forEach((b) => {
+      const li = document.createElement("li");
+      li.textContent = b;
+      msBulletsEl.appendChild(li);
+    });
+    msBulletsEl.hidden = !bullets.length;
+    // BARU (9 Sep 2026, permintaan operator) -- lihat catatan panjang
+    // CSS #msNextLabel di atas ("Layar Istirahat Lengkap").
+    const nextLabelEl = document.getElementById("msNextLabel");
+    if (nextLabelEl) {
+      nextLabelEl.textContent = data.nextLabel ? "➡️ Selanjutnya: " + data.nextLabel : "";
+      nextLabelEl.hidden = !data.nextLabel;
+    }
+    if (modeScreenInterval) { clearInterval(modeScreenInterval); modeScreenInterval = null; }
+    if (data.endAt) {
+      msCountdownEl.hidden = false;
+      tickModeScreen_();
+      modeScreenInterval = setInterval(tickModeScreen_, 250);
+    } else {
+      msCountdownEl.hidden = true;
+    }
+    modeScreenViewEl.hidden = false;
+  }
+  function stopModeScreen(showIdle) {
+    if (modeScreenInterval) { clearInterval(modeScreenInterval); modeScreenInterval = null; }
+    modeScreenState = null;
+    modeScreenViewEl.hidden = true;
+    MODE_SCREEN_KINDS_.forEach((k) => document.body.classList.remove("ms-" + k));
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🗺️ Peta Interaktif.
+  // Lihat catatan panjang CSS #mapView di atas untuk perhitungan
+  // zoom/pan di focusMapPin(). Payload: { type:"map", action:"show"|
+  // "focus"|"stop", imageUrl, pins:[{id,label,xPct,yPct}], pin }.
+  // ------------------------------------------------------------
+  const mapViewEl = document.getElementById("mapView");
+  const mapImgEl = document.getElementById("mapImg");
+  const mapPinsLayerEl = document.getElementById("mapPinsLayer");
+  const mapLegendEl = document.getElementById("mapLegend");
+  const mapNationalPopEl = document.getElementById("mapNationalPop"); // BARU (9 Sep 2026)
+  const mapInfoCardEl = document.getElementById("mapInfoCard");
+  let mapState = null;
+  // BARU (9 Sep 2026, permintaan operator) -- state zoom LIVE (dikendalikan
+  // slider "🔍 Zoom Peta" di Studio, lihat applyMapTransform_() di bawah).
+  // mapZoomCenter: titik (xPct,yPct) yang jadi pusat zoom saat ini --
+  // pindah ke posisi pin waktu "🎯 Fokus", balik ke tengah (50,50) saat
+  // peta penuh ditampilkan. mapZoomScale: 1 = ukuran normal (peta penuh).
+  let mapZoomCenter = { xPct: 50, yPct: 50 };
+  let mapZoomScale = 1;
+  // BARU (9 Sep 2026) -- warna KONSISTEN per nama kategori, dihitung dari
+  // teksnya sendiri -- HARUS sama persis dengan categoryColor() di
+  // js/presentation-studio.js (palet & rumus hash sama) supaya warna pin
+  // di Layar 2 SELALU cocok dengan warna dot di panel Studio & badge
+  // legenda di bawah.
+  // BARU (9 Sep 2026) -- warna KONSISTEN per nama kategori, dihitung dari
+  // teksnya sendiri -- HARUS sama persis dengan categoryColor() di
+  // js/presentation-studio.js (palet, fixed-colors & rumus hash sama)
+  // supaya warna pin di Layar 2 SELALU cocok dengan warna dot di panel
+  // Studio & badge legenda di bawah.
+  const MAP_CATEGORY_PALETTE_ = ["#3d8ee2", "#3de27a", "#a83de2", "#e2793d", "#3de2d4", "#e23d9e"];
+  const MAP_CATEGORY_FIXED_COLORS_ = { "kaki dian": "#d4af37", "pos injil": "#c0392b" };
+  function categoryColor_(category) {
+    const s = String(category || "");
+    const fixed = MAP_CATEGORY_FIXED_COLORS_[s.trim().toLowerCase()];
+    if (fixed) return fixed;
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return MAP_CATEGORY_PALETTE_[h % MAP_CATEGORY_PALETTE_.length];
+  }
+  function renderMapPins_() {
+    mapPinsLayerEl.innerHTML = "";
+    if (!mapState || !Array.isArray(mapState.pins)) return;
+    const pinStyle3D = mapState.pinStyle === "3d"; // BARU (9 Sep 2026, permintaan operator)
+    mapState.pins.forEach((pin) => {
+      const dot = document.createElement("div");
+      dot.className = pinStyle3D ? "map-pin-dot pin-3d" : "map-pin-dot";
+      dot.style.left = pin.xPct + "%";
+      dot.style.top = pin.yPct + "%";
+      const color = pin.category ? categoryColor_(pin.category) : "#e2483d";
+      if (pinStyle3D) dot.style.setProperty("--pin3d-color", color);
+      else if (pin.category) dot.style.background = color;
+      // BARU (9 Sep 2026, permintaan operator) -- pin BESAR-KECIL sesuai
+      // jumlah penduduk kota itu (kalau operator sudah isi lewat "📊 Data"
+      // di Studio) -- skala akar (sqrt), BUKAN linear, supaya kota
+      // sebesar Jakarta tidak menutupi separuh peta dibanding kota kecil;
+      // pin TANPA data penduduk tetap ukuran standar (1.4vw, dari CSS
+      // .map-pin-dot) supaya tidak semua pin jadi kecil kalau baru
+      // sebagian yang diisi datanya.
+      if (pin.population) {
+        const sizeVw = Math.max(1.4, Math.min(4.6, 1.1 + Math.sqrt(Number(pin.population)) / 320));
+        dot.style.width = sizeVw + "vw";
+        dot.style.height = sizeVw + "vw";
+        dot.style.minWidth = (sizeVw * 10) + "px";
+        dot.style.minHeight = (sizeVw * 10) + "px";
+        dot.style.margin = `-${sizeVw / 2}vw 0 0 -${sizeVw / 2}vw`;
+      }
+      mapPinsLayerEl.appendChild(dot);
+      // BARU (9 Sep 2026) -- label teks PERMANEN di Layar 2 cuma untuk
+      // pin MANUAL (venue, biasanya cuma belasan titik) -- pin
+      // BERKATEGORI (kota/kabupaten se-Indonesia, bisa RATUSAN titik
+      // sekaligus) SENGAJA tanpa label permanen supaya peta tidak penuh
+      // sesak tulisan; cukup titik warna + badge hitungan di legenda
+      // (renderMapLegend_()). Nama kota tetap kelihatan operator lewat
+      // `title` (tooltip) di panel Studio (lihat renderMapEditor()).
+      if (pin.label && !pin.category) {
+        const label = document.createElement("div");
+        label.className = "map-pin-label";
+        label.style.left = pin.xPct + "%";
+        label.style.top = pin.yPct + "%";
+        label.textContent = pin.label;
+        mapPinsLayerEl.appendChild(label);
+      }
+    });
+  }
+  // BARU (9 Sep 2026) -- badge legenda kategori ("● Kaki Dian  12",
+  // "● Pos Injil  8") di pojok Layar 2, TAMPIL KE PENONTON. `counts`:
+  // { [namaKategori]: jumlah }, dikirim dari wireMapTab()/
+  // sendGenericItemLive() (js/presentation-studio.js).
+  function renderMapLegend_(counts) {
+    if (!mapLegendEl) return;
+    mapLegendEl.innerHTML = "";
+    if (!counts) return;
+    Object.keys(counts).sort().forEach((cat) => {
+      const row = document.createElement("div");
+      row.className = "map-legend-row";
+      const dot = document.createElement("span");
+      dot.className = "map-legend-dot";
+      dot.style.background = categoryColor_(cat);
+      const text = document.createElement("span");
+      text.textContent = `${cat}  ${counts[cat]}`;
+      row.appendChild(dot);
+      row.appendChild(text);
+      mapLegendEl.appendChild(row);
+    });
+  }
+  // BARU (9 Sep 2026, permintaan operator) -- kartu info kota saat
+  // "🎯 Fokus" ditekan: nama kota + kategori/tahun (kalau ada) + luas
+  // (km²) & jumlah penduduk (kalau operator sudah isi lewat "📊 Data" di
+  // panel Studio, lihat js/presentation-studio.js). Baris yang datanya
+  // kosong SENGAJA tidak ditampilkan (bukan "0" atau "-") supaya kartu
+  // tidak terkesan mengarang data yang belum diisi operator.
+  function renderMapInfoCard_(pin) {
+    if (!mapInfoCardEl || !pin) return;
+    const rows = [];
+    if (pin.category) {
+      rows.push(
+        `<div class="map-info-cat"><span class="map-info-dot" style="background:${categoryColor_(pin.category)};"></span>${escapeHtmlLocal_(pin.category)}${pin.year ? " · sejak " + escapeHtmlLocal_(String(pin.year)) : ""}</div>`
+      );
+    }
+    if (pin.areaKm2) {
+      rows.push(`<div class="map-info-row">📐 Luas: ${Number(pin.areaKm2).toLocaleString("id-ID")} km²</div>`);
+    }
+    if (pin.population) {
+      const popText = Number(pin.population).toLocaleString("id-ID");
+      // BARU (9 Sep 2026) -- "Tahun Data" ditulis ulang jadi "data sensus
+      // terakhir tahun ..." di Layar 2 supaya penonton paham itu angka
+      // sensus, bukan tahun sekarang (field-nya di Studio tetap bernama
+      // populationYear/"Data thn", cuma teks tampilnya diperjelas di sini).
+      rows.push(`<div class="map-info-row">👥 Penduduk: ${popText} jiwa${pin.populationYear ? " (sensus terakhir " + escapeHtmlLocal_(String(pin.populationYear)) + ")" : ""}</div>`);
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- baris kecil sumber data
+    // (mis. "Sumber: Wikidata"), TAMPIL cuma kalau pin.populationSource
+    // dan/atau pin.areaSource terisi (diisi otomatis oleh tombol "🔄
+    // Wikidata"/"🔄 Perbarui Semua..." di Studio, lihat
+    // js/presentation-studio.js -> fetchCityDataAuto_()). Kalau operator
+    // isi/koreksi manual, source-nya dikosongkan lagi di Studio -- jadi
+    // baris ini otomatis tidak muncul untuk data manual (tidak mengarang
+    // sumber untuk angka yang bukan dari sana).
+    const sourceBits = [];
+    if (pin.populationSource) sourceBits.push(pin.populationSource);
+    if (pin.areaSource && pin.areaSource !== pin.populationSource) sourceBits.push(pin.areaSource);
+    if (sourceBits.length) {
+      rows.push(`<div class="map-info-row" style="opacity:.6; font-size:.72em;">Sumber: ${escapeHtmlLocal_(sourceBits.join(" · "))}</div>`);
+    }
+    let photosHtml = "";
+    if (Array.isArray(pin.photos) && pin.photos.length) {
+      photosHtml = `<div class="map-info-photos">${pin.photos.slice(0, 5).map((src) => `<img src="${src}" alt="" />`).join("")}</div>`;
+    }
+    mapInfoCardEl.innerHTML = `<div class="map-info-name">${escapeHtmlLocal_(pin.label || "")}</div>${rows.join("")}${photosHtml}`;
+    mapInfoCardEl.classList.add("show");
+  }
+  function hideMapInfoCard_() {
+    if (!mapInfoCardEl) return;
+    mapInfoCardEl.classList.remove("show");
+  }
+  // BARU (9 Sep 2026, permintaan operator) -- 🌏 banner Total Penduduk
+  // Indonesia (Nasional). `np`: { value, year, source, sourceUrl,
+  // visible } atau null/kosong -- baris kosong/visible=false membuat
+  // banner disembunyikan TAPI gambar peta di baliknya tetap tayang
+  // seperti biasa (elemen ini sibling terpisah dari #mapImg).
+  function renderNationalPop_(np) {
+    if (!mapNationalPopEl) return;
+    if (!np || !np.visible || !np.value) { mapNationalPopEl.innerHTML = ""; return; }
+    const valueText = Number(np.value).toLocaleString("id-ID");
+    const sourceText = np.source ? escapeHtmlLocal_(np.source) : "";
+    mapNationalPopEl.innerHTML =
+      `<div class="natpop-main">🇮🇩 Total Penduduk Indonesia: ${valueText} jiwa</div>` +
+      `<div class="natpop-sub">${np.year ? "Data " + escapeHtmlLocal_(String(np.year)) + (sourceText ? " · " : "") : ""}${sourceText}</div>`;
+  }
+  // present.html tidak selalu punya escapeHtml global di scope ini --
+  // helper kecil lokal saja, cukup untuk teks singkat kartu info.
+  function escapeHtmlLocal_(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function showMap(data) {
+    stopTimer(false);
+    stopStopwatch(false);
+    stopTimerClock(false);
+    stopLocalVideo(false);
+    stopModeScreen(false);
+    if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
+    hideMagnify();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; refEl.textContent = "";
+    refSubEl.hidden = true; refSubEl.textContent = "";
+    textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    mapState = { imageUrl: data.imageUrl, pins: Array.isArray(data.pins) ? data.pins : [], pinStyle: data.pinStyle || "flat" };
+    mapZoomCenter = { xPct: 50, yPct: 50 }; // BARU (9 Sep 2026) -- reset zoom ke peta penuh
+    mapZoomScale = 1;
+    mapImgEl.style.transition = "none";
+    mapImgEl.style.transform = "translate(0px,0px) scale(1)";
+    mapImgEl.src = mapState.imageUrl || "";
+    renderMapPins_();
+    renderMapLegend_(data.categoryCounts);
+    renderNationalPop_(data.nationalPopulation); // BARU (9 Sep 2026)
+    hideMapInfoCard_(); // "▶️ Tampilkan Peta" (peta penuh) selalu menutup kartu info fokus sebelumnya
+    mapViewEl.hidden = false;
+    requestAnimationFrame(() => { mapImgEl.style.transition = "transform 1s ease"; });
+  }
+  // BARU (9 Sep 2026, permintaan operator) -- terapkan mapZoomCenter +
+  // mapZoomScale saat ini ke transform gambar peta. Dipisah dari
+  // focusMapPin() supaya bisa dipanggil ulang oleh slider "🔍 Zoom Peta"
+  // (setMapZoom()) TANPA mengubah titik pusatnya (operator sedang lihat
+  // 1 kota, terus geser slider zoom -- pusatnya harus tetap kota itu,
+  // bukan balik ke tengah peta). Perhitungan translate berbasis piksel
+  // NYATA (getBoundingClientRect di scale 1), sama seperti sebelumnya,
+  // supaya akurat di rasio gambar apa pun.
+  function applyMapTransform_(animate) {
+    const prevTransition = mapImgEl.style.transition;
+    mapImgEl.style.transition = "none";
+    mapImgEl.style.transform = "translate(0px,0px) scale(1)";
+    void mapImgEl.offsetWidth; // paksa reflow supaya rect di bawah terukur di scale 1
+    const rect = mapImgEl.getBoundingClientRect();
+    const scale = mapZoomScale;
+    const pinX = rect.left + (mapZoomCenter.xPct / 100) * rect.width;
+    const pinY = rect.top + (mapZoomCenter.yPct / 100) * rect.height;
+    const tx = window.innerWidth / 2 - pinX * scale;
+    const ty = window.innerHeight / 2 - pinY * scale;
+    requestAnimationFrame(() => {
+      mapImgEl.style.transition = animate === false ? "none" : (prevTransition || "transform 1s ease");
+      mapImgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    });
+  }
+  function focusMapPin(data) {
+    if (!mapState || data.imageUrl !== mapState.imageUrl) { showMap(data); }
+    const pin = data.pin;
+    if (!pin) return;
+    mapZoomCenter = { xPct: pin.xPct, yPct: pin.yPct };
+    mapZoomScale = 2.6;
+    applyMapTransform_(true);
+    renderMapInfoCard_(pin);
+  }
+  // BARU (9 Sep 2026, permintaan operator) -- 🔍 Zoom interaktif: operator
+  // menggeser slider di Studio ({type:"map", action:"zoom", scale:1..6}),
+  // Layar 2 langsung memperbesar/memperkecil dari titik pusat yang
+  // SEDANG aktif (kota yang lagi difokuskan, atau tengah peta kalau
+  // belum fokus ke kota manapun) -- animasi halus, TIDAK loncat-loncat
+  // seperti kalau operator klik ulang "🎯 Fokus" tiap mau ubah zoom.
+  function setMapZoom(scale) {
+    if (!mapState) return;
+    mapZoomScale = Math.max(1, Math.min(6, Number(scale) || 1));
+    applyMapTransform_(true);
+  }
+  function stopMap(showIdle) {
+    mapState = null;
+    mapZoomCenter = { xPct: 50, yPct: 50 };
+    mapZoomScale = 1;
+    mapViewEl.hidden = true;
+    mapImgEl.style.transition = "none";
+    mapImgEl.style.transform = "translate(0px,0px) scale(1)";
+    if (mapLegendEl) mapLegendEl.innerHTML = ""; // BARU (9 Sep 2026)
+    if (mapNationalPopEl) mapNationalPopEl.innerHTML = ""; // BARU (9 Sep 2026)
+    hideMapInfoCard_(); // BARU (9 Sep 2026)
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian. Versi
+  // TEKS SAJA (nama per segmen) -- 100% OFFLINE, tidak ada bagian yang
+  // butuh internet sama sekali (beda dari fitur kuis/polling lewat HP
+  // penonton yang WAJIB online -- lihat jawaban chat untuk daftar
+  // lengkap mana yang offline/online). Versi "1 lingkaran = 1 foto
+  // orang" direncanakan tahap berikutnya (butuh upload gambar per nama,
+  // disimpan lokal/IndexedDB seperti Media Tersimpan -- tetap offline,
+  // cuma lebih banyak kerja UI, sengaja belum di tahap ini).
+  //
+  // Payload: { type:"wheel", action:"show"|"spin"|"stop",
+  //            entries:[string], winnerIndex, spinId }.
+  //   "show" -- gambar ulang roda (dipanggil operator tiap kali daftar
+  //             nama di panel Studio diubah lalu "🎡 Tampilkan Roda"
+  //             ditekan) TANPA memutar apa pun -- siap dilihat penonton
+  //             sebelum tombol "🎲 Putar!" ditekan.
+  //   "spin" -- putar ke `winnerIndex` (indeks pemenang SUDAH ditentukan
+  //             di sisi Studio lewat Math.random(), BUKAN di sini --
+  //             supaya Studio bisa langsung tahu siapa pemenangnya untuk
+  //             mode "buang pemenang" tanpa menunggu animasi selesai).
+  //             Layar 2 hanya menganimasikan visual+suara menuju indeks
+  //             itu, lalu mengonfirmasi balik lewat postMessage
+  //             "present_wheel_result" (dipakai Studio buat menyalakan
+  //             lagi tombol "Putar!" & menghapus nama pemenang kalau
+  //             mode "buang pemenang" aktif).
+  //   "stop" -- sembunyikan roda, kembali ke idle.
+  //
+  // Putaran dianimasikan lewat CSS transform+transition pada elemen
+  // <canvas> itu sendiri (roda cuma digambar SEKALI per "show", lalu
+  // diputar sebagai satu gambar utuh) -- BUKAN redraw canvas berulang
+  // tiap frame -- supaya tetap ringan dijalankan di laptop presentasi
+  // biasa sekalipun daftar namanya panjang.
+  // ------------------------------------------------------------
+  const wheelViewEl = document.getElementById("wheelView");
+  const wheelCanvasEl = document.getElementById("wheelCanvas");
+  const wheelWinnerBannerEl = document.getElementById("wheelWinnerBanner");
+  const WHEEL_COLORS_ = ["#e2483d", "#3d8ee2", "#3de27a", "#e2c23d", "#a83de2", "#e2793d", "#3de2d4", "#e23d9e", "#7a5cff", "#ff8f5c"];
+  let wheelEntries_ = [];
+  // Derajat kumulatif -- SELALU bertambah (tidak pernah direset ke 0
+  // antar putaran, lihat spinWheel()) supaya roda TIDAK PERNAH "lompat
+  // mundur" saat diputar berkali-kali beruntun (mis. mode "buang
+  // pemenang" / undian bertingkat).
+  let wheelRotation_ = 0;
+  let wheelTickTimeouts_ = [];
+  let wheelFinishTimeout_ = null;
+
+  function drawWheelDisc_(entries) {
+    const canvas = wheelCanvasEl;
+    const size = Math.round(Math.min(canvas.clientWidth, canvas.clientHeight)) || 600;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr; canvas.height = size * dpr;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const r = size / 2;
+    const n = Math.max(entries.length, 1);
+    const segDeg = 360 / n;
+    ctx.clearRect(0, 0, size, size);
+    entries.forEach((label, i) => {
+      const startDeg = -90 + i * segDeg; // -90 supaya batas segmen ke-0 mulai dari JAM 12 (atas), sejajar #wheelPointer
+      const startRad = (startDeg * Math.PI) / 180;
+      const endRad = ((startDeg + segDeg) * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(r, r);
+      ctx.arc(r, r, r - 4, startRad, endRad);
+      ctx.closePath();
+      ctx.fillStyle = WHEEL_COLORS_[i % WHEEL_COLORS_.length];
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,.25)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Tulisan nama ditaruh sepanjang radius, dirotasi ikut sudut
+      // TENGAH segmennya sendiri supaya selalu "menghadap keluar" dari
+      // titik pusat roda -- cara baca yang sama seperti roda undian
+      // fisik sungguhan. Nama yang kepanjangan dipotong otomatis + "…"
+      // supaya tidak menabrak segmen sebelahnya.
+      const midRad = ((startDeg + segDeg / 2) * Math.PI) / 180;
+      ctx.save();
+      ctx.translate(r, r);
+      ctx.rotate(midRad);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#fff";
+      ctx.font = `700 ${Math.max(12, Math.min(22, 240 / n))}px Inter, Arial, sans-serif`;
+      const maxLabelWidth = r - 26;
+      const full = String(label || "");
+      let text = full;
+      while (ctx.measureText(text).width > maxLabelWidth && text.length > 1) text = text.slice(0, -1);
+      if (text !== full && text.length > 1) text = text.slice(0, -1) + "…";
+      ctx.fillText(text, r - 14, 0);
+      ctx.restore();
+    });
+    // Hub kecil di tengah -- kosmetik saja, menutup ujung dalam tiap
+    // segmen supaya rapi.
+    ctx.beginPath();
+    ctx.arc(r, r, r * 0.06, 0, Math.PI * 2);
+    ctx.fillStyle = "#17110d";
+    ctx.fill();
+  }
+
+  function clearWheelTimers_() {
+    wheelTickTimeouts_.forEach((t) => clearTimeout(t));
+    wheelTickTimeouts_ = [];
+    if (wheelFinishTimeout_) { clearTimeout(wheelFinishTimeout_); wheelFinishTimeout_ = null; }
+  }
+
+  function showWheel(data) {
+    stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
+    if (typeof stopModeScreen === "function") stopModeScreen(false);
+    if (typeof stopMap === "function") stopMap(false);
+    hideMagnify();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; refEl.textContent = "";
+    refSubEl.hidden = true; refSubEl.textContent = "";
+    textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    clearWheelTimers_();
+    wheelEntries_ = Array.isArray(data.entries) ? data.entries.filter((e) => e && String(e).trim()) : [];
+    wheelWinnerBannerEl.textContent = "";
+    wheelCanvasEl.style.transition = "none";
+    wheelCanvasEl.style.transform = `rotate(${wheelRotation_}deg)`;
+    wheelViewEl.hidden = false; // TAMPILKAN dulu -- baru ukur clientWidth/Height (0 kalau masih hidden) sebelum menggambar
+    drawWheelDisc_(wheelEntries_);
+  }
+
+  function spinWheel(data) {
+    if (!wheelEntries_.length) return; // belum pernah "show" -- operator harus tekan "🎡 Tampilkan Roda" dulu, abaikan diam-diam
+    const n = wheelEntries_.length;
+    const segDeg = 360 / n;
+    const winnerIndex = Math.max(0, Math.min(n - 1, data.winnerIndex || 0));
+    // Titik jatuh sedikit ACAK di dalam segmen pemenang (±35% dari
+    // lebar segmen, tidak pernah sampai ke tepi) -- supaya tidak selalu
+    // pas presisi di tengah-tengah, terasa lebih "asli".
+    const jitter = (Math.random() - 0.5) * segDeg * 0.7;
+    const targetMod = (((-(winnerIndex + 0.5) * segDeg) - jitter) % 360 + 360) % 360;
+    const currentMod = ((wheelRotation_ % 360) + 360) % 360;
+    const forwardDelta = ((targetMod - currentMod) % 360 + 360) % 360;
+    const EXTRA_SPINS = 6; // putaran penuh tambahan biar dramatis sebelum berhenti di segmen target
+    const duration = 4200; // ms
+    wheelRotation_ = wheelRotation_ + EXTRA_SPINS * 360 + forwardDelta;
+    clearWheelTimers_();
+    wheelWinnerBannerEl.textContent = "";
+    requestAnimationFrame(() => {
+      wheelCanvasEl.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.68, 0.18, 1)`;
+      wheelCanvasEl.style.transform = `rotate(${wheelRotation_}deg)`;
+    });
+    // Bunyi "tik" dijadwalkan makin JARANG menjelang berhenti (mengikuti
+    // easeOutCubic, sama kurva percepatan berhentinya dengan animasi
+    // visual di atas) -- kesan roda melambat pelan-pelan sampai benar-
+    // benar diam, bukan berhenti tiba-tiba.
+    const numTicks = 46;
+    for (let k = 1; k <= numTicks; k++) {
+      const t = k / numTicks;
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const at = eased * (duration - 120);
+      wheelTickTimeouts_.push(setTimeout(playWheelTick_, at));
+    }
+    wheelFinishTimeout_ = setTimeout(() => {
+      wheelWinnerBannerEl.textContent = "🏆 " + wheelEntries_[winnerIndex];
+      if (typeof playEffectSound_ === "function") playEffectSound_("tada");
+      if (typeof playConfetti_ === "function") playConfetti_();
+      if (window.opener) {
+        try {
+          window.opener.postMessage({ source: "bibleAppPresenter", type: "present_wheel_result", spinId: data.spinId, winnerIndex: winnerIndex }, location.origin);
+        } catch (e) {}
+      }
+    }, duration + 60);
+  }
+
+  // Nada "tik" pendek & kering (noise singkat + denting tinggi tipis) --
+  // pola SAMA seperti playNoiseBurst_()/playNote_() (🎉 Efek Panggung di
+  // atas) -- 100% disintesis lewat Web Audio API, TIDAK ada file audio
+  // sama sekali, jadi tetap 100% offline.
+  function playWheelTick_() {
+    if (typeof playNoiseBurst_ === "function") playNoiseBurst_(0, 0.045, 0.22);
+    if (typeof playNote_ === "function") playNote_(1600, 0, 0.03, "square", 0.06);
+  }
+
+  function stopWheel(showIdle) {
+    clearWheelTimers_();
+    wheelViewEl.hidden = true;
+    wheelWinnerBannerEl.textContent = "";
     if (showIdle) idleEl.hidden = false;
   }
 
@@ -1498,6 +2706,8 @@
     stopTimer(false); // Timer & Stopwatch tidak boleh berbarengan (lihat catatan di atas)
     stopTimerClock(false); // BARU (7 Sep 2026)
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
+    stopModeScreen(false); // BARU (9 Sep 2026)
+    stopMap(false); // BARU (9 Sep 2026)
     hideMagnify();
     stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
     stopwatchLabelEl.textContent = stopwatchState.label;
@@ -1532,6 +2742,8 @@
     stopTimer(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
+    stopModeScreen(false); // BARU (9 Sep 2026)
+    stopMap(false); // BARU (9 Sep 2026)
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
     stopwatchState = null;
     hideMagnify();
@@ -1849,6 +3061,40 @@
       document.body.classList.toggle("cam-split", theme.camLayout === "split");
       document.body.classList.toggle("cam-subtitle", theme.camLayout === "subtitle");
       document.body.classList.toggle("cam-bubble", theme.camLayout === "bubble");
+      // BARU (9 Sep 2026, sesi ke-9) -- "textbubble" (teks bulat, kamera
+      // jadi latar penuh) -- lihat catatan panjang body.cam-textbubble
+      // di <style> atas. Class "stage-bubble-el" ditaruh di #stage HANYA
+      // saat mode ini aktif, supaya selector posisi generik "bubble-pos-*"
+      // (dipakai bersama cam-bubble juga) tidak menyentuh #stage di mode
+      // lain yang tidak memintanya.
+      document.body.classList.toggle("cam-textbubble", theme.camLayout === "textbubble");
+      const stageEl = document.getElementById("stage");
+      if (stageEl) stageEl.classList.toggle("stage-bubble-el", theme.camLayout === "textbubble");
+      // BARU (9 Sep 2026) -- "split-lr" (kiri-kanan), lihat catatan
+      // panjang body.cam-split-lr di <style> atas.
+      document.body.classList.toggle("cam-split-lr", theme.camLayout === "split-lr");
+    }
+    // BARU (9 Sep 2026, sesi ke-9, permintaan operator "5 sisi") --
+    // posisi bubble (dipakai bersama cam-bubble MAUPUN cam-textbubble),
+    // lihat catatan panjang body.bubble-pos-* di <style> atas.
+    if (theme.bubblePos) {
+      ["tl", "tr", "bl", "br", "c"].forEach((p) => {
+        document.body.classList.toggle("bubble-pos-" + p, theme.bubblePos === p);
+      });
+    }
+    if (typeof theme.camSplitReverse === "boolean") {
+      document.body.classList.toggle("cam-split-lr-reverse", theme.camSplitReverse);
+    }
+    // BARU (9 Sep 2026, sesi ke-9) -- 2 orientasi tambahan yang diminta
+    // operator: "Teks Atas/Kamera Bawah" (balik dari mode "split") &
+    // "Subtitle di Atas" (balik dari mode "subtitle"). Lihat catatan
+    // panjang body.cam-split-reverse-tb & body.cam-subtitle-top di
+    // <style> atas.
+    if (typeof theme.camSplitReverseTB === "boolean") {
+      document.body.classList.toggle("cam-split-reverse-tb", theme.camSplitReverseTB);
+    }
+    if (typeof theme.camSubtitleTop === "boolean") {
+      document.body.classList.toggle("cam-subtitle-top", theme.camSubtitleTop);
     }
     // BARU (8 Sep 2026 v4, permintaan operator "latar belakang transparan
     // atau ada backgroundnya") -- lihat catatan panjang di <style>
@@ -1865,6 +3111,10 @@
     // (mode "bubble", 120px-420px, bawaan 200px), lihat body.cam-bubble
     // di <style>.
     if (theme.camBubbleSize) root.setProperty("--p-cam-bubble-size", theme.camBubbleSize + "px");
+    // BARU (9 Sep 2026, sesi ke-9) -- ukuran lingkaran mode "Teks Bulat"
+    // (textbubble), terpisah dari --p-cam-bubble-size di atas. Lihat
+    // body.cam-textbubble #stage.stage-bubble-el di <style>.
+    if (theme.textBubbleSize) root.setProperty("--p-textbubble-size", theme.textBubbleSize + "px");
     // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
     // dipakai showMain()/showLocalVideo() (lihat variabel modul
     // `videoTextOverlayOn` & catatan panjang di sana) supaya ayat/kidung/
@@ -2160,6 +3410,9 @@
     stopStopwatch(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
+    if (typeof stopModeScreen === "function") stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
+    if (typeof stopMap === "function") stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
+    if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
     hideMagnify(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
     setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
     idleEl.hidden = true;
@@ -2357,6 +3610,9 @@
       stopStopwatch(true);
       stopTimerClock(true); // BARU (7 Sep 2026)
       stopLocalVideo(true); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
+      stopModeScreen(true); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
+      stopMap(true); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
+      if (typeof stopWheel === "function") stopWheel(true); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
       hideMagnify();
       setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
@@ -2386,6 +3642,46 @@
       if (data.action === "stop") { stopTimerClock(true); }
       else if (data.action === "stopBell") { stopBellSound(); }
       else { showTimerClock(data); }
+      return;
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung. Dibuat
+    // "tembak dan lupa" (fire-and-forget) -- lihat catatan panjang di
+    // playEffectVisual_()/playEffectSound_() di atas & wireEffectsTab()
+    // (js/presentation-studio.js). SENGAJA tidak `return` lewat cek
+    // action seperti tipe lain (tidak ada action "stop") karena efeknya
+    // memang dirancang untuk selesai & hilang sendiri.
+    if (data.type === "effect") { playEffectVisual_(data); return; }
+    if (data.type === "sound") { playEffectSound_(data.sound); return; }
+    // BARU (9 Sep 2026, sesi ke-9) -- lihat playShout_() & wireEffectsTab()
+    // (js/presentation-studio.js).
+    if (data.type === "shout") { playShout_(data.text); return; }
+    // BARU (9 Sep 2026) -- "Mode Layar" umum (Welcome/Next Up), lihat
+    // catatan panjang showModeScreen() di atas.
+    if (data.type === "modescreen") {
+      if (data.action === "stop") { stopModeScreen(true); }
+      else { showModeScreen(data); }
+      return;
+    }
+    // BARU (9 Sep 2026) -- 🗺️ Peta Interaktif, lihat catatan panjang
+    // showMap()/focusMapPin() di atas.
+    if (data.type === "map") {
+      if (data.action === "stop") { stopMap(true); }
+      else if (data.action === "focus") { focusMapPin(data); }
+      else if (data.action === "zoom") { setMapZoom(data.scale); } // BARU (9 Sep 2026) -- slider "🔍 Zoom Peta"
+      // BARU (9 Sep 2026, permintaan operator) -- toggle/update 🌏 Total
+      // Penduduk Indonesia TANPA mereset zoom/pin yang sedang tayang
+      // (beda dari action "show" biasa, lihat pushNatPopLive_() di
+      // js/presentation-studio.js).
+      else if (data.action === "natpop") { renderNationalPop_(data.nationalPopulation); }
+      else { showMap(data); }
+      return;
+    }
+    // BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian, lihat
+    // catatan panjang showWheel()/spinWheel() di atas.
+    if (data.type === "wheel") {
+      if (data.action === "stop") { stopWheel(true); }
+      else if (data.action === "spin") { spinWheel(data); }
+      else { showWheel(data); }
       return;
     }
     // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4),
