@@ -182,6 +182,7 @@ const PresentationStudio = (() => {
     else if (payload.type === "clear") Presentation.clearScreen();
     else Presentation.postRaw ? Presentation.postRaw(payload) : rawPost(payload);
     renderStudioPreview(payload);
+    syncMonitorVideoForPayload_(payload); // BARU (10 Sep 2026, lanjutan) -- lihat catatan di fungsi ini
   }
 
   // Kirim tipe payload baru (theme/warta/footnote/timer/black/logo/
@@ -192,6 +193,52 @@ const PresentationStudio = (() => {
   function rawPost(payload) {
     if (typeof Presentation === "undefined" || !Presentation.postRaw) return;
     Presentation.postRaw(payload);
+    syncMonitorVideoForPayload_(payload); // BARU (10 Sep 2026, lanjutan) -- lihat catatan di fungsi ini
+  }
+
+  // BARU (10 Sep 2026, lanjutan permintaan operator) -- "Monitor
+  // Pembicara" (Monitor 3, monitor.html) sekarang juga bisa menampilkan
+  // CUPLIKAN VIDEO dari apa yang sedang tayang di Layar 2 -- HANYA
+  // gambarnya, TANPA suara sama sekali (monitor.html memaksa semua
+  // video/iframe di sana `muted`, apa pun status mute Layar 2). Suara
+  // yang sesungguhnya untuk jemaat TETAP 100% memakai jalur/logika lama
+  // (Layar 2 -> sound system venue) -- fungsi ini TIDAK pernah menyentuh
+  // itu, cuma menyalin info video-nya SAJA ke jendela ke-3.
+  //
+  // rawPost()/post() adalah 2 jalur TUNGGAL yang dipakai SEMUA pengiriman
+  // ke Layar 2 di seluruh file ini (youtube, localvideo, canva,
+  // soundcloud, map, modescreen, slide gambar, teks, clear, dst) --
+  // jadi cukup disadap DI SINI SAJA, tidak perlu menyisipkan kode
+  // serupa di puluhan tempat lain. Pengecualian: Presentation.sendVerse/
+  // sendVerseMulti/sendKidung/sendFreeText yang dipanggil LANGSUNG (tidak
+  // lewat rawPost/post) di sendGenericItemLive()/sendKidungSlide()/tab
+  // Ayat Cepat -- lokasi itu memanggil clearMonitorVideo_() sendiri
+  // secara eksplisit (lihat catatan di situ), karena semuanya memang
+  // konten NON-video.
+  function syncMonitorVideoForPayload_(payload) {
+    if (typeof Presentation === "undefined" || !Presentation.postMonitorVideo || !payload) return;
+    if (payload.type === "youtube") {
+      Presentation.postMonitorVideo({ kind: "youtube", embedUrl: payload.embedUrl || "" });
+    } else if (payload.type === "localvideo") {
+      if (payload.action === "stop") clearMonitorVideo_();
+      else Presentation.postMonitorVideo({ kind: "localvideo", blob: payload.blob || null, name: payload.name || "" });
+    } else if (payload.type === "localvideo_control") {
+      // Monitor 3 selalu senyap -- hanya teruskan play/pause/stop
+      // (posisi pemutaran), JANGAN mute/unmute (tidak relevan, dan
+      // supaya tidak pernah tanpa sengaja membunyikan Monitor 3).
+      if (payload.action === "play" || payload.action === "pause" || payload.action === "stop") {
+        if (typeof Presentation.postMonitorVideoControl === "function") Presentation.postMonitorVideoControl(payload.action);
+      }
+    } else {
+      // Semua tipe lain (teks, ayat, kidung, slide gambar/PDF, canva,
+      // soundcloud, peta, mode layar, clear, black, dst) BUKAN video --
+      // sembunyikan area video di Monitor 3, balik ke tampilan teks
+      // Sekarang/Selanjutnya biasa.
+      clearMonitorVideo_();
+    }
+  }
+  function clearMonitorVideo_() {
+    if (typeof Presentation !== "undefined" && Presentation.postMonitorVideo) Presentation.postMonitorVideo({ kind: "none" });
   }
 
   function escapeHtml(s) {
@@ -846,14 +893,29 @@ const PresentationStudio = (() => {
   // setActivePlaylist() lagi -- lihat playlistGoTo() di bawah). `next`
   // sengaja null kalau item aktif adalah yang TERAKHIR di daftar -- itu
   // yang membuat monitor.html menampilkan layar hitam "END OF SLIDE".
+  // DIPERBAIKI (10 Sep 2026, lanjutan, permintaan operator "apa bisa
+  // dituliskan isinya... apalagi kalau selanjutnya adalah gambar") --
+  // sebelumnya HANYA mengirim ref/judul (mis. "1 Tawarikh 16:34"), jadi
+  // pembicara tidak tahu ISI ayat/syairnya tanpa membuka Alkitab sendiri
+  // -- sekarang IKUT dikirim isi lengkapnya lewat genericItemBodyText()
+  // (fungsi yang SAMA dipakai panel Kumpulan Ayat biasa, lihat
+  // collectionItemBodyText() js/app.js) supaya konsisten. Untuk item
+  // yang BUKAN teks (gambar/PDF/Canva/SoundCloud/peta/dst),
+  // genericItemBodyText() sudah otomatis mengembalikan keterangan jenis
+  // berkasnya (mis. "(berkas PDF/gambar -- tayangkan lewat Studio
+  // Presentasi)") -- itu sendiri sudah cukup memberi tahu pembicara
+  // "selanjutnya bukan teks, melainkan gambar/dst", tanpa perlu logic
+  // baru terpisah.
   function pushMonitorStatus_() {
     if (typeof Presentation === "undefined" || !Presentation.postMonitorStatus || !activePlaylist) return;
     const cur = activePlaylist.items[activePlaylist.index];
     const nxt = activePlaylist.items[activePlaylist.index + 1];
-    let curLabel = "", nxtLabel = null;
+    let curLabel = "", nxtLabel = null, curBody = "", nxtBody = "";
     try { curLabel = cur ? genericItemRefText(cur) : ""; } catch (e) {}
     try { nxtLabel = nxt ? genericItemRefText(nxt) : null; } catch (e) {}
-    Presentation.postMonitorStatus(curLabel, nxtLabel);
+    try { curBody = cur ? genericItemBodyText(cur) : ""; } catch (e) {}
+    try { nxtBody = nxt ? genericItemBodyText(nxt) : ""; } catch (e) {}
+    Presentation.postMonitorStatus(curLabel, nxtLabel, curBody, nxtBody);
   }
 
   function highlightActivePlaylistRow() {
@@ -905,13 +967,16 @@ const PresentationStudio = (() => {
       const v = typeof verseById !== "undefined" ? verseById[it.verseId] : null;
       if (v) Presentation.sendVerse(v, v.bookName);
       renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? v.text : "" }] });
+      clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
     } else if (it.type === "text") {
       Presentation.sendFreeText(it.text || "");
       renderStudioPreview({ type: "text", text: it.text || "" });
+      clearMonitorVideo_();
     } else if (it.type === "announcement") {
       const txt = (it.title ? it.title + "\n\n" : "") + (it.text || "");
       Presentation.sendFreeText(txt);
       renderStudioPreview({ type: "text", text: txt });
+      clearMonitorVideo_();
     } else if (it.type === "kidung") {
       sendKidungSlide(it);
     } else if (it.type === "media") {
@@ -1019,6 +1084,7 @@ const PresentationStudio = (() => {
     };
     Presentation.sendKidung(payload);
     renderStudioPreview(Object.assign({ type: "kidung" }, payload));
+    clearMonitorVideo_(); // kidung bukan video -- sembunyikan area video Monitor 3
   }
 
   function playlistGoTo(idx) {
@@ -3058,6 +3124,7 @@ const PresentationStudio = (() => {
             Presentation.sendVerseMulti(first.refLabel, first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text })));
           }
           renderStudioPreview({ type: "verse", ref: first.refLabel, texts: first.versions });
+          clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
         };
         const previewText = first.versions.map((v) => `[${v.label}] ${v.text}`).join("  ");
         if (isDualLive()) stageNext(first.refLabel, previewText, doSend);
@@ -3760,6 +3827,36 @@ const PresentationStudio = (() => {
     return null;
   }
 
+  // BARU (10 Sep 2026, sesi ke-11, permintaan operator "cara enable/
+  // disable tulisan yang muncul saat YouTube diputar di Layar 2") --
+  // "tulisan yang muncul" itu Closed Caption (CC) BAWAAN YouTube (beda
+  // dari teks lirik/lagu yang mungkin sudah "terbakar" langsung ke
+  // video itu sendiri -- yang terakhir ini TIDAK BISA dimatikan lewat
+  // kode apa pun, karena sudah jadi bagian pixel videonya). Disimpan
+  // lintas sesi (localStorage), diterapkan ke video BARU lewat parameter
+  // resmi "cc_load_policy" di buildYoutubeEmbedUrl() di bawah, & ke
+  // video yang SUDAH tayang lewat perintah live "yt_control" action
+  // "cc" (lihat sendYtCommand() & present.html). BAWAAN: MATI -- video
+  // yang lirik/tulisannya sudah "terbakar" di videonya sendiri (banyak
+  // dipakai channel kidung anak) tidak butuh CC tambahan yang malah
+  // bisa dobel/mengganggu; operator tinggal nyalakan lagi kapan videonya
+  // memang butuh CC. Tombol & pintasan keyboard-nya (Alt+C) didaftarkan
+  // di wireYtControls()/wireModeAndBellKeyboardShortcuts() di bawah.
+  const YT_CAPTIONS_KEY = "bible_app_yt_captions_v1";
+  let ytCaptionsEnabled = localStorage.getItem(YT_CAPTIONS_KEY) === "1";
+  function setYtCaptionsEnabled_(on) {
+    ytCaptionsEnabled = !!on;
+    try { localStorage.setItem(YT_CAPTIONS_KEY, ytCaptionsEnabled ? "1" : "0"); } catch (e) {}
+    document.dispatchEvent(new CustomEvent("ps-yt-captions-changed", { detail: { on: ytCaptionsEnabled } }));
+    // Video yang SUDAH tayang di Layar 2 (& pratinjau mini Studio) --
+    // "cc" bukan bagian dari peta `cmd` biasa (playVideo/pauseVideo/dst)
+    // makanya dikirim lewat rawPost terpisah, ditangani present.html
+    // sebagai loadModule/unloadModule("captions"). Video BERIKUTNYA yang
+    // baru dimuat otomatis mengikuti lewat cc_load_policy di URL-nya.
+    rawPost({ type: "yt_control", action: "cc", arg: ytCaptionsEnabled });
+  }
+  function toggleYtCaptions_() { setYtCaptionsEnabled_(!ytCaptionsEnabled); }
+
   function buildYoutubeEmbedUrl(id, startSeconds) {
     // TANPA autoplay -- video dimuat dalam keadaan siap/pause, bukan
     // langsung jalan. "enablejsapi=1" wajib ada supaya tombol
@@ -3774,7 +3871,7 @@ const PresentationStudio = (() => {
     // video langsung mulai dari titik yang dipilih lewat progress bar
     // "detik mulai" (lihat createYtSeekBar() di bawah), bukan dari awal.
     // Kosong/0/undefined -> perilaku LAMA sama persis (mulai dari awal).
-    let url = `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1&modestbranding=1&iv_load_policy=3&playsinline=1`;
+    let url = `https://www.youtube.com/embed/${id}?rel=0&enablejsapi=1&modestbranding=1&iv_load_policy=3&playsinline=1&cc_load_policy=${ytCaptionsEnabled ? 1 : 0}`;
     const secs = Math.round(startSeconds || 0);
     if (secs > 0) url += `&start=${secs}`;
     return url;
@@ -4995,6 +5092,31 @@ const PresentationStudio = (() => {
     const stopBtn = el("psYtStopBtn");
     const repeatBtn = el("psYtRepeatBtn");
     let muted = false;
+
+    // BARU (10 Sep 2026, sesi ke-11) -- tombol toggle CC/Teks YouTube
+    // dibuat lewat JS di sini (BUKAN nambah markup baru ke index.html,
+    // sesuai permintaan operator "cukup di presentation-studio.js
+    // saja") -- disisipkan tepat setelah #psYtMuteBtn supaya berkumpul
+    // dengan kontrol YouTube lain. Logika hidup/mati sesungguhnya ada
+    // di setYtCaptionsEnabled_()/toggleYtCaptions_() (lihat di atas,
+    // dekat buildYoutubeEmbedUrl()) -- di sini cuma UI-nya.
+    let captionsBtn = el("psYtCaptionsBtn");
+    if (!captionsBtn && muteBtn && muteBtn.parentNode) {
+      captionsBtn = document.createElement("button");
+      captionsBtn.type = "button";
+      captionsBtn.id = "psYtCaptionsBtn";
+      captionsBtn.className = "chip-btn small";
+      muteBtn.insertAdjacentElement("afterend", captionsBtn);
+    }
+    function refreshCaptionsBtnUi_() {
+      if (!captionsBtn) return;
+      captionsBtn.textContent = ytCaptionsEnabled ? "📝 Teks: Nyala" : "📝 Teks: Mati";
+      captionsBtn.title = "Tampilkan/sembunyikan teks (Closed Caption) bawaan YouTube di Layar 2 -- pintasan keyboard: Alt+C";
+      captionsBtn.classList.toggle("active", ytCaptionsEnabled);
+    }
+    refreshCaptionsBtnUi_();
+    document.addEventListener("ps-yt-captions-changed", refreshCaptionsBtnUi_);
+    if (captionsBtn) captionsBtn.addEventListener("click", () => toggleYtCaptions_());
     // ------------------------------------------------------------
     // BARU (4 Sep 2026 v3, permintaan operator) -- laporan: "saat tekan
     // ▶️ Play pertama kali, suara tidak muncul, harus ⏹️ Stop lalu
@@ -5126,6 +5248,18 @@ const PresentationStudio = (() => {
     // tiap kali video BARU ditayangkan (embedUrl beda dari sebelumnya).
     window.resetYtLiveBar = resetYtLiveBar;
 
+    // BARU (10 Sep 2026, sesi ke-11, permintaan operator "keyboard P
+    // untuk toggle play/pause YouTube") -- `ytIsPlaying` dijaga tetap
+    // akurat dari laporan status ASLI player (playerState 1 = playing,
+    // lihat konstanta resmi YouTube IFrame API), BUKAN ditebak dari
+    // tombol mana yang terakhir diklik -- supaya toggle tetap benar
+    // walau video di-play/pause lewat cara lain (mis. operator sempat
+    // klik langsung tombol bawaan YouTube di pratinjau mini).
+    let ytIsPlaying = false;
+    window.toggleYtPlayPause_ = function toggleYtPlayPause_() {
+      if (ytIsPlaying) { if (pauseBtn) pauseBtn.click(); }
+      else { if (playBtn) playBtn.click(); }
+    };
     window.addEventListener("ps-yt-progress", (e) => {
       const d = (e && e.detail) || {};
       if (typeof d.duration === "number" && d.duration > 0 && Math.round(d.duration) !== liveDurationSeconds) {
@@ -5138,6 +5272,7 @@ const PresentationStudio = (() => {
         if (liveRange) liveRange.value = String(secs);
         if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(secs);
       }
+      if (typeof d.state === "number") ytIsPlaying = d.state === 1;
     });
 
     if (liveTimeInput) {
@@ -5224,6 +5359,17 @@ const PresentationStudio = (() => {
       sendYtCommand(muted ? "mute" : "unmute");
       muteBtn.textContent = muted ? "🔇 Bersuara" : "🔇 Mute";
       muteBtn.classList.toggle("active", muted);
+      // BARU (10 Sep 2026, sesi ke-12, permintaan operator "tetap ada
+      // shortcut M untuk mute SEMUA suara") -- tombol/pintasan Mute yang
+      // SUDAH ADA ini (dulu cuma mengurus suara YouTube) SEKARANG ikut
+      // membisukan/membunyikan efek suara 🎉 Efek Panggung (confetti/
+      // reaksi/dst) juga, lewat 1 payload baru "effects_mute" -- lihat
+      // setEffectsMuted_()/getEffectsMasterGain_() di present.html.
+      // TIDAK dikirim ke pratinjau mini Studio (`psYtPreviewFrame`) --
+      // beda dari YouTube, efek suara memang TIDAK PERNAH diputar di
+      // pratinjau mini (cuma di Layar 2 sungguhan), jadi tidak ada apa
+      // pun untuk dibisukan di sana.
+      rawPost({ type: "effects_mute", muted });
     });
     if (repeatBtn) {
       repeatBtn.addEventListener("click", () => {
@@ -5633,6 +5779,31 @@ const PresentationStudio = (() => {
         rawPost({ type: "bell", action: "stop" });
         return;
       }
+      // BARU (10 Sep 2026, sesi ke-11, permintaan operator "keyword P
+      // untuk toggle play/pause YouTube, biar cepat") -- "P" polos
+      // (bukan Alt+P) numpang tombol ▶️ Play/⏸️ Pause yang SUDAH ADA
+      // lewat window.toggleYtPlayPause_() (lihat wireYtControls() di
+      // atas) supaya semua logikanya (unlock suara, baca kolom waktu
+      // LIVE, dst) tetap terpakai apa adanya -- SAMA seperti pola "M"
+      // di atas untuk Mute. Kalau belum ada video yang tayang, klik
+      // tombol yang bersangkutan tidak melakukan apa-apa (sudah dijaga
+      // sendiri oleh sendYtCommand()/present.html) -- aman ditekan
+      // kapan saja.
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "p" || e.key === "P")) {
+        e.preventDefault();
+        if (typeof window.toggleYtPlayPause_ === "function") window.toggleYtPlayPause_();
+        return;
+      }
+      // BARU (10 Sep 2026, sesi ke-11, permintaan operator "cara enable/
+      // disable tulisan (CC) YouTube") -- Alt+C men-toggle Closed
+      // Caption bawaan YouTube, numpang logika toggleYtCaptions_()
+      // (lihat dekat buildYoutubeEmbedUrl() di atas) -- 1 fungsi yang
+      // sama dipakai baik oleh tombol "📝 Teks" maupun pintasan ini.
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        toggleYtCaptions_();
+        return;
+      }
       const n = Number(e.key);
       if (!Number.isInteger(n) || n < 1 || n > 9) return;
       if (e.altKey) {
@@ -5643,9 +5814,53 @@ const PresentationStudio = (() => {
       } else {
         // 1..9 polos -> Mode Cepat ke-N
         const preset = loadModePresets_()[n - 1];
-        if (preset) { e.preventDefault(); applyModePreset_(preset); }
+        if (preset) {
+          e.preventDefault();
+          applyModePreset_(preset);
+          // BARU (10 Sep 2026, sesi ke-12, permintaan operator "kok
+          // ditekan 1-9 sepertinya tidak terjadi apa-apa") -- preset
+          // SENGAJA cuma mengubah GAYA tampilan (lihat catatan panjang
+          // "PENTING" dekat DEFAULT_MODE_PRESETS di atas), TIDAK ikut
+          // menyalakan Kamera/Video -- kalau belum ada sumber (Kamera/
+          // Video/File) yang aktif di Layar 2, memang TIDAK ADA apa pun
+          // yang kelihatan berubah walau pintasannya sudah bekerja
+          // dengan benar di baliknya. Toast kecil ini SEKADAR bukti
+          // visual instan di Studio (bukan di Layar 2) supaya operator
+          // yakin tombolnya "kena" -- tidak mengubah logika apa pun
+          // selain menampilkan label preset yang baru diterapkan.
+          showPsToast_(`⚡ Mode Cepat ${n}: ${preset.label}`);
+        } else {
+          // Preset ke-N belum ada (mis. operator sudah menghapusnya lewat
+          // "➕ Tambah Mode Sendiri" sehingga daftarnya kurang dari 9) --
+          // beri tahu juga supaya tidak terlihat seperti tombolnya mati.
+          showPsToast_(`⚡ Mode Cepat ${n} belum diatur (lihat tab Mode Cepat).`);
+        }
       }
     });
+  }
+
+  // BARU (10 Sep 2026, sesi ke-12) -- toast kecil generik di pojok
+  // Studio, dipakai memberi konfirmasi VISUAL instan untuk pintasan
+  // keyboard yang efeknya tidak selalu langsung kelihatan di panel
+  // (mis. Mode Cepat 1-9 di atas, yang cuma mengganti GAYA -- kalau
+  // belum ada Kamera/Video aktif, tidak ada apa pun yang berubah di
+  // pratinjau). Elemen dibuat SEKALI (dipakai ulang tiap panggilan),
+  // dibersihkan otomatis lewat setTimeout -- aman dipanggil berkali-
+  // kali beruntun (tiap panggilan baru menimpa teks & mengulang timer
+  // sembunyinya, tidak menumpuk elemen baru).
+  let psToastEl_ = null;
+  let psToastTimer_ = null;
+  function showPsToast_(text) {
+    if (!psToastEl_) {
+      psToastEl_ = document.createElement("div");
+      psToastEl_.id = "psKeyboardToast";
+      psToastEl_.style.cssText = "position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:rgba(20,16,11,0.92); color:#f5f2e8; padding:9px 16px; border-radius:999px; font-size:13px; font-weight:600; z-index:99999; box-shadow:0 4px 16px rgba(0,0,0,.35); pointer-events:none; opacity:0; transition:opacity .15s ease;";
+      document.body.appendChild(psToastEl_);
+    }
+    psToastEl_.textContent = text;
+    psToastEl_.style.opacity = "1";
+    clearTimeout(psToastTimer_);
+    psToastTimer_ = setTimeout(() => { if (psToastEl_) psToastEl_.style.opacity = "0"; }, 1600);
   }
 
   // ------------------------------------------------------------
@@ -5962,35 +6177,80 @@ const PresentationStudio = (() => {
   // offline terus seperti gambar peta lainnya (kalibrasi, pin, dst
   // semuanya tetap jalan tanpa perubahan). Fungsi murni (module-level,
   // bukan dalam closure wireMapTab()) supaya gampang dites/dipakai ulang.
-  async function fetchOnlineBaseMap_() {
-    const searchUrl = "https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=" +
-      encodeURIComponent("Indonesia blank location map") + "&srnamespace=6&srlimit=5&format=json&origin=*";
-    const searchRes = await fetch(searchUrl);
-    if (!searchRes.ok) throw new Error("Pencarian Wikimedia gagal (HTTP " + searchRes.status + ")");
-    const searchJson = await searchRes.json();
-    const hits = (searchJson.query && searchJson.query.search) || [];
-    if (!hits.length) throw new Error("Tidak ada peta ditemukan di Wikimedia Commons.");
-    const title = hits[0].title; // mis. "File:Indonesia location map.svg"
+  // DIPERBAIKI (10 Sep 2026, permintaan operator "cari tidak bisa harus
+  // upload") -- sebelumnya HANYA mengandalkan 1 pencarian teks bebas
+  // ("Indonesia blank location map") dan langsung pakai hasil PERTAMA
+  // apa adanya -- kalau hasil pertama itu bukan gambar peta polos yang
+  // valid (mis. berkas SVG rusak/redirect/terlalu besar), operator
+  // terjebak "gagal" tanpa tahu ada pilihan lain, jadi harus unggah
+  // manual. Sekarang dicoba BERURUTAN: (1) daftar judul berkas Wikimedia
+  // Commons yang SUDAH DIKETAHUI berupa peta lokasi Indonesia polos
+  // (diverifikasi memang ada & dipakai luas di Commons/Wikipedia), diambil
+  // LANGSUNG lewat imageinfo (tanpa pencarian teks -- lebih pasti kena),
+  // lalu (2) kalau SEMUA itu gagal (mis. berkas dipindah/dihapus), baru
+  // jatuh ke pencarian teks bebas seperti sebelumnya sebagai cadangan
+  // terakhir. Tiap kegagalan (HTTP error, berkas kosong, dst) TIDAK
+  // menghentikan proses -- lanjut coba kandidat berikutnya, baru lempar
+  // error kalau semua kandidat + pencarian cadangan gagal.
+  const ONLINE_BASE_MAP_CANDIDATES_ = [
+    "File:Indonesia location map.svg",
+    "File:Indonesia_location_map_%28more_islands%29.svg",
+    "File:Blank map of Indonesia.svg",
+    "File:Indonesia (plain).svg",
+  ];
+  async function fetchWikimediaFileByTitle_(title) {
     const infoUrl = "https://commons.wikimedia.org/w/api.php?action=query&titles=" +
       encodeURIComponent(title) + "&prop=imageinfo&iiprop=url&iiurlwidth=2000&format=json&origin=*";
     const infoRes = await fetch(infoUrl);
-    if (!infoRes.ok) throw new Error("Gagal ambil detail berkas (HTTP " + infoRes.status + ")");
+    if (!infoRes.ok) throw new Error("HTTP " + infoRes.status);
     const infoJson = await infoRes.json();
     const pages = (infoJson.query && infoJson.query.pages) || {};
     const page = Object.values(pages)[0];
-    const info = page && page.imageinfo && page.imageinfo[0];
+    if (!page || page.missing !== undefined) throw new Error("berkas tidak ditemukan");
+    const info = page.imageinfo && page.imageinfo[0];
     const fileUrl = info && (info.thumburl || info.url);
-    if (!fileUrl) throw new Error('Berkas "' + title + '" ditemukan tapi URL gambarnya tidak terbaca.');
+    if (!fileUrl) throw new Error("URL gambar tidak terbaca");
     const imgRes = await fetch(fileUrl);
-    if (!imgRes.ok) throw new Error("Gagal unduh gambar peta (HTTP " + imgRes.status + ")");
+    if (!imgRes.ok) throw new Error("gagal unduh gambar (HTTP " + imgRes.status + ")");
     const blob = await imgRes.blob();
+    if (!blob || blob.size < 200) throw new Error("gambar yang diunduh kosong/rusak");
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-    return { dataUrl, title, fileUrl };
+    return { dataUrl, title: page.title || title, fileUrl };
+  }
+  async function fetchOnlineBaseMap_() {
+    const attempts = [];
+    for (const title of ONLINE_BASE_MAP_CANDIDATES_) {
+      try {
+        return await fetchWikimediaFileByTitle_(title);
+      } catch (e) {
+        attempts.push(title + ": " + (e && e.message ? e.message : "gagal"));
+      }
+    }
+    // Cadangan terakhir: pencarian teks bebas, coba SEMUA hasil (bukan
+    // cuma yang pertama) sampai ada yang berhasil diunduh utuh.
+    try {
+      const searchUrl = "https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=" +
+        encodeURIComponent("Indonesia blank location map") + "&srnamespace=6&srlimit=5&format=json&origin=*";
+      const searchRes = await fetch(searchUrl);
+      if (!searchRes.ok) throw new Error("pencarian gagal (HTTP " + searchRes.status + ")");
+      const searchJson = await searchRes.json();
+      const hits = (searchJson.query && searchJson.query.search) || [];
+      for (const hit of hits) {
+        try {
+          return await fetchWikimediaFileByTitle_(hit.title);
+        } catch (e) {
+          attempts.push(hit.title + ": " + (e && e.message ? e.message : "gagal"));
+        }
+      }
+    } catch (e) {
+      attempts.push("pencarian cadangan: " + (e && e.message ? e.message : "gagal"));
+    }
+    throw new Error("Semua sumber peta online gagal dicoba (" + attempts.length + " percobaan). Cek koneksi internet, atau unggah gambar peta manual di atas.");
   }
   // BARU (9 Sep 2026, permintaan operator) -- 🎨 Gaya Peta Dasar: filter
   // gambar diproses LANGSUNG di perangkat lewat Canvas
@@ -7042,6 +7302,104 @@ const PresentationStudio = (() => {
             ? `✅ ${applied} titik diterapkan. ⚠️ Tidak ditemukan: ${notFound.join(", ")}.`
             : `✅ ${applied} titik diterapkan ke peta.`;
         }
+      });
+    }
+    // BARU (10 Sep 2026, permintaan operator "isi 514 kabupaten lewat
+    // excel") -- ⬇️ Unduh Template Excel: CSV berisi header + SEMUA 514
+    // nama kabupaten/kota dari window.INDONESIA_REGENCIES (js/indonesia-
+    // regencies.js), kolom Kategori & Tahun dikosongkan supaya operator
+    // tinggal isi kolom Kategori di Excel untuk kota yang relevan (baris
+    // lain dibiarkan kosong, nanti dilewati saat diunggah kembali -- lihat
+    // handleCityRowsUpload_() di bawah). BOM "\uFEFF" di depan supaya
+    // Excel Windows langsung baca huruf non-ASCII dengan benar (pola sama
+    // seperti saveLangCheckAsCsv() di js/langcheck.js).
+    function downloadCityRowsTemplate_() {
+      const regencies = (typeof window !== "undefined" && Array.isArray(window.INDONESIA_REGENCIES)) ? window.INDONESIA_REGENCIES : [];
+      if (!regencies.length) { alert("Data 514 kabupaten/kota belum termuat (js/indonesia-regencies.js)."); return; }
+      const escCsv = (v) => {
+        const s = String(v == null ? "" : v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const lines = ["Kota/Kabupaten,Kategori,Tahun"].concat(
+        regencies.map((r) => [r.n, "", ""].map(escCsv).join(","))
+      );
+      const csv = lines.join("\r\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "template-titik-peta-514-kabupaten.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+    if (el("psMapCityRowDownloadBtn")) {
+      el("psMapCityRowDownloadBtn").addEventListener("click", downloadCityRowsTemplate_);
+    }
+    // BARU (10 Sep 2026) -- ⬆️ Unggah dari Excel/CSV: baca file lewat
+    // parseCSV() (js/csv.js, sudah dipakai fitur lain di app ini, otomatis
+    // kenali pemisah koma/titik-koma/tab), cocokkan header fleksibel
+    // (baris pertama dilewati KALAU kolom pertamanya "Kota/Kabupaten" --
+    // supaya file yang diunduh dari template di atas maupun file yang
+    // operator buat sendiri tanpa header tetap terbaca), lalu baris yang
+    // kolom Kategori-nya KOSONG dilewati (bukan error) -- itu memang
+    // desainnya: operator cuma isi baris yang relevan di Excel, sisanya
+    // dibiarkan kosong. MENGGANTI SELURUH map.cityRows (bukan menambah)
+    // supaya tidak ada duplikat kalau operator unggah ulang file yang
+    // sama setelah edit -- makanya diberi konfirmasi dulu.
+    function handleCityRowsUpload_(file) {
+      if (!file) return;
+      const map = activeMap();
+      if (!map) { alert("Buat/pilih peta dulu."); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof parseCSV !== "function") { alert("Fitur pembaca CSV (js/csv.js) belum termuat."); return; }
+        let records;
+        try {
+          records = parseCSV(String(reader.result || ""));
+        } catch (e) {
+          alert("Gagal membaca file: " + (e && e.message ? e.message : "format tidak dikenali"));
+          return;
+        }
+        if (!Array.isArray(records) || !records.length) { alert("File kosong atau tidak terbaca."); return; }
+        let rows = records;
+        const firstCell = (rows[0] && rows[0][0] || "").trim().toLowerCase();
+        if (firstCell === "kota/kabupaten" || firstCell === "kota" || firstCell === "kabupaten") rows = rows.slice(1);
+        const newRows = [];
+        let skippedEmpty = 0;
+        rows.forEach((r) => {
+          const city = (r[0] || "").trim();
+          const category = (r[1] || "").trim();
+          const year = (r[2] || "").trim();
+          if (!city) return;
+          if (!category) { skippedEmpty++; return; } // belum diisi di Excel -- dilewati, bukan gagal
+          newRows.push({ city, category, year: year ? Number(year) || "" : "" });
+        });
+        if (!newRows.length) {
+          alert("Tidak ada baris dengan Kategori terisi di file ini. Isi kolom \"Kategori\" dulu di Excel untuk kota yang mau dipakai.");
+          return;
+        }
+        const existingCount = (map.cityRows || []).length;
+        const msg = existingCount
+          ? `Ganti ${existingCount} baris tabel saat ini dengan ${newRows.length} baris dari file? (${skippedEmpty} baris lain di file dilewati karena Kategori kosong)`
+          : `Tambahkan ${newRows.length} baris dari file? (${skippedEmpty} baris lain di file dilewati karena Kategori kosong)`;
+        if (!confirm(msg)) return;
+        map.cityRows = newRows;
+        saveMaps();
+        renderCityRows();
+        const status = el("psMapCityRowStatus");
+        if (status) status.textContent = `✅ ${newRows.length} baris dimuat dari file. Tekan "🧮 Terapkan ke Peta" untuk menaruh pin-nya.`;
+      };
+      reader.onerror = () => alert("Gagal membaca file.");
+      reader.readAsText(file, "UTF-8");
+    }
+    if (el("psMapCityRowUploadBtn") && el("psMapCityRowUploadInput")) {
+      el("psMapCityRowUploadBtn").addEventListener("click", () => el("psMapCityRowUploadInput").click());
+      el("psMapCityRowUploadInput").addEventListener("change", () => {
+        const input = el("psMapCityRowUploadInput");
+        handleCityRowsUpload_(input.files && input.files[0]);
+        input.value = ""; // supaya bisa unggah file yang SAMA lagi kalau operator perbaiki isinya
       });
     }
     // BARU (9 Sep 2026, permintaan operator) -- 🔍 Zoom Peta interaktif.
