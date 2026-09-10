@@ -1246,7 +1246,7 @@ input { font-family: inherit; }
 .effect-preview-screen {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
   aspect-ratio: 16 / 9;
   height: auto;
   margin: 0 auto;
@@ -1329,9 +1329,20 @@ input { font-family: inherit; }
 
 @media (max-width: 720px) {
   .effect-preview-body { padding: 16px; gap: 16px; }
-  /* Tidak perlu override tinggi lagi -- aspect-ratio 16:9 di atas sudah
-     otomatis menyesuaikan diri ke lebar layar HP (mis. YouTube di HP). */
-  .effect-preview-screen { max-width: 100%; }
+  /* PERBAIKAN (10 Sep 2026, lanjutan -- laporan operator "masih kecil"):
+     di HP, LEBAR panel ini sempit (dipotong padding modal + padding
+     body), jadi kalau tinggi kotak cuma ikut aspect-ratio 16:9 dari
+     lebar yang sempit itu, hasilnya tetap kelihatan pendek/kecil --
+     bukan "separuh layar" seperti yang diminta. Makanya di HP, tinggi
+     kotak dikunci pakai satuan TINGGI LAYAR (dvh) supaya benar-benar
+     terasa besar seperti nonton video, TIDAK LAGI ikut lebar sempitnya
+     panel -- lebar tetap 100% seperti biasa. */
+  .effect-preview-screen {
+    max-width: 100%;
+    aspect-ratio: auto;
+    height: min(48vh, 340px);
+    height: min(48dvh, 340px);
+  }
 }
 
 /* ============================================================
