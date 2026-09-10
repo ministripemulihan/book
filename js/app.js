@@ -2999,6 +2999,11 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
   const columnLangs = getSetting(currentUser, "columnLangs") || [];
   if (columnsCount > 1) {
     renderColumnsView(wrap, bookNum, chapter, versesToRender, displayName, columnsCount, columnLangs, verseMode === "verse" ? currentSingleVerse : null);
+    // BARU (9 Sep 2026, sesi ke-9) -- kotak kolom (.reader-columns-panes)
+    // baru saja muncul/berubah isi di DOM, ukur ulang tingginya SEKARANG
+    // (lihat recalcReaderPanesHeight() di bawah). rAF (bukan langsung)
+    // supaya browser sempat selesai reflow dulu sebelum diukur.
+    requestAnimationFrame(() => { if (typeof recalcReaderPanesHeight === "function") recalcReaderPanesHeight(); });
   } else {
     // PERBAIKAN (8 Sep 2026): renderColumnsView() (yang biasa membuang
     // tombol "🔗 Sinkron Semua Kolom" sisa mode "side-panes", lihat
@@ -4953,6 +4958,12 @@ function collectionItemRef(it) {
   // ini sendiri (bisa dari HP) -- beda dari it.type==="media" yang jadi
   // referensi Media Tersimpan Studio.
   if (it.type === "youtube_link") return `▶️ YouTube${it.title ? ": " + it.title : ""}`;
+  // BARU (9 Sep 2026) -- item "🖥️ Mode Layar" (Welcome/Next Up) & "🗺️ Peta".
+  if (it.type === "modescreen") {
+    const meta = (window.MODE_SCREEN_KIND_META && window.MODE_SCREEN_KIND_META[it.kind]) || { icon: "👋", label: "Welcome" };
+    return `${meta.icon} ${meta.label}${it.title ? ": " + it.title : ""}`;
+  }
+  if (it.type === "map") return `🗺️ Peta${it.mapName ? ": " + it.mapName : ""}`;
   return "(jenis tidak dikenal)";
 }
 
@@ -4997,6 +5008,14 @@ function collectionItemBodyText(it) {
   // buildCollectionFsEmbed() di bawah) -- keterangan ini cuma tampil di
   // daftar teks polos (bukan Mode Layar Penuh).
   if (it.type === "youtube_link") return "(video YouTube)";
+  // BARU (9 Sep 2026) -- lihat catatan collectionItemRef() di atas.
+  if (it.type === "modescreen") {
+    const parts = [];
+    if (it.subtitle) parts.push(it.subtitle);
+    if (Array.isArray(it.bullets) && it.bullets.length) parts.push(it.bullets.join("\n"));
+    return parts.length ? parts.join("\n\n") : "(layar Welcome/Next Up -- tayangkan lewat Studio Presentasi)";
+  }
+  if (it.type === "map") return "(peta interaktif -- tayangkan lewat Studio Presentasi)";
   return "";
 }
 
@@ -7131,8 +7150,72 @@ function initFullscreenControl() {
     btn.classList.toggle("active", active);
     btn.textContent = active ? "⤢" : "⛶";
     btn.title = active ? "Keluar layar penuh" : "Layar penuh";
+    // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat recalcReaderPanesHeight()
+    // di bawah & catatan panjang --panes-height di css/style.css. Dipicu
+    // di sini (bukan cuma lewat event resize) karena browser HP kadang
+    // BELUM selesai menyesuaikan viewport (bar alamat baru saja hilang/
+    // muncul) tepat SAAT event fullscreenchange menyala -- 2 percobaan
+    // (langsung + sesaat lagi lewat setTimeout) supaya keduanya tertangkap:
+    // recalc pertama tetap berguna sebagai perkiraan awal, recalc kedua
+    // "membetulkan" begitu browser benar-benar selesai transisi.
+    recalcReaderPanesHeight();
+    setTimeout(recalcReaderPanesHeight, 260);
   });
 }
+
+// ------------------------------------------------------------
+// BARU (9 Sep 2026, sesi ke-9, laporan operator: mode sync 2/3-kolom
+// "kegeser ke atas" setelah gulir di mode fullscreen) -- lihat catatan
+// panjang `--panes-height` di css/style.css (`.reader-columns.reader-
+// columns-panes`) untuk AKAR MASALAHNYA (vh/dvh browser HP telat
+// menghitung ulang tepat sesudah transisi Fullscreen API).
+//
+// Fungsi ini mengukur tinggi viewport SUNGGUHAN detik ini juga (lewat
+// window.visualViewport kalau ada -- itu yang paling akurat mengikuti
+// bar alamat HP naik-turun, fallback ke window.innerHeight kalau
+// browser belum kenal visualViewport), lalu menghitung berapa px yang
+// tersisa UNTUK kotak kolom (`.reader-columns.reader-columns-panes`)
+// -- dari posisi Y kotak itu sendiri sampai bawah layar, dikurangi
+// sedikit jarak aman (var(--panes-bottom-gap), 44px) supaya garis
+// toolbar navigasi pasal yang collapsed (#readerNavBottomWrap) di
+// bawahnya tidak ikut tertutup/terdesak. Hasilnya ditulis ke CSS custom
+// property `--panes-height` (di <html>, jadi berlaku global) dalam
+// satuan PX PASTI -- jauh lebih bisa diandalkan daripada vh/dvh yang
+// terbukti telat di skenario ini.
+//
+// TIDAK melakukan apa pun (aman dipanggil kapan saja/berkali-kali)
+// kalau elemen kolomnya sedang tidak ada di layar (mis. sedang di mode
+// 1-kolom biasa, atau belum masuk halaman baca Alkitab sama sekali).
+// ------------------------------------------------------------
+function recalcReaderPanesHeight() {
+  const panes = document.querySelector(".reader-columns.reader-columns-panes");
+  if (!panes) return;
+  const vpHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  const top = panes.getBoundingClientRect().top;
+  const BOTTOM_GAP = 44; // ruang aman utk garis+panah #readerNavBottomWrap yang collapsed di bawahnya
+  const h = Math.round(vpHeight - top - BOTTOM_GAP);
+  if (h > 160) { // jaga-jaga: kalau hasil hitungnya tidak masuk akal (mis. elemen sedang tersembunyi/belum kelihatan), jangan dipaksakan -- biarkan fallback vh/dvh CSS yang berlaku
+    document.documentElement.style.setProperty("--panes-height", h + "px");
+  }
+}
+(function initReaderPanesHeightRecalc_() {
+  let raf = null;
+  const scheduleRecalc = () => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = null; recalcReaderPanesHeight(); });
+  };
+  window.addEventListener("resize", scheduleRecalc);
+  window.addEventListener("orientationchange", scheduleRecalc);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", scheduleRecalc);
+    // "scroll" milik visualViewport (BUKAN window) menyala saat bar
+    // alamat HP naik/turun akibat gulir, walau ukuran layar CSS-nya
+    // sendiri tidak berubah -- persis momen "ditarik dari bawah sampai
+    // ke atas" yang dilaporkan operator.
+    window.visualViewport.addEventListener("scroll", scheduleRecalc);
+  }
+  document.addEventListener("webkitfullscreenchange", scheduleRecalc);
+})();
 
 // ------------------------------------------------------------
 // 12b) WAKE LOCK — mencegah layar HP mati sendiri (yang otomatis
