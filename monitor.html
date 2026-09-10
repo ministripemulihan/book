@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Monitor Pembicara</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!--
+  BARU (10 Sep 2026, sesi ke-10, permintaan operator "monitor 3 ...
+  gunanya untuk monitor pembicara untuk melihat setelah ini mau baca
+  apa yang ada di kumpulan ayat berikutnya") -- jendela KE-3, TERPISAH
+  dari present.html (Layar 2, yang dilihat jemaat/penonton). File ini
+  SENGAJA dibuat baru & ringan (bukan menambal present.html yang sudah
+  4000+ baris & sangat rumit) -- lebih aman, lebih gampang dipelihara,
+  dan risiko mengganggu Layar 2 yang sudah stabil jadi nol sama sekali
+  (file ini bahkan tidak menyentuh present.html sedikit pun).
+
+  Cara kerja: dibuka lewat window.open() dari js/presentation.js
+  (openMonitorWindow(), dipanggil dari tombol "🖥️③ Monitor Pembicara" di
+  topbar Studio). Begitu dimuat, mengabari window.opener lewat
+  postMessage {type:"speaker_ready"} (pola SAMA persis dengan
+  "present_ready" milik Layar 2) -- Studio lalu mengirim status
+  SEKARANG/SELANJUTNYA lewat postMessage {type:"speaker_status", current,
+  next}. Kalau `next` kosong/null -- ARTINYA item aktif di Kumpulan Ayat
+  sudah yang TERAKHIR -- tampilkan layar HITAM POLOS bertuliskan
+  "END OF SLIDE" (persis kata & warna yang diminta: hitam + tulisan),
+  supaya pembicara tahu setelah ini tidak ada lagi yang disiapkan.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #000; color: #f2f2f2;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #wrap {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 6vh 6vw;
+  }
+  .mon-label {
+    font-size: clamp(14px, 2.4vw, 26px); letter-spacing: .12em;
+    opacity: .55; text-transform: uppercase; margin-bottom: 10px;
+  }
+  #monNow {
+    font-size: clamp(22px, 4.4vw, 56px); font-weight: 700; line-height: 1.25;
+    margin-bottom: 6vh; max-width: 100%;
+    overflow-wrap: break-word;
+  }
+  #monNextLabel { margin-top: 4vh; }
+  #monNext {
+    font-size: clamp(26px, 5.6vw, 72px); font-weight: 800; line-height: 1.25;
+    color: #ffd23f; max-width: 100%; overflow-wrap: break-word;
+  }
+  /* Layar "END OF SLIDE" -- hitam polos + tulisan, SESUAI PERMINTAAN
+     ("kalau selanjutnya habis, maka ... tertulis, end of slide, warna
+     hitam"). SENGAJA teks abu-abu redup (bukan putih terang penuh) --
+     supaya tetap nyaman dipandang lama tanpa menyilaukan mata
+     pembicara di ruangan gelap, tapi masih sangat mudah dibaca. */
+  #monEnd {
+    display: none;
+    font-size: clamp(28px, 6vw, 80px); font-weight: 800;
+    letter-spacing: .08em; color: #7a7a7a;
+  }
+  body.mon-ended #monNowWrap, body.mon-ended #monNextWrap { display: none; }
+  body.mon-ended #monEnd { display: block; }
+  #monClock {
+    position: fixed; top: 18px; right: 22px;
+    font-size: clamp(14px, 1.6vw, 20px); opacity: .4; font-variant-numeric: tabular-nums;
+  }
+  #monWaiting {
+    font-size: clamp(16px, 2vw, 22px); opacity: .4;
+  }
+</style>
+</head>
+<body>
+  <div id="monClock"></div>
+  <div id="wrap">
+    <div id="monWaiting">Menunggu Studio Presentasi mengirim status…</div>
+    <div id="monNowWrap" style="display:none;">
+      <div class="mon-label">Sekarang</div>
+      <div id="monNow"></div>
+      <div id="monNextWrap" style="display:none;">
+        <div class="mon-label" id="monNextLabel">Selanjutnya</div>
+        <div id="monNext"></div>
+      </div>
+    </div>
+    <div id="monEnd">END OF SLIDE</div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  function setClock() {
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2, "0");
+    var mm = String(d.getMinutes()).padStart(2, "0");
+    document.getElementById("monClock").textContent = hh + ":" + mm;
+  }
+  setClock();
+  setInterval(setClock, 15000);
+
+  function applyStatus(data) {
+    var waitingEl = document.getElementById("monWaiting");
+    var nowWrap = document.getElementById("monNowWrap");
+    var nextWrap = document.getElementById("monNextWrap");
+    var nowEl = document.getElementById("monNow");
+    var nextEl = document.getElementById("monNext");
+    waitingEl.style.display = "none";
+    nowWrap.style.display = "block";
+    // PERBAIKAN/CATATAN: `data.current` kosong ("") dianggap SAMA
+    // dengan "belum ada apa-apa yang tayang" (mis. Studio baru dibuka,
+    // belum ada 1 item pun diklik) -- BUKAN otomatis berarti "END OF
+    // SLIDE" (itu HANYA kalau memang ada item aktif tapi `next` kosong).
+    if (!data || !data.current) {
+      nowEl.textContent = "(belum ada yang tayang)";
+      nextWrap.style.display = "none";
+      document.body.classList.remove("mon-ended");
+      return;
+    }
+    nowEl.textContent = data.current;
+    if (data.next) {
+      nextEl.textContent = data.next;
+      nextWrap.style.display = "block";
+      document.body.classList.remove("mon-ended");
+    } else {
+      // Item AKTIF ada, tapi tidak ada lagi sesudahnya -> "END OF SLIDE".
+      nextWrap.style.display = "none";
+      document.body.classList.add("mon-ended");
+    }
+  }
+
+  window.addEventListener("message", function (ev) {
+    var data = ev.data;
+    if (!data || data.source !== "bibleAppPresenter") return;
+    if (data.type === "speaker_status") applyStatus(data);
+  });
+
+  // Beri tahu jendela utama (Studio) bahwa monitor ini sudah siap
+  // menerima status -- pola SAMA seperti "present_ready" milik Layar 2
+  // (js/presentation.js), supaya status pertama yang dikirim SEBELUM
+  // halaman ini selesai dimuat tidak hilang begitu saja.
+  if (window.opener) {
+    try {
+      window.opener.postMessage({ source: "bibleAppPresenter", type: "speaker_ready" }, location.origin);
+    } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
+  }
+})();
+</script>
+</body>
+</html>
