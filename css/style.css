@@ -4503,12 +4503,14 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   display: flex; align-items: center; justify-content: center;
 }
 .ml-card-emoji { font-size: 30px; }
-.ml-card-play {
-  position: absolute; inset: 0; margin: auto; width: 40px; height: 40px;
-  border-radius: 50%; border: none; background: rgba(20,16,10,0.55);
-  color: #fff; font-size: 16px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
+/* PERBAIKAN (12 Sep 2026) -- tombol lingkaran "▶️" terpisah (dulu
+   ".ml-card-play") DIHAPUS karena menutupi thumbnail YouTube yang
+   sudah kecil. Sekarang seluruh kotak gambar (.ml-card-thumb) yang
+   bisa ditekan -- class ini cuma menambah kursor "tangan" + efek
+   gelap tipis saat ditekan, supaya tetap terasa bisa diklik TANPA
+   ada ikon yang menutupi gambar. */
+.ml-card-thumb.ml-card-playable { cursor: pointer; }
+.ml-card-thumb.ml-card-playable:active { filter: brightness(0.82); }
 .ml-card-fav {
   position: absolute; top: 6px; right: 6px; border: none; background: rgba(20,16,10,0.4);
   border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer;
@@ -4576,6 +4578,7 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   padding: 10px 14px; background: var(--paper-raised); border-bottom: 1px solid var(--rule);
   font-size: 14px; color: var(--ink);
 }
+.ml-player-header-actions { display: flex; align-items: center; gap: 6px; }
 .ml-player-body { aspect-ratio: 16/9; background: #000; }
 .ml-player-body iframe, .ml-player-body audio { width: 100%; height: 100%; border: 0; }
 .ml-player-body audio { height: 60px; margin: auto; display: block; }
@@ -4586,6 +4589,8 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   padding: 8px 10px; border: 1px solid var(--rule); border-radius: 8px;
   background: var(--paper); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
 }
+.ml-lp-theme-row { margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ml-lp-theme-row > span { font-size: 13px; color: var(--ink-soft); }
 .ml-lp-screen {
   position: relative; overflow: hidden; border: 1px solid var(--rule); border-radius: 12px;
   background: linear-gradient(160deg, var(--paper-raised), var(--paper));
@@ -4594,7 +4599,11 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 }
 .ml-lp-sampletext {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  padding: 20px; text-align: center; font-family: var(--font-display); font-size: 18px; color: var(--ink);
+  padding: 20px; text-align: center; font-family: var(--font-display); font-size: 18px;
+  /* BARU (12 Sep 2026): warna TIDAK dikunci var(--ink) lagi -- sekarang
+     mewarisi `color` dari .ml-lp-screen yang diatur JS sesuai tema
+     latar terpilih (lihat lpApplyTheme_() di js/media-library.js). */
+  color: inherit;
 }
 @media (max-width: 720px) {
   .ml-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
