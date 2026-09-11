@@ -4499,14 +4499,66 @@ const PresentationStudio = (() => {
     }
   }
 
+  // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md) -- diisi
+  // wireYtPlaylistTab() (di bawah) begitu tab "📺 Playlist Video" selesai
+  // disiapkan, dipakai tombol "➕ Tambah ke Pustaka" di wireYoutubeTab()
+  // (dipanggil LEBIH DULU dari init(), lihat urutan wireYoutubeTab()/
+  // wireYtPlaylistTab() di bawah file) supaya bisa menyegarkan daftar
+  // Playlist begitu link baru tersimpan ke Pustaka Media -- lihat
+  // catatan panjang di ujung wireYtPlaylistTab().
+  let reloadYtLibraryPlaylist_ = null;
+
   function wireYoutubeTab() {
     const input = el("psYtInput");
     const showBtn = el("psYtShowBtn");
     const previewBtn = el("psYtPreviewBtn");
     const addBtn = el("psYtAddQueueBtn");
+    const addToLibraryBtn = el("psYtAddToLibraryBtn");
     const saveBtn = el("psYtSaveQueueBtn");
     const queueList = el("psYtQueueList");
     if (!input || !showBtn) return;
+
+    // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md, bagian 13b
+    // RENCANA-PUSTAKA-MEDIA-FAVORIT.md) -- "➕ Tambah ke Pustaka" di
+    // sebelah kotak tempel-link manual (#psYtInput) yang SUDAH ADA:
+    // supaya link yang ditempel operator BISA langsung tersimpan
+    // PERMANEN ke Pustaka Media (dibagikan ke gembala lain/dipakai lagi
+    // dari tab "📺 Playlist Video" & tab "🎬 YouTube" Pustaka Media),
+    // bukan cuma dipakai sekali pakai seperti sebelumnya ("▶️
+    // Tampilkan"/"👁️ Pratinjau"/"➕ Tambah ke Daftar" semuanya TIDAK
+    // menyimpan apa-apa ke Pustaka Media, cuma ke Layar 2/daftar sesi
+    // lokal). Tombol disembunyikan kalau Pustaka Media belum disetel
+    // operator (CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL kosong) ATAU level
+    // operator ini tidak cukup (MediaLibrary.canAddMedia(), sama dengan
+    // tombol "➕ Tambah" di tab YouTube Pustaka Media) -- form yang
+    // dibuka (MediaLibrary.openAddForm) SUDAH menegakkan gating ini
+    // sendiri, sembunyikan tombolnya juga di sini supaya tidak
+    // membingungkan (tombol ada tapi tidak bisa dipakai).
+    if (addToLibraryBtn) {
+      const showAddToLibrary_ = typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled()
+        && typeof MediaLibrary.canAddMedia === "function" && MediaLibrary.canAddMedia();
+      addToLibraryBtn.hidden = !showAddToLibrary_;
+      if (showAddToLibrary_) {
+        addToLibraryBtn.addEventListener("click", async () => {
+          const id = extractYoutubeId(input.value);
+          if (!id) { alert("Tempel link YouTube yang valid dulu sebelum menambah ke Pustaka Media.\nContoh: https://www.youtube.com/watch?v=XXXXXXXXXXX"); return; }
+          // Coba ambil judul & nama channel otomatis dulu (fungsi yang
+          // SAMA dipakai "➕ Tambah ke Daftar" di bawah) supaya form
+          // Pustaka Media sudah terisi begitu dibuka -- kalau gagal
+          // (mis. offline), form tetap dibuka kosong, operator isi manual.
+          let prefillNama = "", prefillChannel = "";
+          try {
+            const meta = await fetchYoutubeTitleAuthor(id);
+            if (meta) { prefillNama = meta.title || ""; prefillChannel = meta.author || ""; }
+          } catch (e) { /* diamkan -- lihat komentar di atas */ }
+          MediaLibrary.openAddForm({
+            jenis: "youtube",
+            prefill: { link: input.value.trim(), nama: prefillNama, channel: prefillChannel },
+            onSaved: () => { if (typeof reloadYtLibraryPlaylist_ === "function") reloadYtLibraryPlaylist_(); },
+          });
+        });
+      }
+    }
 
     // BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
     // mulai" untuk link yang ditempel di kotak ini, lihat
@@ -4843,6 +4895,50 @@ const PresentationStudio = (() => {
       return isNaN(d.getTime()) ? null : d;
     }
 
+    // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md, bagian 13b/13c
+    // RENCANA-PUSTAKA-MEDIA-FAVORIT.md) -- ganti kolom checkbox 6
+    // kategori CSV lama (Anak/Remaja/.../Bebas per kolom terpisah)
+    // dengan 1 kolom `kategori` teks dipisah koma (skema MediaLibrary
+    // baru, js/media-library.js) -- dicocokkan TANPA peduli besar/kecil
+    // huruf supaya "Anak"/"anak" dst tetap kena filter tab yang sama.
+    function catsFromKategoriString_(kategoriStr) {
+      const parts = String(kategoriStr || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+      const cats = {};
+      CATS.forEach((c) => { cats[c.key] = parts.indexOf(c.key) !== -1; });
+      return cats;
+    }
+
+    // Memetakan hasil `MediaLibrary.Sync.list({jenis:"youtube"})` (item
+    // skema `MediaLibraryCode.gs`: id/jenis/sumber/nama/channel/
+    // keterangan/kategori/link/kidungRef/gambar/durasiDetik/
+    // tanggalAsli/visibility/diuploadOleh/tanggal/updatedAt) ke bentuk
+    // `allVideos` yang SAMA PERSIS dipakai renderList()/sortVideos()/
+    // filteredVideos() di bawah (semula dibangun parseSheetCsv() dari
+    // CSV) -- supaya SEMUA tampilan/logika grid & filter di bawah ini
+    // TIDAK PERLU diubah sama sekali. Baris yang link-nya BUKAN video
+    // YouTube (mis. kontribusi SoundCloud/Suno/Drive lewat tab "🎬
+    // YouTube" Pustaka Media -- di sana "jenis: youtube" sebenarnya
+    // berarti "bukan Efek Suara", sumbernya boleh macam-macam) dilewati
+    // diam-diam, PERSIS seperti baris CSV lama tanpa link YouTube yang
+    // dikenali (lihat `if (!id) return;` di parseSheetCsv()).
+    function mapMediaLibraryItemsToVideos_(items) {
+      const out = [];
+      (items || []).forEach((item) => {
+        const id = typeof extractYoutubeId === "function" ? extractYoutubeId(item.link) : null;
+        if (!id) return;
+        out.push({
+          title: item.nama || id,
+          channel: item.channel || "",
+          url: item.link, videoId: id,
+          embedUrl: buildYoutubeEmbedUrl(id),
+          cats: catsFromKategoriString_(item.kategori),
+          durationMinutes: item.durasiDetik ? Number(item.durasiDetik) / 60 : null,
+          uploadDate: item.tanggalAsli ? parseUploadDate(item.tanggalAsli) : null,
+        });
+      });
+      return out;
+    }
+
     function parseSheetCsv(text) {
       // PERBAIKAN: parseCSV() (js/csv.js) SUDAH mengembalikan array
       // OBJEK per baris (kunci = nama kolom huruf kecil, mis.
@@ -5021,7 +5117,44 @@ const PresentationStudio = (() => {
       return parseSheetCsv(text);
     }
 
+    // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md) -- sumber
+    // data UTAMA sekarang Pustaka Media (`MediaLibraryCode.gs`, lewat
+    // `js/media-library.js`), MENGGANTIKAN Sheet CSV publik lama
+    // (bagian 13b RENCANA-...md: "ganti sumber data YouTube dari CSV
+    // lama ke MediaLibrary"). `media_list` SUDAH terurut TERBARU DULU
+    // (diurutkan mundur berdasarkan `id`, lihat komentar `mlJsonOut_`/
+    // sort di `MediaLibraryCode.gs`) -- kebalikan dari baris Sheet CSV
+    // lama (paling lama di atas, baris baru ditambah di BAWAH). Supaya
+    // sortVideos() ("terbaru": arr.reverse()) & seluruh logika sort/
+    // filter di bawah TIDAK PERLU disentuh, hasilnya di-.reverse() dulu
+    // di sini supaya urutan `allVideos` tetap "lama -> baru" PERSIS
+    // seperti kontrak lama dari parseSheetCsv().
+    async function loadFromMediaLibrary() {
+      if (statusEl) statusEl.textContent = "⏳ Memuat dari Pustaka Media…";
+      try {
+        const items = await MediaLibrary.Sync.list({ jenis: "youtube" });
+        allVideos = mapMediaLibraryItemsToVideos_(items).reverse();
+        if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat dari Pustaka Media (terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
+        renderList();
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "❌ Gagal memuat dari Pustaka Media: " + (err && err.message ? err.message : String(err));
+      }
+    }
+
     async function loadSheet() {
+      // Pustaka Media (MediaLibrary) sudah disetel operator (CONFIG.
+      // MEDIA_LIBRARY_APPS_SCRIPT_URL terisi) -- pakai itu, BUKAN CSV
+      // lagi. Kotak link Google Sheet CSV di bawah TETAP dibiarkan APA
+      // ADANYA di layar (bagian 13c: Sheet lama TIDAK dihapus, operator
+      // boleh pindah isinya kapan saja) tapi tidak lagi dipakai untuk
+      // memuat daftar -- lihat komentar loadFromMediaLibrary() di atas.
+      if (typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled()) {
+        return loadFromMediaLibrary();
+      }
+      // Fallback LAMA (CSV Google Sheet publik) -- HANYA dipakai kalau
+      // Pustaka Media belum disetel operator sama sekali, supaya Studio
+      // versi lama/belum sempat deploy Apps Script TETAP bisa jalan
+      // seperti sebelumnya (tidak ujug-ujug kosong).
       const url = normalizeSheetUrl(urlInput.value);
       if (!url) { if (statusEl) statusEl.textContent = "Tempel dulu link Google Sheet-nya (Publish to web -> CSV)."; return; }
       if (statusEl) statusEl.textContent = "⏳ Memuat…";
@@ -5069,7 +5202,27 @@ const PresentationStudio = (() => {
       renderList();
     });
     renderFilters();
-    if (urlInput.value.trim()) loadSheet(); // sudah pernah disimpan sebelumnya -- langsung muat
+    // BARU (11 Sep 2026) -- kalau Pustaka Media sudah disetel, langsung
+    // muat OTOMATIS tiap Studio dibuka (tidak perlu menunggu operator
+    // menekan "🔄 Muat Ulang" dulu, ATAU sudah pernah menyimpan link
+    // Sheet CSV lama) -- fallback CSV lama TETAP hanya auto-muat kalau
+    // memang sudah pernah disimpan sebelumnya (perilaku lama, tidak
+    // berubah).
+    const mediaLibraryReady_ = typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled();
+    if (mediaLibraryReady_ || urlInput.value.trim()) loadSheet();
+
+    // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md) -- diekspos
+    // ke variabel module-level (dideklarasikan dekat wireYoutubeTab())
+    // supaya tombol "➕ Tambah ke Pustaka" di kotak tempel-link manual
+    // (wireYoutubeTab(), dipanggil SEBELUM wireYtPlaylistTab() dari
+    // init() -- lihat urutan pemanggilan di bawah file ini) bisa
+    // menyegarkan daftar "📺 Playlist Video" ini begitu link baru
+    // tersimpan, tanpa operator perlu pindah tab & tekan "🔄 Muat Ulang"
+    // manual. Aman dipanggil kapan saja (no-op efektif kalau elemen tab
+    // ini belum sempat dibuka/dibangun -- tapi wireYtPlaylistTab()
+    // sendiri SELALU dijalankan sekali di init(), jadi closure ini
+    // sudah selalu siap dipanggil sejak awal).
+    reloadYtLibraryPlaylist_ = loadSheet;
   }
 
   // Tombol ▶️ Play / ⏸️ Pause / 🔇 Mute di baris ikon atas kotak "Tayang"
@@ -6007,24 +6160,105 @@ const PresentationStudio = (() => {
   // dan { type:"sound", sound:"drumroll" } dst untuk efek suara --
   // dipisah type-nya (bukan disatukan ke "effect") supaya nanti kalau
   // mau efek suara TANPA visual atau sebaliknya tetap gampang.
-  function wireEffectsTab() {
-    // BARU (10 Sep 2026, sesi ke-13) -- bangun tombol "🔊 Efek Suara"
-    // otomatis dari SoundFX.LIST (js/soundfx.js, SATU SUMBER KEBENARAN
-    // yang dipakai bersama dengan present.html & effectpreview.js).
-    // Tombol hasil render tetap punya atribut data-sound="..." seperti
-    // sebelumnya, jadi listener [data-sound] di bawah TIDAK PERLU
-    // diubah sama sekali -- otomatis "kepasang" ke tombol baru ini.
-    if (typeof SoundFX !== "undefined" && el("psSoundEffectsGrid")) {
-      SoundFX.renderButtons(el("psSoundEffectsGrid"), { className: "chip-btn small", dataAttr: "sound" });
+  // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md, bagian 13b
+  // RENCANA-PUSTAKA-MEDIA-FAVORIT.md) -- grid tombol "🔊 Efek Suara"
+  // sekarang gabungan SoundFX.LIST (bawaan, selalu ada) + hasil
+  // `media_list?jenis=sound` (kontribusi gembala+ lewat Pustaka Media,
+  // js/media-library.js), DIRENDER PAKAI FUNGSI/GAYA TOMBOL YANG SAMA
+  // (SoundFX.renderButtons()-style: class "chip-btn small", teks
+  // "emoji label") supaya TIDAK ADA beda visual antara efek bawaan &
+  // kontribusi kecuali sumber datanya -- TIDAK mendesain ulang tab ini
+  // sama sekali, cuma menambah isi ke grid tombol yang SUDAH ADA
+  // (#psSoundEffectsGrid) + 1 tombol "➕ Tambah" di ujungnya.
+  //
+  // Tombol efek KONTRIBUSI (bukan bawaan) dibedakan lewat data-sound
+  // berformat "ml:<id>" (supaya tidak pernah tabrakan dengan key bawaan
+  // di SOUND_FX_LIST) + data-sound-src berisi link-nya -- listener klik
+  // di bawah (wireEffectsTab(), lewat delegasi 1 listener di level grid
+  // supaya otomatis "kepasang" ke tombol yang dibangun ulang tiap
+  // renderSoundEffectsGrid_() dipanggil, tanpa perlu re-bind manual)
+  // mengirim payload TAMBAHAN `src` kalau ada -- present.html (listener
+  // "message") memutar lewat SoundFX.playUrl(src) kalau `src` terisi,
+  // atau SoundFX.play(sound) seperti biasa kalau tidak (lihat
+  // SoundFX.playUrl(), js/soundfx.js).
+  //
+  // Dipanggil ULANG (bukan cuma sekali di wireEffectsTab()) tiap kali
+  // "➕ Tambah" berhasil menyimpan efek baru (lewat onSaved), supaya
+  // efek yang baru ditambah LANGSUNG muncul tanpa perlu tutup-buka tab.
+  async function renderSoundEffectsGrid_() {
+    const grid = el("psSoundEffectsGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    if (typeof SoundFX !== "undefined") {
+      SoundFX.renderButtons(grid, { className: "chip-btn small", dataAttr: "sound" });
     }
+    // Efek suara KONTRIBUSI dari Pustaka Media -- hanya dimuat kalau
+    // backend sudah disetel (CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL) &
+    // operator ini memang boleh melihat tab "🔊 Efek Suara" di Pustaka
+    // Media (level sama, MediaLibrary.canSeeSound()) -- kalau tidak,
+    // grid tetap tampil APA ADANYA (cuma efek bawaan) seperti sebelum
+    // langkah ini dikerjakan, tidak rusak/kosong.
+    if (typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled() && MediaLibrary.canSeeSound()) {
+      try {
+        const items = await MediaLibrary.Sync.list({ jenis: "sound" });
+        items.forEach((item) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "chip-btn small";
+          btn.textContent = "🔊 " + (item.nama || "Efek");
+          btn.title = "Efek suara kontribusi (Pustaka Media)" + (item.diuploadOleh ? " -- diunggah " + item.diuploadOleh : "");
+          btn.dataset.sound = "ml:" + item.id;
+          btn.dataset.soundSrc = item.link;
+          grid.appendChild(btn);
+        });
+      } catch (err) {
+        // Gagal ambil kontribusi (mis. offline) -- diamkan, efek bawaan
+        // di atas TETAP tampil & tetap bisa dipakai seperti biasa.
+      }
+    }
+    // "➕ Tambah" -- HANYA gembala+ (MediaLibrary.canAddMedia(), level
+    // SAMA dengan tombol "➕ Tambah" di tab "🔊 Efek Suara" Pustaka
+    // Media) -- membuka form Pustaka Media APA ADANYA (openAddForm_,
+    // dipakai ulang, TIDAK ADA form/kode duplikat), jenis dikunci
+    // "sound" (tab tempat tombol ini ditekan, sesuai bagian 14.3
+    // RENCANA-...md), bawaan visibility "Hanya saya" (bagian 12.2).
+    if (typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled() && MediaLibrary.canAddMedia && MediaLibrary.canAddMedia()) {
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "chip-btn small";
+      addBtn.id = "psSoundEffectsAddBtn";
+      addBtn.textContent = "➕ Tambah";
+      addBtn.addEventListener("click", () => {
+        MediaLibrary.openAddForm({ jenis: "sound", defaultVisibility: "me", onSaved: () => renderSoundEffectsGrid_() });
+      });
+      grid.appendChild(addBtn);
+    }
+  }
+
+  function wireEffectsTab() {
+    // Delegasi 1 listener di level grid (bukan per-tombol lewat
+    // querySelectorAll seperti sebelumnya) -- supaya tombol efek
+    // KONTRIBUSI yang baru ditambahkan (renderSoundEffectsGrid_()
+    // dipanggil ulang lewat onSaved di atas, membangun ulang ISI grid)
+    // tetap otomatis "kepasang" tanpa perlu re-bind manual tiap render
+    // ulang. `dataset.wired` mencegah listener dobel kalau wireEffectsTab()
+    // sampai terpanggil lebih dari 1x (seharusnya cuma 1x dari init(),
+    // tapi aman dijaga).
+    const soundGrid = el("psSoundEffectsGrid");
+    if (soundGrid && !soundGrid.dataset.wired) {
+      soundGrid.dataset.wired = "1";
+      soundGrid.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-sound]");
+        if (!btn) return;
+        rawPost({ type: "sound", sound: btn.dataset.sound, src: btn.dataset.soundSrc || undefined });
+      });
+    }
+    renderSoundEffectsGrid_();
     document.querySelectorAll("[data-effect]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "effect", effect: btn.dataset.effect }));
     });
     document.querySelectorAll("[data-effect-emoji]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "effect", effect: "emoji", emoji: btn.dataset.effectEmoji }));
-    });
-    document.querySelectorAll("[data-sound]").forEach((btn) => {
-      btn.addEventListener("click", () => rawPost({ type: "sound", sound: btn.dataset.sound }));
     });
     // BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama Tuhan") --
     // teks BESAR berkilau di tengah layar, "tembak dan lupa" sama seperti
