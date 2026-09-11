@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260910c" />
+<link rel="stylesheet" href="css/style.css?v=20260911b" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -122,103 +122,30 @@
     </div>
   </div>
 
-  <!-- ===================== PANEL "COBA EFEK SUARA & VISUAL" (BARU, khusus
-       administrator) =====================
-       Dibuka dari menu ⋮ -> "🔊 Coba Efek Suara & Visual" (tombol
-       #effectPreviewBtn, hanya tampil untuk administrator, lihat
-       updateLevelGatedMenus() di js/app.js). Daftar efek SAMA PERSIS
-       dengan tab "🎉 Efek Panggung" di Studio Presentasi
-       (presentation-studio.js) -- lihat js/effectpreview.js untuk kode
-       suara (disintesis lewat Web Audio API, sama seperti present.html)
-       & animasi visualnya. SENGAJA 100% LOKAL di HP ini saja (tidak
-       memanggil rawPost()/tidak menyentuh Layar 2 sama sekali) supaya MC
-       bisa bebas mencoba-coba sebelum presentasi sungguhan, tanpa takut
-       kepencet ke jemaat. -->
-  <div id="effectPreviewOverlay" class="info-kami-overlay" hidden>
-    <div class="info-kami-box effect-preview-box">
+  <!-- ===================== PANEL "🎵 PUSTAKA MEDIA" (BARU, 11 Sep 2026)
+       =====================
+       Dibuka dari menu ⋮ -> "🎵 Pustaka Media" (tombol #mediaLibraryBtn,
+       tampil untuk SEMUA orang yang login -- lihat js/media-library.js).
+       MENGGANTIKAN panel "🔊 Coba Efek Suara & Visual" (js/effectpreview.js,
+       dihapus) -- isinya sekarang jadi tab "🎆 Layar Publik" di sini
+       (lihat bagian 13a RENCANA-PUSTAKA-MEDIA-FAVORIT.md), DITAMBAH tab
+       "🎬 YouTube" / "🔊 Efek Suara" / "Kidung" / "⭐ Favorit" / "Semua"
+       yang tersambung ke apps-script/MediaLibraryCode.gs. Seluruh isi
+       body (tab, grid kartu, dst) dirender oleh js/media-library.js --
+       markup di sini sengaja minimal (cangkang overlay + tempat tab/
+       body/tombol tambah saja). -->
+  <div id="mediaLibraryOverlay" class="info-kami-overlay" hidden>
+    <div class="info-kami-box ml-box">
       <div class="info-kami-header">
-        <h2>🔊 Coba Efek Suara & Visual</h2>
+        <h2>🎵 Pustaka Media</h2>
         <div class="info-kami-header-actions">
-          <button type="button" id="effectPreviewCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+          <button type="button" id="mlRefreshBtn" class="icon-btn" title="Segarkan" aria-label="Segarkan">🔄</button>
+          <button type="button" id="mlAddBtn" class="chip-btn small primary" hidden>➕ Tambah</button>
+          <button type="button" id="mediaLibraryCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
         </div>
       </div>
-      <div class="effect-preview-body">
-        <p class="effect-preview-hint">
-          Menu ini untuk MC/operator MENCOBA DULU suara &amp; efek visual di HP ini sebelum presentasi.
-          Efek yang dipencet di sini <strong>HANYA terdengar/terlihat di HP ini</strong> — <strong>tidak</strong>
-          dikirim ke Layar 2 jemaat.
-        </p>
-
-        <!-- Contoh tulisan -- supaya efek tidak dicoba di atas latar kosong,
-             tapi di atas teks yang mirip tampilan sungguhan di Layar 2.
-             Diketik bebas, langsung tampil live di kotak pratinjau di
-             bawah lewat wireSampleTextInput_() (js/effectpreview.js). -->
-        <div class="effect-preview-sample-row">
-          <label for="effectPreviewSampleInput">Contoh tulisan di layar (opsional, buat lihat efeknya di atas teks beneran)</label>
-          <input type="text" id="effectPreviewSampleInput" class="effect-preview-sample-input"
-                 value="Yohanes 3:16 — Karena begitu besar kasih Allah akan dunia ini..." />
-        </div>
-
-        <!-- Kotak pratinjau efek visual -- meniru "#effectsLayer" di present.html,
-             tapi diperkecil & dikunci di dalam kotak ini saja (overflow:hidden). -->
-        <div class="effect-preview-screen" id="effectPreviewScreen">
-          <div class="effect-preview-sampletext" id="effectPreviewSampleText">Yohanes 3:16 — Karena begitu besar kasih Allah akan dunia ini...</div>
-          <canvas id="effectPreviewConfettiCanvas" class="effect-preview-confetti-canvas"></canvas>
-          <div id="effectPreviewLayer" class="effect-preview-layer"></div>
-          <span class="effect-preview-screen-label">Pratinjau layar</span>
-        </div>
-
-        <div class="effect-preview-section">
-          <h3>🎬 Efek Visual</h3>
-          <div class="effect-preview-grid">
-            <button type="button" class="chip-btn small" data-preview-effect="confetti">🎉 Confetti</button>
-            <button type="button" class="chip-btn small" data-preview-effect="balon">🎈 Balon</button>
-            <button type="button" class="chip-btn small" data-preview-effect="happy">🥳 Bahagia</button>
-            <button type="button" class="chip-btn small" data-preview-emoji="👏">👏 Tepuk Tangan</button>
-            <button type="button" class="chip-btn small" data-preview-emoji="❤️">❤️ Cinta</button>
-            <button type="button" class="chip-btn small" data-preview-emoji="🙌">🙌 Semangat</button>
-            <button type="button" class="chip-btn small" data-preview-emoji="🔥">🔥 Api</button>
-            <button type="button" class="chip-btn small" data-preview-emoji="😂">😂 Tertawa</button>
-            <button type="button" class="chip-btn small" data-preview-emoji="👍">👍 Jempol</button>
-          </div>
-        </div>
-
-        <div class="effect-preview-section">
-          <h3>📣 Seruan Teks</h3>
-          <div class="effect-preview-grid">
-            <button type="button" class="chip-btn small" data-preview-shout="PUJI TUHAN!">🙌 Puji Tuhan!</button>
-            <button type="button" class="chip-btn small" data-preview-shout="HALELUYA!">🙌 Haleluya!</button>
-            <button type="button" class="chip-btn small" data-preview-shout="AMIN!">🙌 Amin!</button>
-          </div>
-        </div>
-
-        <div class="effect-preview-section">
-          <h3>🔊 Efek Suara</h3>
-          <!-- BARU (10 Sep 2026, sesi ke-13) -- dibangun otomatis oleh
-               SoundFX.renderButtons() (js/soundfx.js, dipanggil dari
-               js/effectpreview.js) dari daftar SoundFX.LIST -- SAMA
-               PERSIS dengan daftar di tab "🎉 Efek Panggung" (Studio) &
-               yang bisa diputar sungguhan di Layar 2 (present.html).
-               Tambah efek baru di js/soundfx.js = otomatis muncul di
-               sini juga, tidak perlu edit file ini. -->
-          <div class="effect-preview-grid" id="effectPreviewSoundGrid"></div>
-        </div>
-
-        <!-- BARU (tambahan, permintaan operator: "tidak mau cara
-             downloadnya kalau semua jadi 1, tetapi bisa satu-satu, dan
-             otomatis bertambah kalau soundfx.js bertambah"). Daftar di
-             bawah ini dibangun oleh SoundFX.renderDownloadList() di
-             js/effectpreview.js DARI js/soundfx.js -> SOUND_FX_LIST
-             langsung -- SATU baris tombol unduh per efek yang punya
-             file (baik lokal assets/sounds/... maupun link Google
-             Drive), otomatis bertambah tanpa edit apa pun di sini
-             kalau SOUND_FX_LIST bertambah. -->
-        <div class="effect-preview-section">
-          <h3>💾 Unduh Efek Suara (Satu-Satu)</h3>
-          <p class="effect-preview-hint">Sudah dengar-dengar di atas dan cocok? Unduh file MP3-nya satu per satu di sini -- daftar ini otomatis mengikuti isi js/soundfx.js.</p>
-          <div class="soundfx-dl-list" id="effectPreviewDlList"></div>
-        </div>
-      </div>
+      <div class="ml-tabs" id="mlTabs"></div>
+      <div class="ml-body" id="mlBody"></div>
     </div>
   </div>
 
@@ -395,14 +322,14 @@
            Penyimpanan Drive", khusus administrator, sama seperti logViewerBtn/
            userManageBtn di atas. -->
       <button id="driveUsageBtn" class="more-menu-btn" hidden>📦 Pemakaian Drive</button>
-      <!-- BARU -- "🔊 Coba Efek Suara & Visual", khusus administrator (lihat
-           js/effectpreview.js). Dipakai MC/operator untuk MENDENGAR & MELIHAT
-           LEBIH DULU di HP-nya sendiri semua efek suara & visual yang ada di
-           tab "🎉 Efek Panggung" (presentation-studio.js), SEBELUM memutuskan
-           mana yang mau dipencet nanti saat presentasi sungguhan. Efek di
-           sini HANYA lokal di HP ini (Web Audio + animasi di kotak
-           pratinjau) -- TIDAK dikirim ke Layar 2. -->
-      <button id="effectPreviewBtn" class="more-menu-btn" hidden>🔊 Coba Efek Suara & Visual</button>
+      <!-- BARU (11 Sep 2026) -- "🎵 Pustaka Media" (js/media-library.js),
+           MENGGANTIKAN "🔊 Coba Efek Suara & Visual" (js/effectpreview.js,
+           dihapus). Menu ini TERBUKA UNTUK SEMUA orang yang login (bukan
+           cuma administrator) -- lihat bagian 3a RENCANA-PUSTAKA-MEDIA-
+           FAVORIT.md: yang membedakan levelnya bukan "boleh buka menu atau
+           tidak", tapi TAB apa yang terlihat & apakah ada tombol "➕
+           Tambah" DI DALAM panelnya. -->
+      <button id="mediaLibraryBtn" class="more-menu-btn">🎵 Pustaka Media</button>
       <!-- Satu tombol untuk unduh pertama kali MAUPUN sinkron ulang -- teks
            tombol disesuaikan otomatis lewat updateResyncBtnLabel() di
            js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
@@ -1842,6 +1769,15 @@
             <button type="button" id="psYtShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
             <button type="button" id="psYtPreviewBtn" class="chip-btn small">👁️ Pratinjau</button>
             <button type="button" id="psYtAddQueueBtn" class="chip-btn small">➕ Tambah ke Daftar</button>
+            <!-- BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md) --
+                 simpan PERMANEN link yang ditempel di atas ke Pustaka
+                 Media (bisa dilihat lagi lewat tab "📺 Playlist Video" di
+                 bawah & tab "🎬 YouTube" menu "🎵 Pustaka Media") -- beda
+                 dari 3 tombol di atas yang cuma sekali pakai/lokal.
+                 Disembunyikan otomatis kalau Pustaka Media belum disetel
+                 atau level operator tidak cukup, lihat wireYoutubeTab()
+                 (js/presentation-studio.js). -->
+            <button type="button" id="psYtAddToLibraryBtn" class="chip-btn small" hidden>➕ Tambah ke Pustaka</button>
           </div>
           <div class="ps-yt-hint">Mendukung link youtube.com/watch, youtu.be, dan YouTube Shorts. Centang "Latar suara saja" untuk memutar lagu di belakang layar sambil tetap menampilkan ayat/pengumuman -- mis. video A tampil (boleh dibisukan lewat 🔇 Mute) sementara suara sebenarnya berasal dari video B yang diputar sebagai latar.</div>
 
@@ -3121,7 +3057,7 @@
   <script src="js/media.js?v=20260821b"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260908b"></script>
-  <script src="js/kidung-ui.js?v=20260910a"></script>
+  <script src="js/kidung-ui.js?v=20260911b"></script>
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
@@ -3132,9 +3068,14 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
-  <script src="js/soundfx.js?v=20260910e"></script>
-  <script src="js/presentation-studio.js?v=20260910d"></script>
-  <script src="js/effectpreview.js?v=20260910d"></script>
+  <script src="js/soundfx.js?v=20260911c"></script>
+  <script src="js/presentation-studio.js?v=20260911c"></script>
+  <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
+       favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
+       langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
+       digantikan tab "🎆 Layar Publik" di dalam media-library.js. -->
+  <script src="js/favorites.js?v=20260911a"></script>
+  <script src="js/media-library.js?v=20260911c"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260910c"></script>
