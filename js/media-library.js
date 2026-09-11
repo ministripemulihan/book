@@ -176,6 +176,35 @@ const MediaLibrary = (() => {
     return "lainnya";
   }
 
+  // BARU (11 Sep 2026, perbaikan bug "thumbnail tidak muncul" & "klik
+  // tidak terjadi apa-apa") -- kolom "Sumber" di Sheet kadang beda
+  // besar/kecil huruf (mis. "Youtube"/"YOUTUBE" dari baris hasil migrasi
+  // manual/copy-paste), padahal kode di bawah membandingkannya persis
+  // huruf kecil semua ("youtube"). Akibatnya baris itu dianggap BUKAN
+  // YouTube: gambar thumbnail gagal muncul (jatuh ke kotak warna + ikon
+  // 🎬) DAN saat diklik malah lompat ke cabang "buka tab baru" (kadang
+  // diblokir browser, kelihatan seperti "tidak terjadi apa-apa"). Fungsi
+  // ini menormalkan nilai kolom Sumber (buang spasi + huruf kecil semua)
+  // -- nilai yang TIDAK dikenali (typo dst) dianggap kosong supaya jatuh
+  // ke tebakan dari bentuk link (guessSumberFromLink) alih-alih dipaksa
+  // ke cabang "lainnya" yang salah.
+  function normSumber_(s) {
+    const v = String(s || "").trim().toLowerCase();
+    const known = (CONFIG.MEDIA_LIBRARY_SOURCES || []).map((o) => o.key);
+    return known.indexOf(v) !== -1 ? v : "";
+  }
+  // Menggabungkan kolom "Sumber" tersimpan dengan tebakan dari bentuk
+  // link -- KHUSUS untuk YouTube, tebakan dari link SELALU diutamakan
+  // (link "youtube.com"/"youtu.be" nyaris tidak mungkin salah tebak),
+  // supaya baris yang kolom Sumber-nya keliru/beda huruf/belum sempat
+  // diisi TETAP dikenali sebagai YouTube (gambar & cara putar tetap
+  // benar) tanpa operator perlu membetulkan Sheet-nya dulu.
+  function resolveSumber_(sumberField, link) {
+    const guessed = guessSumberFromLink(link);
+    if (guessed === "youtube") return "youtube";
+    return normSumber_(sumberField) || guessed;
+  }
+
   // ID video YouTube dari berbagai bentuk link (watch?v=, youtu.be/,
   // shorts/, embed/).
   function youtubeIdFromLink(link) {
@@ -303,7 +332,11 @@ const MediaLibrary = (() => {
     // muncul -- selalu jatuh ke kotak warna + ikon. Sekarang dicoba
     // tebak dari bentuk link juga (`guessSumberFromLink`), bukan cuma
     // mengandalkan kolom Sumber yang mungkin belum terisi.
-    const sumberUntukGambar_ = spec.sumber || guessSumberFromLink(spec.link);
+    // PERBAIKAN (11 Sep 2026): pakai resolveSumber_() (lihat komentar di
+    // dekat definisinya) -- BUKAN lagi `spec.sumber || guessSumberFromLink(...)`
+    // apa adanya, supaya kolom "Sumber" yang keliru/beda huruf besar-
+    // kecil tidak lagi bikin gambar YouTube gagal muncul.
+    const sumberUntukGambar_ = resolveSumber_(spec.sumber, spec.link);
     if (spec.gambar) {
       thumb.style.backgroundImage = `url("${spec.gambar.replace(/"/g, "")}")`;
     } else if (sumberUntukGambar_ === "youtube") {
@@ -323,7 +356,34 @@ const MediaLibrary = (() => {
     // thumbnail YouTube yang sudah kecil). Sekarang SELURUH kotak
     // gambar yang bisa ditekan untuk memutar, supaya gambar aslinya
     // tetap kelihatan penuh tanpa ikon menutupi.
-    if (spec.onPlay) {
+    //
+    // BARU (11 Sep 2026, permintaan operator) -- video YouTube sekarang
+    // diputar LANGSUNG DI DALAM kotak kecil ini sendiri (gambar diganti
+    // <iframe> YouTube persis di tempatnya) begitu ditekan, BUKAN lagi
+    // langsung lompat ke jendela pemutar terpisah/tab baru. Sumber
+    // masalah "diklik tidak terjadi apa-apa" sebelumnya adalah bug
+    // `sumberUntukGambar_` di atas (sudah dibetulkan lewat resolveSumber_)
+    // -- baris yang salah dikira "bukan YouTube" jatuh ke cabang buka
+    // tab baru punya `playItem_()`, yang kadang diblokir browser. Klik
+    // KEDUA kali (saat video sudah main di kotak kecil) tetap membuka
+    // jendela pemutar besar (openPlayerOverlay_ lewat spec.onPlay) untuk
+    // operator yang mau lihat lebih besar/layar penuh.
+    const ytIdUntukInline_ = sumberUntukGambar_ === "youtube" ? youtubeIdFromLink(spec.link) : "";
+    if (ytIdUntukInline_ && spec.onPlay) {
+      thumb.classList.add("ml-card-playable");
+      thumb.setAttribute("role", "button");
+      thumb.setAttribute("aria-label", "Putar " + (spec.nama || ""));
+      thumb.addEventListener("click", () => {
+        if (thumb.querySelector("iframe")) { spec.onPlay(); return; } // sudah main -> klik lagi = buka lebih besar
+        const iframe = document.createElement("iframe");
+        iframe.className = "ml-card-inline-frame";
+        iframe.src = `https://www.youtube.com/embed/${ytIdUntukInline_}?playsinline=1&autoplay=1`;
+        iframe.allow = "autoplay; encrypted-media";
+        iframe.allowFullscreen = true;
+        iframe.setAttribute("frameborder", "0");
+        thumb.insertBefore(iframe, thumb.firstChild);
+      });
+    } else if (spec.onPlay) {
       thumb.classList.add("ml-card-playable");
       thumb.setAttribute("role", "button");
       thumb.setAttribute("aria-label", "Putar " + (spec.nama || ""));
@@ -437,7 +497,8 @@ const MediaLibrary = (() => {
       }
       return;
     }
-    const sumber = item.sumber || guessSumberFromLink(item.link);
+    // PERBAIKAN (11 Sep 2026) -- lihat komentar resolveSumber_() di atas.
+    const sumber = resolveSumber_(item.sumber, item.link);
     if (sumber === "youtube") {
       // PERBAIKAN (12 Sep 2026): `autoplay=1` DIHAPUS -- banyak
       // browser (terutama Safari/HP) MEMBLOKIR autoplay video BER-
