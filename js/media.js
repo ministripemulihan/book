@@ -35,6 +35,51 @@ function saveMediaToCache(sheetKey, rows) {
 }
 
 async function fetchMediaSheet(sheet) {
+  const rows = await fetchMediaSheetRows_(sheet);
+  saveMediaToCache(sheet.key, rows);
+  return rows;
+}
+
+// PENTING (diperbaiki 11 Sep 2026) -- SEBELUMNYA data Bacaan Bersuara
+// (mp3/mp4/YouTube) SELALU diambil lewat link "Publish to Web" (CSV)
+// Google Sheets (sheet.csvUrl). Link itu adalah SNAPSHOT yang disimpan
+// terpisah oleh server Google sendiri: (1) baru ter-update beberapa
+// saat setelah Sheet aslinya diedit (delay publikasi ulang), dan (2)
+// kalau publikasinya sempat "Dihentikan" lalu diterbitkan ulang, Google
+// memberi ID publikasi BARU -- link LAMA yang tertanam di
+// CONFIG.READING_MEDIA_SHEETS jadi basi SELAMANYA walau isi Sheet
+// aslinya sudah diedit berkali-kali (persis laporan operator: "sudah
+// ditambah dari 2 jadi 4 link YouTube, tapi tidak muncul-muncul").
+// SEKARANG: kalau Apps Script sudah dikonfigurasi (CONFIG.APPS_SCRIPT_URL,
+// lihat js/sync.js), diutamakan mengambil data LANGSUNG dari
+// spreadsheet-nya lewat Code.gs (readReadingMediaRows_(), type=
+// "reading_media") -- ini SELALU membaca isi sel TERBARU apa adanya
+// (SpreadsheetApp, bukan snapshot publikasi), tidak ada delay/basi sama
+// sekali, dan ID spreadsheet-nya (beda dari link publikasi) tidak
+// pernah berubah sendiri. sheet.csvUrl TETAP dipertahankan sebagai
+// CADANGAN best-effort -- kalau Apps Script gagal/belum dikonfigurasi,
+// jatuh balik ke cara lama supaya proyek yang belum sempat mengisi
+// CONFIG.APPS_SCRIPT_URL tetap bisa jalan seperti sebelumnya.
+async function fetchMediaSheetRows_(sheet) {
+  if (typeof Sync !== "undefined" && Sync.enabled()) {
+    try {
+      const data = await Sync._get({ type: "reading_media", sheetKey: sheet.key });
+      if (data && data.ok && Array.isArray(data.rows)) {
+        return data.rows.map((r) => ({
+          no: "",
+          pembacaan: r.pembacaan || "",
+          mp3: (r.mp3 || "").trim(),
+          mp4: (r.mp4 || "").trim(),
+          youtube: (r.youtube || "").trim(),
+        }));
+      }
+      // data.ok === false (mis. tab tidak ditemukan / ID spreadsheet
+      // salah) -- tetap coba CSV cadangan di bawah, best-effort.
+    } catch (e) {
+      // Apps Script gagal terhubung (offline dst) -- coba CSV cadangan di bawah.
+    }
+  }
+  if (!sheet.csvUrl) throw new Error("Gagal mengambil data Bacaan Bersuara (Apps Script gagal & csvUrl cadangan belum diisi untuk sheet ini).");
   const res = await fetch(sheet.csvUrl, { cache: "no-store" });
   if (!res.ok) throw new Error("Gagal mengambil data (" + res.status + ")");
   const text = await res.text();
@@ -48,7 +93,7 @@ async function fetchMediaSheet(sheet) {
   // apa pun nama headernya) -- supaya tidak perlu menyeragamkan nama
   // header di Google Sheet-nya sama sekali, urutan kolom (No | [nama
   // kitab/pembacaan] | Link MP3 | Link MP4 | Youtube) sudah cukup.
-  const rows = records.map((r) => {
+  return records.map((r) => {
     const values = Object.values(r);
     return {
       no: r["no"] || r["nomor"] || values[0] || "",
@@ -64,8 +109,6 @@ async function fetchMediaSheet(sheet) {
       youtube: (r["youtube"] || "").trim(),
     };
   });
-  saveMediaToCache(sheet.key, rows);
-  return rows;
 }
 
 // Menebak kitab & pasal dari teks rentang bacaan (mis. "Kejadian 1:1-2:3",
@@ -90,7 +133,8 @@ function guessReferenceFromPembacaan(text) {
 let mediaCurrentSheetKey = null;
 
 function availableMediaSheets() {
-  return (CONFIG.READING_MEDIA_SHEETS || []).filter((s) => s.csvUrl && s.csvUrl.trim());
+  const appsScriptReady = typeof Sync !== "undefined" && Sync.enabled();
+  return (CONFIG.READING_MEDIA_SHEETS || []).filter((s) => (s.csvUrl && s.csvUrl.trim()) || appsScriptReady);
 }
 
 // ------------------------------------------------------------
