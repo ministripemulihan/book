@@ -161,6 +161,33 @@ const MediaLibrary = (() => {
   }
 
   // ------------------------------------------------------------
+  // 3b) REFERENSI KIDUNG di form tambah/edit (bagian 4b rencana --
+  //     "🔗 Referensi Media Lain", + permintaan operator 13 Sep 2026
+  //     supaya bisa ditandai LANGSUNG dari menu Pustaka Media, bukan
+  //     cuma lewat layar baca 1 kidung). Format tersimpan di Sheet
+  //     SAMA PERSIS seperti kidungFavoriteKey() di js/kidung-ui.js
+  //     ("{buku}|{noKidung}"), sekarang BOLEH lebih dari 1 dipisah
+  //     koma supaya 1 video boleh ditandai ke beberapa kidung sekaligus
+  //     (lihat kidungRefFilter di apps-script/MediaLibraryCode.gs --
+  //     sudah diubah supaya tetap ketemu walau kolomnya berisi banyak).
+  // ------------------------------------------------------------
+  function parseKidungRefString_(str) {
+    return String(str || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((tok) => {
+        const idx = tok.indexOf("|");
+        if (idx === -1) return null;
+        return { buku: tok.slice(0, idx).trim(), noKidung: tok.slice(idx + 1).trim() };
+      })
+      .filter(Boolean);
+  }
+  function joinKidungRefs_(list) {
+    return (list || []).map((k) => k.buku + "|" + k.noKidung).join(",");
+  }
+
+  // ------------------------------------------------------------
   // 4) TEBAK `sumber` DARI BENTUK LINK (bagian 14.3 rencana, sudah
   //    dikonfirmasi operator -- lihat STATUS-PUSTAKA-MEDIA.md)
   // ------------------------------------------------------------
@@ -357,45 +384,27 @@ const MediaLibrary = (() => {
     // gambar yang bisa ditekan untuk memutar, supaya gambar aslinya
     // tetap kelihatan penuh tanpa ikon menutupi.
     //
-    // BARU (11 Sep 2026, permintaan operator) -- video YouTube sekarang
-    // diputar LANGSUNG DI DALAM kotak kecil ini sendiri (gambar diganti
-    // <iframe> YouTube persis di tempatnya) begitu ditekan, BUKAN lagi
-    // langsung lompat ke jendela pemutar terpisah/tab baru. Sumber
-    // masalah "diklik tidak terjadi apa-apa" sebelumnya adalah bug
-    // `sumberUntukGambar_` di atas (sudah dibetulkan lewat resolveSumber_)
-    // -- baris yang salah dikira "bukan YouTube" jatuh ke cabang buka
-    // tab baru punya `playItem_()`, yang kadang diblokir browser. Klik
-    // KEDUA kali (saat video sudah main di kotak kecil) tetap membuka
-    // jendela pemutar besar (openPlayerOverlay_ lewat spec.onPlay) untuk
-    // operator yang mau lihat lebih besar/layar penuh.
-    const ytIdUntukInline_ = sumberUntukGambar_ === "youtube" ? youtubeIdFromLink(spec.link) : "";
-    if (ytIdUntukInline_ && spec.onPlay) {
-      thumb.classList.add("ml-card-playable");
-      thumb.setAttribute("role", "button");
-      thumb.setAttribute("aria-label", "Putar " + (spec.nama || ""));
-      thumb.addEventListener("click", () => {
-        if (thumb.querySelector("iframe")) { spec.onPlay(); return; } // sudah main -> klik lagi = buka lebih besar
-        // PERBAIKAN (11 Sep 2026, laporan operator "videonya ke-mute") --
-        // `autoplay=1` DIHAPUS dari sini, PERSIS alasan yang sama dengan
-        // openPlayerOverlay_()/playItem_() di bawah (lihat komentar
-        // "PERBAIKAN (12 Sep 2026)" dekat situ): browser (terutama
-        // Safari/HP, tapi Chrome desktop juga bisa) MEMBLOKIR autoplay
-        // video BERSUARA dari iframe YouTube yang disisipkan lewat kode
-        // -- video tetap "jalan" tapi otomatis DIBISUKAN oleh browser,
-        // kelihatan seperti "videonya kemute, tidak keluar suara".
-        // Tanpa `autoplay`, video tampil dengan tombol ▶️ bawaan
-        // YouTube -- begitu operator menekan tombol play ITU SENDIRI
-        // (klik asli DI DALAM iframe YouTube), videonya PASTI keluar
-        // suara (bukan lagi trik autoplay yang dicurigai browser).
-        const iframe = document.createElement("iframe");
-        iframe.className = "ml-card-inline-frame";
-        iframe.src = `https://www.youtube.com/embed/${ytIdUntukInline_}?playsinline=1`;
-        iframe.allow = "autoplay; encrypted-media";
-        iframe.allowFullscreen = true;
-        iframe.setAttribute("frameborder", "0");
-        thumb.insertBefore(iframe, thumb.firstChild);
-      });
-    } else if (spec.onPlay) {
+    // PERBAIKAN (13 Sep 2026, laporan operator lanjutan -- "youtubenya
+    // masih belum tampil suaranya, saat di play") -- SEBELUMNYA (11-12
+    // Sep) video YouTube diputar LANGSUNG di kotak kartu kecil ini
+    // sendiri (gambar diganti <iframe> di tempat, klik PERTAMA cuma
+    // memuat iframe TANPA autoplay, operator harus klik LAGI persis di
+    // atas tombol ▶️ bawaan YouTube di dalam kotak kecil itu -- 2 kali
+    // tekan, target keduanya KECIL sekali di HP, ~160x100px). Sesudah
+    // dicoba operator, videonya kelihatan sudah bereaksi (berubah jadi
+    // ikon ⏸) tapi tetap tidak bersuara -- kemungkinan besar tekanan
+    // ke-2 itu tidak selalu persis kena tombol ▶️ YouTube yang kecil
+    // (gampang meleset di kotak sekecil itu), bukan soal autoplay lagi.
+    // DISEDERHANAKAN: klik kartu manapun (YouTube atau bukan) SEKARANG
+    // SELALU langsung membuka jendela pemutar besar (openPlayerOverlay_
+    // lewat spec.onPlay -- lihat playItem_()), BUKAN lagi memuat iframe
+    // kecil di kartu dulu. Cuma 1 kali tekan di kartu + 1 kali tekan di
+    // tombol ▶️ YouTube ASLI yang JAUH LEBIH BESAR di jendela pemutar --
+    // klik itu tetap klik ASLI di dalam iframe YouTube (bukan trik
+    // autoplay), jadi suaranya tetap DIJAMIN keluar sesuai aturan
+    // browser, cuma sekarang target tekan keduanya jauh lebih besar &
+    // tidak gampang meleset.
+    if (spec.onPlay) {
       thumb.classList.add("ml-card-playable");
       thumb.setAttribute("role", "button");
       thumb.setAttribute("aria-label", "Putar " + (spec.nama || ""));
@@ -1036,6 +1045,13 @@ const MediaLibrary = (() => {
             <textarea id="mlFormKeterangan" rows="2">${escapeHtml_(editItem ? editItem.keterangan : "")}</textarea>
           </label>
           <fieldset class="ml-kategori-fieldset">
+            <legend>🎵 Kidung terkait (opsional, boleh lebih dari satu)</legend>
+            <p class="ml-hint">Tandai video/link ini supaya muncul di bagian "🔗 Referensi Media Lain" saat kidung itu dibuka. 1 kidung boleh punya banyak link, & 1 link ini juga boleh ditandai ke lebih dari 1 kidung.</p>
+            <div class="ml-kidung-chips" id="mlFormKidungChips"></div>
+            <input type="text" id="mlFormKidungSearch" placeholder="Cari judul atau nomor kidung..." autocomplete="off" />
+            <div class="ml-kidung-results" id="mlFormKidungResults" hidden></div>
+          </fieldset>
+          <fieldset class="ml-kategori-fieldset">
             <legend>Kategori</legend>
             <div class="ml-kategori-checks">
               ${KATEGORI_BAKU.map((k) => `<label class="ml-kategori-chk"><input type="checkbox" value="${k}" ${kategoriTerpilih.includes(k) ? "checked" : ""}/> ${k}</label>`).join("")}
@@ -1106,6 +1122,90 @@ const MediaLibrary = (() => {
       });
     }
 
+    // ---- Kidung terkait (chip + pencarian, lihat parseKidungRefString_
+    //      di atas) ----
+    // `kidungRefState` menyimpan {buku, noKidung, judul} -- `judul`
+    // dicari dari getKidungList() (js/kidung.js) supaya chip-nya
+    // menampilkan JUDUL, bukan cuma kode "Kidung|169" yang tidak enak
+    // dibaca operator. Diisi awal dari editItem.kidungRef (mode edit)
+    // ATAU o.kidungRef (dipanggil dari layar baca 1 kidung, format
+    // TUNGGAL -- lihat js/kidung-ui.js buildKidungMediaRefSection()).
+    let kidungRefState = parseKidungRefString_(editItem ? editItem.kidungRef : (o.kidungRef || ""));
+    const kidungChipsEl = el_("mlFormKidungChips");
+    const kidungSearchInput = el_("mlFormKidungSearch");
+    const kidungResultsEl = el_("mlFormKidungResults");
+    let kidungAllList_ = null; // dimuat sekali (async), lihat loadKidungAllList_ di bawah
+
+    function renderKidungChips_() {
+      if (!kidungChipsEl) return;
+      if (!kidungRefState.length) { kidungChipsEl.innerHTML = ""; return; }
+      kidungChipsEl.innerHTML = kidungRefState.map((k, i) => {
+        const label = k.judul ? `No. ${escapeHtml_(k.noKidung)} — ${escapeHtml_(k.judul)}` : `${escapeHtml_(k.buku)}|${escapeHtml_(k.noKidung)}`;
+        return `<span class="ml-kidung-chip" data-idx="${i}">${label} <button type="button" data-ml-kidung-remove="${i}" aria-label="Hapus">✕</button></span>`;
+      }).join("");
+      kidungChipsEl.querySelectorAll("[data-ml-kidung-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.mlKidungRemove, 10);
+          kidungRefState.splice(idx, 1);
+          renderKidungChips_();
+        });
+      });
+    }
+    async function loadKidungAllList_() {
+      if (kidungAllList_) return kidungAllList_;
+      if (typeof getKidungList !== "function") { kidungAllList_ = []; return kidungAllList_; }
+      try {
+        kidungAllList_ = await getKidungList();
+      } catch (err) {
+        kidungAllList_ = [];
+      }
+      return kidungAllList_;
+    }
+    // Isi judul untuk referensi awal (editItem/o.kidungRef) yang
+    // datangnya cuma berupa kode "buku|noKidung" tanpa judul.
+    if (kidungRefState.length) {
+      loadKidungAllList_().then((list) => {
+        kidungRefState.forEach((k) => {
+          const found = list.find((it) => it.buku === k.buku && String(it.noKidung) === String(k.noKidung));
+          if (found) k.judul = found.judul;
+        });
+        renderKidungChips_();
+      });
+    }
+    renderKidungChips_();
+    if (kidungSearchInput) {
+      kidungSearchInput.addEventListener("input", async () => {
+        const q = kidungSearchInput.value.trim().toLowerCase();
+        if (!q) { kidungResultsEl.hidden = true; kidungResultsEl.innerHTML = ""; return; }
+        const list = await loadKidungAllList_();
+        const isNumeric = /^\d+$/.test(q);
+        const matches = list.filter((k) => {
+          if (kidungRefState.some((sel) => sel.buku === k.buku && String(sel.noKidung) === String(k.noKidung))) return false; // sudah dipilih
+          if (isNumeric) return String(k.noKidung).startsWith(q);
+          return (k.judul || "").toLowerCase().includes(q) || String(k.noKidung).toLowerCase().includes(q);
+        }).slice(0, 8);
+        if (!matches.length) {
+          kidungResultsEl.hidden = false;
+          kidungResultsEl.innerHTML = `<p class="ml-hint" style="margin:6px 10px;">Tidak ketemu kidung yang cocok.</p>`;
+          return;
+        }
+        kidungResultsEl.hidden = false;
+        kidungResultsEl.innerHTML = matches.map((k, i) =>
+          `<button type="button" class="ml-kidung-result-item" data-idx="${i}">${escapeHtml_(k.buku)} No. ${escapeHtml_(k.noKidung)} — ${escapeHtml_(k.judul || "")}</button>`
+        ).join("");
+        kidungResultsEl.querySelectorAll("[data-idx]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const k = matches[parseInt(btn.dataset.idx, 10)];
+            kidungRefState.push({ buku: k.buku, noKidung: k.noKidung, judul: k.judul });
+            kidungSearchInput.value = "";
+            kidungResultsEl.hidden = true;
+            kidungResultsEl.innerHTML = "";
+            renderKidungChips_();
+          });
+        });
+      });
+    }
+
     el_("mlForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const errEl = el_("mlFormError");
@@ -1125,7 +1225,7 @@ const MediaLibrary = (() => {
         keterangan: el_("mlFormKeterangan").value.trim(),
         kategori,
         link,
-        kidungRef: (editItem && editItem.kidungRef) || o.kidungRef || "",
+        kidungRef: joinKidungRefs_(kidungRefState),
         visibility,
       };
       const submitBtn = el_("mlFormSubmitBtn");
