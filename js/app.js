@@ -1258,10 +1258,10 @@ function updateLevelGatedMenus() {
   if (el("userManageBtn")) el("userManageBtn").hidden = !isAdministrator();
   // TAHAP 6 -- lihat showDriveUsagePanel() di bawah.
   if (el("driveUsageBtn")) el("driveUsageBtn").hidden = !isAdministrator();
-  // BARU -- "🔊 Coba Efek Suara & Visual": khusus administrator, sama
-  // seperti logViewerBtn/userManageBtn/driveUsageBtn di atas (lihat
-  // js/effectpreview.js).
-  if (el("effectPreviewBtn")) el("effectPreviewBtn").hidden = !isAdministrator();
+  // "🎵 Pustaka Media" (js/media-library.js) -- SENGAJA TIDAK digating di
+  // sini, tombolnya selalu tampil untuk semua orang yang login (lihat
+  // bagian 3a RENCANA-PUSTAKA-MEDIA-FAVORIT.md); tab & tombol "➕ Tambah"
+  // DI DALAM panelnya sendiri yang digating per level.
   if (typeof AdminBell !== "undefined") AdminBell.refreshVisibility(isAdministrator());
   applyGuestModeUi();
 }
@@ -8469,11 +8469,11 @@ function initUIEvents() {
       closeSidebarOnMobile();
     });
   }
-  if (el("effectPreviewBtn")) {
-    // BARU -- lihat js/effectpreview.js (EffectPreview.open()).
-    el("effectPreviewBtn").addEventListener("click", () => {
+  if (el("mediaLibraryBtn")) {
+    // BARU (11 Sep 2026) -- lihat js/media-library.js (MediaLibrary.open()).
+    el("mediaLibraryBtn").addEventListener("click", () => {
       el("moreMenu").hidden = true;
-      if (typeof EffectPreview !== "undefined") EffectPreview.open();
+      if (typeof MediaLibrary !== "undefined") MediaLibrary.open();
       closeSidebarOnMobile();
     });
   }
