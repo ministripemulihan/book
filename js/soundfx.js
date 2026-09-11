@@ -121,6 +121,17 @@ const SoundFX = (() => {
     { key: "wowRekaman", label: "Wow (Rekaman)", emoji: "😮", src: "assets/sounds/wow-rekaman.mp3" },
     { key: "cling", label: "Cling", emoji: "🔔", src: "assets/sounds/cling.mp3" },
     { key: "cieeee", label: "Cieeee", emoji: "😏", src: "assets/sounds/cieeee.mp3" },
+
+    // --------------------------------------------------------
+    // CONTOH efek dari LINK LUAR (Google Drive) -- SENGAJA DIKOMENTARI
+    // (tidak aktif) supaya tidak muncul tombol yang gagal diputar di
+    // Studio sungguhan. Lihat panduan lengkap "CARA MENAMBAH EFEK DARI
+    // GOOGLE DRIVE" di komentar playAudioFile_() di bawah. Untuk
+    // mengaktifkan: salin 1 baris di bawah ini KE LUAR tanda komentar,
+    // ganti key/label/emoji sesukanya, dan ganti "id=" di URL dengan ID
+    // file MP3 sungguhan milik operator di Google Drive.
+    //
+    // { key: "contohGoogleDrive", label: "Contoh dari Google Drive", emoji: "☁️", src: "https://drive.google.com/uc?export=download&id=GANTI_DENGAN_ID_FILE_DRIVE_ANDA" },
   ];
 
   // Lookup cepat key -> src, dibangun sekali dari SOUND_FX_LIST supaya
@@ -143,11 +154,27 @@ const SoundFX = (() => {
   let getAudioContext_ = null; // override opsional, lihat configure()
   let getDestination_ = null; // override opsional, lihat configure()
   let noiseBuffer_ = null;
+  // Status mute untuk efek SUMBER EKSTERNAL (link luar, mis. Google
+  // Drive) -- efek jenis ini TIDAK lewat destination_()/gain Web Audio
+  // (lihat komentar "SUMBER EKSTERNAL" di playAudioFile_() di bawah),
+  // jadi mute-nya harus diatur manual lewat SoundFX.setMuted(), dipanggil
+  // present.html bersamaan dengan setEffectsMuted_() supaya sakelar "M"
+  // tetap membisukan SEMUA jenis efek, lokal maupun link luar.
+  let externalMuted_ = false;
+  const activeExternalAudios_ = []; // <audio> yang lagi jalan, utk mute/stop langsung
 
   function configure(opts) {
     if (!opts) return;
     if (typeof opts.getAudioContext === "function") getAudioContext_ = opts.getAudioContext;
     if (typeof opts.getDestination === "function") getDestination_ = opts.getDestination;
+  }
+
+  // Dipanggil dari luar (present.html, bersamaan dengan setEffectsMuted_())
+  // supaya efek dari link luar (yang tidak lewat gain Web Audio) ikut
+  // dibisukan/dibunyikan lagi seperti efek lokal.
+  function setMuted(muted) {
+    externalMuted_ = !!muted;
+    activeExternalAudios_.forEach((a) => { try { a.volume = externalMuted_ ? 0 : 1; } catch (e) {} });
   }
 
   function ctx_() {
@@ -257,8 +284,51 @@ const SoundFX = (() => {
   // per src, supaya file yang sama HANYA di-fetch+decode SEKALI selama
   // halaman terbuka -- klik berikutnya ke efek yang sama langsung pakai
   // buffer yang sudah ada di memori (instan, tidak fetch ulang).
+  //
+  // DUA JENIS SUMBER (BARU 10 Sep 2026, permintaan operator: "mau update
+  // sendiri, dari GitHub sendiri atau dari link Google Drive, boleh
+  // beda-beda tiap efek"):
+  //
+  //  1) FILE LOKAL (path relatif, mis. "assets/sounds/nama.mp3") -- file
+  //     yang operator sendiri upload ke folder assets/sounds/ di
+  //     repo GitHub-nya. Diputar lewat Web Audio (fetch+decodeAudioData
+  //     +AudioBufferSourceNode) -- BISA di-cache offline penuh (lihat
+  //     predownloadAll()/tombol "Unduh Semua Efek Suara") & tetap ikut
+  //     sakelar mute "M" Layar 2 karena lewat destination_() yang sama.
+  //
+  //  2) LINK LUAR (URL lengkap diawali "http://" atau "https://", mis.
+  //     link Google Drive) -- diputar lewat elemen <audio> BIASA, BUKAN
+  //     Web Audio, karena hampir semua penyedia file luar (termasuk
+  //     Google Drive) TIDAK mengizinkan situs lain "membaca" isi file-nya
+  //     lewat fetch() (aturan CORS) -- <audio> tag biasa TIDAK kena
+  //     aturan itu (sama seperti <img>), jadi cara ini yang paling
+  //     andal untuk link luar. Konsekuensinya:
+  //       - TIDAK BISA disiapkan offline di muka (harus online tiap
+  //         dipakai) -- makanya predownloadAll() di bawah SENGAJA
+  //         melewati jenis ini.
+  //       - Tetap ikut sakelar mute "M" Layar 2, tapi caranya beda
+  //         (lihat setMuted() & activeExternalAudios_ di atas, BUKAN
+  //         lewat destination_()).
+  //     CARA MENAMBAH EFEK DARI GOOGLE DRIVE:
+  //       a. Upload file MP3 ke Google Drive, klik kanan -> Bagikan ->
+  //          ubah akses jadi "Siapa saja yang memiliki link".
+  //       b. Link yang didapat biasanya seperti:
+  //          https://drive.google.com/file/d/ID_FILE_DI_SINI/view?usp=sharing
+  //          Salin bagian ID_FILE_DI_SINI saja, lalu tempel ke format:
+  //          https://drive.google.com/uc?export=download&id=ID_FILE_DI_SINI
+  //       c. Tempel URL hasil langkah (b) itu ke field "src" entry baru
+  //          di SOUND_FX_LIST (lihat contoh key "contohGoogleDrive" di
+  //          bawah -- GANTI id-nya dengan file MP3 milik operator
+  //          sendiri, atau hapus baris contoh itu kalau tidak dipakai).
+  //       d. Sebaiknya file MP3-nya TIDAK terlalu besar (di bawah ±15 MB)
+  //          -- file Google Drive yang besar kadang menampilkan halaman
+  //          konfirmasi "pindai virus" alih-alih file-nya langsung, yang
+  //          bikin efeknya gagal diputar.
   // --------------------------------------------------------
   const audioBufferCache_ = {};
+  function isExternalUrl_(src) {
+    return /^https?:\/\//i.test(src);
+  }
   function loadAudioBuffer_(src) {
     if (!audioBufferCache_[src]) {
       audioBufferCache_[src] = fetch(src)
@@ -267,7 +337,22 @@ const SoundFX = (() => {
     }
     return audioBufferCache_[src];
   }
+  function playExternalAudio_(src) {
+    try {
+      const a = new Audio(src);
+      a.volume = externalMuted_ ? 0 : 1;
+      activeExternalAudios_.push(a);
+      const cleanup = () => {
+        const i = activeExternalAudios_.indexOf(a);
+        if (i !== -1) activeExternalAudios_.splice(i, 1);
+      };
+      a.addEventListener("ended", cleanup);
+      a.addEventListener("error", cleanup);
+      a.play().catch(() => cleanup()); // diamkan -- efek suara TIDAK BOLEH sampai mengganggu UI kalau gagal
+    } catch (e) { /* diamkan, sama alasannya */ }
+  }
   function playAudioFile_(src) {
+    if (isExternalUrl_(src)) { playExternalAudio_(src); return; }
     loadAudioBuffer_(src)
       .then((buffer) => {
         try {
@@ -400,5 +485,135 @@ const SoundFX = (() => {
     });
   }
 
-  return { LIST: SOUND_FX_LIST, configure, play, renderButtons };
+  // --------------------------------------------------------
+  // downloadOne(key) -- BARU (tambahan, permintaan operator: "bisa
+  // satu-satu", jadi masing-masing efek diunduh sendiri-sendiri, BUKAN
+  // digabung jadi 1 file/aksi). Berbeda dari predownloadAll() di atas:
+  // predownloadAll() hanya MENYIAPKAN efek agar siap diputar OFFLINE
+  // lewat Cache API (tidak menghasilkan file di HP), sedangkan
+  // downloadOne() benar-benar MENYIMPAN 1 file MP3 ke folder Unduhan
+  // HP/laptop operator.
+  //   - File LOKAL (assets/sounds/...): di-fetch sebagai blob supaya
+  //     nama file unduhannya bisa dipaksa rapi (mis. "cheerRekaman.mp3"),
+  //     bukan nama acak dari browser.
+  //   - Link LUAR (Google Drive dst, lihat isExternalUrl_() di atas):
+  //     TIDAK bisa di-fetch sebagai blob (kena CORS, sama seperti alasan
+  //     predownloadAll() melewatinya) -- jadi cukup dibuka di tab baru;
+  //     Google Drive sendiri yang akan memicu dialog unduh di browser.
+  // --------------------------------------------------------
+  function downloadOne(key) {
+    const item = SOUND_FX_LIST.find((it) => it.key === key && it.src);
+    if (!item) return Promise.reject(new Error("Efek suara tidak ditemukan / tidak punya file: " + key));
+    if (isExternalUrl_(item.src)) {
+      window.open(item.src, "_blank");
+      return Promise.resolve();
+    }
+    return fetch(item.src)
+      .then((res) => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.blob();
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const ext = (item.src.split(".").pop() || "mp3").split("?")[0];
+        a.href = url;
+        a.download = item.key + "." + ext;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+      });
+  }
+
+  // --------------------------------------------------------
+  // renderDownloadList(container) -- BARU (tambahan, pasangan
+  // downloadOne() di atas). Membangun daftar unduh SATU PER SATU
+  // langsung dari SOUND_FX_LIST -- SAMA seperti renderButtons() di
+  // bawah, jadi begitu ada entry baru ditambahkan di SOUND_FX_LIST
+  // (baik file baru yang di-push ke assets/sounds/ lewat GitHub, MAUPUN
+  // link Google Drive baru yang sudah "anyone with the link"), baris
+  // unduhnya OTOMATIS muncul di sini juga tanpa perlu edit kode lain
+  // sama sekali -- cukup reload halaman. Efek sintesis murni (tidak
+  // punya "src") dilewati karena tidak ada file untuk diunduh.
+  // --------------------------------------------------------
+  function renderDownloadList(container) {
+    if (!container) return;
+    container.innerHTML = "";
+    const items = SOUND_FX_LIST.filter((it) => it.src);
+    if (items.length === 0) {
+      container.innerHTML = '<p class="effect-preview-hint">Belum ada efek suara berbasis file (semua masih sintesis).</p>';
+      return;
+    }
+    items.forEach((item) => {
+      const external = isExternalUrl_(item.src);
+      const row = document.createElement("div");
+      row.className = "soundfx-dl-row";
+      const label = document.createElement("span");
+      label.className = "soundfx-dl-row-label";
+      label.textContent = `${item.emoji} ${item.label}`;
+      const source = document.createElement("span");
+      source.className = "soundfx-dl-row-source";
+      source.textContent = external ? "☁️ Google Drive" : "📱 Lokal";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip-btn small soundfx-dl-row-btn";
+      btn.textContent = "⬇";
+      btn.title = "Unduh " + item.label;
+      btn.addEventListener("click", () => {
+        btn.disabled = true;
+        btn.textContent = "…";
+        downloadOne(item.key)
+          .catch(() => { btn.title = "Gagal mengunduh " + item.label + " -- coba lagi"; })
+          .then(() => { btn.disabled = false; btn.textContent = "⬇"; });
+      });
+      row.appendChild(label);
+      row.appendChild(source);
+      row.appendChild(btn);
+      container.appendChild(row);
+    });
+  }
+
+  // --------------------------------------------------------
+  // predownloadAll(onProgress) -- BARU (10 Sep 2026, permintaan operator:
+  // opsi centang "sertakan juga efek suara MP3" di dialog "📥 Unduh Data
+  // Alkitab", js/app.js showBibleSyncPrompt()/syncFromServer()). TIDAK
+  // dipanggil otomatis oleh SoundFX sendiri -- defaultnya efek MP3 HANYA
+  // di-fetch+cache SATU PER SATU secara "malas" (lihat playAudioFile_())
+  // begitu tombolnya benar-benar dipencet, BUKAN diunduh semua di muka.
+  // Fungsi ini dipanggil HANYA kalau operator secara sadar mencentang
+  // opsi itu -- mem-fetch+decode SEMUA file MP3 di SOUND_FX_LIST
+  // sekaligus (lewat loadAudioBuffer_() yang sama dipakai play(), jadi
+  // hasilnya juga otomatis ke-cache oleh Service Worker & buffer-nya
+  // langsung siap di memori, TIDAK di-fetch ulang) supaya semuanya siap
+  // dipakai offline sejak awal, tanpa perlu menunggu jeda pertama kali
+  // tiap tombol dipencet nanti.
+  //   onProgress(doneCount, totalCount) -- opsional, dipanggil tiap 1
+  //   file selesai (berhasil ATAU gagal) supaya pemanggil bisa
+  //   menampilkan progres "X dari Y efek suara".
+  // 1 file gagal (mis. koneksi putus di tengah) TIDAK menggagalkan file
+  // lain -- diam-diam dilewati, konsisten dengan playAudioFile_().
+  // --------------------------------------------------------
+  function predownloadAll(onProgress) {
+    // Hanya file LOKAL (assets/sounds/...) yang bisa disiapkan offline --
+    // link luar (Google Drive dst) TIDAK mungkin di-cache dengan cara ini
+    // (lihat komentar "LINK LUAR" di playAudioFile_() di atas), jadi
+    // dilewati di sini supaya tidak dihitung sebagai "gagal".
+    const items = SOUND_FX_LIST.filter((it) => it.src && !isExternalUrl_(it.src));
+    const total = items.length;
+    let done = 0;
+    if (typeof onProgress === "function") onProgress(0, total);
+    return Promise.all(
+      items.map((it) =>
+        loadAudioBuffer_(it.src)
+          .catch(() => {})
+          .then(() => {
+            done++;
+            if (typeof onProgress === "function") onProgress(done, total);
+          })
+      )
+    );
+  }
+
+  return { LIST: SOUND_FX_LIST, configure, play, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted };
 })();
