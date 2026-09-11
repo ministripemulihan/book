@@ -4826,7 +4826,26 @@ const PresentationStudio = (() => {
     // tetap bisa menimpanya lewat kotak input + "💾 Simpan Link" (yang
     // tersimpan di localStorage per perangkat itu SELALU menang di atas
     // nilai bawaan ini).
-    const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1UdMQ3JZkeXr8KYwVNW8cmipp0B9oH2FYLwudTFxqR0g/export?format=csv&gid=0";
+    // DIPERBARUI (11 Sep 2026, permintaan operator) -- link Sheet BAWAAN
+    // sekarang menunjuk ke Sheet BARU "MediaLibrary" (skema 16 kolom
+    // ID/Jenis/Sumber/Nama/Channel/Keterangan/Kategori/Link/KidungRef/
+    // Gambar/DurasiDetik/TanggalAsli/Visibility/DiuploadOleh/Tanggal/
+    // UpdatedAt -- lihat apps-script/MediaLibraryCode.gs), MENGGANTIKAN
+    // Sheet 6-kolom-checkbox LAMA. Skema barunya BEDA (1 kolom "Kategori"
+    // teks dipisah koma, bukan 6 kolom Anak/Remaja/.../Bebas terpisah) --
+    // lihat parseSheetCsv() di bawah yang sudah disesuaikan supaya
+    // mengerti KEDUA skema (baru & lama, deteksi otomatis).
+    //
+    // CATATAN: jalur "🔄 Muat Ulang" CSV ini HANYA dipakai sebagai
+    // CADANGAN kalau Pustaka Media (CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL)
+    // belum disetel sama sekali -- lihat loadSheet() di bawah. Supaya
+    // link ini benar-benar bisa dibaca sebagai CSV, Sheet BARU itu juga
+    // harus sudah di-"Publish to web" (File -> Bagikan -> Publikasikan
+    // ke web -> pilih tab "MediaLibrary" -> format CSV) -- kalau belum,
+    // "🔄 Muat Ulang" akan gagal walau link-nya sudah benar (normal,
+    // Apps Script/Sheet privat tidak bisa dibaca langsung sebagai CSV
+    // publik).
+    const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/13p5RpQwY3I9rXDBEQ4DQ1EXw4XJvQ-Z2bDYuOZ473I0/export?format=csv&gid=0";
     const CATS = [
       { key: "anak", label: "Anak" },
       { key: "remaja", label: "Remaja" },
@@ -4939,6 +4958,22 @@ const PresentationStudio = (() => {
       return out;
     }
 
+    // DIPERBAIKI (11 Sep 2026, permintaan operator) -- Sheet CSV BAWAAN
+    // (DEFAULT_SHEET_URL di atas) sekarang berskema BARU (sama dengan
+    // apps-script/MediaLibraryCode.gs, dibaca lewat kolom "Kategori" 1
+    // teks dipisah koma & "DurasiDetik" dalam DETIK -- lihat
+    // catsFromKategoriString_()/mapMediaLibraryItemsToVideos_() di atas
+    // yang dipakai jalur Pustaka Media), BUKAN lagi 6 kolom checkbox
+    // terpisah Anak/Remaja/.../Bebas + "Durasi" dalam MENIT seperti Sheet
+    // LAMA. Fungsi ini sekarang MENDETEKSI OTOMATIS skema mana yang
+    // dipakai baris CSV yang sedang dibaca (cek ada/tidaknya kolom
+    // "kategori"), supaya:
+    //   - Sheet BARU (DEFAULT_SHEET_URL) terbaca benar kalau operator
+    //     mem-"Publish to web" -nya, DAN
+    //   - link CADANGAN lama (FALLBACK_SHEET_URL, skema 6-kolom) ATAU
+    //     link Sheet lama yang mungkin masih disimpan operator di
+    //     perangkatnya (localStorage) TETAP jalan seperti sebelumnya --
+    //     tidak ada yang tiba-tiba rusak.
     function parseSheetCsv(text) {
       // PERBAIKAN: parseCSV() (js/csv.js) SUDAH mengembalikan array
       // OBJEK per baris (kunci = nama kolom huruf kecil, mis.
@@ -4949,21 +4984,41 @@ const PresentationStudio = (() => {
       const records = parseCSV(text);
       const out = [];
       records.forEach((rec) => {
-        const url = (rec.url || rec.link || "").trim();
+        // Skema BARU pakai kolom "Link" (bukan "URL") & "Nama" (bukan
+        // "Title") -- tapi kedua nama kolom tetap diterima supaya tidak
+        // peduli mana pun yang dipakai di Sheet operator.
+        const url = (rec.link || rec.url || "").trim();
         const id = typeof extractYoutubeId === "function" ? extractYoutubeId(url) : null;
         if (!id) return; // baris tanpa link YouTube yang dikenali -- lewati diam-diam
-        const cats = {};
-        CATS.forEach((c) => { cats[c.key] = truthy(rec[c.key] || rec[c.label.toLowerCase()]); });
+
+        // Kolom "kategori" (huruf kecil, dari header "Kategori") HANYA
+        // ada di skema BARU -- dipakai sebagai penanda skema mana yang
+        // sedang dibaca.
+        const pakaiSkemaBaru = rec.kategori !== undefined;
+        const cats = pakaiSkemaBaru
+          ? catsFromKategoriString_(rec.kategori)
+          : (() => {
+              const c = {};
+              CATS.forEach((cc) => { c[cc.key] = truthy(rec[cc.key] || rec[cc.label.toLowerCase()]); });
+              return c;
+            })();
+
         out.push({
-          title: (rec.title || rec.judul || "").trim() || id,
+          title: (rec.nama || rec.title || rec.judul || "").trim() || id,
           channel: (rec.channel || rec["channel name"] || rec.saluran || "").trim(),
           url, videoId: id,
           embedUrl: buildYoutubeEmbedUrl(id),
           cats,
-          // BARU (4 Sep 2026) -- lihat catatan parseDurationToMinutes/
-          // parseUploadDate di atas.
-          durationMinutes: parseDurationToMinutes(rec.durasi || rec.menit || rec.duration || rec["durasi (menit)"]),
-          uploadDate: parseUploadDate(rec.tanggal || rec.upload || rec["upload date"] || rec.date || rec["tanggal upload"]),
+          // BARU (4 Sep 2026, disesuaikan 11 Sep 2026 utk skema baru) --
+          // skema baru simpan "DurasiDetik" dalam DETIK (kolom
+          // "durasidetik" huruf kecil), skema lama pakai "Durasi" dalam
+          // MENIT -- lihat parseDurationToMinutes()/komentar di atas.
+          durationMinutes: pakaiSkemaBaru
+            ? (rec.durasidetik ? Number(rec.durasidetik) / 60 : null)
+            : parseDurationToMinutes(rec.durasi || rec.menit || rec.duration || rec["durasi (menit)"]),
+          // Skema baru pakai "TanggalAsli" (kolom "tanggalasli"), skema
+          // lama pakai "Tanggal"/"Upload Date" dsb.
+          uploadDate: parseUploadDate(rec.tanggalasli || rec.tanggal || rec.upload || rec["upload date"] || rec.date || rec["tanggal upload"]),
         });
       });
       return out; // urutan APA ADANYA seperti baris di Sheet (atas -> bawah)
