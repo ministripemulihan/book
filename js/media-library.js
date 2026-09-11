@@ -192,6 +192,34 @@ const MediaLibrary = (() => {
     const id = youtubeIdFromLink(link);
     return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
   }
+
+  // ------------------------------------------------------------
+  // BARU (12 Sep 2026, sesi perbaikan bug pemutaran) -- link Google
+  // Drive yang ditempel operator biasanya bentuk "share" biasa
+  // (.../file/d/ID/view?usp=sharing atau ...?id=ID), BUKAN link
+  // unduhan langsung -- kalau dipasang apa adanya ke <audio src="...">
+  // atau <video src="...">, browser dapat HALAMAN HTML (bukan berkas
+  // audio/video), jadi GAGAL DIPUTAR (dan `.play()` gagalnya lewat
+  // Promise, TIDAK melempar error yang bisa ditangkap try/catch biasa
+  // -- ini penyebab efek suara kontribusi & video Drive "diam saja"
+  // tanpa pesan error apa pun). Fungsi ini menebak ID file dari
+  // berbagai bentuk link Drive & mengubahnya ke bentuk unduhan
+  // langsung yang bisa diputar <audio>/<video> (berlaku untuk file
+  // yang cukup kecil -- file besar tetap kena halaman "pindai virus"
+  // Google, di luar kendali kode ini).
+  // ------------------------------------------------------------
+  function driveFileId_(link) {
+    const s = String(link || "");
+    let m = s.match(/drive\.google\.com\/file\/d\/([\w-]{10,})/);
+    if (m) return m[1];
+    m = s.match(/[?&]id=([\w-]{10,})/);
+    if (m) return m[1];
+    return "";
+  }
+  function resolvePlayableUrl_(link) {
+    const id = driveFileId_(link);
+    return id ? `https://drive.google.com/uc?export=download&id=${id}` : String(link || "");
+  }
   // Judul otomatis lewat oEmbed YouTube (gratis, tanpa API key) --
   // dipakai form tambah supaya operator tidak wajib ketik nama manual
   // (bagian 9 rencana). Gagal diam-diam (mis. offline) -- form tetap
@@ -268,9 +296,17 @@ const MediaLibrary = (() => {
 
     const thumb = document.createElement("div");
     thumb.className = "ml-card-thumb";
+    // PERBAIKAN (12 Sep 2026) -- sebelumnya thumbnail YouTube HANYA
+    // muncul kalau kolom `Sumber` di Sheet persis berisi "youtube".
+    // Untuk item hasil migrasi manual (Cara A) kolom itu sering kosong
+    // walau link-nya YouTube asli, jadi gambar asli tidak pernah
+    // muncul -- selalu jatuh ke kotak warna + ikon. Sekarang dicoba
+    // tebak dari bentuk link juga (`guessSumberFromLink`), bukan cuma
+    // mengandalkan kolom Sumber yang mungkin belum terisi.
+    const sumberUntukGambar_ = spec.sumber || guessSumberFromLink(spec.link);
     if (spec.gambar) {
       thumb.style.backgroundImage = `url("${spec.gambar.replace(/"/g, "")}")`;
-    } else if (spec.jenis === "youtube" && spec.sumber === "youtube") {
+    } else if (sumberUntukGambar_ === "youtube") {
       const thumbUrl = youtubeThumbnail(spec.link);
       if (thumbUrl) thumb.style.backgroundImage = `url("${thumbUrl}")`;
       else thumb.style.background = colorForKey_(spec.id || spec.nama);
@@ -282,13 +318,17 @@ const MediaLibrary = (() => {
       thumb.appendChild(emoji);
     }
 
-    const playBtn = document.createElement("button");
-    playBtn.type = "button";
-    playBtn.className = "ml-card-play";
-    playBtn.setAttribute("aria-label", "Putar");
-    playBtn.textContent = "▶️";
-    playBtn.addEventListener("click", () => spec.onPlay && spec.onPlay());
-    thumb.appendChild(playBtn);
+    // PERBAIKAN (12 Sep 2026, permintaan operator) -- tombol lingkaran
+    // "▶️" terpisah DIHAPUS (terlalu kecil, malah menutupi gambar
+    // thumbnail YouTube yang sudah kecil). Sekarang SELURUH kotak
+    // gambar yang bisa ditekan untuk memutar, supaya gambar aslinya
+    // tetap kelihatan penuh tanpa ikon menutupi.
+    if (spec.onPlay) {
+      thumb.classList.add("ml-card-playable");
+      thumb.setAttribute("role", "button");
+      thumb.setAttribute("aria-label", "Putar " + (spec.nama || ""));
+      thumb.addEventListener("click", () => spec.onPlay());
+    }
 
     const favBtn = document.createElement("button");
     favBtn.type = "button";
@@ -377,24 +417,67 @@ const MediaLibrary = (() => {
   function playItem_(item) {
     if (item.jenis === "sound" && !item.sumber) {
       // Efek suara kontribusi (link Drive/mp3) -- putar langsung.
-      try { new Audio(item.link).play(); } catch (err) { window.open(item.link, "_blank"); }
+      // PERBAIKAN (12 Sep 2026): (1) link Drive "share" biasa ditebak
+      // & diubah dulu ke bentuk unduhan langsung lewat
+      // resolvePlayableUrl_(), (2) `.play()` mengembalikan Promise --
+      // kalau gagal (mis. link ternyata tetap bukan berkas audio
+      // langsung), errornya ASYNC dan TIDAK tertangkap try/catch biasa
+      // seperti kode lama, jadi sebelumnya efek "diam saja" tanpa
+      // fallback apa pun. Sekarang errornya ditangkap lewat
+      // `.catch()` & barulah jatuh ke buka tab baru.
+      const url = resolvePlayableUrl_(item.link);
+      try {
+        const audio = new Audio(url);
+        const p = audio.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(() => window.open(item.link, "_blank"));
+        }
+      } catch (err) {
+        window.open(item.link, "_blank");
+      }
       return;
     }
     const sumber = item.sumber || guessSumberFromLink(item.link);
     if (sumber === "youtube") {
-      openPlayerOverlay_(`<iframe src="https://www.youtube.com/embed/${youtubeIdFromLink(item.link)}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`, item.nama);
+      // PERBAIKAN (12 Sep 2026): `autoplay=1` DIHAPUS -- banyak
+      // browser (terutama Safari/HP) MEMBLOKIR autoplay video BER-
+      // SUARA sama sekali (video jadi diam/tidak jalan, kelihatan
+      // seperti "videonya tidak keluar suara") kalau dipicu dari luar
+      // iframe YouTube itu sendiri. Tanpa `autoplay`, video langsung
+      // tampil dengan tombol ▶️ bawaan YouTube -- sekali ditekan
+      // operator DIJAMIN keluar suara (itu klik langsung di dalam
+      // pemutarnya sendiri, bukan trik autoplay).
+      openPlayerOverlay_(`<iframe src="https://www.youtube.com/embed/${youtubeIdFromLink(item.link)}?playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`, item.nama, item.link);
     } else if (sumber === "soundcloud") {
-      openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(item.link)}&auto_play=true"></iframe>`, item.nama);
+      openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(item.link)}&auto_play=true"></iframe>`, item.nama, item.link);
     } else if (sumber === "mp3" || (sumber === "google_drive" && /\.(mp3|wav|m4a)(\?|$)/i.test(item.link))) {
-      openPlayerOverlay_(`<audio controls autoplay src="${item.link}"></audio>`, item.nama);
+      openPlayerOverlay_(`<audio controls autoplay src="${resolvePlayableUrl_(item.link)}"></audio>`, item.nama, item.link);
+    } else if (sumber === "google_drive") {
+      // PERBAIKAN (12 Sep 2026) -- dulu SEMUA link Drive selain
+      // .mp3/.wav/.m4a (termasuk kebanyakan link "share" biasa tanpa
+      // akhiran jelas, video ATAU audio) langsung dibuka tab baru
+      // (tidak pernah dicoba diputar di dalam aplikasi). Sekarang
+      // dicoba dulu lewat <video> (bisa memutar berkas video MAUPUN
+      // audio-saja) dengan link yang sudah diubah ke bentuk unduhan
+      // langsung -- fallback tombol buka link tetap ada di bawah video
+      // kalau linknya ternyata tidak bisa diputar langsung (mis. file
+      // besar kena halaman "pindai virus" Google).
+      const resolved = resolvePlayableUrl_(item.link);
+      openPlayerOverlay_(`<video controls autoplay playsinline src="${resolved}" style="width:100%;height:100%;background:#000;"></video>`, item.nama, item.link);
     } else {
-      // suno / lainnya / google_drive video -- coba embed sederhana,
-      // fallback tombol buka link kalau gagal (sesuai bagian 4b).
+      // suno / lainnya -- tidak ada cara embed yang bisa diandalkan,
+      // buka tab baru saja (sesuai bagian 4b).
       window.open(item.link, "_blank");
     }
   }
 
-  function openPlayerOverlay_(innerHtml, title) {
+  // PERBAIKAN (12 Sep 2026) -- parameter baru `fallbackLink` (opsional):
+  // tombol "🔗 Buka" di header pemutar, jalan pintas kalau embed di
+  // dalam kotak ternyata tidak keluar suara/gambar sama sekali
+  // (mis. link Drive file besar kena halaman "pindai virus" Google) --
+  // operator tinggal tekan ini untuk buka link aslinya di tab baru,
+  // tidak perlu menebak-nebak kenapa gagal.
+  function openPlayerOverlay_(innerHtml, title, fallbackLink) {
     let ov = el_("mlPlayerOverlay");
     if (!ov) {
       ov = document.createElement("div");
@@ -404,7 +487,10 @@ const MediaLibrary = (() => {
         <div class="ml-player-box">
           <div class="ml-player-header">
             <span id="mlPlayerTitle"></span>
-            <button type="button" id="mlPlayerCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+            <div class="ml-player-header-actions">
+              <a id="mlPlayerOpenLink" class="icon-btn" href="#" target="_blank" rel="noopener" title="Buka link aslinya" aria-label="Buka link aslinya" hidden>🔗</a>
+              <button type="button" id="mlPlayerCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+            </div>
           </div>
           <div class="ml-player-body" id="mlPlayerBody"></div>
         </div>`;
@@ -414,6 +500,11 @@ const MediaLibrary = (() => {
     }
     el_("mlPlayerTitle").textContent = title || "";
     el_("mlPlayerBody").innerHTML = innerHtml;
+    const openLink = el_("mlPlayerOpenLink");
+    if (openLink) {
+      if (fallbackLink) { openLink.href = fallbackLink; openLink.hidden = false; }
+      else { openLink.hidden = true; openLink.removeAttribute("href"); }
+    }
     ov.hidden = false;
   }
   function closePlayerOverlay_() {
@@ -582,6 +673,38 @@ const MediaLibrary = (() => {
   const BALLOON_EMOJIS_ = ["🎈", "🎈", "🎈", "🎈"];
   const HAPPY_EMOJIS_ = ["🎉", "😄", "🥳", "✨"];
 
+  // BARU (12 Sep 2026, permintaan operator "background Layar Publik
+  // bisa ganti-ganti theme yang ada, dibuat persis theme yang sudah
+  // ada sekarang") -- SENGAJA DISALIN PERSIS (bukan dipakai bareng)
+  // dari `const THEMES` di js/presentation-studio.js (baris ~110),
+  // supaya file ini tidak perlu bergantung ke modul Studio (yang tidak
+  // selalu ikut termuat di semua halaman) hanya untuk 7 pasang warna.
+  // PENTING: kalau operator menambah/mengubah tema di Studio Presentasi
+  // nanti, salin juga perubahannya ke sini secara MANUAL supaya kedua
+  // tempat tetap sinkron/sama persis.
+  const LP_THEMES_ = [
+    { key: "gelap", label: "Gelap", bg: "#05070c", ink: "#f5f2e8" },
+    { key: "terang", label: "Terang", bg: "#fdfaf3", ink: "#1a1a1a" },
+    { key: "emas", label: "Emas", bg: "#1a1206", ink: "#e9c977" },
+    { key: "biru", label: "Biru Malam", bg: "#0b1730", ink: "#ffffff" },
+    { key: "sepia", label: "Sepia", bg: "#f4e8d0", ink: "#3a2c17" },
+    { key: "putih", label: "Putih", bg: "#ffffff", ink: "#173f91" },
+    { key: "krem", label: "Krem", bg: "#fdf1cf", ink: "#2f6fb3" },
+  ];
+  const LP_THEME_KEY_ = "bible_app_ml_lp_theme_v1";
+  function lpSavedThemeKey_() {
+    try { return localStorage.getItem(LP_THEME_KEY_) || "terang"; } catch (e) { return "terang"; }
+  }
+  function lpApplyTheme_(key) {
+    const t = LP_THEMES_.find((x) => x.key === key) || LP_THEMES_[1];
+    const screen = lpScreenEl_();
+    if (screen) { screen.style.background = t.bg; screen.style.color = t.ink; }
+    document.querySelectorAll("#mlLpThemeGrid [data-lp-theme]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.lpTheme === t.key);
+    });
+    try { localStorage.setItem(LP_THEME_KEY_, t.key); } catch (e) {}
+  }
+
   function lpScreenEl_() { return el_("mlLpScreen"); }
   function lpLayerEl_() { return el_("mlLpLayer"); }
   function lpCanvasEl_() { return el_("mlLpConfettiCanvas"); }
@@ -691,6 +814,12 @@ const MediaLibrary = (() => {
         Coba dulu suara &amp; efek visual di HP ini SEBELUM presentasi. Efek yang dipencet di sini
         <strong>hanya terdengar/terlihat di HP ini</strong> — <strong>tidak</strong> dikirim ke Layar 2 jemaat.
       </p>
+      <div class="ml-lp-theme-row">
+        <span>🎨 Tema latar (persis tema Layar Proyeksi di Studio Presentasi)</span>
+        <div class="ps-theme-grid ps-theme-grid-inline" id="mlLpThemeGrid">
+          ${LP_THEMES_.map((t) => `<button type="button" class="ps-theme-swatch" data-lp-theme="${t.key}" style="background:${t.bg}; color:${t.ink};${t.key === "putih" ? " border:1px solid #d8d8d8;" : ""}">${t.label}</button>`).join("")}
+        </div>
+      </div>
       <div class="ml-lp-sample-row">
         <label for="mlLpSampleInput">Contoh tulisan di layar (opsional)</label>
         <input type="text" id="mlLpSampleInput" class="ml-lp-sample-input" value="Yohanes 3:16 — Karena begitu besar kasih Allah akan dunia ini..." />
@@ -732,6 +861,11 @@ const MediaLibrary = (() => {
         <p class="ml-hint">Sudah dengar-dengar di atas dan cocok? Unduh file MP3-nya satu per satu di sini.</p>
         <div class="soundfx-dl-list" id="mlLpDlList"></div>
       </div>`;
+
+    body.querySelectorAll("#mlLpThemeGrid [data-lp-theme]").forEach((btn) => {
+      btn.addEventListener("click", () => lpApplyTheme_(btn.dataset.lpTheme));
+    });
+    lpApplyTheme_(lpSavedThemeKey_());
 
     const input = el_("mlLpSampleInput");
     const sample = el_("mlLpSampleText");
@@ -1052,7 +1186,7 @@ const MediaLibrary = (() => {
     guessSumberFromLink,
     canAddMedia,
     canSeeSound,
-    // BARU (11 Sep 2026, langkah 3 STATUS-PUSTAKA-MEDIA.md) -- dipakai 
+    // BARU (11 Sep 2026, langkah 3 STATUS-PUSTAKA-MEDIA.md) -- dipakai
     // js/kidung-ui.js (bagian "🔗 Referensi Media Lain") supaya kartu &
     // form tambah di layar baca kidung persis sama dengan yang dipakai
     // di menu "🎵 Pustaka Media" ini, tidak ada kode/tampilan duplikat.
@@ -1061,5 +1195,11 @@ const MediaLibrary = (() => {
     // dipanggil setelah tambah/edit berhasil disimpan).
     openAddForm: openAddForm_,
     renderItemCard: itemToCard_,
+    // BARU (12 Sep 2026, sesi perbaikan bug pemutaran) -- dipakai ulang
+    // js/presentation-studio.js (tombol efek suara kontribusi di tab
+    // "🎉 Efek Panggung") supaya link Drive "share" biasa juga diubah
+    // ke bentuk unduhan langsung SEBELUM dikirim ke Layar 2 sungguhan,
+    // konsisten dengan pemutaran pratinjau di menu ini.
+    resolvePlayableUrl: resolvePlayableUrl_,
   };
 })();
