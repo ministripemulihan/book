@@ -180,6 +180,7 @@ const EffectPreview = (() => {
     if (wired_) return;
     wired_ = true;
     wireSampleTextInput_();
+    refreshEpvSoundFxDl_();
     // BARU (10 Sep 2026, sesi ke-13) -- tombol "🔊 Efek Suara" dibangun
     // otomatis dari SoundFX.LIST (js/soundfx.js) ke dalam
     // #effectPreviewSoundGrid, dengan onClick langsung memanggil
@@ -224,6 +225,22 @@ const EffectPreview = (() => {
 
   return { open, close };
 })();
+
+// ------------------------------------------------------------
+// BARU (tambahan, permintaan operator: unduh efek suara SATU-SATU,
+// bukan digabung jadi 1 tombol/aksi, dan OTOMATIS bertambah kalau
+// SOUND_FX_LIST di js/soundfx.js bertambah -- baik file baru yang
+// di-push ke assets/sounds/ lewat GitHub, MAUPUN link Google Drive
+// baru yang sudah dibagikan "siapa saja yang memiliki link". TIDAK
+// ada logika unduh yang ditulis di sini -- cukup panggil
+// SoundFX.renderDownloadList(), 1 sumber kebenaran yang sama dipakai
+// di mana pun daftar ini perlu ditampilkan.
+// ------------------------------------------------------------
+function refreshEpvSoundFxDl_() {
+  const container = document.getElementById("effectPreviewDlList");
+  if (!container || typeof SoundFX === "undefined" || typeof SoundFX.renderDownloadList !== "function") return;
+  SoundFX.renderDownloadList(container);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const closeBtn = document.getElementById("effectPreviewCloseBtn");
