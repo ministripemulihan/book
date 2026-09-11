@@ -119,10 +119,24 @@ async function refreshPlanFromRemote(username) {
       try {
         await resyncMediaPlan(remote); // mengisi remote.schedule dari sheet asli, completed dicocokkan per-index
       } catch (e) {
-        // offline / sheet Bacaan Bersuara ini sedang tidak bisa diakses --
-        // biarkan schedule kosong dulu, tetap simpan progres centangnya
-        // (completed) supaya tidak hilang; nanti otomatis lengkap lagi
-        // begitu panel dibuka saat online.
+        // PENTING (diperbaiki) -- offline / sheet Bacaan Bersuara ini
+        // sedang tidak bisa diakses (mis. jaringan HP putus sesaat,
+        // Publish-to-web belum aktif, dsb). SEBELUMNYA di titik ini kode
+        // tetap lanjut menyimpan `remote` apa adanya (schedule KOSONG) ke
+        // localStorage di bawah -- kalau device ini KEBETULAN sudah
+        // punya schedule lengkap untuk plan yang SAMA (dari sesi
+        // sebelumnya / baru saja dibuat), itu akan TERTIMPA jadi kosong,
+        // dan panel Rencana Baca jadi tampil hanya judul + progres tanpa
+        // daftar hari sama sekali (harus bikin rencana baru untuk
+        // "memperbaikinya" -- padahal datanya sebenarnya tidak hilang).
+        // Sekarang: kalau device ini sudah punya schedule lokal yang
+        // lengkap untuk planId yang sama, PERTAHANKAN itu, jangan ditimpa
+        // versi kosong dari server. `updatedAt` tetap dipakai dari
+        // remote supaya progres centang (completed) dari device lain
+        // tetap ikut masuk.
+        if (local && local.planId === remote.planId && local.schedule && local.schedule.length) {
+          remote.schedule = local.schedule;
+        }
       }
     }
     localStorage.setItem(planStorageKey(username), JSON.stringify(remote));
