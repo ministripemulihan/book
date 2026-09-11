@@ -6208,7 +6208,13 @@ const PresentationStudio = (() => {
           btn.textContent = "🔊 " + (item.nama || "Efek");
           btn.title = "Efek suara kontribusi (Pustaka Media)" + (item.diuploadOleh ? " -- diunggah " + item.diuploadOleh : "");
           btn.dataset.sound = "ml:" + item.id;
-          btn.dataset.soundSrc = item.link;
+          // PERBAIKAN (12 Sep 2026) -- item.link ditebak/diubah dulu
+          // lewat MediaLibrary.resolvePlayableUrl() (link Drive "share"
+          // biasa -> bentuk unduhan langsung) SEBELUM dikirim ke Layar 2,
+          // supaya efek suara kontribusi dari Google Drive benar-benar
+          // BERSUARA di sana, bukan cuma diam (lihat komentar lengkap di
+          // js/media-library.js, playItem_() & resolvePlayableUrl_()).
+          btn.dataset.soundSrc = (typeof MediaLibrary !== "undefined" && MediaLibrary.resolvePlayableUrl) ? MediaLibrary.resolvePlayableUrl(item.link) : item.link;
           grid.appendChild(btn);
         });
       } catch (err) {
@@ -9372,7 +9378,7 @@ const PresentationStudio = (() => {
 
   // ------------------------------------------------------------
   // Deteksi ukuran layar (khusus laptop/komputer) + gate mode tamu
-  // ------------------------------------------------------------ 
+  // ------------------------------------------------------------
   function refreshDeviceGate() {
     const desktop = isDesktop();
     const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
