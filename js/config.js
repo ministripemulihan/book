@@ -100,6 +100,37 @@ const CONFIG = {
   AI_CHAT_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
 
   // ----------------------------------------------------------
+  // 3c-2) PUSTAKA MEDIA (Efek Suara + YouTube/link luar + referensi
+  // Kidung) — Google Apps Script BARU & TERPISAH lagi (lihat
+  // "RENCANA-PUSTAKA-MEDIA-FAVORIT.md" & "apps-script/MediaLibraryCode.gs")
+  // ----------------------------------------------------------
+  // Kosongkan untuk mematikan menu "🎵 Pustaka Media" (menggantikan
+  // js/effectpreview.js & tab "Playlist Video" lama di Studio Presentasi).
+  MEDIA_LIBRARY_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx3CHI1_akP3M5ImcNFKRh6cfA6rcD95qilPz3_aQQ9CcAVao07sgQRyftnIOtXVno3/exec",
+  // Sheet baru: https://docs.google.com/spreadsheets/d/13p5RpQwY3I9rXDBEQ4DQ1EXw4XJvQ-Z2bDYuOZ473I0/edit?gid=0
+  // Sheet YouTube LAMA (sumber migrasi manual, TIDAK dihapus): https://docs.google.com/spreadsheets/d/1UdMQ3JZkeXr8KYwVNW8cmipp0B9oH2FYLwudTFxqR0g/edit?gid=0
+
+  // Level yang boleh MENAMBAH item baru (YouTube, Efek Suara, atau
+  // referensi media Kidung) DAN yang boleh melihat/mendengar tab
+  // "🔊 Efek Suara" & "🎆 Efek Visual". Tab "🎬 YouTube"/Kidung TIDAK
+  // dibatasi daftar ini -- selalu terbuka untuk SEMUA orang yang login
+  // (lihat bagian 3a dokumen rencana).
+  MEDIA_LIBRARY_ADD_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
+  MEDIA_LIBRARY_SOUND_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
+
+  // Pilihan "sumber" untuk item jenis "youtube" (sekarang bisa juga
+  // bukan YouTube -- lihat bagian 4b dokumen rencana, sambungan Kidung
+  // ke referensi media multi-sumber).
+  MEDIA_LIBRARY_SOURCES: [
+    { key: "youtube", label: "YouTube", emoji: "🎬" },
+    { key: "soundcloud", label: "SoundCloud", emoji: "☁️" },
+    { key: "mp3", label: "File MP3 (link)", emoji: "🎵" },
+    { key: "google_drive", label: "Google Drive", emoji: "📁" },
+    { key: "suno", label: "Suno", emoji: "🎼" },
+    { key: "lainnya", label: "Lainnya", emoji: "🔗" },
+  ],
+
+  // ----------------------------------------------------------
   // 3d) VERIFIKASI BAHASA AYAT — alat bantu ADMIN (lihat js/langcheck.js)
   // ----------------------------------------------------------
   // Memindai SEMUA ayat yang tersimpan lokal untuk mendeteksi baris yang
