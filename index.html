@@ -202,21 +202,21 @@
                Tambah efek baru di js/soundfx.js = otomatis muncul di
                sini juga, tidak perlu edit file ini. -->
           <div class="effect-preview-grid" id="effectPreviewSoundGrid"></div>
-          <div class="effect-preview-section">
-  <h3>💾 Unduh Efek Suara ke HP Ini</h3>
-  <p class="effect-preview-hint">Sudah dengar-dengar di atas dan cocok? Unduh semua efek suara lokal di sini juga, tanpa pindah menu.</p>
-  <div class="soundfx-dl-card" id="epvSoundFxDlCard">
-    <div class="soundfx-dl-status-row">
-      <span class="soundfx-dl-icon" id="epvSoundFxDlIcon">🎧</span>
-      <span class="soundfx-dl-text" id="epvSoundFxDlStatusText">Memeriksa status unduhan…</span>
-    </div>
-    <div class="progress-track" id="epvSoundFxDlProgressTrack" hidden><div id="epvSoundFxDlProgressFill" class="progress-fill"></div></div>
-    <div class="soundfx-dl-btn-row">
-      <button type="button" id="epvSoundFxDlBtn" class="chip-btn primary small">📥 Unduh Semua Efek Suara</button>
-    </div>
-  </div>
-</div>
-        
+        </div>
+
+        <!-- BARU (tambahan, permintaan operator: "tidak mau cara
+             downloadnya kalau semua jadi 1, tetapi bisa satu-satu, dan
+             otomatis bertambah kalau soundfx.js bertambah"). Daftar di
+             bawah ini dibangun oleh SoundFX.renderDownloadList() di
+             js/effectpreview.js DARI js/soundfx.js -> SOUND_FX_LIST
+             langsung -- SATU baris tombol unduh per efek yang punya
+             file (baik lokal assets/sounds/... maupun link Google
+             Drive), otomatis bertambah tanpa edit apa pun di sini
+             kalau SOUND_FX_LIST bertambah. -->
+        <div class="effect-preview-section">
+          <h3>💾 Unduh Efek Suara (Satu-Satu)</h3>
+          <p class="effect-preview-hint">Sudah dengar-dengar di atas dan cocok? Unduh file MP3-nya satu per satu di sini -- daftar ini otomatis mengikuti isi js/soundfx.js.</p>
+          <div class="soundfx-dl-list" id="effectPreviewDlList"></div>
         </div>
       </div>
     </div>
@@ -3132,9 +3132,9 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
-  <script src="js/soundfx.js?v=20260910d"></script>
+  <script src="js/soundfx.js?v=20260910e"></script>
   <script src="js/presentation-studio.js?v=20260910d"></script>
-  <script src="js/effectpreview.js?v=20260910b"></script>
+  <script src="js/effectpreview.js?v=20260910d"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
   <script src="js/app.js?v=20260910c"></script>
