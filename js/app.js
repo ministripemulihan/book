@@ -554,11 +554,26 @@ async function confirmAndSync(isFirstTime) {
     alert("Tidak ada sambungan internet saat ini. Coba lagi setelah tersambung.");
     return;
   }
+  // PENTING (diperbaiki, 11 Sep 2026, permintaan operator: "tidak boleh
+  // dibedakan untuk masalah notifikasi, harus tetap tampil di HP") --
+  // SEBELUMNYA baris di bawah ini langsung memanggil syncFromServer()
+  // TANPA dialog info ukuran (MB) sama sekali begitu connType terdeteksi
+  // "wifi"/"ethernet" (lihat detectConnectionType() -- Network
+  // Information API). Network Information API ini HANYA didukung
+  // sebagian browser (terutama Chrome/Android) -- jadi di HP Android
+  // yang tersambung WiFi, dialog info ukuran SELALU dilompati (langsung
+  // unduh diam-diam), sedangkan di kebanyakan browser desktop (API ini
+  // tidak didukung -> connType selalu null) dialog info ukuran SELALU
+  // muncul. Akibatnya: sinkron di HP terasa "tidak ada info berapa MB
+  // yang diunduh" dibanding di komputer, padahal kodenya sama -- cuma
+  // API deteksi WiFi ini yang membedakan. Sekarang: dialog info ukuran
+  // SELALU ditampilkan dulu di SEMUA perangkat/browser sebelum sinkron
+  // ulang benar-benar mulai (showBibleSyncPrompt di bawah tetap
+  // menyesuaikan isi teksnya kalau WiFi/ethernet sudah pasti terdeteksi
+  // -- tanpa peringatan kuota seluler -- tapi tombol "Lanjutkan
+  // Sekarang (~xx MB)" tetap selalu ada supaya angka ukurannya konsisten
+  // di HP maupun komputer).
   const connType = detectConnectionType();
-  if (connType === "wifi" || connType === "ethernet") {
-    syncFromServer(isFirstTime);
-    return;
-  }
   await showBibleSyncPrompt({ isFirstTime, connType });
 }
 
@@ -596,9 +611,11 @@ async function showBibleSyncPrompt(opts) {
 
   const title = document.createElement("div");
   title.className = "announcement-big-title";
-  title.textContent = isFirstTime && (connType === "wifi" || connType === "ethernet" || !connType && navigator.onLine)
+  title.textContent = isFirstTime
     ? "📥 Unduh Data Alkitab (Pertama Kali)"
-    : "📶 Belum terdeteksi WiFi";
+    : (connType === "wifi" || connType === "ethernet")
+      ? "🔄 Sinkronkan Ulang Data Alkitab"
+      : "📶 Belum terdeteksi WiFi";
   box.appendChild(title);
 
   const msg = document.createElement("div");
@@ -609,6 +626,15 @@ async function showBibleSyncPrompt(opts) {
       `Setelah selesai, semua bacaan tersimpan di perangkat dan bisa dibuka lagi kapan pun tanpa perlu unduh ulang / tanpa internet — jadi loading panjang di awal ini WAJAR, bukan aplikasi macet. ` +
       `Prosesnya bisa memakan waktu beberapa menit tergantung kecepatan internet.` +
       (connType === "cellular" ? " Perangkat ini sepertinya sedang memakai DATA SELULER — unduhan sebesar ini bisa memakai banyak kuota." : "");
+  } else if (connType === "wifi" || connType === "ethernet") {
+    // BARU -- WiFi/kabel sudah PASTI terdeteksi (dulu kasus ini tidak
+    // pernah sampai ke dialog ini sama sekali, lihat catatan di
+    // confirmAndSync() di atas). Tidak perlu peringatan kuota, tapi
+    // info ukuran (MB) tetap selalu ditampilkan supaya konsisten dengan
+    // browser yang tidak bisa mendeteksi jenis sambungan (kebanyakan
+    // desktop) -- itulah sebab laporan "di HP tidak ada info MB seperti
+    // di komputer".
+    msg.textContent = `Perangkat ini terdeteksi tersambung WiFi/kabel. Data yang akan diunduh ulang sekitar ${dlInfo.label}.`;
   } else {
     // Sinkron ulang, WiFi/kabel tidak/tidak-bisa dipastikan -- SEKARANG
     // ikut menyebutkan perkiraan ukurannya (dlInfo.label, mis. "~62 MB
@@ -620,7 +646,8 @@ async function showBibleSyncPrompt(opts) {
   }
   box.appendChild(msg);
 
-  if (!isFirstTime || connType === "cellular" || !connType) {
+  const isConfirmedWifi = connType === "wifi" || connType === "ethernet";
+  if (isFirstTime || !isConfirmedWifi) {
     const msg2 = document.createElement("div");
     msg2.className = "announcement-big-meta";
     msg2.textContent = isFirstTime
