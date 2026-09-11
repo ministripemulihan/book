@@ -9372,7 +9372,7 @@ const PresentationStudio = (() => {
 
   // ------------------------------------------------------------
   // Deteksi ukuran layar (khusus laptop/komputer) + gate mode tamu
-  // ------------------------------------------------------------
+  // ------------------------------------------------------------ 
   function refreshDeviceGate() {
     const desktop = isDesktop();
     const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
