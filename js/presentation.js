@@ -887,7 +887,7 @@ const Presentation = (() => {
     // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak
     // "Berikutnya"/"Tayang" langsung memakai proporsi yang benar sedari
     // pertama kali Studio dibuka, tanpa menunggu Layar 2 benar-benar
-    // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry".
+    // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry". 
     try {
       const { w, h } = getStoredScreenSize();
       applyPreviewRatio(w, h);
