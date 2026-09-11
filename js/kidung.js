@@ -776,7 +776,7 @@ function buildKidungShareButton(meta, baits) {
 // tombol ini SELALU langsung salin ke clipboard, TIDAK PERNAH membuka
 // kotak share bawaan OS (navigator.share). Alasan ditambahkan terpisah:
 // di HP, tombol "🔗 Bagikan" langsung membuka kotak pilih aplikasi
-// (WhatsApp/dll) begitu ditekan -- kalau operator cuma mau MENGETES/
+// (WhatsApp/dll) begitu ditekan -- kalau operator cuma mau MENGETES/ 
 // memastikan teksnya benar (mis. tempel ke editor/Notes untuk dicek),
 // tidak ada cara mudah melakukannya lewat kotak share itu, jadi terasa
 // seperti "tidak muncul apa-apa". Tombol ini kasih jalan pintas yang
