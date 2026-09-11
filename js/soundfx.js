@@ -615,5 +615,15 @@ const SoundFX = (() => {
     );
   }
 
-  return { LIST: SOUND_FX_LIST, configure, play, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted };
+  // BARU (11 Sep 2026, langkah 4 STATUS-PUSTAKA-MEDIA.md) -- playUrl(src)
+  // memutar file audio dari URL APA SAJA (link mp3/wav/Drive milik
+  // "Efek Suara" kontribusi di Pustaka Media, js/media-library.js),
+  // BUKAN dari SOUND_FX_LIST bawaan. Numpang playAudioFile_() yang
+  // SAMA persis dipakai efek ber-"src" di SOUND_FX_LIST -- otomatis
+  // ikut lewat destination_() (jadi tetap kena sakelar mute "M" Layar
+  // 2) & ikut dicache di audioBufferCache_ seperti efek mp3 bawaan.
+  // Dipanggil dari present.html saat menerima payload
+  // {type:"sound", src:"..."} (lihat wireEffectsTab(),
+  // js/presentation-studio.js, & listener "message" di present.html).
+  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted };
 })();
