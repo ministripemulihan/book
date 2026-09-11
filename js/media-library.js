@@ -375,9 +375,21 @@ const MediaLibrary = (() => {
       thumb.setAttribute("aria-label", "Putar " + (spec.nama || ""));
       thumb.addEventListener("click", () => {
         if (thumb.querySelector("iframe")) { spec.onPlay(); return; } // sudah main -> klik lagi = buka lebih besar
+        // PERBAIKAN (11 Sep 2026, laporan operator "videonya ke-mute") --
+        // `autoplay=1` DIHAPUS dari sini, PERSIS alasan yang sama dengan
+        // openPlayerOverlay_()/playItem_() di bawah (lihat komentar
+        // "PERBAIKAN (12 Sep 2026)" dekat situ): browser (terutama
+        // Safari/HP, tapi Chrome desktop juga bisa) MEMBLOKIR autoplay
+        // video BERSUARA dari iframe YouTube yang disisipkan lewat kode
+        // -- video tetap "jalan" tapi otomatis DIBISUKAN oleh browser,
+        // kelihatan seperti "videonya kemute, tidak keluar suara".
+        // Tanpa `autoplay`, video tampil dengan tombol ▶️ bawaan
+        // YouTube -- begitu operator menekan tombol play ITU SENDIRI
+        // (klik asli DI DALAM iframe YouTube), videonya PASTI keluar
+        // suara (bukan lagi trik autoplay yang dicurigai browser).
         const iframe = document.createElement("iframe");
         iframe.className = "ml-card-inline-frame";
-        iframe.src = `https://www.youtube.com/embed/${ytIdUntukInline_}?playsinline=1&autoplay=1`;
+        iframe.src = `https://www.youtube.com/embed/${ytIdUntukInline_}?playsinline=1`;
         iframe.allow = "autoplay; encrypted-media";
         iframe.allowFullscreen = true;
         iframe.setAttribute("frameborder", "0");
