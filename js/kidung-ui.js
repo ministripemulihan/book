@@ -40,6 +40,14 @@
 // ============================================================
 
 let kidungCurrentBuku = "Kidung";
+// BARU (9 Sep 2026, sesi ke-9) -- status buka/tutup toolbar bawah
+// (.kidung-toolbar) TERAKHIR, diingat lintas render/navigasi (swipe,
+// tombol ◀/▶, panah keyboard) selama sesi ini masih berjalan. Lihat
+// catatan panjang di buildKidungToolbar() untuk kenapa ini dibutuhkan.
+// Bawaan `false` (belum dilipat -- SAMA seperti perilaku sebelum
+// perbaikan ini, supaya tidak ada perubahan tampilan mendadak bagi yang
+// belum pernah menyentuh toolbar ini sama sekali di sesi berjalan).
+let _kidungToolbarCollapsed = false;
 
 // FIX (20 Agu 2026) — bug "Kidung No. 95 tidak ditemukan" di HP padahal
 // di komputer ketemu: data Kidung di IndexedDB tiap perangkat SEBELUMNYA
@@ -1287,9 +1295,108 @@ function kidungSquareLoopToggle(url, titleForSession, label) {
   return btn;
 }
 
+// ------------------------------------------------------------
+// 🔗 REFERENSI MEDIA LAIN (bagian 4b RENCANA-PUSTAKA-MEDIA-FAVORIT.md,
+// langkah 3 STATUS-PUSTAKA-MEDIA.md) -- TAMBAHAN di luar pemutar
+// linkYoutube/linkMp3_1/linkMp3_2/linkVideo/linkMidi yang SUDAH ADA di
+// atas (bukan pengganti). Menampilkan SEMUA baris MediaLibrary
+// (js/media-library.js, apps-script/MediaLibraryCode.gs) yang
+// `kidungRef`-nya cocok dengan kidung yang sedang dibuka -- format
+// PERSIS SAMA dengan kidungFavoriteKey() di bawah (`{buku}|{noKidung}`).
+// Kartu & form tambah dipakai ULANG dari MediaLibrary (renderItemCard/
+// openAddForm) supaya tidak ada kode/tampilan duplikat -- lihat "11)"
+// di js/media-library.js untuk API publik yang dipakai di sini.
+function buildKidungMediaRefSection(meta) {
+  const section = document.createElement("div");
+  section.className = "kidung-media-ref-section";
+
+  // Fitur ini bergantung pada MediaLibrary (js/media-library.js) &
+  // CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL -- kalau salah satu belum ada
+  // (skrip belum dimuat / URL Apps Script belum diisi operator),
+  // sembunyikan bagian ini sama sekali daripada tampil kosong/rusak.
+  if (typeof MediaLibrary === "undefined" || !MediaLibrary.Sync || !MediaLibrary.Sync.enabled()) {
+    section.hidden = true;
+    return section;
+  }
+
+  const kidungRef = kidungFavoriteKey(meta); // {buku}|{noKidung}, sama seperti favorit kidung
+
+  const head = document.createElement("div");
+  head.className = "kidung-media-ref-head";
+  const heading = document.createElement("h4");
+  heading.textContent = "🔗 Referensi Media Lain";
+  head.appendChild(heading);
+  section.appendChild(head);
+
+  // Tombol "➕ Tambah" -- HANYA level MEDIA_LIBRARY_ADD_LEVELS (bagian
+  // 4b: "sama seperti MEDIA_LIBRARY_ADD_LEVELS, bukan level lebih
+  // longgar, supaya konsisten"), sama seperti tab YouTube/Efek Suara di
+  // menu "🎵 Pustaka Media".
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "chip-btn small";
+  addBtn.textContent = "➕ Tambah referensi media";
+  addBtn.hidden = !MediaLibrary.canAddMedia();
+  head.appendChild(addBtn);
+
+  const grid = document.createElement("div");
+  grid.className = "ml-grid kidung-media-ref-grid";
+  section.appendChild(grid);
+
+  function renderGridState_(html) {
+    grid.innerHTML = html;
+  }
+
+  async function reload() {
+    renderGridState_('<p class="ml-loading">Memuat referensi media…</p>');
+    try {
+      const items = await MediaLibrary.Sync.list({ kidungRef });
+      grid.innerHTML = "";
+      if (!items.length) {
+        const p = document.createElement("p");
+        p.className = "ml-empty";
+        p.textContent = "Belum ada referensi media tambahan untuk kidung ini.";
+        grid.appendChild(p);
+        return;
+      }
+      items.forEach((it) => grid.appendChild(MediaLibrary.renderItemCard(it)));
+    } catch (err) {
+      renderGridState_('<p class="ml-error"></p>');
+      grid.querySelector(".ml-error").textContent = "Gagal memuat referensi media: " + (err && err.message ? err.message : String(err));
+    }
+  }
+
+  // `jenis: "youtube"` dipakai sebagai bawaan form (field `sumber`
+  // berupa dropdown, bukan hanya YouTube -- lihat bagian 4b) --
+  // `kidungRef` sudah otomatis terisi sesuai kidung yang sedang dibuka,
+  // `onSaved` (BARU di js/media-library.js) me-refresh daftar kartu di
+  // bagian ini begitu tambah/edit berhasil disimpan.
+  addBtn.addEventListener("click", () => {
+    MediaLibrary.openAddForm({ jenis: "youtube", kidungRef, onSaved: reload });
+  });
+
+  reload();
+  return section;
+}
+
 function buildKidungToolbar(meta, baits, bodyEl) {
   const wrap = document.createElement("div");
-  wrap.className = "kidung-toolbar";
+  // PERBAIKAN (9 Sep 2026, sesi ke-9, laporan operator: "sekarang selalu
+  // modenya garis paling bawah kebuka, padahal sebelumnya ketutup") --
+  // AKAR MASALAH: fungsi ini dipanggil ULANG dari NOL setiap kali pindah
+  // kidung (swipe kiri/kanan, tombol ◀/▶, ATAU panah keyboard -- semua
+  // lewat openKidungReader() -> renderKidungReader() -> fungsi ini),
+  // dan className `wrap` SEBELUMNYA selalu ditulis polos "kidung-toolbar"
+  // tanpa embel-embel apa pun -- jadi toolbar SELALU mulai TERBUKA
+  // (bukan "collapsed") tiap kali, apa pun status sebelum berpindah.
+  // SEKARANG status buka/tutup disimpan di variabel modul
+  // `_kidungToolbarCollapsed` (lihat deklarasi di atas file ini) yang
+  // TIDAK ikut hilang saat elemen toolbar lama dibuang & yang baru
+  // dibuat -- begitu operator menutup/membuka toolbar (lihat
+  // toggleBtn click di bawah), nilainya disimpan di sana, dan
+  // pemanggilan fungsi ini BERIKUTNYA (dari swipe/panah/tombol mana
+  // pun) langsung memakai nilai TERAKHIR itu, bukan selalu "terbuka".
+  wrap.className = "kidung-toolbar" + (_kidungToolbarCollapsed ? " collapsed" : "");
 
   const body = document.createElement("div");
   body.className = "kidung-toolbar-body";
@@ -1439,15 +1546,33 @@ function buildKidungToolbar(meta, baits, bodyEl) {
   grid.appendChild(nextBtn);
   body.appendChild(grid);
 
+  // BARU (11 Sep 2026, langkah 3 STATUS-PUSTAKA-MEDIA.md) -- bagian
+  // "🔗 Referensi Media Lain" (bagian 4b rencana), TAMBAHAN di bawah
+  // grid tombol bawaan di atas (linkYoutube/linkMp3_1 dst TETAP jalan
+  // seperti biasa, tidak diubah). Ikut collapsible bareng toolbar
+  // karena ditaruh di `body` yang sama (disembunyikan/ditampilkan
+  // bareng toggle ^/v di bawah).
+  body.appendChild(buildKidungMediaRefSection(meta));
+
   // ---- Pemicu sembunyikan/tampilkan: garis tipis + ^ / v kecil & transparan ----
   const toggleBtn = document.createElement("button");
   toggleBtn.type = "button";
   toggleBtn.className = "kidung-toolbar-toggle";
-  toggleBtn.innerHTML = '<span class="kidung-toolbar-toggle-arrow">v</span>';
+  // PERBAIKAN (9 Sep 2026, sesi ke-9) -- anak panah awal HARUS ikut
+  // status TERSIMPAN (_kidungToolbarCollapsed), bukan selalu "v" --
+  // supaya anak panahnya juga konsisten dengan wrap.className di atas
+  // begitu toolbar baru ini pertama kali muncul di layar (sebelum
+  // sempat diklik sama sekali).
+  toggleBtn.innerHTML = '<span class="kidung-toolbar-toggle-arrow">' + (_kidungToolbarCollapsed ? "^" : "v") + '</span>';
   toggleBtn.title = "Sembunyikan/tampilkan tombol navigasi, bagikan, & pemutar";
   toggleBtn.setAttribute("aria-label", "Sembunyikan/tampilkan tombol kidung");
   toggleBtn.addEventListener("click", () => {
     const collapsed = wrap.classList.toggle("collapsed");
+    // PERBAIKAN (9 Sep 2026, sesi ke-9) -- simpan status TERBARU ke
+    // variabel modul supaya toolbar BERIKUTNYA (kidung lain yang
+    // dibuka lewat swipe/panah/tombol) ikut status ini, bukan selalu
+    // balik ke "terbuka".
+    _kidungToolbarCollapsed = collapsed;
     toggleBtn.querySelector(".kidung-toolbar-toggle-arrow").textContent = collapsed ? "^" : "v";
   });
   wrap.appendChild(toggleBtn);
