@@ -279,11 +279,23 @@ const CONFIG = {
   // ----------------------------------------------------------
   // Sheet TERPISAH dari sheet Alkitab utama — isinya bukan teks ayat,
   // tapi daftar rentang bacaan + link (kolom: No/Nomor | Pembacaan |
-  // Link MP3 | Link MP4 | Youtube). Publikasikan tiap TAB sheet ke web
-  // sebagai CSV (sama caranya seperti sheet Alkitab di atas — tiap tab
-  // menghasilkan URL berbeda), lalu tempel URL-nya di bawah ini.
-  // Kosongkan csvUrl ("") kalau salah satu belum ada / belum ingin dipakai
-  // — sheet itu otomatis disembunyikan dari menu, aplikasi tidak error.
+  // Link MP3 | Link MP4 | Youtube).
+  //
+  // PENTING (diperbaiki 11 Sep 2026) -- data ini SEKARANG diutamakan
+  // diambil LANGSUNG dari spreadsheet-nya lewat Apps Script (lihat
+  // READING_MEDIA_SHEET_ID/READING_MEDIA_TABS & readReadingMediaRows_()
+  // di apps-script/Code.gs), BUKAN lagi lewat "Publish to Web" CSV --
+  // supaya selalu data TERBARU (tidak ada delay/snapshot Google, dan
+  // tidak basi kalau publikasinya sempat dihentikan/diterbitkan ulang).
+  // `key` di bawah HARUS SAMA PERSIS dengan key di READING_MEDIA_TABS
+  // (apps-script/Code.gs) supaya Apps Script tahu tab mana yang mau
+  // dibaca -- kalau menambah sheet BARU di sini, tambahkan juga
+  // pemetaannya di READING_MEDIA_TABS.
+  // `csvUrl` di bawah TETAP DIPERTAHANKAN sebagai CADANGAN (fallback)
+  // best-effort saja -- hanya dipakai kalau CONFIG.APPS_SCRIPT_URL
+  // belum diisi atau Apps Script sedang gagal diakses. Boleh dikosongkan
+  // ("") kalau tidak mau menyiapkan cadangan CSV sama sekali, TIDAK
+  // memengaruhi jalur utama (Apps Script) di atas.
   READING_MEDIA_SHEETS: [
     {
       key: "pl_ind",
