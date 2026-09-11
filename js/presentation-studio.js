@@ -4854,7 +4854,7 @@ const PresentationStudio = (() => {
       { key: "injil", label: "Injil" },
       { key: "bebas", label: "Bebas" },
     ];
-    let allVideos = []; // [{ title, channel, url, videoId, embedUrl, cats:{anak,remaja,...} }]
+    let allVideos = []; // [{ title, channel, url, videoId, embedUrl, categories:["Anak","PPKMA",...] }]
     let activeFilter = "all";
 
     urlInput.value = localStorage.getItem(SHEET_KEY) || DEFAULT_SHEET_URL;
@@ -4920,11 +4920,25 @@ const PresentationStudio = (() => {
     // dengan 1 kolom `kategori` teks dipisah koma (skema MediaLibrary
     // baru, js/media-library.js) -- dicocokkan TANPA peduli besar/kecil
     // huruf supaya "Anak"/"anak" dst tetap kena filter tab yang sama.
-    function catsFromKategoriString_(kategoriStr) {
-      const parts = String(kategoriStr || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-      const cats = {};
-      CATS.forEach((c) => { cats[c.key] = parts.indexOf(c.key) !== -1; });
-      return cats;
+    //
+    // DIPERBARUI (11 Sep 2026, permintaan operator: "supaya kategori
+    // yang saya ubah/tambah di Sheet ikut muncul sebagai tombol filter
+    // di Studio, bukan cuma 6 yang tetap") -- dulu fungsi ini mengubah
+    // kolom "Kategori" jadi objek {anak:bool, remaja:bool, ...} yang
+    // HANYA mengenali 6 kunci baku di CATS (kategori lain, mis. isi
+    // Sheet operator sendiri seperti "PPKMA", diam-diam DIBUANG --
+    // videonya tetap kelihatan di tab "Semua" tapi tidak akan pernah
+    // kena filter APA PUN karena tidak ada tombolnya). Sekarang kategori
+    // APA ADANYA dari Sheet disimpan sebagai daftar teks mentah
+    // (`categories`, lihat pemakaiannya di mapMediaLibraryItemsToVideos_/
+    // parseSheetCsv di bawah) -- tombol filter sendiri dibangun OTOMATIS
+    // dari kumpulan semua kategori yang benar-benar ada di video yang
+    // termuat (lihat computeKnownCategories_()/renderFilters() di bawah),
+    // jadi kategori baru yang operator ketik di Sheet langsung dapat
+    // tombolnya sendiri begitu "🔄 Muat Ulang" ditekan -- TIDAK PERLU
+    // ubah kode lagi tiap kali kategori baru ditambah.
+    function splitKategoriRaw_(kategoriStr) {
+      return String(kategoriStr || "").split(",").map((s) => s.trim()).filter(Boolean);
     }
 
     // Memetakan hasil `MediaLibrary.Sync.list({jenis:"youtube"})` (item
@@ -4950,7 +4964,7 @@ const PresentationStudio = (() => {
           channel: item.channel || "",
           url: item.link, videoId: id,
           embedUrl: buildYoutubeEmbedUrl(id),
-          cats: catsFromKategoriString_(item.kategori),
+          categories: splitKategoriRaw_(item.kategori),
           durationMinutes: item.durasiDetik ? Number(item.durasiDetik) / 60 : null,
           uploadDate: item.tanggalAsli ? parseUploadDate(item.tanggalAsli) : null,
         });
@@ -4962,7 +4976,7 @@ const PresentationStudio = (() => {
     // (DEFAULT_SHEET_URL di atas) sekarang berskema BARU (sama dengan
     // apps-script/MediaLibraryCode.gs, dibaca lewat kolom "Kategori" 1
     // teks dipisah koma & "DurasiDetik" dalam DETIK -- lihat
-    // catsFromKategoriString_()/mapMediaLibraryItemsToVideos_() di atas
+    // splitKategoriRaw_()/mapMediaLibraryItemsToVideos_() di atas
     // yang dipakai jalur Pustaka Media), BUKAN lagi 6 kolom checkbox
     // terpisah Anak/Remaja/.../Bebas + "Durasi" dalam MENIT seperti Sheet
     // LAMA. Fungsi ini sekarang MENDETEKSI OTOMATIS skema mana yang
@@ -4995,20 +5009,19 @@ const PresentationStudio = (() => {
         // ada di skema BARU -- dipakai sebagai penanda skema mana yang
         // sedang dibaca.
         const pakaiSkemaBaru = rec.kategori !== undefined;
-        const cats = pakaiSkemaBaru
-          ? catsFromKategoriString_(rec.kategori)
-          : (() => {
-              const c = {};
-              CATS.forEach((cc) => { c[cc.key] = truthy(rec[cc.key] || rec[cc.label.toLowerCase()]); });
-              return c;
-            })();
+        const categories = pakaiSkemaBaru
+          ? splitKategoriRaw_(rec.kategori)
+          // Skema LAMA (6 kolom checkbox terpisah) -- diubah jadi daftar
+          // label yang sama seperti dulu (Anak/Remaja/.../Bebas) supaya
+          // tombol filter otomatis tetap kebentuk untuk video lama ini.
+          : CATS.filter((cc) => truthy(rec[cc.key] || rec[cc.label.toLowerCase()])).map((cc) => cc.label);
 
         out.push({
           title: (rec.nama || rec.title || rec.judul || "").trim() || id,
           channel: (rec.channel || rec["channel name"] || rec.saluran || "").trim(),
           url, videoId: id,
           embedUrl: buildYoutubeEmbedUrl(id),
-          cats,
+          categories,
           // BARU (4 Sep 2026, disesuaikan 11 Sep 2026 utk skema baru) --
           // skema baru simpan "DurasiDetik" dalam DETIK (kolom
           // "durasidetik" huruf kecil), skema lama pakai "Durasi" dalam
@@ -5062,7 +5075,9 @@ const PresentationStudio = (() => {
     }
 
     function filteredVideos() {
-      let list = activeFilter === "all" ? allVideos : allVideos.filter((v) => v.cats[activeFilter]);
+      let list = activeFilter === "all"
+        ? allVideos
+        : allVideos.filter((v) => (v.categories || []).some((c) => c.trim().toLowerCase() === activeFilter));
       const q = searchQuery.trim().toLowerCase();
       // PERBAIKAN (4 Sep 2026 v2, permintaan operator) -- pencarian
       // SEKARANG ikut mencocokkan NAMA CHANNEL juga, tidak cuma judul
@@ -5072,8 +5087,53 @@ const PresentationStudio = (() => {
       return sortVideos(list);
     }
 
+    // BARU (11 Sep 2026, permintaan operator) -- kumpulkan SEMUA
+    // kategori yang benar-benar dipakai video yang termuat sekarang
+    // (huruf kecil = kunci filter/pembanding, versi apa adanya = label
+    // tombol yang ditampilkan -- diambil dari kemunculan PERTAMA supaya
+    // "Anak"/"anak" campur tidak jadi 2 tombol beda). Dipanggil ulang
+    // tiap kali allVideos berubah (lihat renderFilters() di bawah &
+    // pemanggilnya di loadFromMediaLibrary()/loadSheet()).
+    function computeKnownCategories_() {
+      const seen = new Map();
+      allVideos.forEach((v) => {
+        (v.categories || []).forEach((raw) => {
+          const label = String(raw || "").trim();
+          if (!label) return;
+          const key = label.toLowerCase();
+          if (!seen.has(key)) seen.set(key, label);
+        });
+      });
+      return Array.from(seen.entries())
+        .map(([key, label]) => ({ key, label }))
+        .sort((a, b) => a.label.localeCompare(b.label, "id", { sensitivity: "base" }));
+    }
+
+    // DIPERBARUI (11 Sep 2026, permintaan operator: "kategori yang saya
+    // ubah di Sheet supaya ikut muncul sebagai tombol di Studio") --
+    // dulu tombol filter 100% statis dari HTML (6 tombol tetap:
+    // Anak/Remaja/Pemuda/SPR/Injil/Bebas). Sekarang, selain tombol
+    // "Semua" yang tetap ada, SEMUA tombol lain DIBANGUN ULANG tiap
+    // renderFilters() dipanggil, mengikuti computeKnownCategories_() di
+    // atas -- jadi kategori apa pun yang operator ketik/ubah di kolom
+    // Kategori Sheet langsung dapat tombolnya sendiri begitu video
+    // termuat, TANPA perlu ubah kode/HTML lagi.
     function renderFilters() {
       if (!filterWrap) return;
+      filterWrap.querySelectorAll("[data-filter]:not([data-filter='all'])").forEach((btn) => btn.remove());
+      computeKnownCategories_().forEach((c) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip-btn small";
+        btn.dataset.filter = c.key;
+        btn.textContent = c.label;
+        btn.addEventListener("click", () => {
+          activeFilter = c.key;
+          renderFilters();
+          renderList();
+        });
+        filterWrap.appendChild(btn);
+      });
       filterWrap.querySelectorAll("[data-filter]").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.filter === activeFilter);
       });
@@ -5089,8 +5149,8 @@ const PresentationStudio = (() => {
       videos.forEach((v, i) => {
         const row = document.createElement("div");
         row.className = "ps-yt-playlist-row";
-        const tagsHtml = CATS.filter((c) => v.cats[c.key])
-          .map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c.label)}</span>`).join("");
+        const tagsHtml = (v.categories || [])
+          .map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c)}</span>`).join("");
         row.innerHTML = `
           <img class="ps-yt-playlist-thumb" src="https://i.ytimg.com/vi/${escapeHtml(v.videoId)}/mqdefault.jpg" alt="" loading="lazy" />
           <div class="ps-yt-playlist-info">
@@ -5190,6 +5250,7 @@ const PresentationStudio = (() => {
         const items = await MediaLibrary.Sync.list({ jenis: "youtube" });
         allVideos = mapMediaLibraryItemsToVideos_(items).reverse();
         if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat dari Pustaka Media (terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
+        renderFilters(); // BARU (11 Sep 2026) -- tombol kategori ikut kategori Sheet terbaru
         renderList();
       } catch (err) {
         if (statusEl) statusEl.textContent = "❌ Gagal memuat dari Pustaka Media: " + (err && err.message ? err.message : String(err));
@@ -5216,6 +5277,7 @@ const PresentationStudio = (() => {
       try {
         allVideos = await fetchAndParse(url);
         if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat (terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
+        renderFilters();
         renderList();
       } catch (e) {
         // Link utama gagal -- coba link cadangan sebelum benar-benar
@@ -5226,6 +5288,7 @@ const PresentationStudio = (() => {
           try {
             allVideos = await fetchAndParse(FALLBACK_SHEET_URL);
             if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat lewat link cadangan (link utama gagal dimuat -- terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
+            renderFilters();
             renderList();
             return;
           } catch (e2) { /* cadangan juga gagal -- lanjut tampilkan pesan gagal di bawah */ }
@@ -5239,7 +5302,11 @@ const PresentationStudio = (() => {
       loadSheet();
     });
     if (reloadBtn) reloadBtn.addEventListener("click", loadSheet);
-    if (filterWrap) filterWrap.querySelectorAll("[data-filter]").forEach((btn) => {
+    // DIPERBARUI (11 Sep 2026) -- tombol kategori (selain "Semua") SEKARANG
+    // dibangun & dipasangi listener-nya sendiri di renderFilters() (lihat
+    // komentar di sana), jadi di sini tinggal pasang untuk tombol "Semua"
+    // saja yang tetap statis dari HTML.
+    if (filterWrap) filterWrap.querySelectorAll("[data-filter='all']").forEach((btn) => {
       btn.addEventListener("click", () => {
         activeFilter = btn.dataset.filter;
         renderFilters();
