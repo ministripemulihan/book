@@ -211,9 +211,46 @@ const PresentationStudio = (() => {
   // TIDAK membuka jendela baru / merebut fokus berkali-kali.
   function rawPost(payload) {
     if (typeof Presentation === "undefined" || !Presentation.postRaw) return;
+    // BARU (12 Sep 2026, permintaan operator "3 model ukuran gambar/PDF
+    // ... saat di klik next zoomnya tetap di posisi itu") -- disadap DI
+    // SATU TEMPAT ini (persis pola syncMonitorVideoForPayload_ di bawah)
+    // supaya SEMUA jalur yang mengirim {type:"slide", imageUrl} (tab
+    // File, Media Tersimpan, Kumpulan Ayat, ◀ ▶ ganti halaman, dst --
+    // ada beberapa titik berbeda di file ini) otomatis ikut membawa
+    // pengaturan tampilan yang SEDANG dipilih operator (lihat
+    // getSlideDisplayMode_() & panel "🎨 Tampilan"), TANPA perlu
+    // menyisipkan kode serupa di tiap titik itu satu per satu -- dan
+    // karena pengaturannya dibaca ulang setiap kali (bukan disimpan di
+    // payload sekali saja), otomatis tetap "nempel" ke posisi/mode yang
+    // sama waktu operator pindah ◀ ▶ ke halaman berikutnya.
+    if (payload && payload.type === "slide" && !payload.displayMode) {
+      const mode = getSlideDisplayMode_();
+      payload.displayMode = mode.displayMode;
+      payload.zoomPct = mode.zoomPct;
+    }
     Presentation.postRaw(payload);
     syncMonitorVideoForPayload_(payload); // BARU (10 Sep 2026, lanjutan) -- lihat catatan di fungsi ini
   }
+
+  // BARU (12 Sep 2026) -- pengaturan "🎨 Tampilan" -> "Ukuran Gambar/PDF
+  // (Layar 2)": tersimpan per perangkat (localStorage), dibaca ulang di
+  // rawPost() di atas tiap kali ada slide dikirim. `displayMode`: salah
+  // satu dari "original" (bawaan), "fitwidth", "zoom". `zoomPct`: 100-400,
+  // hanya dipakai kalau displayMode==="zoom".
+  const SLIDE_DISPLAY_MODE_KEY = "ps_slide_display_mode_v1";
+  const SLIDE_ZOOM_PCT_KEY = "ps_slide_zoom_pct_v1";
+  function getSlideDisplayMode_() {
+    const displayMode = localStorage.getItem(SLIDE_DISPLAY_MODE_KEY) || "original";
+    const zoomPct = parseInt(localStorage.getItem(SLIDE_ZOOM_PCT_KEY), 10) || 150;
+    return { displayMode, zoomPct };
+  }
+  function setSlideDisplayMode_(mode) {
+    localStorage.setItem(SLIDE_DISPLAY_MODE_KEY, mode);
+  }
+  function setSlideZoomPct_(pct) {
+    localStorage.setItem(SLIDE_ZOOM_PCT_KEY, String(pct));
+  }
+  window.getSlideDisplayMode_ = getSlideDisplayMode_; // dipakai wireSlideDisplayModeControls_() di bawah
 
   // BARU (10 Sep 2026, lanjutan permintaan operator) -- "Monitor
   // Pembicara" (Monitor 3, monitor.html) sekarang juga bisa menampilkan
@@ -1544,7 +1581,18 @@ const PresentationStudio = (() => {
       // bertumpuk (bukan YouTube -- video sudah punya sub-daftar judul
       // sendiri di bawah, lihat videoLabels di bawah).
       const showGrid = multi && !isYt;
-      row.innerHTML = `<span class="ps-file-name">${isYt ? "▶️ " : ""}${item.driveFileId ? "☁️ " : ""}${item.publicUrl ? "🔓 " : ""}${escapeHtml(item.name)}</span>
+      // BARU (12 Sep 2026, permintaan operator "saat di upload masuk ke
+      // media tersimpan bisa kelihatan gambarnya") -- thumbnail kecil
+      // (halaman pertama) ditampilkan LANGSUNG di baris daftar untuk
+      // item gambar/PDF (bukan YouTube -- video sudah punya ikon ▶️
+      // sendiri), TIDAK perlu menekan "🔳" dulu (tombol itu tetap ada,
+      // untuk melihat SEMUA halaman sekaligus kalau berkasnya
+      // bertumpuk). `images[0]` selalu berupa data-URL/link gambar
+      // (hasil konversi pdfFileToImages()/gambar langsung), aman dipakai
+      // langsung sebagai src <img> baik utk item lokal maupun yang
+      // sudah diunduh dari Drive.
+      const thumbHtml = (!isYt && images[0]) ? `<img src="${images[0]}" class="ps-file-thumb" alt="" loading="lazy" />` : "";
+      row.innerHTML = `${thumbHtml}<span class="ps-file-name">${isYt ? "▶️ " : ""}${item.driveFileId ? "☁️ " : ""}${item.publicUrl ? "🔓 " : ""}${escapeHtml(item.name)}</span>
         <span class="ps-file-actions">
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button>` : ""}
           ${showGrid ? `<button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
@@ -1836,14 +1884,46 @@ const PresentationStudio = (() => {
       });
     }
     if (el("psAnnInsertBtn")) {
-      el("psAnnInsertBtn").addEventListener("click", () => {
+      el("psAnnInsertBtn").addEventListener("click", async () => {
         const title = (el("psAnnTitle") && el("psAnnTitle").value.trim()) || "";
         const body = (el("psAnnBody") && el("psAnnBody").value.trim()) || "";
         if (!title && !body) return;
         const full = title ? `${title}\n\n${body}` : body;
-        // Memakai penyimpanan "Tulisan Bebas" bawaan (js/presentation.js)
-        // supaya pengumuman ini otomatis masuk daftar tersimpan / Kumpulan
-        // Ayat sederhana yang bisa dikirim ulang kapan saja.
+        // PERBAIKAN (12 Sep 2026, laporan operator: "klik ke kumpulan ayat,
+        // ternyata tidak tersimpan") -- tombol ini BERTULISKAN "Sisipkan ke
+        // Kumpulan Ayat" tapi SEBELUMNYA cuma menyimpan ke daftar "Tulisan
+        // Bebas" terpisah (SAVED_KEY di js/presentation.js, localStorage
+        // per perangkat, TIDAK tersinkron & TIDAK muncul di tab "📚
+        // Kumpulan Ayat" sama sekali) -- itu sebabnya operator tidak
+        // menemukannya lagi di sana. SEKARANG ditambahkan LANGSUNG ke
+        // kumpulan yang sedang dipilih di dropdown #psCollectionSelect
+        // (persis pola addColBtn tab File, lihat sekitar baris 3880) lewat
+        // addAnnouncementToCollection() (js/collections.js) -- item masuk
+        // sebagai type \"announcement\" beneran (judul & isi terpisah,
+        // ditampilkan tebal di Layar 2 saat dikirim ulang), otomatis ikut
+        // tersinkron ke akun operator. Kalau belum ada kumpulan yang
+        // dipilih, operator diminta nama kumpulan dulu (promptCollectionName,
+        // sama seperti tombol "➕ Kumpulan" di tab lain).
+        if (typeof addAnnouncementToCollection === "function") {
+          const username = typeof currentUser !== "undefined" ? currentUser : null;
+          const sel = el("psCollectionSelect");
+          const colName = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+            ? loadCollections(username)[sel.value].name
+            : await promptCollectionName(username);
+          if (colName) {
+            addAnnouncementToCollection(username, colName, body, title);
+            if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+            const btn = el("psAnnInsertBtn");
+            if (btn) {
+              const original = btn.textContent;
+              btn.textContent = "✅ Tersimpan ke Kumpulan Ayat";
+              setTimeout(() => { btn.textContent = original; }, 1200);
+            }
+          }
+        }
+        // Tetap juga disimpan ke daftar "Tulisan Bebas" lama (dipakai di
+        // panel ⋮ sederhana/HP, lihat js/presentation.js) -- supaya alur
+        // lama yang sudah terbiasa dipakai operator tidak hilang.
         if (el("presentFreeText")) el("presentFreeText").value = full;
         if (el("presentSaveFreeTextBtn")) el("presentSaveFreeTextBtn").click();
         // BARU (7 Sep 2026) -- ikut kirim rata teks yang sedang dipilih
@@ -4783,6 +4863,12 @@ const PresentationStudio = (() => {
     // banyak video, persis pola PDF multi-halaman: kumpulkan dulu semua
     // embed-URL, baru addMediaItem() sekali di akhir.
     let queue = []; // [{ id, videoId, embedUrl, title, author, durationLabel, label }]
+    // BARU (12 Sep 2026, laporan operator "youtube latar belakang tidak
+    // bisa disimpan") -- link latar yang PALING BARU mulai diputar
+    // (bukan queue) -- dibaca psYtBgSaveBtn di bawah supaya bisa
+    // disimpan LANGSUNG ke Media Tersimpan tanpa perlu tempel ulang
+    // link/tanpa lewat "➕ Tambah ke Daftar" dulu.
+    let lastBgTrack_ = null; // { embedUrl, videoId, title }
 
     function labelFor(entry) {
       const parts = [entry.title || entry.videoId];
@@ -4836,6 +4922,11 @@ const PresentationStudio = (() => {
         // (tidak ada konsep "pratinjau" untuk audio latar).
         rawPost({ type: "yt_bg", embedUrl });
         setYtBgStatus(`🎧 Latar: ${id} (tekan ▶ Play di bawah untuk mulai)`);
+        lastBgTrack_ = { embedUrl, videoId: id, title: null };
+        // Judul otomatis (kalau sempat termuat) supaya nama simpanan
+        // tidak cuma berupa id video mentah -- lihat psYtBgSaveBtn di
+        // bawah.
+        fetchYoutubeTitleAuthor(id).then((meta) => { if (meta) lastBgTrack_ && (lastBgTrack_.title = meta.title); });
         return;
       }
       // PERBAIKAN (4 Sep 2026, permintaan operator) -- "▶️ Tampilkan"
@@ -4925,7 +5016,26 @@ const PresentationStudio = (() => {
     window.playAsYtBackground = function playAsYtBackground(embedUrl, label) {
       rawPost({ type: "yt_bg", embedUrl });
       setYtBgStatus(`🎧 Latar: ${label || "video"} (tekan ▶ Play di bawah untuk mulai)`);
+      lastBgTrack_ = { embedUrl, videoId: null, title: label || null };
     };
+    // BARU (12 Sep 2026) -- lihat catatan panjang di label tombol
+    // (index.html, #psYtBgSaveBtn) untuk penjelasan akar masalahnya.
+    if (el("psYtBgSaveBtn")) el("psYtBgSaveBtn").addEventListener("click", async () => {
+      const btn = el("psYtBgSaveBtn");
+      if (!lastBgTrack_ || !lastBgTrack_.embedUrl) { alert("Belum ada audio latar yang pernah diputar di perangkat ini -- tempel link & tekan \"▶️ Tampilkan\" (dengan \"Latar suara saja\" dicentang) dulu, atau pilih dari dropdown \"Pilih dari video yang sudah tersimpan\" di bawah."); return; }
+      if (typeof addMediaItem !== "function") return;
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const defaultName = lastBgTrack_.title || lastBgTrack_.videoId || "Video Latar";
+      const name = await promptSaveName("media", username, defaultName);
+      if (name === null) return; // dibatalkan
+      const labels = [{ title: lastBgTrack_.title || lastBgTrack_.videoId || defaultName, durationLabel: "" }];
+      const id = await addMediaItem(username, name, [lastBgTrack_.embedUrl], name, "youtube", labels);
+      if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh?)."); return; }
+      renderMediaList();
+      const original = btn.textContent;
+      btn.textContent = "✅ Tersimpan";
+      setTimeout(() => { btn.textContent = original; }, 1200);
+    });
 
     if (addBtn) addBtn.addEventListener("click", () => {
       const id = extractYoutubeId(input.value);
@@ -6671,8 +6781,27 @@ const PresentationStudio = (() => {
     // efek lain di atas -- payload TERPISAH ("shout", bukan "effect")
     // supaya tidak tercampur alur emoji/confetti yang generiknya beda
     // (lihat playShout_() di present.html).
+    // BARU (12 Sep 2026, permintaan operator "bisa ganti warna") --
+    // warna terpilih (bawaan "yellow", SAMA seperti sebelum ada
+    // pilihan warna sama sekali) disimpan per perangkat & disorot di
+    // #psShoutColorRow supaya operator ingat pilihan terakhir.
+    const SHOUT_COLOR_KEY = "ps_shout_color_v1";
+    let shoutColor_ = localStorage.getItem(SHOUT_COLOR_KEY) || "yellow";
+    function markActiveShoutColor_() {
+      document.querySelectorAll("[data-shout-color]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.shoutColor === shoutColor_);
+      });
+    }
+    document.querySelectorAll("[data-shout-color]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        shoutColor_ = btn.dataset.shoutColor;
+        localStorage.setItem(SHOUT_COLOR_KEY, shoutColor_);
+        markActiveShoutColor_();
+      });
+    });
+    markActiveShoutColor_();
     document.querySelectorAll("[data-shout]").forEach((btn) => {
-      btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.shout }));
+      btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.shout, color: shoutColor_ }));
     });
     // BARU (9 Sep 2026, sesi ke-9, permintaan operator "break time,
     // lonceng, sebagai pintasan cepat offline") -- 2 tombol yang TIDAK
@@ -6775,28 +6904,55 @@ const PresentationStudio = (() => {
   // panjang di wireWheelTab() di atas untuk alasan pola ini (Studio
   // yang menentukan pemenang lebih dulu, Layar 2 cuma menganimasikannya).
   let wheelPendingSpin_ = null;
+  // PERBAIKAN (12 Sep 2026, laporan operator: "saat di check list buang
+  // pemenang, saat di putar, langsung tidak sampai 1 detik hilang
+  // namanya") -- akar masalahnya: begitu Layar 2 selesai menganimasikan
+  // & melapor balik (present_wheel_result), fungsi ini LANGSUNG (tanpa
+  // jeda sama sekali) membuang nama pemenang dari daftar & mengirim
+  // ULANG {type:"wheel", action:"show", ...} ke Layar 2 -- showWheel()
+  // di present.html MENGOSONGKAN #wheelWinnerBanner tiap kali menerima
+  // "show" (supaya bersih untuk putaran berikutnya), jadi nama pemenang
+  // yang BARU SAJA muncul langsung tertimpa hilang dalam hitungan
+  // milidetik, sebelum penonton sempat membacanya. SEKARANG: bagian
+  // "buang pemenang" ini ditunda WHEEL_WINNER_HOLD_MS (2.5 detik) --
+  // nama pemenang tetap tampil di Layar 2 (banner dari spinWheel() di
+  // present.html sendiri, TIDAK disentuh selama jeda ini) sebelum roda
+  // disegarkan tanpa nama itu. Tombol "🎲 Putar!" juga baru dinyalakan
+  // lagi SESUDAH jeda ini (bukan sebelumnya) supaya operator tidak
+  // keburu memutar ulang sebelum nama pemenang sempat terbaca.
+  const WHEEL_WINNER_HOLD_MS = 2500;
   function handleWheelResult_(data) {
     if (!wheelPendingSpin_ || wheelPendingSpin_.spinId !== data.spinId) return; // hasil dari putaran LAMA (mis. Reset ditekan di tengah animasi) -- abaikan
     const { winnerIndex, removeWinner } = wheelPendingSpin_;
     const winnerName = wheelCurrentEntries_[winnerIndex] || "?";
-    wheelSpinning_ = false;
     wheelPendingSpin_ = null;
     const spinBtn = el("psWheelSpinBtn");
     const winnerBox = el("psWheelWinnerBox");
     const entriesTa = el("psWheelEntries");
     if (winnerBox) { winnerBox.hidden = false; winnerBox.textContent = "🏆 Pemenang: " + winnerName; }
-    if (removeWinner) {
-      // Buang nama pemenang dari daftar (mode gugur) -- textarea &
-      // roda yang tampil di Layar 2 ikut disegarkan TANPA memutar ulang,
-      // supaya siap untuk "Putar!" berikutnya tanpa nama yang sudah
-      // menang muncul lagi.
-      wheelCurrentEntries_ = wheelCurrentEntries_.filter((_, i) => i !== winnerIndex);
-      if (entriesTa) entriesTa.value = wheelCurrentEntries_.join("\n");
-      if (wheelCurrentEntries_.length >= 2) {
-        rawPost({ type: "wheel", action: "show", entries: wheelCurrentEntries_ });
+    const finishUp_ = () => {
+      wheelSpinning_ = false;
+      if (removeWinner) {
+        // Buang nama pemenang dari daftar (mode gugur) -- textarea &
+        // roda yang tampil di Layar 2 ikut disegarkan TANPA memutar
+        // ulang, supaya siap untuk "Putar!" berikutnya tanpa nama yang
+        // sudah menang muncul lagi.
+        wheelCurrentEntries_ = wheelCurrentEntries_.filter((_, i) => i !== winnerIndex);
+        if (entriesTa) entriesTa.value = wheelCurrentEntries_.join("\n");
+        if (wheelCurrentEntries_.length >= 2) {
+          rawPost({ type: "wheel", action: "show", entries: wheelCurrentEntries_ });
+        }
       }
+      if (spinBtn) spinBtn.disabled = wheelCurrentEntries_.length < 2;
+    };
+    if (removeWinner) {
+      // Tombol tetap dikunci sampai jeda selesai (mencegah klik ganda
+      // di tengah jeda "tahan nama pemenang").
+      if (spinBtn) spinBtn.disabled = true;
+      setTimeout(finishUp_, WHEEL_WINNER_HOLD_MS);
+    } else {
+      finishUp_();
     }
-    if (spinBtn) spinBtn.disabled = wheelCurrentEntries_.length < 2;
   }
 
   // ------------------------------------------------------------
@@ -9885,6 +10041,44 @@ const PresentationStudio = (() => {
     if (el("psContentScaleDec")) el("psContentScaleDec").addEventListener("click", () => { el("psContentScale").value = Math.max(60, Number(el("psContentScale").value) - 10); applyContentScale(); });
     if (el("psContentScaleInc")) el("psContentScaleInc").addEventListener("click", () => { el("psContentScale").value = Math.min(140, Number(el("psContentScale").value) + 10); applyContentScale(); });
     wireManualValueInput("psContentScaleValue", "psContentScale");
+    wireSlideDisplayModeControls_();
+  }
+
+  // BARU (12 Sep 2026) -- panel "🎨 Tampilan" -> "Ukuran Gambar/PDF
+  // (Layar 2)", lihat getSlideDisplayMode_()/setSlideDisplayMode_()/
+  // rawPost() di atas untuk bagaimana nilai ini dipakai. Tombol
+  // "🔍 Zoom" cuma memunculkan slider persen (#psSlideZoomRow) --
+  // TIDAK langsung mengirim apa pun ke Layar 2 sendirian (perubahan
+  // baru terlihat begitu gambar/PDF BERIKUTNYA ditayangkan/◀ ▶,
+  // konsisten dengan pengaturan lain di tab ini seperti Huruf/Ukuran
+  // Teks yang juga baru berlaku untuk pengiriman berikutnya).
+  function wireSlideDisplayModeControls_() {
+    const modeBtns = Array.from(document.querySelectorAll("#psSlideDisplayModeRow [data-slide-mode]"));
+    const zoomRow = el("psSlideZoomRow");
+    const zoomSlider = el("psSlideZoomPct");
+    const zoomValue = el("psSlideZoomPctValue");
+    if (!modeBtns.length) return;
+    const initial = getSlideDisplayMode_();
+    function refreshActive(mode) {
+      modeBtns.forEach((b) => b.classList.toggle("active", b.dataset.slideMode === mode));
+      if (zoomRow) zoomRow.hidden = mode !== "zoom";
+    }
+    refreshActive(initial.displayMode);
+    if (zoomSlider) zoomSlider.value = initial.zoomPct;
+    if (zoomValue) zoomValue.value = initial.zoomPct;
+    modeBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setSlideDisplayMode_(btn.dataset.slideMode);
+        refreshActive(btn.dataset.slideMode);
+      });
+    });
+    function applyZoomPct() {
+      const pct = Math.max(100, Math.min(400, Number(zoomSlider.value) || 150));
+      if (zoomValue) zoomValue.value = pct;
+      setSlideZoomPct_(pct);
+    }
+    if (zoomSlider) zoomSlider.addEventListener("input", applyZoomPct);
+    wireManualValueInput("psSlideZoomPctValue", "psSlideZoomPct");
   }
 
   // ------------------------------------------------------------
