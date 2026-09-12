@@ -1182,6 +1182,53 @@
   /* ---- Pen (coret-coret) ---- */
   #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
 
+  /* ---- 🎯 Efek Fokus (klik = lingkaran mengembang) -- BARU (12 Sep 2026,
+     permintaan operator "diklik pakai mouse akan timbul gambar lingkaran
+     yang bergerak dari titik yang ditekan sampai keluar"). Koordinat SAMA
+     seperti Penunjuk/Kaca Pembesar di atas (fraction dari window penuh,
+     dikirim dari kotak pratinjau "Tayang" Studio saat mode ini aktif --
+     lihat wirePointerPen(), js/presentation-studio.js), TAPI beda dari
+     Penunjuk (nempel terus mengikuti kursor): ini "tembak dan lupa" --
+     SATU cincin muncul PERSIS di titik yang diklik, mengembang & memudar
+     sendiri lalu hilang, dipakai untuk menyorot 1 titik penting sekali
+     tekan (mis. menunjuk detail di PDF/gambar), bukan menunjuk terus-
+     menerus. Lihat playFocusRipple_() di bawah. */
+  .ms-focus-ripple {
+    position: fixed; width: 40px; height: 40px; border-radius: 50%;
+    border: 5px solid #ffd23f; box-shadow: 0 0 18px 2px rgba(255,210,63,.6);
+    pointer-events: none; z-index: 56; transform: translate(-50%, -50%) scale(0.3);
+    opacity: 1; animation: msFocusRippleExpand 0.9s ease-out forwards;
+  }
+  @keyframes msFocusRippleExpand {
+    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(6); opacity: 0; }
+  }
+
+  /* ---- 🌍 Efek Gempa (Earthquake) -- BARU (12 Sep 2026, permintaan
+     operator "gambar bergerak dan beraturan lalu berhenti lagi"). Numpang
+     #stage APA ADANYA (isinya boleh ayat/kidung/gambar PDF/apa pun yang
+     sedang tayang, tidak perlu tahu isinya) -- cuma menambah class
+     ".ms-earthquake-shake" sesaat lewat playEarthquakeEffect_() di bawah,
+     "tembak dan lupa" sama seperti efek 🎊 Reaksi Visual lain. Guncangan
+     dibuat MENGECIL BERTAHAP (kuat di awal, mereda, berhenti total di
+     akhir) supaya terasa seperti gempa sungguhan, bukan getaran rata. */
+  .ms-earthquake-shake { animation: msEarthquakeShake 1.6s ease-out; }
+  @keyframes msEarthquakeShake {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    8%   { transform: translate(-18px, 10px) rotate(-1.2deg); }
+    16%  { transform: translate(16px, -12px) rotate(1.1deg); }
+    24%  { transform: translate(-14px, 8px) rotate(-1deg); }
+    32%  { transform: translate(12px, -9px) rotate(0.9deg); }
+    40%  { transform: translate(-10px, 7px) rotate(-0.7deg); }
+    48%  { transform: translate(8px, -6px) rotate(0.6deg); }
+    56%  { transform: translate(-6px, 5px) rotate(-0.5deg); }
+    64%  { transform: translate(5px, -4px) rotate(0.4deg); }
+    72%  { transform: translate(-3px, 3px) rotate(-0.25deg); }
+    80%  { transform: translate(2px, -2px) rotate(0.15deg); }
+    88%  { transform: translate(-1px, 1px) rotate(-0.08deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+  }
+
   /* ---- 🔍 Kaca Pembesar (BARU 27 Agu 2026) -- lihat showMagnify()/
      hideMagnify() di bawah & wirePointerPen() di js/presentation-studio.js.
      Cuma aktif untuk file yang ditayangkan sebagai gambar (PDF/gambar/
@@ -1932,10 +1979,51 @@
       setTimeout(() => playEmojiReaction_(emoji), i * 220);
     });
   }
+  // BARU (12 Sep 2026, permintaan operator "efek gempa bumi") -- lihat
+  // catatan CSS .ms-earthquake-shake/@keyframes msEarthquakeShake di atas
+  // untuk gaya guncangannya. `stageEl` (elemen #stage) SUDAH ada dari
+  // deklarasi lain di file ini (dipakai luas untuk tampilkan ayat/kidung/
+  // gambar dst) -- fungsi ini TIDAK membuat elemen baru, cuma menambah/
+  // menghapus 1 class di elemen yang sudah ada. `void stageEl.offsetWidth`
+  // MEMAKSA browser membaca ulang layout sebelum class dipasang lagi --
+  // trik supaya kalau operator memencet "🌍 Gempa" 2x beruntun SEBELUM
+  // animasi pertama selesai, animasinya benar-benar mengulang dari awal
+  // (bukan diam karena browser menganggap class-nya "tidak berubah").
+  function playEarthquakeEffect_() {
+    if (!stageEl) return;
+    stageEl.classList.remove("ms-earthquake-shake");
+    void stageEl.offsetWidth;
+    stageEl.classList.add("ms-earthquake-shake");
+    stageEl.addEventListener("animationend", function onEnd(e) {
+      if (e.animationName !== "msEarthquakeShake") return;
+      stageEl.classList.remove("ms-earthquake-shake");
+      stageEl.removeEventListener("animationend", onEnd);
+    });
+  }
+  // BARU (12 Sep 2026, permintaan operator "🎯 Efek Fokus") -- lihat CSS
+  // .ms-focus-ripple/@keyframes msFocusRippleExpand di atas. Koordinat
+  // `xFrac`/`yFrac` SAMA persis cara hitungnya dengan pointerDot/showMagnify
+  // di atas (fraction 0-1 dari window PENUH, bukan dari #stage), dikirim
+  // dari 1 KLIK (bukan gerak kursor terus-menerus) di kotak pratinjau
+  // "Tayang" Studio saat mode "🎯 Efek Fokus" aktif -- lihat wirePointerPen()
+  // (js/presentation-studio.js). Elemen ring dibuang sendiri lewat
+  // animationend (fire-and-forget, aman diklik berkali-kali beruntun --
+  // tiap klik bikin ring BARU, tidak saling mengganggu ring sebelumnya).
+  function playFocusRipple_(xFrac, yFrac) {
+    const layer = document.getElementById("effectsLayer");
+    if (!layer) return;
+    const ring = document.createElement("div");
+    ring.className = "ms-focus-ripple";
+    ring.style.left = (xFrac * window.innerWidth) + "px";
+    ring.style.top = (yFrac * window.innerHeight) + "px";
+    ring.addEventListener("animationend", () => ring.remove());
+    layer.appendChild(ring);
+  }
   function playEffectVisual_(data) {
     if (data.effect === "emoji") playEmojiReaction_(data.emoji);
     else if (data.effect === "balon") playBalloonEffect_();
     else if (data.effect === "happy") playHappyBurst_();
+    else if (data.effect === "earthquake") playEarthquakeEffect_();
     else playConfetti_(); // default/"confetti"
   }
 
@@ -3978,6 +4066,10 @@
       showMagnify(data.x, data.y, data.percent || 100);
       return;
     }
+    // BARU (12 Sep 2026) -- "🎯 Efek Fokus", lihat playFocusRipple_() di
+    // atas & wirePointerPen() (js/presentation-studio.js) untuk tombol
+    // toggle & klik di kotak pratinjau Studio yang mengirim payload ini.
+    if (data.type === "clickfocus") { playFocusRipple_(data.x, data.y); return; }
     if (data.type === "yt_control") {
       // Kontrol Play/Pause/Mute dari tombol di Studio Presentasi -- dikirim
       // lewat postMessage standar YouTube IFrame Player API. Butuh embedUrl
@@ -4276,7 +4368,7 @@
   // punya resolusi yang tidak standar). Ini menggantikan pendekatan
   // "pilih resolusi manual" sebelumnya -- sekarang otomatis mengikuti
   // kenyataan, jadi posisi Penunjuk/Pen & titik patah baris teks juga
-  // ikut akurat tanpa operator perlu mengatur apa pun. 
+  // ikut akurat tanpa operator perlu mengatur apa pun.
   // ------------------------------------------------------------
   function reportGeometry() {
     if (!window.opener) return;
