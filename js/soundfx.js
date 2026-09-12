@@ -121,9 +121,9 @@ const SoundFX = (() => {
     { key: "wowRekaman", label: "Wow (Rekaman)", emoji: "😮", src: "assets/sounds/wow-rekaman.mp3" },
     { key: "cling", label: "Cling", emoji: "🔔", src: "assets/sounds/cling.mp3" },
     { key: "cieeee", label: "Cieeee", emoji: "😏", src: "assets/sounds/cieeee.mp3" },
+    { key: "saya_cinta_tuhan_yesus", label: "Saya Cinta Tuhan Yesus", emoji: "I❤️🥰", src: "assets/sounds/saya_cinta_tuhan_yesus.mp3" },
     { key: "bfy_jangan_skip_makan", label: "BFY Jangan Skip Makan", emoji: "🥗📖💪", src: "assets/sounds/bfy_jangan_skip_makan.mp3" },
     { key: "jangan_skip_makan", label: "Jangan Skip Makan", emoji: "🍔😋", src: "assets/sounds/jangan_skip_makan.mp3" },
-    { key: "saya_cinta_tuhan_yesus", label: "Saya Cinta Tuhan Yesus", emoji: "🥰❤️", src: "assets/sounds/saya_cinta_tuhan_yesus.mp3" },
     // --------------------------------------------------------
     // CONTOH efek dari LINK LUAR (Google Drive) -- SENGAJA DIKOMENTARI
     // (tidak aktif) supaya tidak muncul tombol yang gagal diputar di
