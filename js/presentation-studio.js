@@ -870,6 +870,51 @@ const PresentationStudio = (() => {
     });
   }
 
+  // BARU (12 Sep 2026 v8, laporan operator "thumbnail kok kecil banget") --
+  // "🖼️ Ukuran Thumbnail" di atas daftar Kumpulan Ayat: 2 tombol preset
+  // cepat (44px "Kecil" bawaan / 176px "Besar", persis 4x lipat) + 1
+  // slider manual (32-220px) untuk operator yang mau ukuran di antaranya.
+  // Diterapkan lewat 1 variabel CSS `--ps-thumb-size` di :root (dibaca
+  // .ps-verse-thumb, lihat css/style.css) -- SATU tempat ini cukup untuk
+  // semua thumbnail yang sudah ada di DOM sekaligus, TANPA perlu
+  // renderCollectionList() ulang (beda dari pengaturan lain yang baru
+  // berlaku di render berikutnya). Tersimpan per perangkat (localStorage),
+  // sama seperti getSlideDisplayMode_() di atas.
+  const COLLECTION_THUMB_SIZE_KEY = "ps_collection_thumb_size_v1";
+  function getCollectionThumbSizePx_() {
+    const v = parseInt(localStorage.getItem(COLLECTION_THUMB_SIZE_KEY), 10);
+    return Number.isFinite(v) && v >= 32 && v <= 220 ? v : 44;
+  }
+  function applyCollectionThumbSizePx_(px) {
+    document.documentElement.style.setProperty("--ps-thumb-size", px + "px");
+  }
+  function wireCollectionThumbSize_() {
+    const slider = el("psCollectionThumbSizeSlider");
+    const valueInput = el("psCollectionThumbSizeValue");
+    const presetBtns = Array.from(document.querySelectorAll("#psCollectionThumbSizePresetRow [data-thumb-size-preset]"));
+    const initialPx = getCollectionThumbSizePx_();
+    applyCollectionThumbSizePx_(initialPx); // langsung terapkan begitu Studio dibuka, bukan menunggu slider disentuh
+    if (slider) slider.value = initialPx;
+    if (valueInput) valueInput.value = initialPx;
+    function refreshPresetActive(px) {
+      presetBtns.forEach((b) => b.classList.toggle("active", Number(b.dataset.thumbSizePreset) === px));
+    }
+    refreshPresetActive(initialPx);
+    function setSize(px) {
+      px = Math.max(32, Math.min(220, Math.round(px)));
+      localStorage.setItem(COLLECTION_THUMB_SIZE_KEY, String(px));
+      applyCollectionThumbSizePx_(px);
+      if (slider) slider.value = px;
+      if (valueInput) valueInput.value = px;
+      refreshPresetActive(px);
+    }
+    presetBtns.forEach((btn) => {
+      btn.addEventListener("click", () => setSize(Number(btn.dataset.thumbSizePreset)));
+    });
+    if (slider) slider.addEventListener("input", () => setSize(Number(slider.value)));
+    wireManualValueInput("psCollectionThumbSizeValue", "psCollectionThumbSizeSlider"); // Enter/blur di kotak angka otomatis memicu "input" slider di atas (lihat commit() di wireManualValueInput)
+  }
+
   // Tombol "✎ Atur Urutan" di atas daftar Kumpulan Ayat -- cuma
   // menyalakan/mematikan tampilnya tombol mini ⏮️⬆️⬇️⏭️ (lihat
   // renderCollectionList() di atas), TIDAK mengubah data apa pun sendiri.
@@ -10395,6 +10440,7 @@ const PresentationStudio = (() => {
     wireCollectionNewButton();
     wireCollectionShareButton();
     wireCollectionDeleteAllButton();
+    wireCollectionThumbSize_();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
     // Jalan pintas di header utama (index.html, ikon 🎛️ -- khusus laptop/
