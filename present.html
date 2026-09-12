@@ -4580,11 +4580,21 @@
       // sesudah bait PERTAMA (meniru layout buku kidung cetak: bait 1,
       // Koor, baru bait 2 dst) -- bukan ditempel di paling akhir
       // seperti bawaan.
+      // BARU (13 Sep 2026 v2, permintaan operator "masih ada jarak jauh
+      // ke koor") -- antara bait PERTAMA & koor, sengaja TIDAK ditambah
+      // .kidung-line-gap terpisah lagi (dulu ditumpuk: margin-bottom
+      // bawaan .kidung-bait-line + gap terpisah = 2x jarak sekaligus,
+      // kelihatan jauh dibanding mockup yang "Koor:"-nya nempel persis
+      // di bawah baris terakhir bait 1). Sekarang cuma pakai margin-
+      // bottom bawaan .kidung-bait-line itu SAJA (masih ikut slider
+      // "Spasi Baris" di tab 🎨 Tampilan, cuma tidak dobel lagi) --
+      // antara koor & sisa bait tetap pakai gapHtml seperti biasa
+      // (blok koor sendiri tidak punya margin-bottom bawaan).
       let textHtml;
       if (data.koorMid && data.koorTeks && baits.length > 1) {
         const firstHtml = baitLineHtml(baits[0]);
         const restHtml = baits.slice(1).map(baitLineHtml).join(gapHtml);
-        textHtml = firstHtml + gapHtml + koorBlockHtml + gapHtml + restHtml;
+        textHtml = firstHtml + koorBlockHtml + gapHtml + restHtml;
       } else {
         const baitHtml = baits.map(baitLineHtml).join(gapHtml);
         textHtml = baitHtml + (koorBlockHtml ? gapHtml + koorBlockHtml : "");
