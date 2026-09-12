@@ -121,6 +121,8 @@ const SoundFX = (() => {
     { key: "wowRekaman", label: "Wow (Rekaman)", emoji: "😮", src: "assets/sounds/wow-rekaman.mp3" },
     { key: "cling", label: "Cling", emoji: "🔔", src: "assets/sounds/cling.mp3" },
     { key: "cieeee", label: "Cieeee", emoji: "😏", src: "assets/sounds/cieeee.mp3" },
+    { key: "bfy_jangan_skip_makan", label: "BFY Jangan Skip Makan", emoji: "🥗📖💪", src: "assets/sounds/bfy_jangan_skip_makan.mp3" },
+    { key: "jangan_skip_makan", label: "Jangan Skip Makan", emoji: "🍔😋", src: "assets/sounds/bfy_jangan_skip_makan.mp3" },
 
     // --------------------------------------------------------
     // CONTOH efek dari LINK LUAR (Google Drive) -- SENGAJA DIKOMENTARI
