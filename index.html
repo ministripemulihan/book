@@ -942,6 +942,26 @@
                daftar berubah -- supaya operator tidak perlu buka dropdown
                dulu cuma untuk lihat angkanya. -->
           <p id="psCollectionCount" class="ps-collection-count"></p>
+          <!-- BARU (12 Sep 2026 v8, laporan operator "thumbnail kok kecil
+               banget") -- kontrol ukuran thumbnail halaman PDF/gambar di
+               daftar Kumpulan Ayat (lihat .ps-verse-thumb & fillCollection
+               Thumbnails_() di js/presentation-studio.js/css/style.css).
+               Pola SAMA PERSIS dengan "🖼️ Ukuran Gambar/PDF (Layar 2)" di
+               tab "🎨 Tampilan" (2 tombol preset cepat + slider manual) --
+               2 tombol "Kecil"/"Besar" cuma jalan pintas ke 2 nilai siap
+               pakai, slider di bawahnya untuk atur bebas kalau operator
+               mau ukuran di antaranya. Tersimpan per perangkat
+               (localStorage), lihat wireCollectionThumbSize_() di
+               js/presentation-studio.js. -->
+          <div class="ps-field-label" style="margin-top:8px;">🖼️ Ukuran Thumbnail</div>
+          <div class="ps-btn-row" id="psCollectionThumbSizePresetRow">
+            <button type="button" class="chip-btn small" data-thumb-size-preset="44">🔲 Kecil</button>
+            <button type="button" class="chip-btn small" data-thumb-size-preset="176">🔳 Besar</button>
+          </div>
+          <div class="ps-btn-row">
+            <input type="range" id="psCollectionThumbSizeSlider" min="32" max="220" step="4" value="44" style="flex:1;" />
+            <input type="number" id="psCollectionThumbSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="32" max="220" step="4" value="44" title="Ketik ukuran thumbnail manual (32-220px), lalu tekan Enter" />px
+          </div>
           <div id="psCollectionList" class="ps-verse-list"></div>
         </div>
 
