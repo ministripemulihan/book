@@ -2177,7 +2177,16 @@
             <span class="ps-pen-size-label" title="Paling kecil (10%)">🔍<sub>-</sub></span>
             <input type="range" id="psMagnifyZoomSlider" min="10" max="10000" step="10" value="100" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Paling besar (10000%)">🔍<sup>+</sup></span>
-            <span id="psMagnifyZoomValue" class="ps-pen-size-value">100%</span>
+            <!-- BARU (12 Sep 2026, permintaan operator "kolom perbesar bisa
+                 diketik manual pakai keyboard") -- dulu cuma <span> (angka
+                 tampil saja, tidak bisa diklik/diketik), sekarang jadi
+                 <input type="number"> supaya operator bisa ketik langsung
+                 angka zoom yang diinginkan (mis. "350") tanpa perlu geser
+                 slider pelan-pelan buat angka presisi -- lihat listener
+                 "change"/Enter di wirePointerPen() (js/presentation-studio.js),
+                 yang menjaga slider & angka ini TETAP SINKRON dua arah,
+                 apa pun cara operator mengubahnya (ketik ATAU geser). -->
+            <input type="number" id="psMagnifyZoomValue" class="ps-pen-size-value ps-pen-size-value-input" min="10" max="10000" step="10" value="100" title="Ketik angka zoom manual (10-10000), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Gerakkan kursor di atas kotak pratinjau "Tayang" saat Kaca Pembesar aktif -- kotak kecil di Layar 2 menunjukkan besar zoom saat ini (10%–10000%).</div>
 
