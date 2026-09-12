@@ -5330,6 +5330,23 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       groupRemoveBtnHtml = `<button type="button" class="chip-btn small danger col-remove-group-btn">🗑️ Hapus ${groupCount} Bait Kidung Ini</button>`;
     }
   }
+  // BARU (12 Sep 2026, permintaan operator "hapus langsung seluruh isi
+  // PDF, dulu bisa sekarang tidak") -- SAMA PERSIS pola kidung di atas,
+  // tapi untuk item "media" (PDF/gambar dari "➕ Semua Halaman") yang
+  // mediaItemId-nya sama -- lihat removeMediaGroupFromCollection()
+  // (js/collections.js).
+  let mediaGroupRemoveBtnHtml = "";
+  let mediaGroupCount = 0;
+  if (it.type === "media" && it.mediaItemId) {
+    const sameMediaIdx = [];
+    col.items.forEach((x, xi) => {
+      if (x && x.type === "media" && x.mediaItemId === it.mediaItemId) sameMediaIdx.push(xi);
+    });
+    mediaGroupCount = sameMediaIdx.length;
+    if (mediaGroupCount > 1 && sameMediaIdx[0] === i) {
+      mediaGroupRemoveBtnHtml = `<button type="button" class="chip-btn small danger col-remove-mediagroup-btn">🗑️ Hapus Semua ${mediaGroupCount} Halaman Ini</button>`;
+    }
+  }
 
   const item = document.createElement("div");
   item.className = "collection-verse-item";
@@ -5347,6 +5364,7 @@ function buildCollectionItemRow(id, col, it, i, opts) {
         ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
         ${v ? '<button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>' : ""}
         ${groupRemoveBtnHtml}
+        ${mediaGroupRemoveBtnHtml}
         <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
       </div>
       ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
@@ -5393,6 +5411,13 @@ function buildCollectionItemRow(id, col, it, i, opts) {
     groupRemoveBtn.addEventListener("click", () => {
       if (!confirm(`Hapus SEMUA ${groupCount} bait kidung "${it.title || ("No. " + it.kidungNo)}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
       if (removeKidungGroupFromCollection(currentUser, id, it.buku, it.kidungNo) > 0) opts.onChanged();
+    });
+  }
+  const mediaGroupRemoveBtn = item.querySelector(".col-remove-mediagroup-btn");
+  if (mediaGroupRemoveBtn) {
+    mediaGroupRemoveBtn.addEventListener("click", () => {
+      if (!confirm(`Hapus SEMUA ${mediaGroupCount} halaman "${it.name || "berkas ini"}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+      if (removeMediaGroupFromCollection(currentUser, id, it.mediaItemId) > 0) opts.onChanged();
     });
   }
   const moveTopBtn = item.querySelector(".col-move-top-btn");
