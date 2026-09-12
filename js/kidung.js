@@ -431,6 +431,18 @@ async function getKidungCategories(bukuFilter) {
 //  panggil splitKidungIntoSlides() dengan `groupSizes` custom -- lihat
 //  parameter opsional di bawah -- jadi tidak perlu mode baru per kasus.
 //
+//  `koorMid` (BARU 13 Sep 2026, permintaan operator, parameter opsional
+//  ke-4) -- kalau `true`, tiap slide grup yang berisi >1 bait + koor
+//  ditandai `koorMid: true` supaya PENAMPIL (present.html/preview Studio)
+//  menyisipkan koor PERSIS sesudah bait PERTAMA di slide itu (meniru
+//  layout buku kidung cetak: bait 1, Koor, baru bait 2 dst -- lihat
+//  mockup yang dicontohkan operator), BUKAN ditempel di paling akhir
+//  slide seperti bawaan. Tidak berlaku (diabaikan) utk mode "1"/"1+koor"
+//  (cuma 1 bait, tidak ada "tengah"), "koor" (tanpa bait sama sekali),
+//  atau "1firstKoor" (sudah otomatis punya pola serupa lewat 2 slide
+//  terpisah) -- splitter TETAP jalan seperti biasa utk mode-mode itu,
+//  cuma flag `koorMid`-nya tidak pernah ditambahkan.
+//
 //  Aturan pas 1 slide berisi >1 bait tapi koor-nya BEDA per bait (mis.
 //  slide [4,5] sedangkan bait 4 pakai koor A dan bait 5 sudah pindah
 //  ke koor B): koor yang ditampilkan cuma milik bait TERAKHIR di slide
@@ -438,7 +450,7 @@ async function getKidungCategories(bukuFilter) {
 //  -- sisanya (koor A) tetap otomatis muncul di slide-slide sebelumnya
 //  yang masih full berisi bait-bait ber-koor A.
 // ============================================================
-function splitKidungIntoSlides(baits, mode, groupSizes) {
+function splitKidungIntoSlides(baits, mode, groupSizes, koorMid) {
   if (!baits || !baits.length) return [];
 
   if (mode === "koor") {
@@ -502,11 +514,15 @@ function splitKidungIntoSlides(baits, mode, groupSizes) {
     idx += size;
     if (!group.length) return;
     const last = group[group.length - 1];
+    const slideKoorTeks = withKoor ? (last.koorTeks || null) : null;
     slides.push({
       baits: group.map((b) => ({ noBait: b.noBait, teks: b.teks })),
-      koorTeks: withKoor ? (last.koorTeks || null) : null,
+      koorTeks: slideKoorTeks,
       koorGroup: withKoor ? (last.koorGroup || null) : null,
       onlyKoor: false,
+      // Lihat catatan "koorMid" di atas komentar mode -- cuma relevan
+      // kalau slide ini memang punya >1 bait DAN koor untuk disisipkan.
+      koorMid: !!(koorMid && group.length > 1 && slideKoorTeks),
     });
   });
   return slides;
@@ -776,7 +792,7 @@ function buildKidungShareButton(meta, baits) {
 // tombol ini SELALU langsung salin ke clipboard, TIDAK PERNAH membuka
 // kotak share bawaan OS (navigator.share). Alasan ditambahkan terpisah:
 // di HP, tombol "🔗 Bagikan" langsung membuka kotak pilih aplikasi
-// (WhatsApp/dll) begitu ditekan -- kalau operator cuma mau MENGETES/ 
+// (WhatsApp/dll) begitu ditekan -- kalau operator cuma mau MENGETES/
 // memastikan teksnya benar (mis. tempel ke editor/Notes untuk dicek),
 // tidak ada cara mudah melakukannya lewat kotak share itu, jadi terasa
 // seperti "tidak muncul apa-apa". Tombol ini kasih jalan pintas yang
