@@ -1143,7 +1143,26 @@
     flex-direction: column; align-items: center; justify-content: center;
     gap: 1.6vh; z-index: 3; text-align: center; max-width: 96vw;
   }
-  #timerAnalogClockWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
+  #timerAnalogClockWrap:not([hidden]) {
+    display: flex;
+    /* DIPERBAIKI (12 Sep 2026 v4, laporan operator "tampilan kurang
+       tengah, letaknya di kanan bawah") -- bug SAMA PERSIS yang sudah
+       pernah diperbaiki di #timerClockWrap (lihat catatan panjang di
+       situ untuk penjelasan lengkap): "animation: fadeUp .4s ease both"
+       -- keyframe "to"-nya eksplisit set `transform:none`, dan animasi
+       SELALU menang atas rule non-animasi untuk properti yang sama,
+       jadi ini MENIMPA/MENGHAPUS `transform: translate(-50%,-50%)` di
+       rule dasar #timerAnalogClockWrap di atas (yang seharusnya
+       memusatkan kotak jam) -- akibatnya kotaknya nempel di titik
+       acuan 50%/50% APA ADANYA (cuma sudut kiri-atas kotak yang tepat
+       di tengah layar, bukan tengah kotaknya), jadi jam bulat besarnya
+       "melenceng" ke kanan-bawah, makin parah karena kotak jam ini
+       sekarang besar sekali (min(88vh,88vw)). "fadeInOnly" (dipakai
+       #timerClockWrap) cuma menganimasikan opacity, TIDAK PERNAH
+       menyentuh transform, jadi translate(-50%,-50%) tetap utuh
+       sepanjang & sesudah animasi -- jam tetap tepat di tengah. */
+    animation: fadeInOnly .4s ease both;
+  }
   #timerAnalogCaption {
     font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.02em;
     font-size: calc(clamp(18px, 2.6vw, 34px) * var(--p-scale));
