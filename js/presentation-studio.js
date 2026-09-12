@@ -6060,6 +6060,12 @@ const PresentationStudio = (() => {
     try { localStorage.setItem(SCROLLBAR_HIDDEN_KEY, hidden ? "1" : "0"); } catch (e) {}
   }
 
+  // BARU (12 Sep 2026 v2) -- penyimpan waktu & kombinasi pintasan
+  // terakhir yang DIPROSES, dipakai debounce di wireModeAndBellKeyboardShortcuts()
+  // di bawah (lihat catatan panjang di sana).
+  let lastShortcutKey_ = null;
+  let lastShortcutAt_ = 0;
+
   function wireModeAndBellKeyboardShortcuts() {
     document.addEventListener("keydown", (e) => {
       const studio = el("presentStudio");
@@ -6080,6 +6086,28 @@ const PresentationStudio = (() => {
       // pintasan di bawah (P, M, Alt+H, Alt+C, 1-9, Alt+1-9) -- bukan
       // cuma P -- supaya semuanya konsisten aman dari gema yang sama.
       if (e.repeat) return;
+      // BARU (12 Sep 2026 v2, laporan operator "masih ngaco, tekan P 1x
+      // tetap kadang blip pause lalu main sendiri lagi -- ternyata pakai
+      // stylus/pena, bukan keyboard fisik biasa") -- `e.repeat` di atas
+      // CUMA menyaring gema tombol yang DITAHAN lama (OS auto-repeat).
+      // Stylus/keyboard virtual/layar sentuh kadang mengirim BEBERAPA
+      // event `keydown` yang BENAR-BENAR TERPISAH (bukan auto-repeat,
+      // `e.repeat` tetap false di semuanya) untuk 1x sentuhan/ketuk --
+      // lolos dari penyaring di atas, tapi efeknya SAMA PERSIS (2x
+      // toggle beruntun dalam hitungan milidetik = kelihatan "ngeblip").
+      // Perbaikan: debounce -- pintasan yang SAMA PERSIS (kombinasi
+      // Alt + huruf/angka yang sama) diabaikan kalau baru saja diproses
+      // < 350ms lalu, SIAPA PUN/APA PUN sumber keydown-nya (keyboard
+      // fisik, stylus, atau event apa pun) -- 350ms jauh lebih lama
+      // dari jeda antar-event dobel stylus (biasanya < 50ms), tapi
+      // masih jauh lebih cepat dari kecepatan menekan tombol yang SAMA
+      // 2x SENGAJA berturutan oleh operator (jarang perlu secepat itu
+      // untuk pintasan yang sama -- P/M/Alt+H, dst).
+      const shortcutKey_ = (e.altKey ? "alt+" : "") + e.key.toLowerCase();
+      const now_ = Date.now();
+      if (shortcutKey_ === lastShortcutKey_ && now_ - lastShortcutAt_ < 350) return;
+      lastShortcutKey_ = shortcutKey_;
+      lastShortcutAt_ = now_;
       // BARU (10 Sep 2026, sesi ke-10, permintaan operator "defaultnya
       // show, dan misalnya ditekan Alt+H maka hide semua ... vertikal
       // scroll atau horizontal scroll") -- Alt+H sengaja dipakai (bukan
