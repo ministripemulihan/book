@@ -605,7 +605,10 @@ const Presentation = (() => {
   function populateBellSelectSimple_() {
     const sel = el("presentTimerBellSelect");
     if (!sel) return;
-    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }];
+    // BARU (12 Sep 2026) -- numpang SoundFX.bellChoices() (js/soundfx.js),
+    // SAMA seperti getBellChoices_() versi Studio (js/presentation-studio.js)
+    // -- lihat komentar panjang di bellChoices() untuk detailnya.
+    const list = (typeof SoundFX !== "undefined" && SoundFX.bellChoices) ? SoundFX.bellChoices() : ((typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }]);
     let saved = "";
     try { saved = localStorage.getItem(TIMER_BELL_CHOICE_KEY_SIMPLE) || ""; } catch (e) {}
     const fallback = (typeof CONFIG !== "undefined" && CONFIG.TIMER_BELL_DEFAULT_KEY) || list[0].key;
@@ -887,7 +890,7 @@ const Presentation = (() => {
     // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak
     // "Berikutnya"/"Tayang" langsung memakai proporsi yang benar sedari
     // pertama kali Studio dibuka, tanpa menunggu Layar 2 benar-benar
-    // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry". 
+    // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry".
     try {
       const { w, h } = getStoredScreenSize();
       applyPreviewRatio(w, h);
