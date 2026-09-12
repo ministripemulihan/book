@@ -168,6 +168,12 @@ const PresentationStudio = (() => {
   let penStroke = [];
   // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar, lihat wirePointerPen() di bawah.
   let magnifyActive = false;
+  // BARU (12 Sep 2026) -- 🎯 Efek Fokus (klik = lingkaran mengembang di
+  // Layar 2), lihat wirePointerPen() di bawah & playFocusRipple_()
+  // (present.html). Mode ke-4 yang saling eksklusif dengan Penunjuk/Pen/
+  // Kaca Pembesar di atas (cuma 1 yang boleh aktif dalam 1 waktu, sama
+  // pola-nya dengan 3 yang sudah ada).
+  let focusClickActive = false;
 
   function el(id) { return document.getElementById(id); }
   function isDesktop() { return window.innerWidth >= DESKTOP_MIN_WIDTH; }
@@ -8881,6 +8887,10 @@ const PresentationStudio = (() => {
       });
     }
     const magnifyBtns = () => Array.from(document.querySelectorAll("[data-ps-magnify-toggle]"));
+    // BARU (12 Sep 2026) -- 🎯 Efek Fokus, lihat catatan panjang di
+    // deklarasi focusClickActive di atas & blok wrap.addEventListener("click", ...)
+    // di bawah untuk pengirimannya.
+    const focusClickBtns = () => Array.from(document.querySelectorAll("[data-ps-focusclick-toggle]"));
 
     // akses cepat di atas kotak "Tayang") -- keduanya dicari lewat
     // data-attribute yang sama supaya statusnya selalu sinkron, apa pun
@@ -8898,7 +8908,7 @@ const PresentationStudio = (() => {
     }
 
     function updateMode() {
-      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || magnifyActive);
+      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || magnifyActive || focusClickActive);
     }
 
     document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((chip) => {
@@ -8912,9 +8922,11 @@ const PresentationStudio = (() => {
       pointerActive = !pointerActive;
       penActive = false;
       magnifyActive = false;
+      focusClickActive = false;
       pointerBtns().forEach((b) => b.classList.toggle("active", pointerActive));
       penBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
+      focusClickBtns().forEach((b) => b.classList.remove("active"));
       if (!pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
       rawPost({ type: "magnify", on: false });
       updateMode();
@@ -8923,9 +8935,11 @@ const PresentationStudio = (() => {
       penActive = !penActive;
       pointerActive = false;
       magnifyActive = false;
+      focusClickActive = false;
       penBtns().forEach((b) => b.classList.toggle("active", penActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
+      focusClickBtns().forEach((b) => b.classList.remove("active"));
       if (!penActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
       rawPost({ type: "magnify", on: false });
       updateMode();
@@ -8934,12 +8948,36 @@ const PresentationStudio = (() => {
       magnifyActive = !magnifyActive;
       pointerActive = false;
       penActive = false;
+      focusClickActive = false;
       magnifyBtns().forEach((b) => b.classList.toggle("active", magnifyActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
       penBtns().forEach((b) => b.classList.remove("active"));
+      focusClickBtns().forEach((b) => b.classList.remove("active"));
       if (!magnifyActive) rawPost({ type: "magnify", on: false });
       if (dot) dot.style.display = "none";
       rawPost({ type: "pointer", on: false });
+      updateMode();
+    }));
+    // BARU (12 Sep 2026) -- 🎯 Efek Fokus: BEDA dari 3 mode lain di atas
+    // (yang aktif SELAMA kursor bergerak), mode ini cuma menunggu 1 KLIK
+    // di kotak pratinjau "Tayang" (lihat wrap.addEventListener("click", ...)
+    // di bawah) -- tiap klik mengirim 1 payload "clickfocus" yang memicu
+    // 1 ring mengembang lalu hilang sendiri di Layar 2 (playFocusRipple_(),
+    // present.html), TIDAK ada state "on/off" yang perlu dimatikan di
+    // Layar 2 seperti Penunjuk/Kaca Pembesar (tidak ada apa pun yang
+    // "menempel" di sana untuk dibersihkan).
+    focusClickBtns().forEach((btn) => btn.addEventListener("click", () => {
+      focusClickActive = !focusClickActive;
+      pointerActive = false;
+      penActive = false;
+      magnifyActive = false;
+      focusClickBtns().forEach((b) => b.classList.toggle("active", focusClickActive));
+      pointerBtns().forEach((b) => b.classList.remove("active"));
+      penBtns().forEach((b) => b.classList.remove("active"));
+      magnifyBtns().forEach((b) => b.classList.remove("active"));
+      rawPost({ type: "pointer", on: false });
+      rawPost({ type: "magnify", on: false });
+      if (dot) dot.style.display = "none";
       updateMode();
     }));
     penClearBtns().forEach((btn) => btn.addEventListener("click", () => {
@@ -8986,6 +9024,20 @@ const PresentationStudio = (() => {
         }
       });
       wrap.addEventListener("mousedown", () => { penStroke = []; });
+      // BARU (12 Sep 2026) -- 🎯 Efek Fokus: 1 klik di kotak pratinjau
+      // (bukan gerak kursor, lihat blok mousemove di atas untuk 3 mode
+      // lain) = 1 ring dikirim ke Layar 2 di titik itu persis. Dipasang
+      // TERPISAH dari listener "mousemove" di atas supaya tidak mengirim
+      // berkali-kali kalau operator cuma menggerakkan kursor tanpa klik.
+      wrap.addEventListener("click", (e) => {
+        if (!focusClickActive) return;
+        const rect = wrap.getBoundingClientRect();
+        let x = (e.clientX - rect.left) / rect.width;
+        let y = (e.clientY - rect.top) / rect.height;
+        x = Math.min(1, Math.max(0, x));
+        y = Math.min(1, Math.max(0, y));
+        rawPost({ type: "clickfocus", x, y });
+      });
       wrap.addEventListener("mouseleave", () => {
         if (pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
         if (magnifyActive) rawPost({ type: "magnify", on: false });
