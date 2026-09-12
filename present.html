@@ -592,8 +592,16 @@
        diatur dari Studio (slider "Spasi Baris", lihat --p-line-height
        di applyTheme()/js/presentation-studio.js) supaya teks panjang
        (mis. hasil unggah file Word/.doc) bisa dirapatkan/direnggangkan
-       spasi antar barisnya tanpa mengubah ukuran hurufnya. */
-    line-height: var(--p-line-height, 1.35);
+       spasi antar barisnya tanpa mengubah ukuran hurufnya.
+       BARU (13 Sep 2026, permintaan operator) -- slider "Spasi Baris"
+       sekarang bisa turun sampai 20% (dulu 60%) supaya jarak ANTAR
+       BLOK bait/koor (.kidung-bait-line/.kidung-line-gap di bawah,
+       yang TETAP pakai var(--p-line-height) mentah tanpa lantai) bisa
+       "dempet-dempet" seperti mockup. Tapi line-height baris DI DALAM
+       1 blok teks sendiri (properti ini) dikasih lantai 0.95 supaya
+       baris-baris panjang tidak saling tindih/terpotong walau slider
+       ditekan sampai batas paling bawah. */
+    line-height: max(0.95, var(--p-line-height, 1.35));
     max-width: calc(1200px * var(--p-content-scale, 1));
     white-space: pre-wrap;
     /* BARU (28 Agu 2026) -- 🎥 Kamera Latar: --p-cam-ink & --p-outline-shadow
@@ -635,11 +643,15 @@
   }
   #stage.fade-in #text, #stage.fade-in #ref { animation: fadeUp .5s ease both; }
   /* Slide Kidung (Presentation.sendKidung()) -- bait polos memakai warna
-     tulisan tema biasa (var(--p-ink)), koor DISOROT kuning tetap (TIDAK
-     ikut var(--p-ink)/tema) supaya selalu jelas kelihatan "ini bagian
-     koor" di tema apa pun (gelap/terang/sepia/dst -- lihat THEMES di
-     js/presentation-studio.js), meniru mockup layar biru-kuning yang
-     dicontohkan. */
+     tulisan tema biasa (var(--p-ink)), label "Koor:" DISOROT kuning
+     tetap (TIDAK ikut var(--p-ink)/tema) supaya selalu jelas kelihatan
+     "ini bagian koor" di tema apa pun (gelap/terang/sepia/dst -- lihat
+     THEMES di js/presentation-studio.js).
+     BARU (13 Sep 2026, permintaan operator) -- persis meniru mockup
+     yang dikasih: cuma LABEL "Koor:" yang kuning, TEKS SYAIR koor-nya
+     sendiri warna putih/normal SAMA seperti bait biasa (dulu seluruh
+     blok koor -- label & syair -- kuning semua, lihat .kidung-koor-line
+     di bawah yang sekarang TIDAK lagi menimpa warna). */
   .kidung-bait-line {
     /* BARU (4 Sep 2026, permintaan operator) -- jarak antar BLOK bait
        (dulu clamp() tetap, TIDAK ikut slider "Spasi Baris" sama sekali --
@@ -648,13 +660,18 @@
        sama dipakai slider itu (nilai bawaan 1.35 => rasio 1, tidak
        berubah kalau slider belum disentuh sama sekali) -- geser slider
        ke kiri (mis. 60%) merapatkan jarak antar bait JUGA, bukan cuma
-       spasi antar baris di dalam 1 bait yang panjang. */
-    margin: 0 auto calc(clamp(10px, 1.6vh, 20px) * var(--p-line-height, 1.35) / 1.35);
+       spasi antar baris di dalam 1 bait yang panjang.
+       BARU (13 Sep 2026) -- sengaja TETAP pakai var(--p-line-height)
+       MENTAH (tanpa lantai 0.95 seperti #text di atas) supaya jarak
+       antar blok ini bisa terus mengecil sampai nyaris dempet waktu
+       slider "Spasi Baris" ditekan ke batas bawah barunya (20%). */
+    margin: 0 auto calc(clamp(4px, 1.6vh, 20px) * var(--p-line-height, 1.35) / 1.35);
   }
-  .kidung-line-gap { display: block; height: calc(clamp(6px, 1vh, 14px) * var(--p-line-height, 1.35) / 1.35); }
+  .kidung-line-gap { display: block; height: calc(clamp(2px, 1vh, 14px) * var(--p-line-height, 1.35) / 1.35); }
   .kidung-koor-line {
-    color: var(--p-koor, #ffd84a);
-    font-weight: 600;
+    /* Warna & bold TIDAK dipaksa lagi di sini -- syair koor ikut warna
+       tema biasa (var(--p-ink), sama seperti bait), cuma label "Koor:"
+       (.kidung-koor-label di bawah) yang tetap kuning & bold. */
   }
   .kidung-koor-label {
     display: inline-block;
@@ -664,6 +681,7 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin-bottom: 0.3em;
+    color: var(--p-koor, #ffd84a);
   }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
   /* BARU (7 Sep 2026) -- KHUSUS untuk elemen yang posisinya sendiri
@@ -4549,13 +4567,29 @@
       refSubEl.hidden = !kidungSub;
       refSubEl.textContent = kidungSub;
       const escKidung = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-      const baitHtml = (data.bait || [])
-        .map((b) => `<div class="kidung-bait-line">${escKidung((b.noBait ? b.noBait + ". " : "") + (b.teks || "")).replace(/\n/g, "<br>")}</div>`)
-        .join('<div class="kidung-line-gap">&nbsp;</div>');
-      const koorHtml = data.koorTeks
-        ? `<div class="kidung-line-gap">&nbsp;</div><div class="kidung-koor-line"><span class="kidung-koor-label">Koor:</span><br>${escKidung(data.koorTeks).replace(/\n/g, "<br>")}</div>`
+      const baitLineHtml = (b) => `<div class="kidung-bait-line">${escKidung((b.noBait ? b.noBait + ". " : "") + (b.teks || "")).replace(/\n/g, "<br>")}</div>`;
+      const koorBlockHtml = data.koorTeks
+        ? `<div class="kidung-koor-line"><span class="kidung-koor-label">Koor:</span><br>${escKidung(data.koorTeks).replace(/\n/g, "<br>")}</div>`
         : "";
-      textEl.innerHTML = baitHtml + koorHtml;
+      const gapHtml = '<div class="kidung-line-gap">&nbsp;</div>';
+      const baits = data.bait || [];
+      // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah"
+      // (checkbox #psKidungKoorMidToggle di Studio Presentasi, lihat
+      // koorMid di splitKidungIntoSlides()/js/kidung.js): kalau AKTIF
+      // & slide ini punya >1 bait + koor, koor disisipkan PERSIS
+      // sesudah bait PERTAMA (meniru layout buku kidung cetak: bait 1,
+      // Koor, baru bait 2 dst) -- bukan ditempel di paling akhir
+      // seperti bawaan.
+      let textHtml;
+      if (data.koorMid && data.koorTeks && baits.length > 1) {
+        const firstHtml = baitLineHtml(baits[0]);
+        const restHtml = baits.slice(1).map(baitLineHtml).join(gapHtml);
+        textHtml = firstHtml + gapHtml + koorBlockHtml + gapHtml + restHtml;
+      } else {
+        const baitHtml = baits.map(baitLineHtml).join(gapHtml);
+        textHtml = baitHtml + (koorBlockHtml ? gapHtml + koorBlockHtml : "");
+      }
+      textEl.innerHTML = textHtml;
     }
     stageEl.classList.add("fade-in");
   }
@@ -5070,7 +5104,7 @@
   // di ayat/kidung/PDF/apapun") -- interval INI SENDIRI berjalan terus
   // sejak halaman dimuat, TERLEPAS dari apa yang sedang tayang di #stage
   // (ayat/kidung/pengumuman/gambar/PDF/video/Timer/dst) & terlepas dari
-  // status show/hide-nya sendiri (cukup update teksnya tiap detik -- 
+  // status show/hide-nya sendiri (cukup update teksnya tiap detik --
   // murah, elemen ini toh disembunyikan lewat CSS `display:none` selama
   // "cc-on" belum aktif, lihat applyTheme() di atas & CSS
   // #cornerClockOverlay di atas). Ini kebalikan dari #timerClockWrap
