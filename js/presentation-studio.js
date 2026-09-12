@@ -8883,8 +8883,32 @@ const PresentationStudio = (() => {
       magnifyPercent = Number(magnifyZoomSlider.value) || 100;
       magnifyZoomSlider.addEventListener("input", () => {
         magnifyPercent = Number(magnifyZoomSlider.value) || 100;
-        if (magnifyZoomValue) magnifyZoomValue.textContent = magnifyPercent + "%";
+        if (magnifyZoomValue) magnifyZoomValue.value = magnifyPercent;
       });
+    }
+    // BARU (12 Sep 2026, permintaan operator "kolom perbesar bisa diketik
+    // manual pakai keyboard") -- `psMagnifyZoomValue` sekarang <input
+    // type="number"> (lihat index.html), bukan <span> lagi. Dipakai lewat
+    // "change" (jadi TIDAK mengirim apa pun tiap 1 karakter diketik --
+    // baru dibaca setelah operator menekan Enter atau klik di luar kotak,
+    // supaya angka setengah-jadi seperti "3" saat baru mulai mengetik
+    // "350" tidak sempat dipaksa jadi 10% dulu) -- nilai DIJEPIT (clamp)
+    // ke rentang 10-10000% yang sama dengan slider, lalu slider & kotak
+    // sama-sama disegarkan supaya keduanya SELALU sinkron, apa pun cara
+    // terakhir operator mengubah angkanya.
+    if (magnifyZoomValue) {
+      magnifyZoomValue.addEventListener("change", () => {
+        let v = Math.round(Number(magnifyZoomValue.value));
+        if (!Number.isFinite(v)) v = magnifyPercent;
+        v = Math.min(10000, Math.max(10, v));
+        magnifyPercent = v;
+        magnifyZoomValue.value = v;
+        if (magnifyZoomSlider) magnifyZoomSlider.value = v;
+      });
+      // Enter langsung "commit" tanpa perlu pindah fokus dulu (change
+      // baru terpicu kalau kotak kehilangan fokus/blur) -- blur() di
+      // sini otomatis memicu "change" di atas.
+      magnifyZoomValue.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); magnifyZoomValue.blur(); } });
     }
     const magnifyBtns = () => Array.from(document.querySelectorAll("[data-ps-magnify-toggle]"));
     // BARU (12 Sep 2026) -- 🎯 Efek Fokus, lihat catatan panjang di
