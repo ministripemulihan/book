@@ -7309,7 +7309,7 @@ const PresentationStudio = (() => {
             // posisi slider supaya operator bisa lanjut menggeser dari
             // situ, bukan dari 100% yang salah/menyesatkan.
             if (el("psMapZoomSlider")) el("psMapZoomSlider").value = 260;
-            if (el("psMapZoomValue")) el("psMapZoomValue").textContent = "260%";
+            if (el("psMapZoomValue")) el("psMapZoomValue").value = "260";
           }
         });
       });
@@ -8047,12 +8047,13 @@ const PresentationStudio = (() => {
     function sendMapZoom(pct) {
       const scale = pct / 100;
       rawPost({ type: "map", action: "zoom", scale });
-      if (el("psMapZoomValue")) el("psMapZoomValue").textContent = pct + "%";
+      if (el("psMapZoomValue")) el("psMapZoomValue").value = pct;
     }
     if (el("psMapZoomSlider")) {
       el("psMapZoomSlider").addEventListener("input", () => {
         sendMapZoom(Number(el("psMapZoomSlider").value));
       });
+      wireManualValueInput("psMapZoomValue", "psMapZoomSlider");
     }
     if (el("psMapZoomOutBtn")) {
       el("psMapZoomOutBtn").addEventListener("click", () => {
@@ -8076,7 +8077,7 @@ const PresentationStudio = (() => {
     // padahal peta sudah di-reset ke penuh).
     function resetMapZoomSlider() {
       if (el("psMapZoomSlider")) el("psMapZoomSlider").value = 100;
-      if (el("psMapZoomValue")) el("psMapZoomValue").textContent = "100%";
+      if (el("psMapZoomValue")) el("psMapZoomValue").value = "100";
     }
     if (el("psMapShowBtn")) {
       el("psMapShowBtn").addEventListener("click", () => {
@@ -8577,7 +8578,7 @@ const PresentationStudio = (() => {
     if (el("psCamFacingSelect")) el("psCamFacingSelect").value = s.facing;
     if (el("psCamMirror")) el("psCamMirror").checked = !!s.mirror;
     if (el("psCamOutlineSlider")) el("psCamOutlineSlider").value = String(s.outlineWidth);
-    if (el("psCamOutlineValue")) el("psCamOutlineValue").textContent = s.outlineWidth + "px";
+    if (el("psCamOutlineValue")) el("psCamOutlineValue").value = s.outlineWidth;
     if (el("psCamInkColor")) el("psCamInkColor").value = s.customInk;
     if (el("psCamOutlineColor")) el("psCamOutlineColor").value = s.customOutline;
     document.querySelectorAll("[data-ps-cam-text]").forEach((b) => b.classList.toggle("active", b.dataset.psCamText === s.textMode));
@@ -8630,11 +8631,12 @@ const PresentationStudio = (() => {
     }
     function applyOutline() {
       const v = Number(el("psCamOutlineSlider").value);
-      if (el("psCamOutlineValue")) el("psCamOutlineValue").textContent = v + "px";
+      if (el("psCamOutlineValue")) el("psCamOutlineValue").value = v;
       saveCameraSettings({ outlineWidth: v });
       sendLatarTextState();
     }
     if (el("psCamOutlineSlider")) el("psCamOutlineSlider").addEventListener("input", applyOutline);
+    wireManualValueInput("psCamOutlineValue", "psCamOutlineSlider");
     sendLatarTextState(); // kirim gaya tersimpan sekali di awal, siap dipakai begitu Kamera/Gambar dinyalakan
 
     // BARU (8 Sep 2026, permintaan operator) -- toggle Tata Letak
@@ -8666,9 +8668,10 @@ const PresentationStudio = (() => {
     if (el("psCamSplitPctSlider")) {
       el("psCamSplitPctSlider").addEventListener("input", () => {
         const v = Number(el("psCamSplitPctSlider").value) || 42;
-        if (el("psCamSplitPctValue")) el("psCamSplitPctValue").textContent = v + "%";
+        if (el("psCamSplitPctValue")) el("psCamSplitPctValue").value = v;
         saveAndSendTheme({ camSplitPct: v });
       });
+      wireManualValueInput("psCamSplitPctValue", "psCamSplitPctSlider");
     }
     // BARU (8 Sep 2026 v3, permintaan operator "kamera bulat kanan
     // bawah") -- slider "Ukuran lingkaran Kamera" (120px-420px, bawaan
@@ -8676,9 +8679,10 @@ const PresentationStudio = (() => {
     if (el("psCamBubbleSizeSlider")) {
       el("psCamBubbleSizeSlider").addEventListener("input", () => {
         const v = Number(el("psCamBubbleSizeSlider").value) || 200;
-        if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").textContent = v + "px";
+        if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").value = v;
         saveAndSendTheme({ camBubbleSize: v });
       });
+      wireManualValueInput("psCamBubbleSizeValue", "psCamBubbleSizeSlider");
     }
     // BARU (9 Sep 2026, sesi ke-9, permintaan operator "lingkaran kecil
     // di 5 sisi") -- posisi bubble, berlaku untuk mode "Teks Penuh,
@@ -8699,9 +8703,10 @@ const PresentationStudio = (() => {
     if (el("psTextBubbleSizeSlider")) {
       el("psTextBubbleSizeSlider").addEventListener("input", () => {
         const v = Number(el("psTextBubbleSizeSlider").value) || 420;
-        if (el("psTextBubbleSizeValue")) el("psTextBubbleSizeValue").textContent = v + "px";
+        if (el("psTextBubbleSizeValue")) el("psTextBubbleSizeValue").value = v;
         saveAndSendTheme({ textBubbleSize: v });
       });
+      wireManualValueInput("psTextBubbleSizeValue", "psTextBubbleSizeSlider");
     }
     // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
     // toggle "📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video".
@@ -8851,6 +8856,56 @@ const PresentationStudio = (() => {
   // di-resize. Sebelumnya ada pad terpisah di bawah tombol -- sekarang
   // operator gerakkan kursor langsung di atas gambar pratinjau.
   // ------------------------------------------------------------
+  // BARU (12 Sep 2026, permintaan operator "semua slider bisa diketik
+  // manual + ada tanda 2 segitiga seperti Kaca Pembesar") -- helper
+  // umum yang dipakai SEMUA kolom angka slider di panel ini (Ukuran
+  // Pen, Ukuran Teks, Spasi Baris, Ukuran Konten, Ukuran Timer,
+  // Ukuran Zona Kamera, Ukuran Lingkaran Kamera/Teks, Ketebalan
+  // Border, Zoom Peta, dst) supaya SEMUANYA berkelakuan SAMA PERSIS
+  // seperti kolom zoom 🔍 Kaca Pembesar (lihat `magnifyZoomValue` di
+  // wirePointerPen() bawah): angkanya bisa DIKETIK manual (dijepit ke
+  // rentang min-max slider terkait, commit lewat Enter atau klik di
+  // luar kotak), DAN otomatis dapat panah atas/bawah "▲▼" (tanda 2
+  // segitiga) bawaan browser untuk <input type="number"> lewat class
+  // css "ps-pen-size-value-input" (lihat style.css) -- tidak perlu
+  // digambar manual, itu tombol spinner NATIVE dari <input type=
+  // "number">.
+  //
+  // Cara pakai: cukup panggil wireManualValueInput("idInputAngka",
+  // "idSliderTerkait") SEKALI setelah slider terkait sudah dipasangi
+  // listener "input"-nya sendiri (applyScale(), applyOutline(), dst) --
+  // helper ini TIDAK mengulang logika slider tsb, cuma menyalin angka
+  // yang diketik ke slider lalu memicu ulang event "input" bawaan
+  // slider itu (dispatchEvent), jadi 1 sumber logika saja yang perlu
+  // dijaga (di slider), bukan 2 (slider + kotak angka) yang gampang
+  // beda kalau salah satu diubah tapi lupa ubah yang lain.
+  function wireManualValueInput(numberInputId, sliderId) {
+    const input = el(numberInputId);
+    const slider = el(sliderId);
+    if (!input || !slider) return;
+    const min = Number(slider.min || input.min) || 0;
+    const max = Number(slider.max || input.max) || 100;
+    function commit() {
+      let v = Math.round(Number(input.value));
+      if (!Number.isFinite(v)) v = Number(slider.value) || min;
+      v = Math.min(max, Math.max(min, v));
+      input.value = v;
+      if (Number(slider.value) !== v) {
+        slider.value = v;
+        // Memicu ulang listener "input" slider ini supaya semua efek
+        // (kirim ke Layar 2, simpan tema, dst) berjalan SAMA PERSIS
+        // seperti kalau operator menggeser slidernya langsung.
+        slider.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+    input.addEventListener("change", commit);
+    // Enter langsung "commit" tanpa perlu pindah fokus dulu (change
+    // baru terpicu kalau kotak kehilangan fokus/blur) -- blur() di
+    // sini otomatis memicu "change" di atas. Sama seperti kolom zoom
+    // Kaca Pembesar.
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
+  }
+
   function wirePointerPen() {
     const wrap = el("psPreviewBoxWrap");
     const dot = el("psPointerDot");
@@ -8869,9 +8924,10 @@ const PresentationStudio = (() => {
       penSize = Number(sizeSlider.value) || 17;
       sizeSlider.addEventListener("input", () => {
         penSize = Number(sizeSlider.value) || 17;
-        if (sizeValueEl) sizeValueEl.textContent = penSize + "px";
+        if (sizeValueEl) sizeValueEl.value = penSize;
       });
     }
+    wireManualValueInput("psPenSizeValue", "psPenSizeSlider");
 
     // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar: zoom 10%-10000% (default
     // 100%), dikirim bersama posisi kursor tiap mousemove (lihat blok
@@ -9125,10 +9181,10 @@ const PresentationStudio = (() => {
     if (el("psFontScale")) el("psFontScale").value = String(Math.round(theme.scale * 100));
     // BARU (4 Sep 2026) -- pulihkan juga angka % yang ditampilkan di
     // samping slider Ukuran Teks/Spasi Baris saat panel dibuka ulang.
-    if (el("psFontScaleValue")) el("psFontScaleValue").textContent = Math.round(theme.scale * 100) + "%";
-    if (el("psFontScaleValueCam")) el("psFontScaleValueCam").textContent = Math.round(theme.scale * 100) + "%"; // BARU (7 Sep 2026 v4)
+    if (el("psFontScaleValue")) el("psFontScaleValue").value = Math.round(theme.scale * 100);
+    if (el("psFontScaleValueCam")) el("psFontScaleValueCam").value = Math.round(theme.scale * 100); // BARU (7 Sep 2026 v4)
     if (el("psLineHeight")) el("psLineHeight").value = String(Math.round(theme.lineHeight * 100));
-    if (el("psLineHeightValue")) el("psLineHeightValue").textContent = Math.round(theme.lineHeight * 100) + "%";
+    if (el("psLineHeightValue")) el("psLineHeightValue").value = Math.round(theme.lineHeight * 100);
     // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
     // layar), lihat catatan --p-content-scale di present.html.
     if (el("psContentScale")) el("psContentScale").value = String(Math.round((theme.contentScale || 1) * 100));
@@ -9136,7 +9192,7 @@ const PresentationStudio = (() => {
     // panel Studio dibuka ulang/dimuat ulang, pola sama seperti
     // psContentScale di atas.
     if (el("psTimerScale")) el("psTimerScale").value = String(Math.round((theme.timerScale || 1) * 100));
-    if (el("psTimerScaleValue")) el("psTimerScaleValue").textContent = Math.round((theme.timerScale || 1) * 100) + "%";
+    if (el("psTimerScaleValue")) el("psTimerScaleValue").value = Math.round((theme.timerScale || 1) * 100);
     // PERBAIKAN (7 Sep 2026) -- pulihkan juga tombol aktif "WARNA ANGKA
     // COUNTDOWN" (Jam Target) saat panel dibuka ulang -- sebelumnya tidak
     // dipulihkan sama sekali di sini (beda dari kirim ke Layar 2 di atas
@@ -9186,7 +9242,7 @@ const PresentationStudio = (() => {
     if (el("psCamSplitPctSlider")) {
       const savedPct = theme.camSplitPct || 42;
       el("psCamSplitPctSlider").value = String(savedPct);
-      if (el("psCamSplitPctValue")) el("psCamSplitPctValue").textContent = savedPct + "%";
+      if (el("psCamSplitPctValue")) el("psCamSplitPctValue").value = savedPct;
     }
     // BARU (9 Sep 2026) -- pulihkan centang "Balik Sisi".
     if (el("psCamSplitReverse")) el("psCamSplitReverse").checked = !!theme.camSplitReverse;
@@ -9197,7 +9253,7 @@ const PresentationStudio = (() => {
     if (el("psCamBubbleSizeSlider")) {
       const savedBubble = theme.camBubbleSize || 200;
       el("psCamBubbleSizeSlider").value = String(savedBubble);
-      if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").textContent = savedBubble + "px";
+      if (el("psCamBubbleSizeValue")) el("psCamBubbleSizeValue").value = savedBubble;
     }
     // BARU (9 Sep 2026, sesi ke-9) -- pulihkan tombol posisi bubble aktif
     // & slider "Ukuran lingkaran Teks" (mode textbubble).
@@ -9210,7 +9266,7 @@ const PresentationStudio = (() => {
     if (el("psTextBubbleSizeSlider")) {
       const savedTextBubble = theme.textBubbleSize || 420;
       el("psTextBubbleSizeSlider").value = String(savedTextBubble);
-      if (el("psTextBubbleSizeValue")) el("psTextBubbleSizeValue").textContent = savedTextBubble + "px";
+      if (el("psTextBubbleSizeValue")) el("psTextBubbleSizeValue").value = savedTextBubble;
     }
     // BARU (8 Sep 2026) -- pulihkan status centang "Ayat/Kidung/Pengumuman
     // TETAP tampil di atas video".
@@ -9341,11 +9397,11 @@ const PresentationStudio = (() => {
     if (el("psFontBold")) el("psFontBold").addEventListener("change", () => saveAndSendTheme({ bold: el("psFontBold").checked }));
     function applyScale() {
       const pct = Number(el("psFontScale").value);
-      if (el("psFontScaleValue")) el("psFontScaleValue").textContent = pct + "%"; // BARU (4 Sep 2026)
+      if (el("psFontScaleValue")) el("psFontScaleValue").value = pct; // BARU (4 Sep 2026)
       // BARU (7 Sep 2026 v4) -- ikut perbarui angka % di panel gabungan
       // (tab "📷 Kamera") juga, supaya ketiga tempat A-/A+ selalu tampil
       // angka yang sama persis.
-      if (el("psFontScaleValueCam")) el("psFontScaleValueCam").textContent = pct + "%";
+      if (el("psFontScaleValueCam")) el("psFontScaleValueCam").value = pct;
       saveAndSendTheme({ scale: pct / 100 });
     }
     if (el("psFontScale")) el("psFontScale").addEventListener("input", applyScale);
@@ -9356,6 +9412,15 @@ const PresentationStudio = (() => {
     // sama, cuma sekarang bisa diteruskan lebih jauh.
     if (el("psFontDec")) el("psFontDec").addEventListener("click", () => { el("psFontScale").value = Math.max(60, Number(el("psFontScale").value) - 10); applyScale(); });
     if (el("psFontInc")) el("psFontInc").addEventListener("click", () => { el("psFontScale").value = Math.min(480, Number(el("psFontScale").value) + 10); applyScale(); });
+    // BARU (12 Sep 2026) -- kolom angka bisa diketik manual, SAMA
+    // seperti Kaca Pembesar (lihat wireManualValueInput() di atas
+    // wirePointerPen()). psFontScaleValueCam TIDAK punya slider
+    // sendiri (cuma duplikat tampilan di tab "📷 Kamera"), jadi
+    // sengaja diarahkan ke slider psFontScale yang SAMA -- mengetik
+    // angka di SALAH SATU dari 2 kotak ini (tab Tampilan atau tab
+    // Kamera) otomatis menyamakan keduanya lewat applyScale().
+    wireManualValueInput("psFontScaleValue", "psFontScale");
+    wireManualValueInput("psFontScaleValueCam", "psFontScale");
     // Duplikat A-/A+ di baris ps-preview-quicktools (selalu kelihatan di
     // atas kotak "Tayang") -- pakai fungsi applyScale() & psFontScale yang
     // SAMA (sumber kebenaran tetap 1: psFontScale), jadi kedua pasang
@@ -9377,12 +9442,13 @@ const PresentationStudio = (() => {
     // terlihat dari jauh (permainan/aktivitas), bukan cuma ayat.
     function applyTimerScale() {
       const pct = Number(el("psTimerScale").value);
-      if (el("psTimerScaleValue")) el("psTimerScaleValue").textContent = pct + "%";
+      if (el("psTimerScaleValue")) el("psTimerScaleValue").value = pct;
       saveAndSendTheme({ timerScale: pct / 100 });
     }
     if (el("psTimerScale")) el("psTimerScale").addEventListener("input", applyTimerScale);
     if (el("psTimerScaleDec")) el("psTimerScaleDec").addEventListener("click", () => { el("psTimerScale").value = Math.max(50, Number(el("psTimerScale").value) - 25); applyTimerScale(); });
     if (el("psTimerScaleInc")) el("psTimerScaleInc").addEventListener("click", () => { el("psTimerScale").value = Math.min(1000, Number(el("psTimerScale").value) + 25); applyTimerScale(); });
+    wireManualValueInput("psTimerScaleValue", "psTimerScale");
     // BARU (28 Agu 2026) -- "Spasi Baris" (line-height Layar 2, lihat
     // --p-line-height di present.html). PERMINTAAN OPERATOR: teks
     // panjang (mis. hasil unggah file Word/.doc, lihat wireFileTab())
@@ -9392,7 +9458,7 @@ const PresentationStudio = (() => {
     // sendiri-sendiri (font besar+spasi rapat, atau sebaliknya).
     function applyLineHeight() {
       const pct = Number(el("psLineHeight").value);
-      if (el("psLineHeightValue")) el("psLineHeightValue").textContent = pct + "%"; // BARU (4 Sep 2026)
+      if (el("psLineHeightValue")) el("psLineHeightValue").value = pct; // BARU (4 Sep 2026)
       saveAndSendTheme({ lineHeight: pct / 100 });
     }
     if (el("psLineHeight")) el("psLineHeight").addEventListener("input", applyLineHeight);
@@ -9400,6 +9466,7 @@ const PresentationStudio = (() => {
     // di input range-nya sendiri di index.html).
     if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(60, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
     if (el("psLineHeightInc")) el("psLineHeightInc").addEventListener("click", () => { el("psLineHeight").value = Math.min(250, Number(el("psLineHeight").value) + 10); applyLineHeight(); });
+    wireManualValueInput("psLineHeightValue", "psLineHeight");
 
     // BARU (28 Agu 2026) -- "Ukuran Konten": lebar kotak teks/jarak
     // tepi di Layar 2 (lihat --p-content-scale di present.html) --
@@ -9408,12 +9475,13 @@ const PresentationStudio = (() => {
     // (>100%) supaya teks memakai hampir seluruh lebar layar.
     function applyContentScale() {
       const pct = Number(el("psContentScale").value);
-      if (el("psContentScaleValue")) el("psContentScaleValue").textContent = pct + "%";
+      if (el("psContentScaleValue")) el("psContentScaleValue").value = pct;
       saveAndSendTheme({ contentScale: pct / 100 });
     }
     if (el("psContentScale")) el("psContentScale").addEventListener("input", applyContentScale);
     if (el("psContentScaleDec")) el("psContentScaleDec").addEventListener("click", () => { el("psContentScale").value = Math.max(60, Number(el("psContentScale").value) - 10); applyContentScale(); });
     if (el("psContentScaleInc")) el("psContentScaleInc").addEventListener("click", () => { el("psContentScale").value = Math.min(140, Number(el("psContentScale").value) + 10); applyContentScale(); });
+    wireManualValueInput("psContentScaleValue", "psContentScale");
   }
 
   // ------------------------------------------------------------
