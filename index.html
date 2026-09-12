@@ -2156,7 +2156,7 @@
             <span class="ps-pen-size-label" title="Paling kecil">•</span>
             <input type="range" id="psPenSizeSlider" min="2" max="40" step="1" value="17" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Paling besar">●</span>
-            <span id="psPenSizeValue" class="ps-pen-size-value">17px</span>
+            <input type="number" id="psPenSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="2" max="40" step="1" value="17" title="Ketik angka ukuran Pen manual (2-40), lalu tekan Enter" />px
           </div>
           <div class="ps-pointer-hint" id="psPointerHint">Gerakkan kursor di atas kotak pratinjau "Tayang" di atas saat Penunjuk/Pen aktif.</div>
 
@@ -2241,7 +2241,7 @@
             <input type="range" id="psFontScale" min="60" max="480" value="100" style="flex:1;" />
             <button type="button" id="psFontInc" class="chip-btn small">A+</button>
             <!-- BARU (4 Sep 2026, permintaan operator) -->
-            <span id="psFontScaleValue" class="ps-pen-size-value">100%</span>
+            <input type="number" id="psFontScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="480" step="1" value="100" title="Ketik angka Ukuran Teks manual (60-480), lalu tekan Enter" />%
           </div>
           <!-- BARU (28 Agu 2026) -- "Spasi Baris" (jarak antar baris di
                Layar 2), dipisah dari "Ukuran Teks" -- lihat --p-line-height
@@ -2259,7 +2259,7 @@
                  dirapatkan lebih jauh lagi kalau memang terasa kebesaran. -->
             <input type="range" id="psLineHeight" min="60" max="250" value="135" style="flex:1;" />
             <button type="button" id="psLineHeightInc" class="chip-btn small" title="Renggangkan spasi baris">≡+</button>
-            <span id="psLineHeightValue" class="ps-pen-size-value">135%</span>
+            <input type="number" id="psLineHeightValue" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="250" step="1" value="135" title="Ketik angka Spasi Baris manual (60-250), lalu tekan Enter" />%
           </div>
           <!-- BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak
                teks/jarak tepi di Layar 2) -- lihat applyContentScale()
@@ -2271,7 +2271,7 @@
             <button type="button" id="psContentScaleDec" class="chip-btn small" title="Persempit kotak teks">▭-</button>
             <input type="range" id="psContentScale" min="60" max="140" value="100" style="flex:1;" />
             <button type="button" id="psContentScaleInc" class="chip-btn small" title="Lebarkan kotak teks">▭+</button>
-            <span id="psContentScaleValue" class="ps-pen-size-value">100%</span>
+            <input type="number" id="psContentScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="140" step="1" value="100" title="Ketik angka Ukuran Konten manual (60-140), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Mengatur seberapa lebar kotak teks memakai layar -- persempit supaya latar (Kamera/Gambar) lebih terlihat di tepi, atau lebarkan supaya teks memakai hampir seluruh layar.</div>
           <!-- BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/
@@ -2290,7 +2290,7 @@
             <button type="button" id="psTimerScaleDec" class="chip-btn small" title="Perkecil angka Timer/Stopwatch">A-</button>
             <input type="range" id="psTimerScale" min="50" max="1000" value="100" step="10" style="flex:1;" />
             <button type="button" id="psTimerScaleInc" class="chip-btn small" title="Perbesar angka Timer/Stopwatch">A+</button>
-            <span id="psTimerScaleValue" class="ps-pen-size-value">100%</span>
+            <input type="number" id="psTimerScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="50" max="1000" step="10" value="100" title="Ketik angka Ukuran Timer/Stopwatch manual (50-1000), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Khusus memperbesar/memperkecil angka ⏱️ Timer & Stopwatch di Layar 2 (tidak memengaruhi ukuran ayat/teks/kidung) -- bisa sampai 10x lebih besar, cocok untuk permainan/aktivitas yang perlu terlihat dari jauh.</div>
         </div>
@@ -2400,7 +2400,7 @@
             <span class="ps-pen-size-label" title="Zona kamera kecil">▭</span>
             <input type="range" id="psCamSplitPctSlider" min="10" max="90" step="1" value="42" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Zona kamera besar">▮</span>
-            <span id="psCamSplitPctValue" class="ps-pen-size-value">42%</span>
+            <input type="number" id="psCamSplitPctValue" class="ps-pen-size-value ps-pen-size-value-input" min="10" max="90" step="1" value="42" title="Ketik angka Ukuran Zona Kamera manual (10-90), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Geser ke kanan supaya Kamera/Gambar Latar mendapat porsi layar lebih besar (dan zona ayat/kidung/pengumuman mengecil) -- atau ke kiri untuk sebaliknya. Di mode "Kamera Kiri, Konten Kanan" slider yang sama ini mengatur LEBAR (bukan tinggi) zona kamera.</div>
 
@@ -2436,7 +2436,7 @@
             <span class="ps-pen-size-label" title="Lingkaran kecil">◦</span>
             <input type="range" id="psCamBubbleSizeSlider" min="120" max="1200" step="20" value="200" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Lingkaran sangat besar">●</span>
-            <span id="psCamBubbleSizeValue" class="ps-pen-size-value">200px</span>
+            <input type="number" id="psCamBubbleSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="120" max="1200" step="20" value="200" title="Ketik angka Ukuran Lingkaran Kamera manual (120-1200), lalu tekan Enter" />px
           </div>
 
           <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks
@@ -2474,7 +2474,7 @@
             <span class="ps-pen-size-label" title="Lingkaran kecil">◦</span>
             <input type="range" id="psTextBubbleSizeSlider" min="200" max="1200" step="20" value="420" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Lingkaran sangat besar">●</span>
-            <span id="psTextBubbleSizeValue" class="ps-pen-size-value">420px</span>
+            <input type="number" id="psTextBubbleSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="200" max="1200" step="20" value="420" title="Ketik angka Ukuran Lingkaran Teks manual (200-1200), lalu tekan Enter" />px
           </div>
           <div class="ps-pointer-hint">Catatan: teks yang sangat panjang mungkin perlu di-scroll sendiri di dalam lingkaran kalau lingkarannya diperkecil -- perbesar lingkaran atau perkecil "Ukuran Huruf" (panel 🎨) kalau ingin semua teks langsung terlihat penuh.</div>
 
@@ -2588,7 +2588,7 @@
           <div class="ps-field-label" style="margin-top:10px;">Ukuran huruf</div>
           <div class="ps-btn-row" style="align-items:center;">
             <button type="button" id="psFontDecCam" class="chip-btn small" title="Perkecil huruf">A-</button>
-            <span id="psFontScaleValueCam" class="ps-pen-size-value">100%</span>
+            <input type="number" id="psFontScaleValueCam" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="480" step="1" value="100" title="Ketik angka Ukuran Huruf manual (60-480), lalu tekan Enter" />%
             <button type="button" id="psFontIncCam" class="chip-btn small" title="Perbesar huruf">A+</button>
           </div>
           <div class="ps-field-label" style="margin-top:14px;">Warna tulisan & stroke (kontur)</div>
@@ -2618,7 +2618,7 @@
             <span class="ps-pen-size-label" title="Tipis">•</span>
             <input type="range" id="psCamOutlineSlider" min="1" max="8" step="1" value="3" />
             <span class="ps-pen-size-label ps-pen-size-label-big" title="Tebal">●</span>
-            <span id="psCamOutlineValue" class="ps-pen-size-value">3px</span>
+            <input type="number" id="psCamOutlineValue" class="ps-pen-size-value ps-pen-size-value-input" min="1" max="8" step="1" value="3" title="Ketik angka Ketebalan Border manual (1-8), lalu tekan Enter" />px
           </div>
           <div class="ps-pointer-hint">Latar (Kamera/Gambar) tetap otomatis tersembunyi saat "⬛ Hitam" / "◆ Logo" / slide file / video YouTube sedang tayang -- warna/stroke/ukuran huruf di atas TETAP berlaku (tidak ikut hilang). Spasi baris & lebar kotak teks masih di tab "🎨 Tampilan".</div>
         </div>
@@ -2928,7 +2928,7 @@
             <button type="button" id="psMapZoomOutBtn" class="chip-btn small">➖</button>
             <input type="range" id="psMapZoomSlider" min="100" max="600" step="10" value="100" style="flex:1;" />
             <button type="button" id="psMapZoomInBtn" class="chip-btn small">➕</button>
-            <span id="psMapZoomValue" class="ps-pointer-hint" style="min-width:44px; text-align:right;">100%</span>
+            <input type="number" id="psMapZoomValue" class="ps-pen-size-value ps-pen-size-value-input" min="100" max="600" step="10" value="100" style="min-width:44px;" title="Ketik angka Zoom Peta manual (100-600), lalu tekan Enter" />%
           </div>
 
           <div class="ps-btn-row" style="margin-top:10px;">
