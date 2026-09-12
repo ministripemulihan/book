@@ -209,6 +209,15 @@ const PresentationStudio = (() => {
   // supaya jendela Layar 2 & status buka/tutupnya tetap 1 sumber
   // kebenaran, dan supaya gerakan Penunjuk/Pen (dikirim tiap mousemove)
   // TIDAK membuka jendela baru / merebut fokus berkali-kali.
+  // BARU (12 Sep 2026 v4, laporan operator "sudah pilih Sesuai Lebar
+  // tapi gambar yang SEDANG tayang tidak berubah, harus pindah halaman
+  // dulu baru kelihatan") -- disimpan di sini SETIAP kali sebuah slide
+  // gambar/PDF berhasil dikirim ke Layar 2, supaya tombol mode ukuran
+  // di panel "🎨 Tampilan" (wireSlideDisplayModeControls_() di bawah)
+  // bisa langsung MENGIRIM ULANG slide yang sama dengan displayMode
+  // baru begitu diklik -- operator tidak perlu ◀ ▶ dulu untuk melihat
+  // hasilnya di slide yang sedang tayang saat itu juga.
+  let lastSlidePayload_ = null;
   function rawPost(payload) {
     if (typeof Presentation === "undefined" || !Presentation.postRaw) return;
     // BARU (12 Sep 2026, permintaan operator "3 model ukuran gambar/PDF
@@ -223,13 +232,28 @@ const PresentationStudio = (() => {
     // karena pengaturannya dibaca ulang setiap kali (bukan disimpan di
     // payload sekali saja), otomatis tetap "nempel" ke posisi/mode yang
     // sama waktu operator pindah ◀ ▶ ke halaman berikutnya.
-    if (payload && payload.type === "slide" && !payload.displayMode) {
-      const mode = getSlideDisplayMode_();
-      payload.displayMode = mode.displayMode;
-      payload.zoomPct = mode.zoomPct;
+    if (payload && payload.type === "slide") {
+      if (!payload.displayMode) {
+        const mode = getSlideDisplayMode_();
+        payload.displayMode = mode.displayMode;
+        payload.zoomPct = mode.zoomPct;
+      }
+      lastSlidePayload_ = payload;
     }
     Presentation.postRaw(payload);
     syncMonitorVideoForPayload_(payload); // BARU (10 Sep 2026, lanjutan) -- lihat catatan di fungsi ini
+  }
+  // Dipakai wireSlideDisplayModeControls_() supaya klik tombol
+  // Asli/Sesuai Lebar/Zoom langsung terlihat di slide yang SEDANG
+  // tayang (bukan cuma berlaku utk slide berikutnya).
+  function reapplyCurrentSlideDisplayMode_() {
+    if (!lastSlidePayload_ || lastSlidePayload_.type !== "slide") return;
+    const mode = getSlideDisplayMode_();
+    const resend = Object.assign({}, lastSlidePayload_, {
+      displayMode: mode.displayMode,
+      zoomPct: mode.zoomPct,
+    });
+    rawPost(resend);
   }
 
   // BARU (12 Sep 2026) -- pengaturan "🎨 Tampilan" -> "Ukuran Gambar/PDF
@@ -715,7 +739,21 @@ const PresentationStudio = (() => {
       const isMedia = it && it.type === "media" && it.mediaItemId;
       const mediaGroupN = isMedia ? mediaGroupCount[it.mediaItemId] : 0;
       const showMediaGroupDelete = isMedia && mediaGroupN > 1 && mediaGroupFirstIdx[it.mediaItemId] === i;
+      // BARU (12 Sep 2026 v6, permintaan operator "kok tidak keluar
+      // gambar detil setiap halaman, cuma tulisan") -- untuk item
+      // "media" (halaman PDF/gambar), tampilkan THUMBNAIL kecil isi
+      // halaman itu sendiri di samping tulisan referensinya, bukan
+      // cuma teks "WG 260906 (hal 2/7)" polos. `src` thumbnail diisi
+      // BELAKANGAN secara async oleh fillCollectionThumbnails_() di
+      // bawah (gambar aslinya tersimpan di IndexedDB Media Tersimpan,
+      // bukan di objek `it` ini sendiri -- lihat sendMediaSlideFromCollection()
+      // di atas untuk pola async yang sama) -- di sini cukup taruh
+      // elemen <img> kosong dengan data-atribut penanda posisinya.
+      const thumbHtml = isMedia
+        ? `<img class="ps-verse-thumb" alt="" data-thumb-media-id="${escapeHtml(it.mediaItemId)}" data-thumb-page="${it.pageIndex || 0}" hidden />`
+        : "";
       row.innerHTML =
+        thumbHtml +
         `<div class="ps-verse-row-body"><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
@@ -796,6 +834,40 @@ const PresentationStudio = (() => {
       wrap.appendChild(row);
     });
     highlightActivePlaylistRow();
+    fillCollectionThumbnails_(wrap, username); // isi <img> thumbnail halaman PDF/gambar (lihat catatan di atas)
+  }
+
+  // BARU (12 Sep 2026 v6) -- lihat catatan panjang di renderCollectionList()
+  // di atas ("thumbHtml"). Dipanggil SEKALI per render (bukan per baris)
+  // supaya loadMediaItems() (baca IndexedDB, lumayan berat kalau Media
+  // Tersimpan isinya banyak) cuma jalan SEKALI, hasilnya dipakai untuk
+  // SEMUA baris thumbnail sekaligus. Async & tidak diawait oleh pemanggil
+  // (renderCollectionList() TETAP sinkron seperti sebelumnya) -- begitu
+  // datanya siap, <img> yang masih ada di DOM (belum keburu di-render
+  // ulang lagi oleh klik lain) langsung diisi `src`+dimunculkan.
+  let collectionThumbToken_ = 0;
+  async function fillCollectionThumbnails_(wrap, username) {
+    const thumbEls = Array.from(wrap.querySelectorAll("img.ps-verse-thumb[data-thumb-media-id]"));
+    if (!thumbEls.length || typeof loadMediaItems !== "function") return;
+    const myToken = ++collectionThumbToken_; // batalkan hasil lama kalau render lain sudah menyusul duluan
+    let mediaItems;
+    try {
+      mediaItems = await loadMediaItems(username);
+    } catch (e) {
+      return;
+    }
+    if (myToken !== collectionThumbToken_) return; // sudah usang, render lain sudah menggantikan
+    const byId = {};
+    (mediaItems || []).forEach((m) => { byId[m.id] = m; });
+    thumbEls.forEach((imgEl) => {
+      const found = byId[imgEl.dataset.thumbMediaId];
+      if (!found || found.type === "youtube" || !found.images || !found.images.length) return;
+      const pageIdx = Math.min(parseInt(imgEl.dataset.thumbPage, 10) || 0, found.images.length - 1);
+      const src = found.images[pageIdx];
+      if (!src) return;
+      imgEl.src = src;
+      imgEl.hidden = false;
+    });
   }
 
   // Tombol "✎ Atur Urutan" di atas daftar Kumpulan Ayat -- cuma
@@ -10070,12 +10142,14 @@ const PresentationStudio = (() => {
       btn.addEventListener("click", () => {
         setSlideDisplayMode_(btn.dataset.slideMode);
         refreshActive(btn.dataset.slideMode);
+        reapplyCurrentSlideDisplayMode_(); // langsung terlihat di slide yang sedang tayang
       });
     });
     function applyZoomPct() {
       const pct = Math.max(100, Math.min(400, Number(zoomSlider.value) || 150));
       if (zoomValue) zoomValue.value = pct;
       setSlideZoomPct_(pct);
+      reapplyCurrentSlideDisplayMode_(); // slider Zoom juga langsung terlihat live
     }
     if (zoomSlider) zoomSlider.addEventListener("input", applyZoomPct);
     wireManualValueInput("psSlideZoomPctValue", "psSlideZoomPct");
