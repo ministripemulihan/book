@@ -2424,6 +2424,16 @@ const PresentationStudio = (() => {
   let timerMode_ = "duration";
   let timerClockEndAt_ = null; // epoch ms jam target -- null kalau tidak sedang berjalan
   let timerClockDisplayInterval_ = null;
+  // BARU (12 Sep 2026 v2) -- mode ke-3 "🕐 Jam" (jam dinding BERJALAN,
+  // beda dari "clock"/Jam Target di atas yang hitung MUNDUR ke 1 titik
+  // -- mode ini TIDAK PERNAH "selesai", cuma terus menampilkan jam
+  // sekarang sampai dihentikan manual). Numpang timerClockWrap/
+  // timerClockDisplayInterval_ punya "clock" untuk pratinjau standby
+  // (lihat syncTimerNowPreview_()), tapi START/STOP-nya sendiri
+  // (rawPost type:"timerclock") lewat startTimerNow_()/stopTimerNow_()
+  // di bawah, dibedakan dari mode "clock" lewat flag `isNow:true`.
+  let timerNowStyle_ = "digital"; // "digital" | "analog" -- lihat psTimerNowStyleRow (index.html)
+  let timerNowPreviewInterval_ = null;
 
   function fmtMMSS(totalSec) {
     const s = Math.max(0, Math.round(totalSec));
@@ -2473,6 +2483,27 @@ const PresentationStudio = (() => {
     disp.textContent = targetMs == null ? "00:00:00" : fmtHMS_(Math.max(0, (targetMs - Date.now()) / 1000));
   }
 
+  // BARU (12 Sep 2026 v2) -- pratinjau (#psTimerDisplay) untuk mode
+  // "🕐 Jam" SAAT standby -- BEDA dari syncTimerClockPreview_() di atas
+  // (yang statis, cuma dihitung ulang saat jam target diubah): di sini
+  // jamnya sendiri terus berjalan (jam dinding sungguhan), jadi perlu
+  // interval sendiri supaya pratinjau di Studio pun ikut berdetak,
+  // bukan cuma diam di angka saat mode pertama dipilih. Interval
+  // DIHENTIKAN begitu timer benar-benar mulai (lihat startTimerNow_())
+  // atau mode diganti (lihat setTimerMode_()).
+  function stopTimerNowPreview_() {
+    if (timerNowPreviewInterval_) { clearInterval(timerNowPreviewInterval_); timerNowPreviewInterval_ = null; }
+  }
+  function syncTimerNowPreview_() {
+    if (timerMode_ !== "now") return;
+    const disp = el("psTimerDisplay");
+    if (!disp) return;
+    const tick = () => { disp.textContent = fmtHMS_((Date.now() - new Date().setHours(0, 0, 0, 0)) / 1000); };
+    tick();
+    stopTimerNowPreview_();
+    timerNowPreviewInterval_ = setInterval(tick, 1000);
+  }
+
   // Menampilkan/menyembunyikan tombol Timer sesuai timerState_ SEKARANG
   // -- SATU-SATUNYA tempat yang boleh mengubah `hidden`/teks tombol,
   // supaya tidak ada 2 tempat kode yang bisa saling menimpa keputusan
@@ -2485,29 +2516,37 @@ const PresentationStudio = (() => {
     const modeBtns = Array.from(document.querySelectorAll("[data-timer-mode]"));
     const disp = el("psTimerDisplay");
     const isClock = timerMode_ === "clock";
+    // BARU (12 Sep 2026 v2) -- mode ke-3 "🕐 Jam" (jam dinding berjalan).
+    // Diperlakukan SAMA seperti "clock" (Jam Target) untuk hal-hal yang
+    // memang tidak masuk akal di kedua mode itu (Jeda/Lanjut, pratinjau
+    // standby berkedip) -- lihat catatan masing-masing di bawah.
+    const isNow = timerMode_ === "now";
+    const isNonDuration = isClock || isNow;
     if (disp) {
       disp.classList.toggle("ps-timer-standby", timerState_ === "standby");
       disp.classList.toggle("done", timerState_ === "done");
     }
     if (startBtn) {
       startBtn.hidden = timerState_ === "running" || timerState_ === "done";
-      startBtn.textContent = (!isClock && timerState_ === "paused") ? "▶️ Lanjut" : "▶️ Mulai";
-      startBtn.title = (!isClock && timerState_ === "paused") ? "Lanjutkan dari sisa waktu" : "Mulai";
+      startBtn.textContent = (!isNonDuration && timerState_ === "paused") ? "▶️ Lanjut" : "▶️ Mulai";
+      startBtn.title = (!isNonDuration && timerState_ === "paused") ? "Lanjutkan dari sisa waktu" : "Mulai";
     }
-    // BARU (7 Sep 2026) -- "⏸️ Jeda" TIDAK berlaku untuk mode "clock":
-    // jam target sudah pasti (mis. jam 19:00), "dijeda" lalu "dilanjut"
-    // tidak masuk akal -- jam targetnya tidak ikut mundur. Lihat catatan
-    // panjang startTimerClock_() di bawah.
-    if (pauseBtn) pauseBtn.hidden = isClock || timerState_ !== "running";
+    // BARU (7 Sep 2026) -- "⏸️ Jeda" TIDAK berlaku untuk mode "clock"
+    // ATAU "now" (BARU 12 Sep 2026 v2): jam target sudah pasti (mis. jam
+    // 19:00) atau memang jam dinding sungguhan -- "dijeda" lalu
+    // "dilanjut" tidak masuk akal untuk keduanya. Lihat catatan panjang
+    // startTimerClock_() di bawah.
+    if (pauseBtn) pauseBtn.hidden = isNonDuration || timerState_ !== "running";
     if (resetBtn) {
       resetBtn.hidden = timerState_ === "standby";
-      resetBtn.textContent = isClock ? "⏹️ Hentikan" : "🔁 Ulang";
-      resetBtn.title = isClock ? "Hentikan & sembunyikan dari Layar 2" : "Ulang dari standby";
+      resetBtn.textContent = isNonDuration ? "⏹️ Hentikan" : "🔁 Ulang";
+      resetBtn.title = isNonDuration ? "Hentikan & sembunyikan dari Layar 2" : "Ulang dari standby";
     }
     // BARU (7 Sep 2026) -- "👁️ Tampilkan" (preview standby berkedip) cuma
-    // relevan SAAT standby & mode "duration" -- belum didukung utk "clock"
-    // (jam target tidak butuh pratinjau berkedip, jam-nya sudah jelas).
-    if (previewBtn) previewBtn.hidden = isClock || timerState_ !== "standby";
+    // relevan SAAT standby & mode "duration" -- belum didukung utk
+    // "clock"/"now" (jam target/jam dinding tidak butuh pratinjau
+    // berkedip, jam-nya sudah jelas/langsung berjalan).
+    if (previewBtn) previewBtn.hidden = isNonDuration || timerState_ !== "standby";
     // BARU (7 Sep 2026) -- ganti mode HANYA bisa saat standby (belum
     // berjalan) -- kalau sedang berjalan/dijeda/selesai, tombol mode
     // dinonaktifkan supaya operator tidak bingung ganti mode di tengah
@@ -2516,10 +2555,13 @@ const PresentationStudio = (() => {
       b.classList.toggle("active", b.dataset.timerMode === timerMode_);
       b.disabled = timerState_ !== "standby";
     });
-    if (el("psTimerLabelRow")) el("psTimerLabelRow").hidden = isClock;
-    if (el("psTimerLabelPreview")) el("psTimerLabelPreview").hidden = isClock;
-    if (el("psTimerDurationFields")) el("psTimerDurationFields").hidden = isClock;
+    if (el("psTimerLabelRow")) el("psTimerLabelRow").hidden = isNonDuration;
+    if (el("psTimerLabelPreview")) el("psTimerLabelPreview").hidden = isNonDuration;
+    if (el("psTimerDurationFields")) el("psTimerDurationFields").hidden = isNonDuration;
     if (el("psTimerClockFields")) el("psTimerClockFields").hidden = !isClock;
+    if (el("psTimerNowFields")) el("psTimerNowFields").hidden = !isNow;
+    if (isNow && timerState_ === "standby") syncTimerNowPreview_();
+    else if (!isNow) stopTimerNowPreview_();
   }
 
   // BARU (7 Sep 2026) -- kirim ULANG overlay standby ke Layar 2 kalau
@@ -2726,13 +2768,36 @@ const PresentationStudio = (() => {
     renderTimerUi_();
   }
 
-  // Ganti mode "Durasi" <-> "Jam Target" -- HANYA diizinkan saat standby
-  // (lihat renderTimerUi_(), tombol mode dinonaktifkan selain saat itu).
+  // BARU (12 Sep 2026 v2) -- mulai/hentikan mode "🕐 Jam" (jam dinding
+  // BERJALAN, lihat catatan panjang timerNowStyle_/timerNowPreviewInterval_
+  // di atas). Numpang rawPost type:"timerclock" SAMA seperti mode "clock"
+  // (Jam Target) -- present.html membedakan lewat flag `isNow:true`
+  // (lihat showTimerClock() di sana), supaya tidak perlu menambah 1 jenis
+  // pesan postMessage baru lagi. TIDAK ADA validasi "sudah lewat" seperti
+  // startTimerClock_() (jam dinding tidak punya konsep "lewat").
+  function startTimerNow_() {
+    stopTimerNowPreview_();
+    timerState_ = "running";
+    const caption = (el("psTimerNowCaption") && el("psTimerNowCaption").value.trim()) || "";
+    rawPost({ type: "timerclock", action: "start", isNow: true, nowStyle: timerNowStyle_, caption });
+    renderTimerUi_();
+  }
+  function stopTimerNow_() {
+    timerState_ = "standby";
+    rawPost({ type: "timerclock", action: "stop" });
+    renderTimerUi_();
+  }
+
+  // Ganti mode "Durasi" <-> "Jam Target" <-> "Jam" -- HANYA diizinkan
+  // saat standby (lihat renderTimerUi_(), tombol mode dinonaktifkan
+  // selain saat itu).
   function setTimerMode_(mode) {
-    if (mode !== "duration" && mode !== "clock") return;
+    if (mode !== "duration" && mode !== "clock" && mode !== "now") return;
     if (timerState_ !== "standby" || timerMode_ === mode) return;
     timerMode_ = mode;
+    stopTimerNowPreview_();
     if (mode === "clock") syncTimerClockPreview_();
+    else if (mode === "now") syncTimerNowPreview_();
     else if (el("psTimerDisplay")) el("psTimerDisplay").textContent = fmtMMSS(timerTotal);
     renderTimerUi_();
   }
@@ -2808,6 +2873,20 @@ const PresentationStudio = (() => {
     // (#psTimerDisplay) tiap kali diubah, pola SAMA seperti
     // setTimerCustomSeconds()/syncTimerLabelPreview() utk mode "duration".
     if (el("psTimerClockTarget")) el("psTimerClockTarget").addEventListener("input", syncTimerClockPreview_);
+    // BARU (12 Sep 2026 v2) -- pilihan Model Jam (Digital/Analog) untuk
+    // mode "🕐 Jam" -- disimpan di timerNowStyle_ (lokal, dipakai saat
+    // "▶️ Mulai" ditekan, lihat startTimerNow_()), TIDAK perlu ikut
+    // localStorage theme (murni pilihan sesaat per tayangan, bukan
+    // preferensi tampilan permanen seperti Gaya Timer/Stopwatch).
+    if (el("psTimerNowStyleRow")) {
+      const nowStyleBtns = Array.from(el("psTimerNowStyleRow").querySelectorAll("[data-timernow-style]"));
+      nowStyleBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          timerNowStyle_ = btn.dataset.timernowStyle;
+          nowStyleBtns.forEach((b) => b.classList.toggle("active", b === btn));
+        });
+      });
+    }
     // BARU (7 Sep 2026, permintaan operator) -- warna angka Jam Target.
     // 4 tombol cepat + "Ikut Tema" (data-timerclock-color="") berbagi 1
     // sumber kebenaran dengan pemilih warna bebas (psTimerClockColorCustom)
@@ -2888,6 +2967,7 @@ const PresentationStudio = (() => {
     // pernah "Lanjut" -- lihat catatan panjang di sana).
     if (el("psTimerStartBtn")) el("psTimerStartBtn").addEventListener("click", () => {
       if (timerMode_ === "clock") { startTimerClock_(); return; }
+      if (timerMode_ === "now") { startTimerNow_(); return; } // BARU 12 Sep 2026 v2
       if (timerState_ === "paused") { resumeTimer_(); return; }
       if (timerTotal > 0) startTimer(timerTotal);
       else flashTimerNeedsDuration(); // belum pilih durasi (preset/custom) -- kasih tanda, jangan diam saja
@@ -2900,6 +2980,7 @@ const PresentationStudio = (() => {
     // sendiri sudah diatur di renderTimerUi_().
     if (el("psTimerCancelBtn")) el("psTimerCancelBtn").addEventListener("click", () => {
       if (timerMode_ === "clock") { stopTimerClock_(); return; }
+      if (timerMode_ === "now") { stopTimerNow_(); return; } // BARU 12 Sep 2026 v2
       resetTimerToStandby_();
     });
     // BARU (7 Sep 2026) -- "👁️ Tampilkan ke Layar 2", lihat toggleTimerPreview_().
@@ -8887,6 +8968,25 @@ const PresentationStudio = (() => {
         saveAndSendTheme({ stageTransparent: el("psStageTransparent").checked });
       });
     }
+    // BARU (12 Sep 2026 v2, permintaan operator "jam kecil di pojok,
+    // aktif di ayat/kidung/PDF/apapun") -- 🕐 Jam Pojok: pola SAMA
+    // seperti toggle/tombol posisi lain di sini (1 sumber kebenaran,
+    // dikirim lewat theme.cornerClockOn/cornerClockPos -- lihat
+    // #cornerClockOverlay & applyTheme(), present.html).
+    if (el("psCornerClockOn")) {
+      el("psCornerClockOn").addEventListener("change", () => {
+        saveAndSendTheme({ cornerClockOn: el("psCornerClockOn").checked });
+      });
+    }
+    if (el("psCornerClockPosRow")) {
+      const ccPosBtns = Array.from(el("psCornerClockPosRow").querySelectorAll("[data-corner-clock-pos]"));
+      ccPosBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          saveAndSendTheme({ cornerClockPos: btn.dataset.cornerClockPos });
+          ccPosBtns.forEach((b) => b.classList.toggle("active", b === btn));
+        });
+      });
+    }
     // BARU (9 Sep 2026) -- "🔁 Balik sisi" khusus mode "Kamera Kiri,
     // Konten Kanan", lihat body.cam-split-lr-reverse (present.html).
     if (el("psCamSplitReverse")) {
@@ -9418,7 +9518,13 @@ const PresentationStudio = (() => {
   // video, teks tampil sebagai BAR SUBTITLE menempel di bawah, lihat
   // body.cam-subtitle). `camSplitPct`: tinggi zona kamera (%) untuk
   // mode "split", bisa diatur bebas lewat slider (bawaan 42).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420 };
+  // BARU (12 Sep 2026 v2) -- `cornerClockOn`/`cornerClockPos`: 🕐 Jam
+  // Pojok (lihat #cornerClockOverlay, present.html) -- lapisan jam kecil
+  // independen dari showMain()/showTimer()/dst, tetap tampil di ATAS
+  // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
+  // false) supaya operator yang belum pernah menyentuh fiturnya tidak
+  // tiba-tiba melihat jam baru muncul di Layar 2.
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left" };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -9559,6 +9665,14 @@ const PresentationStudio = (() => {
     // BARU (8 Sep 2026 v4) -- pulihkan status centang "Latar teks
     // transparan" (mode "Kamera Atas, Teks Bawah").
     if (el("psStageTransparent")) el("psStageTransparent").checked = !!theme.stageTransparent;
+    // BARU (12 Sep 2026 v2) -- pulihkan sakelar & posisi 🕐 Jam Pojok.
+    if (el("psCornerClockOn")) el("psCornerClockOn").checked = !!theme.cornerClockOn;
+    if (el("psCornerClockPosRow")) {
+      const savedCcPos = theme.cornerClockPos || "top-left";
+      Array.from(el("psCornerClockPosRow").querySelectorAll("[data-corner-clock-pos]")).forEach((b) => {
+        b.classList.toggle("active", b.dataset.cornerClockPos === savedCcPos);
+      });
+    }
     applyThemeToStudioPreview(theme);
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- `camSplitReverse` ("🔁 Balik
     // Sisi" mode split kiri-kanan) SEBELUMNYA tidak pernah ikut daftar
@@ -9569,7 +9683,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos } });
   }
 
   function saveAndSendTheme(partial) {
@@ -9593,7 +9707,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
