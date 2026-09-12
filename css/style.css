@@ -3658,6 +3658,23 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 .ps-verse-row:hover { border-color: var(--brass); }
 .ps-verse-ref { display: block; font-weight: 700; font-size: 12.5px; color: var(--brass-soft); }
 .ps-verse-snippet { display: block; font-size: 12px; color: var(--ps-ink-soft); margin-top: 2px; }
+/* BARU (12 Sep 2026 v6, permintaan operator "kok tidak keluar gambar
+   detil setiap halaman") -- thumbnail kecil isi halaman PDF/gambar,
+   ditaruh di kiri baris "Kumpulan Ayat" untuk item berkas media (lihat
+   renderCollectionList()/fillCollectionThumbnails_() di js/presentation-
+   studio.js). `float:left` supaya tulisan referensi+cuplikan di
+   sebelahnya (.ps-verse-row-body, elemen block biasa) otomatis mengalir
+   di sampingnya TANPA perlu mengubah struktur flex/grid baris yang
+   sudah ada (tombol hapus/urutan di bawahnya tetap selebar penuh
+   seperti sebelumnya, `clear` alami begitu tinggi thumbnail terlampaui).
+   `hidden` bawaan (dilepas oleh fillCollectionThumbnails_ begitu
+   gambarnya siap dimuat dari IndexedDB) -- baris tetap terlihat rapi
+   sebelum thumbnail selesai dimuat, tidak ada kotak kosong menganga. */
+.ps-verse-thumb {
+  float: left; width: 44px; height: 44px; margin: 0 8px 4px 0;
+  object-fit: cover; border-radius: 6px; border: 1px solid var(--ps-card-border);
+  background: #fff;
+}
 /* Bagian yang bisa diklik untuk tayang (dulu seluruh baris <button>,
    sekarang dipecah supaya tombol mini ⏮️⬆️⬇️⏭️ di sebelahnya -- lihat
    .ps-verse-row-reorder di bawah -- tidak ikut ke-klik "tayang" tiap
