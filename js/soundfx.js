@@ -625,5 +625,52 @@ const SoundFX = (() => {
   // Dipanggil dari present.html saat menerima payload
   // {type:"sound", src:"..."} (lihat wireEffectsTab(),
   // js/presentation-studio.js, & listener "message" di present.html).
-  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted };
+
+  // ============================================================
+  // 🔔 BARU (12 Sep 2026, permintaan operator "bisa ambil dari suara
+  // effect yang ada sekarang di sound effect semua, jadi defaultnya
+  // sudah benar, tetapi bisa diganti jadi suara yang lainnya yang
+  // sudah dimasukkan, jadi suara itu bisa terus update selama
+  // soundfx.js ada seberapa banyak") --
+  //
+  // Sebelum ini, dropdown "🔔 Suara Bel" (Timer/Countdown) HANYA diisi
+  // dari CONFIG.BELL_SOUNDS (js/config.js) -- daftar terpisah yang
+  // harus diisi manual 1-per-1 (link Google Drive) kalau operator mau
+  // bel selain "Bel 1 (Bawaan)". SEKARANG bellChoices() di bawah
+  // MENGGABUNGKAN 2 sumber jadi 1 daftar dropdown:
+  //   1. "🔔 Bel 1 (Bawaan)" (bunyi "denting" bawaan, key "bell1",
+  //      TETAP paling atas & bawaan/default -- TIDAK berubah sama
+  //      sekali dari sebelumnya) + bel custom link Drive lain kalau
+  //      operator pernah menambah sendiri di CONFIG.BELL_SOUNDS (cara
+  //      lama, tetap didukung).
+  //   2. SEMUA efek di SOUND_FX_LIST di atas ("🎉 Efek Panggung" yang
+  //      sudah ada -- Drumroll, Tepuk Tangan, Ding, dst, termasuk yang
+  //      berbasis file mp3 di assets/sounds/) -- ditambahkan OTOMATIS
+  //      sebagai pilihan bel tambahan, ditandai `isFx:true` supaya
+  //      pemanggil (present.html) tahu harus memutarnya lewat
+  //      SoundFX.play(key) (BUKAN lewat link Drive).
+  // Karena daftar ini dibaca LANGSUNG dari SOUND_FX_LIST tiap dipanggil
+  // (bukan disalin sekali saja), menambah/mengurangi baris di
+  // SOUND_FX_LIST di atas OTOMATIS ikut menambah/mengurangi pilihan
+  // bel di sini juga -- tidak perlu sentuh fungsi ini sama sekali,
+  // TIDAK PEDULI SUDAH JADI BERAPA BANYAK baris di SOUND_FX_LIST.
+  // Dipakai oleh: js/presentation-studio.js (dropdown & grid "Bel
+  // Cepat" tab Studio + jalan pintas Alt+1..9), js/presentation.js
+  // (dropdown panel sederhana HP), present.html (ringBell() saat
+  // benar-benar membunyikannya).
+  // ------------------------------------------------------------
+  function bellChoices() {
+    const out = [];
+    const custom = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }];
+    custom.forEach((b) => { if (b && b.key) out.push({ key: b.key, label: b.label || b.key, url: b.url || "" }); });
+    SOUND_FX_LIST.forEach((fx) => {
+      // Jaga-jaga supaya tidak dobel kalau suatu saat ada key yang
+      // kebetulan sama persis antara CONFIG.BELL_SOUNDS & SOUND_FX_LIST.
+      if (out.some((o) => o.key === fx.key)) return;
+      out.push({ key: fx.key, label: (fx.emoji ? fx.emoji + " " : "🔊 ") + fx.label, isFx: true });
+    });
+    return out;
+  }
+
+  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted, bellChoices };
 })();
