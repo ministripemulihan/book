@@ -3671,9 +3671,9 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
    gambarnya siap dimuat dari IndexedDB) -- baris tetap terlihat rapi
    sebelum thumbnail selesai dimuat, tidak ada kotak kosong menganga. */
 .ps-verse-thumb {
-  float: left; width: 44px; height: 44px; margin: 0 8px 4px 0;
+  float: left; width: var(--ps-thumb-size, 44px); height: var(--ps-thumb-size, 44px); margin: 0 8px 4px 0;
   object-fit: cover; border-radius: 6px; border: 1px solid var(--ps-card-border);
-  background: #fff;
+  background: #fff; transition: width .15s ease, height .15s ease;
 }
 /* Bagian yang bisa diklik untuk tayang (dulu seluruh baris <button>,
    sekarang dipecah supaya tombol mini ⏮️⬆️⬇️⏭️ di sebelahnya -- lihat
