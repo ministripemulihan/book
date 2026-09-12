@@ -770,7 +770,9 @@ const MediaLibrary = (() => {
     { key: "emas", label: "Emas", bg: "#1a1206", ink: "#e9c977" },
     { key: "biru", label: "Biru Malam", bg: "#0b1730", ink: "#ffffff" },
     { key: "sepia", label: "Sepia", bg: "#f4e8d0", ink: "#3a2c17" },
-    { key: "putih", label: "Putih", bg: "#ffffff", ink: "#173f91" },
+    // DIPERBAIKI (12 Sep 2026 v3) -- disamakan dengan THEMES.putih di
+    // js/presentation-studio.js (tulisan hitam pekat, bukan biru lagi).
+    { key: "putih", label: "Putih", bg: "#ffffff", ink: "#111111" },
     { key: "krem", label: "Krem", bg: "#fdf1cf", ink: "#2f6fb3" },
   ];
   const LP_THEME_KEY_ = "bible_app_ml_lp_theme_v1";
