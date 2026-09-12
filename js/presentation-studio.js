@@ -114,10 +114,14 @@ const PresentationStudio = (() => {
     biru:   { bg: "#0b1730", ink: "#ffffff" },
     sepia:  { bg: "#f4e8d0", ink: "#3a2c17" },
     // BARU (4 Sep 2026, permintaan operator) -- 2 tema baru:
-    // "Putih" (latar putih bersih, tulisan biru tegas) & "Krem" (latar
-    // kuning krem lembut, tulisan biru muda) -- beda dari "Terang"
-    // (tulisan hitam) & "Sepia" (tulisan coklat) yang sudah ada.
-    putih:  { bg: "#ffffff", ink: "#173f91" },
+    // "Putih" (latar putih bersih) & "Krem" (latar kuning krem lembut).
+    // DIPERBAIKI (12 Sep 2026 v3, laporan operator "putih-biru kurang
+    // kontras, maunya putih-hitam") -- "Putih" SEBELUMNYA pakai tulisan
+    // biru tegas (#173f91); sekarang diganti hitam pekat supaya
+    // kontrasnya maksimal (putih-hitam), sesuai permintaan. "Krem"
+    // dibiarkan seperti semula (tulisan biru muda) karena tidak
+    // disebut bermasalah.
+    putih:  { bg: "#ffffff", ink: "#111111" },
     krem:   { bg: "#fdf1cf", ink: "#2f6fb3" },
   };
 
