@@ -464,9 +464,25 @@ const PresentationStudio = (() => {
       // benar-benar mencerminkan apa yang tayang di Layar 2.
       const subText = kidungSubLine(payload.pengarang, payload.birama, payload.jumlahBait);
       const subHtml = subText ? `<div class="present-preview-ref" style="font-size:0.65em; opacity:0.8; text-transform:none; letter-spacing:normal;">${escapeHtml(subText)}</div>` : "";
-      const baitHtml = (payload.bait || []).map((b) => `<div class="present-preview-text">${escapeHtml((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`).join("");
-      const koorHtml = payload.koorTeks ? `<div class="present-preview-text" style="color:#ffd84a; font-weight:600; margin-top:6px;"><b>Koor:</b> ${escapeHtml(payload.koorTeks)}</div>` : "";
-      box.innerHTML = `${refHtml}${subHtml}${baitHtml}${koorHtml}`;
+      // BARU (13 Sep 2026, permintaan operator) -- pratinjau mini ini
+      // sekarang ikut mencerminkan 2 hal baru di Layar 2 (lihat showMain()
+      // kind "kidung" di present.html untuk versi lengkapnya): (1) cuma
+      // label "Koor:" yang kuning, teks syair koor-nya sendiri warna
+      // normal (dulu satu blok kuning semua); (2) "Koor di tengah"
+      // (payload.koorMid) -- koor disisipkan sesudah bait pertama,
+      // bukan ditempel di akhir.
+      const baits = payload.bait || [];
+      const baitLine = (b) => `<div class="present-preview-text">${escapeHtml((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`;
+      const koorBlock = payload.koorTeks
+        ? `<div class="present-preview-text" style="margin-top:6px;"><b style="color:#ffd84a;">Koor:</b> ${escapeHtml(payload.koorTeks)}</div>`
+        : "";
+      let bodyHtml;
+      if (payload.koorMid && payload.koorTeks && baits.length > 1) {
+        bodyHtml = baitLine(baits[0]) + koorBlock + baits.slice(1).map(baitLine).join("");
+      } else {
+        bodyHtml = baits.map(baitLine).join("") + koorBlock;
+      }
+      box.innerHTML = `${refHtml}${subHtml}${bodyHtml}`;
     }
   }
 
@@ -1286,6 +1302,7 @@ const PresentationStudio = (() => {
     const payload = {
       ref: genericItemRefText(it), bait: it.bait || [], koorTeks: it.koorTeks || null,
       pengarang: it.pengarang || "", birama: it.birama || "", jumlahBait: it.jumlahBait || 0,
+      koorMid: !!it.koorMid, // BARU (13 Sep 2026) -- lihat catatan "Koor di tengah" di atas
     };
     Presentation.sendKidung(payload);
     renderStudioPreview(Object.assign({ type: "kidung" }, payload));
@@ -1395,7 +1412,11 @@ const PresentationStudio = (() => {
         currentSlides = [];
         return;
       }
-      currentSlides = typeof splitKidungIntoSlides === "function" ? splitKidungIntoSlides(currentBaits, modeSelect ? modeSelect.value : "1+koor") : [];
+      // BARU (13 Sep 2026, permintaan operator) -- checkbox
+      // #psKidungKoorMidToggle ("Koor di tengah"), lihat catatan koorMid
+      // di splitKidungIntoSlides() (js/kidung.js).
+      const koorMidToggle = el("psKidungKoorMidToggle");
+      currentSlides = typeof splitKidungIntoSlides === "function" ? splitKidungIntoSlides(currentBaits, modeSelect ? modeSelect.value : "1+koor", null, !!(koorMidToggle && koorMidToggle.checked)) : [];
       if (!currentSlides.length) {
         slideListWrap.innerHTML = '<p class="present-saved-empty">Tidak ada slide untuk mode ini.</p>';
         return;
@@ -1412,6 +1433,7 @@ const PresentationStudio = (() => {
         ikon: currentMeta.ikon || "",
         bait: s.baits,
         koorTeks: s.koorTeks,
+        koorMid: !!s.koorMid,
         // BARU (4 Sep 2026) -- pengarang/birama/jumlahBait ikut disimpan di
         // sini (sudah tersedia di currentMeta lewat getKidungList(), lihat
         // js/kidung.js) supaya bisa ditampilkan sebagai baris kecil kedua
@@ -1478,6 +1500,9 @@ const PresentationStudio = (() => {
     if (noInput) noInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goBtn.click(); } });
     if (searchInput) searchInput.addEventListener("input", () => renderSearchResults(searchInput.value));
     if (modeSelect) modeSelect.addEventListener("change", renderSlides);
+    // BARU (13 Sep 2026) -- checkbox "Koor di tengah" ikut memicu
+    // renderSlides() ulang (sama seperti ganti mode select).
+    if (el("psKidungKoorMidToggle")) el("psKidungKoorMidToggle").addEventListener("change", renderSlides);
     if (addAllBtn) {
       addAllBtn.addEventListener("click", async () => {
         if (!currentMeta || !currentSlides.length) return;
@@ -1489,6 +1514,7 @@ const PresentationStudio = (() => {
           addKidungToCollection(username, name, {
             buku: currentMeta.buku, kidungNo: currentMeta.noKidung, title: currentMeta.judul,
             ikon: currentMeta.ikon || "", bait: slide.baits, koorTeks: slide.koorTeks,
+            koorMid: !!slide.koorMid, // BARU (13 Sep 2026) -- lihat catatan "Koor di tengah" di atas
           });
         });
         renderCollectionSelect();
@@ -10140,7 +10166,12 @@ const PresentationStudio = (() => {
     if (el("psLineHeight")) el("psLineHeight").addEventListener("input", applyLineHeight);
     // BARU (4 Sep 2026) -- batas bawah ikut diturunkan ke 60 (lihat catatan
     // di input range-nya sendiri di index.html).
-    if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(60, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
+    // BARU (13 Sep 2026, permintaan operator) -- batas bawah diturunkan
+    // lagi ke 20 supaya jarak ANTAR BLOK bait/koor bisa "dempet-dempet"
+    // seperti mockup -- teks di DALAM 1 bait sendiri tetap dijaga
+    // legible (lihat lantai line-height khusus #text di present.html,
+    // TIDAK ikut turun sampai 20%, cuma jarak antar blok yang ikut).
+    if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(20, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
     if (el("psLineHeightInc")) el("psLineHeightInc").addEventListener("click", () => { el("psLineHeight").value = Math.min(250, Number(el("psLineHeight").value) + 10); applyLineHeight(); });
     wireManualValueInput("psLineHeightValue", "psLineHeight");
 
