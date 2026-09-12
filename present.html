@@ -1092,6 +1092,73 @@
   #timerClockWrap.tc-pos-bottom-left { top: auto; bottom: 6vh; left: 4vw; transform: none; }
   #timerClockWrap.tc-pos-bottom-right { top: auto; bottom: 6vh; left: auto; right: 4vw; transform: none; }
 
+  /* ============================================================
+     BARU (12 Sep 2026 v2, permintaan operator) -- 🕰️ Jam Analog SATU
+     LAYAR PENUH, dipakai KHUSUS mode "🕐 Jam" (bukan hitung mundur)
+     saat operator memilih Model "Analog" (index.html, psTimerNowStyleRow
+     -> data.nowStyle, lihat wireTimer() js/presentation-studio.js &
+     showTimerClock() di skrip bawah). Pola show/hide SAMA seperti
+     #timerClockWrap (posisi tengah panggung, sengaja terpisah supaya
+     tidak saling mengganggu satu sama lain). 3 jarum (jam/menit/detik)
+     digambar sebagai <line> di dalam SVG viewBox 0 0 100 100 (pusat
+     50,50), diputar lewat `transform: rotate(...)` yang dihitung ulang
+     tiap detik lewat tickAnalogClock() (skrip bawah) -- BUKAN CSS
+     animation (supaya selalu tepat mengikuti waktu SUNGGUHAN perangkat,
+     bukan animasi berulang generik). -->
+  #timerAnalogClockWrap {
+    display: none; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 1.6vh; z-index: 3; text-align: center; max-width: 96vw;
+  }
+  #timerAnalogClockWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
+  #timerAnalogCaption {
+    font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.02em;
+    font-size: calc(clamp(18px, 2.6vw, 34px) * var(--p-scale));
+    color: var(--p-timerclock-color, var(--p-ink));
+  }
+  #timerAnalogClockSvg {
+    width: min(88vh, 88vw); height: min(88vh, 88vw);
+    filter: drop-shadow(0 4px 24px rgba(0,0,0,0.35));
+  }
+  #timerAnalogClockSvg .ac-face { fill: none; stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 1.6; opacity: .85; }
+  #timerAnalogClockSvg .ac-tick { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 1; opacity: .55; }
+  #timerAnalogClockSvg .ac-tick-major { stroke-width: 2; opacity: .9; }
+  #timerAnalogClockSvg .ac-hand { stroke-linecap: round; transform-origin: 50px 50px; }
+  #timerAnalogClockSvg .ac-hour { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 4; }
+  #timerAnalogClockSvg .ac-minute { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 2.6; }
+  #timerAnalogClockSvg .ac-second { stroke: var(--p-accent, #d8b45c); stroke-width: 1.2; }
+  #timerAnalogClockSvg .ac-hub { fill: var(--p-timerclock-color, var(--p-ink)); }
+
+  /* ============================================================
+     BARU (12 Sep 2026 v2, permintaan operator "jam kecil di pojok, aktif
+     di ayat/kidung/PDF/apapun") -- 🕐 Jam Pojok: lapisan TERPISAH TOTAL
+     dari #stage & semua kind konten (ayat/kidung/pengumuman/gambar/PDF/
+     video/dst) -- fixed ke jendela Layar 2 (BUKAN ke #stage, supaya
+     posisinya tidak ikut kegeser transform apa pun di dalam #stage),
+     z-index tinggi (di atas semua konten, tapi masih di BAWAH lapisan
+     Efek Panggung/Pen/Penunjuk yang memang harus paling atas -- lihat
+     urutan z-index #effectsLayer/#penCanvas/#pointerDot di atas).
+     pointer-events:none supaya tidak menghalangi klik apa pun di Layar 2.
+     Independen dari showMain()/showTimer()/dst -- lihat interval
+     tickCornerClock() (skrip bawah, jalan terus SEJAK halaman dimuat,
+     terlepas dari apa yang sedang tayang di #stage) & applyTheme()
+     (theme.cornerClockOn/cornerClockPos) untuk kontrolnya. ---- */
+  #cornerClockOverlay {
+    display: none; position: fixed; z-index: 45; pointer-events: none;
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
+    font-size: clamp(14px, 2.2vw, 30px);
+    color: var(--p-ink); background: rgba(0,0,0,0.38);
+    padding: 0.35em 0.7em; border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+  #cornerClockOverlay.cc-on { display: block; }
+  #cornerClockOverlay.cc-pos-top-left { top: 3vh; left: 3vw; }
+  #cornerClockOverlay.cc-pos-top-right { top: 3vh; right: 3vw; }
+  #cornerClockOverlay.cc-pos-bottom-left { bottom: 3vh; left: 3vw; }
+  #cornerClockOverlay.cc-pos-bottom-right { bottom: 3vh; right: 3vw; }
+
   /* BARU (7 Sep 2026, laporan operator) -- ikon bendera gambar utk teks
      Pengumuman/Teks Cepat. Lihat catatan panjang di flagifyAnnouncementText_()
      (skrip bawah) untuk KENAPA ini perlu (emoji bendera 🇮🇩 dkk. jadi cuma
@@ -1157,6 +1224,28 @@
      komentar panjangnya). ---- */
   #stopwatchWrap { display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1.4vh; }
   #stopwatchWrap:not([hidden]) { display: flex; animation: fadeUp .4s ease both; }
+  /* DIPERBAIKI (12 Sep 2026 v2) -- pakai `order` flex (BUKAN urutan DOM)
+     supaya gaya Klasik (label DI ATAS angka, seperti sebelumnya) & gaya
+     Lingkaran Besar (cincin+angka jadi 1 unit DI ATAS, label di BAWAH,
+     lihat komentar panjang di HTML #stopwatchWrap) bisa beda urutan
+     tampilan TANPA perlu 2 salinan markup berbeda. */
+  #stopwatchLabel { order: 1; }
+  .sw-ring-wrap { order: 2; }
+  #stopwatchLapBadge { order: 3; }
+  #stopwatchStatusBadge { order: 4; }
+  body.tv-bigcircle .sw-ring-wrap { order: 1; }
+  body.tv-bigcircle #stopwatchLabel { order: 2; }
+  /* Wadah cincin+angka -- gaya Klasik: `display:contents` (wadah ini
+     "menghilang" dari layout, cincinnya sendiri toh sudah disembunyikan
+     total lewat #stopwatchRing{display:none} bawaan, jadi tidak ada
+     bedanya sama sekali dari sebelumnya). Gaya Lingkaran Besar: jadi
+     kotak relatif supaya #stopwatchTime bisa ditumpuk PERSIS di
+     TENGAHNYA lewat position:absolute (lihat rule body.tv-bigcircle
+     #stopwatchTime di bawah, dekat CSS #stopwatchRing). */
+  .sw-ring-wrap { display: contents; }
+  body.tv-bigcircle .sw-ring-wrap {
+    display: flex; position: relative; align-items: center; justify-content: center;
+  }
   #stopwatchLabel {
     font-family: "Inter", Arial, sans-serif; font-weight: 700; letter-spacing: 0.01em;
     font-size: calc(clamp(20px, 3.2vw, 42px) * var(--p-scale)); color: var(--p-ink); text-align: center;
@@ -1199,21 +1288,30 @@
     max-width: 92vw; max-height: 78vh;
   }
   body.tv-bigcircle #timerRing circle { stroke-width: 4; }
-  /* Angka BESAR bawaan di DALAM cincin disembunyikan total di gaya ini
-     (diganti #timerTimeBelow, kecil, di bawah cincin -- lihat HTML
-     #timerWrap & style #timerTimeBelow di bawah). */
-  body.tv-bigcircle #timerTime { display: none; }
-  #timerTimeBelow {
-    display: none; /* hanya tampil di gaya Lingkaran Besar, lihat rule di bawah */
-  }
-  body.tv-bigcircle #timerTimeBelow {
-    display: block;
-    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
-    font-size: calc(clamp(16px, 2.6vw, 34px) * var(--p-timer-scale) * var(--p-scale));
-    color: var(--p-ink); font-variant-numeric: tabular-nums; opacity: .95;
-    margin-top: .6vh;
-  }
-  body.tv-bigcircle #timerTimeBelow.done-text { color: #d9463a; }
+  /* DIPERBAIKI (12 Sep 2026 v2, laporan operator "00:00 kekecilan &
+     tidak di dalam lingkaran") -- SEBELUMNYA angka besar bawaan di
+     DALAM cincin (#timerTime, teks SVG) disembunyikan total di gaya
+     ini, diganti #timerTimeBelow -- sebuah <div> HTML BIASA yang
+     ditaruh di LUAR cincin (jadi keliatan kecil & tidak nempel ke
+     cincin sama sekali, persis seperti dilaporkan). Perbaikannya:
+     JANGAN disembunyikan lagi -- #timerTime tetap dipakai (sudah
+     otomatis PERSIS di tengah cincin karena posisinya <text x="50"
+     y="55" text-anchor="middle"> di dalam SVG viewBox yang sama
+     dengan cincinnya), dan karena unit font-size-nya ikut skala
+     viewBox SVG (bukan px biasa), teks ini OTOMATIS ikut membesar
+     proporsional saat cincin dibesarkan (lihat #timerRing width/height
+     bigcircle di atas, jauh lebih besar dari gaya Klasik) -- tidak
+     perlu font-size terpisah. #timerTimeBelow (duplikatnya, dulu
+     dipakai gaya ini) TIDAK dipakai lagi sama sekali sekarang, tetap
+     disembunyikan permanen (default #timerTimeBelow { display:none }
+     di atas, TIDAK ditimpa lagi di sini) supaya tidak dobel. */
+  body.tv-bigcircle #timerTime { font-size: 28px; }
+  /* Tata letak diubah jadi KOLOM (cincin besar di ATAS, judul sesi +
+     badge "MULAI" di BAWAHNYA, tersusun rapi ke tengah) -- gaya Klasik
+     TETAP baris (cincin kecil bersebelahan dengan judul) seperti
+     sebelumnya, TIDAK terpengaruh (rule di bawah cuma aktif kalau
+     body.tv-bigcircle). */
+  body.tv-bigcircle #timerWrap { flex-direction: column; gap: 2vh; }
   /* Judul sesi ("Sesi Bagi Nikmat" dst) ikut dikecilkan di gaya ini --
      di gaya Klasik ukurannya tetap seperti sebelumnya (rule #timerLabel
      di atas). */
@@ -1238,7 +1336,20 @@
   }
   body.tv-bigcircle #stopwatchRing circle { fill: none; stroke-width: 4; stroke: var(--p-accent); opacity: .55; }
   body.tv-bigcircle #stopwatchLabel { font-size: calc(clamp(15px, 2vw, 26px) * var(--p-scale)); margin-top: 1.2vh; }
-  body.tv-bigcircle #stopwatchTime { font-size: calc(clamp(16px, 2.8vw, 36px) * var(--p-timer-scale)); }
+  /* DIPERBAIKI (12 Sep 2026 v2, laporan operator "kekecilan & tidak di
+     dalam lingkaran") -- SEBELUMNYA angka ini kecil (clamp 16-36px) &
+     berdiri sendiri DI BAWAH cincin (bukan di dalamnya). Sekarang
+     ditumpuk PERSIS di tengah cincin (position:absolute, lihat
+     .sw-ring-wrap di atas) & ukurannya dihitung PROPORSIONAL terhadap
+     diameter cincin itu sendiri (bukan clamp px tetap lagi) supaya
+     selalu terlihat besar mengisi cincin, seberapa pun cincin
+     diperbesar/diperkecil lewat slider "Ukuran Timer/Stopwatch". */
+  body.tv-bigcircle #stopwatchTime {
+    position: absolute; inset: 0; margin: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(min(66vh, 62vw) * var(--p-timer-scale) * 0.22);
+    line-height: 1; white-space: nowrap;
+  }
 
   /* ---- Pointer (Penunjuk) ---- */
   #pointerDot {
@@ -1494,6 +1605,35 @@
       <div id="timerClockTime">00:00:00</div>
       <div id="timerClockStatusBadge"></div>
     </div>
+    <!-- BARU (12 Sep 2026 v2) -- 🕰️ Jam Analog SATU LAYAR PENUH, lihat
+         catatan panjang CSS #timerAnalogClockWrap di atas & showTimerClock()/
+         tickAnalogClock() di skrip bawah. 12 garis tanda jam (4 di
+         antaranya "major", digambar lebih tebal, di posisi 12/3/6/9)
+         digambar statis di markup (tidak perlu dihitung ulang lewat JS,
+         posisinya tetap selamanya) -- HANYA ke-3 jarumnya yang diputar
+         dinamis lewat JS tiap detik. -->
+    <div id="timerAnalogClockWrap" hidden>
+      <div id="timerAnalogCaption" hidden></div>
+      <svg id="timerAnalogClockSvg" viewBox="0 0 100 100">
+        <circle class="ac-face" cx="50" cy="50" r="46"></circle>
+        <line class="ac-tick ac-tick-major" x1="50" y1="6" x2="50" y2="12"></line>
+        <line class="ac-tick ac-tick-major" x1="94" y1="50" x2="88" y2="50"></line>
+        <line class="ac-tick ac-tick-major" x1="50" y1="94" x2="50" y2="88"></line>
+        <line class="ac-tick ac-tick-major" x1="6" y1="50" x2="12" y2="50"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(30 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(60 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(120 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(150 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(210 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(240 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(300 50 50)"></line>
+        <line class="ac-tick" x1="50" y1="8" x2="50" y2="12" transform="rotate(330 50 50)"></line>
+        <line id="acHourHand" class="ac-hand ac-hour" x1="50" y1="50" x2="50" y2="27"></line>
+        <line id="acMinuteHand" class="ac-hand ac-minute" x1="50" y1="50" x2="50" y2="16"></line>
+        <line id="acSecondHand" class="ac-hand ac-second" x1="50" y1="56" x2="50" y2="10"></line>
+        <circle class="ac-hub" cx="50" cy="50" r="2.2"></circle>
+      </svg>
+    </div>
     <!-- BARU (9 Sep 2026, permintaan operator) -- "Mode Layar" umum
          (Welcome/Next Up), lihat catatan panjang CSS #modeScreenView
          di atas & showModeScreen() di skrip bawah. -->
@@ -1520,11 +1660,25 @@
            gaya "Klasik" (bawaan) masih dipakai -- lihat CSS
            body.tv-bigcircle #stopwatchRing di atas & applyTheme() di
            skrip bawah. -->
-      <svg id="stopwatchRing" viewBox="0 0 100 100" hidden>
-        <circle id="stopwatchRingBg" cx="50" cy="50" r="44"></circle>
-      </svg>
+      <!-- DIPERBAIKI (12 Sep 2026 v2, laporan operator "angka kekecilan &
+           tidak di dalam lingkaran") -- SEBELUMNYA #stopwatchRing (cincin
+           dekoratif) & #stopwatchTime (angka) adalah 2 elemen TERPISAH
+           yang ditumpuk VERTIKAL (cincin di atas, angka kecil di
+           bawahnya) -- bukan bertumpuk SATU DI ATAS YANG LAIN, makanya
+           angkanya terlihat di LUAR cincin. Dibungkus 1 wadah baru
+           (.sw-ring-wrap) supaya di gaya "⭕ Lingkaran Besar" angkanya
+           bisa ditumpuk PERSIS di tengah cincin (position:absolute) --
+           lihat CSS .sw-ring-wrap & body.tv-bigcircle #stopwatchTime di
+           atas. Di gaya Klasik wadah ini TIDAK berubah apa pun
+           (display:contents, cincinnya sendiri memang sudah disembunyikan
+           total di gaya Klasik). -->
+      <div class="sw-ring-wrap" id="swRingWrap">
+        <svg id="stopwatchRing" viewBox="0 0 100 100" hidden>
+          <circle id="stopwatchRingBg" cx="50" cy="50" r="44"></circle>
+        </svg>
+        <div id="stopwatchTime">00:00</div>
+      </div>
       <div id="stopwatchLabel"></div>
-      <div id="stopwatchTime">00:00</div>
       <!-- BARU (7 Sep 2026) -- lihat catatan CSS #stopwatchLapBadge/#stopwatchStatusBadge di atas. -->
       <div id="stopwatchLapBadge"></div>
       <div id="stopwatchStatusBadge"></div>
@@ -1561,6 +1715,11 @@
   <div id="effectsLayer">
     <canvas id="effectsConfettiCanvas"></canvas>
   </div>
+
+  <!-- BARU (12 Sep 2026 v2, permintaan operator "jam kecil di pojok,
+       aktif di ayat/kidung/PDF/apapun") -- lihat catatan panjang CSS
+       #cornerClockOverlay di atas & tickCornerClock() di skrip bawah. -->
+  <div id="cornerClockOverlay"><span id="cornerClockTimeEl">00:00:00</span></div>
 
   <!-- DIPERBAIKI (10 Sep 2026, lanjutan) -- pita kecil di pojok bawah
        (bukan lagi menutup seluruh layar), teks diperpendek & tidak lagi
@@ -1667,6 +1826,14 @@
   const timerClockCaptionEl = document.getElementById("timerClockCaption");
   const timerClockTimeEl = document.getElementById("timerClockTime");
   const timerClockStatusBadgeEl = document.getElementById("timerClockStatusBadge");
+  // BARU (12 Sep 2026 v2) -- 🕰️ Jam Analog satu layar & 🕐 Jam Pojok.
+  const timerAnalogClockWrap = document.getElementById("timerAnalogClockWrap");
+  const timerAnalogCaptionEl = document.getElementById("timerAnalogCaption");
+  const acHourHandEl = document.getElementById("acHourHand");
+  const acMinuteHandEl = document.getElementById("acMinuteHand");
+  const acSecondHandEl = document.getElementById("acSecondHand");
+  const cornerClockOverlayEl = document.getElementById("cornerClockOverlay");
+  const cornerClockTimeEl = document.getElementById("cornerClockTimeEl");
   // BARU (27 Agu 2026) -- lihat showStopwatch()/tickStopwatch() di bawah.
   const stopwatchWrap = document.getElementById("stopwatchWrap");
   const stopwatchTimeEl = document.getElementById("stopwatchTime");
@@ -2380,8 +2547,29 @@
     const pad2 = (n) => String(n).padStart(2, "0");
     return pad2(hh) + ":" + pad2(mm) + ":" + pad2(ss);
   }
+  // BARU (12 Sep 2026 v2) -- format JAM:MENIT:DETIK dari jam DINDING
+  // sungguhan (dipakai mode "🕐 Jam" -> data.isNow, BEDA dari
+  // fmtClockCountdown() di atas yang menghitung SISA WAKTU/durasi).
+  function fmtWallClock_(d) {
+    const pad2 = (n) => String(n).padStart(2, "0");
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
   function tickTimerClock() {
     if (!timerClockState) return;
+    // BARU (12 Sep 2026 v2) -- mode "🕐 Jam" (jam dinding BERJALAN,
+    // isNow:true) -- TIDAK ADA target/sisa waktu, TIDAK PERNAH "selesai",
+    // cukup tampilkan jam SEKARANG terus-menerus.
+    if (timerClockState.isNow) {
+      const clockStr = fmtWallClock_(new Date());
+      if (clockStr.length !== timerClockTimeEl.textContent.length) {
+        timerClockTimeEl.textContent = clockStr;
+        fitTimerClockNumber_();
+      } else {
+        timerClockTimeEl.textContent = clockStr;
+      }
+      timerClockTimeEl.classList.remove("done-text");
+      return;
+    }
     const remain = (timerClockState.endAt - Date.now()) / 1000;
     const remainClamped = Math.max(0, remain);
     const isDone = remain <= 0;
@@ -2404,32 +2592,74 @@
       if (timerClockInterval) { clearInterval(timerClockInterval); timerClockInterval = null; }
     }
   }
+  // BARU (12 Sep 2026 v2) -- 🕰️ Jam Analog satu layar (3 jarum), lihat
+  // catatan panjang CSS #timerAnalogClockWrap di atas. Jarum diputar
+  // pakai `transform: rotate(deg)` dihitung dari waktu SEKARANG (bukan
+  // CSS animation berulang generik) supaya selalu tepat mengikuti jam
+  // sungguhan perangkat -- diperbarui tiap detik (cukup, tidak perlu
+  // requestAnimationFrame karena jarum detik "mencentang" per detik,
+  // bukan bergerak halus kontinu, sama seperti jam analog fisik biasa).
+  let analogClockInterval = null;
+  function tickAnalogClock() {
+    const now = new Date();
+    const h = now.getHours() % 12;
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+    const hourDeg = (h + m / 60) * 30; // 360/12
+    const minDeg = (m + s / 60) * 6; // 360/60
+    const secDeg = s * 6;
+    if (acHourHandEl) acHourHandEl.style.transform = `rotate(${hourDeg}deg)`;
+    if (acMinuteHandEl) acMinuteHandEl.style.transform = `rotate(${minDeg}deg)`;
+    if (acSecondHandEl) acSecondHandEl.style.transform = `rotate(${secDeg}deg)`;
+  }
   function showTimerClock(data) {
     stopTimer(false);
     stopStopwatch(false); // BARU -- Timer/Stopwatch/Countdown Jam Target berbagi ruang tengah yang sama, tidak boleh berbarengan
     stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
-    timerClockState = { endAt: data.endAt, caption: data.caption || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
+    idleEl.hidden = true;
+    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // hentikan video kalau countdown ditayangkan menimpanya
+    if (timerClockInterval) { clearInterval(timerClockInterval); timerClockInterval = null; }
+    if (analogClockInterval) { clearInterval(analogClockInterval); analogClockInterval = null; }
+    // BARU (12 Sep 2026 v2) -- mode "🕐 Jam" + Model "Analog": tampilkan
+    // #timerAnalogClockWrap (jam bulat 3 jarum) SEBAGAI GANTI kotak
+    // digital #timerClockWrap -- keduanya SALING EKSKLUSIF (lihat
+    // masing-masing di bawah), tidak pernah tampil berbarengan.
+    if (data.isNow && data.nowStyle === "analog") {
+      timerClockState = null;
+      timerClockWrap.hidden = true;
+      timerAnalogCaptionEl.textContent = data.caption || "";
+      timerAnalogCaptionEl.hidden = !data.caption;
+      timerAnalogClockWrap.hidden = false;
+      tickAnalogClock();
+      analogClockInterval = setInterval(tickAnalogClock, 1000);
+      return;
+    }
+    timerAnalogClockWrap.hidden = true;
+    timerClockState = { endAt: data.endAt, caption: data.caption || "", bell: !!data.bell, bellKey: data.bellKey || "", isNow: !!data.isNow, _rang: false };
     timerClockCaptionEl.textContent = timerClockState.caption;
     timerClockCaptionEl.hidden = !timerClockState.caption;
     if (timerClockStatusBadgeEl) timerClockStatusBadgeEl.textContent = "";
     timerClockWrap.classList.remove("ps-standby");
     timerClockWrap.hidden = false;
-    idleEl.hidden = true;
-    refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
-    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // hentikan video kalau countdown ditayangkan menimpanya
     tickTimerClock();
     fitTimerClockNumber_(); // ukur begitu pertama tayang (caption baru bisa saja mengubah lebar tersedia)
-    if (timerClockInterval) clearInterval(timerClockInterval);
-    timerClockInterval = setInterval(tickTimerClock, 250);
+    // BARU (12 Sep 2026 v2) -- mode "🕐 Jam" (isNow) update tiap 1 detik
+    // saja cukup (jam dinding, bukan hitung mundur presisi) -- mode
+    // "clock" (Jam Target, hitung mundur) TETAP 250ms seperti sebelumnya
+    // supaya transisi ke "00:00:00" & bel tetap presisi.
+    timerClockInterval = setInterval(tickTimerClock, data.isNow ? 1000 : 250);
   }
   function stopTimerClock(showIdle) {
     if (timerClockInterval) { clearInterval(timerClockInterval); timerClockInterval = null; }
+    if (analogClockInterval) { clearInterval(analogClockInterval); analogClockInterval = null; }
     stopBellSound();
     timerClockState = null;
     timerClockWrap.hidden = true;
     timerClockWrap.classList.remove("ps-standby");
+    timerAnalogClockWrap.hidden = true;
     if (timerClockStatusBadgeEl) timerClockStatusBadgeEl.textContent = "";
     if (showIdle) idleEl.hidden = false;
   }
@@ -3458,6 +3688,17 @@
       if (theme.timerClockPos && theme.timerClockPos !== "center") {
         timerClockWrap.classList.add("tc-pos-" + theme.timerClockPos);
       }
+    }
+    // BARU (12 Sep 2026 v2, permintaan operator "jam kecil di pojok,
+    // aktif di ayat/kidung/PDF/apapun") -- 🕐 Jam Pojok: lihat catatan
+    // panjang CSS #cornerClockOverlay & tickCornerClock() di skrip
+    // bawah. Independen TOTAL dari showMain()/showTimer()/dst -- cuma
+    // menyalakan/mematikan & memindah posisi lapisannya di sini,
+    // interval jamnya sendiri sudah berjalan terus sejak halaman dimuat.
+    if (cornerClockOverlayEl) {
+      cornerClockOverlayEl.classList.toggle("cc-on", !!theme.cornerClockOn);
+      cornerClockOverlayEl.className = cornerClockOverlayEl.className.replace(/\bcc-pos-\S+/g, "").trim();
+      cornerClockOverlayEl.classList.add("cc-pos-" + (theme.cornerClockPos || "top-left"));
     }
     // DIPERBAIKI (7 Sep 2026, laporan operator) -- akar masalah "Jam
     // Target kepinggir kanan bawah" yang SEBENARNYA: fitTimerClockNumber_()
@@ -4524,6 +4765,24 @@
     } catch (e) { /* beda origin / opener tertutup -- diamkan */ }
   }
   reportGeometry();
+
+  // BARU (12 Sep 2026 v2, permintaan operator "jam kecil di pojok, aktif
+  // di ayat/kidung/PDF/apapun") -- interval INI SENDIRI berjalan terus
+  // sejak halaman dimuat, TERLEPAS dari apa yang sedang tayang di #stage
+  // (ayat/kidung/pengumuman/gambar/PDF/video/Timer/dst) & terlepas dari
+  // status show/hide-nya sendiri (cukup update teksnya tiap detik --
+  // murah, elemen ini toh disembunyikan lewat CSS `display:none` selama
+  // "cc-on" belum aktif, lihat applyTheme() di atas & CSS
+  // #cornerClockOverlay di atas). Ini kebalikan dari #timerClockWrap
+  // (mode "🕐 Jam" di tengah panggung) yang HANYA berjalan saat operator
+  // menekan "▶️ Mulai" -- jam pojok ini justru dimaksudkan untuk selalu
+  // siap tampil kapan saja tanpa perlu ditayangkan secara eksplisit.
+  if (cornerClockTimeEl) {
+    const tickCornerClock = () => { cornerClockTimeEl.textContent = fmtWallClock_(new Date()); };
+    tickCornerClock();
+    setInterval(tickCornerClock, 1000);
+  }
+
   let geomResizeTimer = null;
   window.addEventListener("resize", () => {
     if (geomResizeTimer) clearTimeout(geomResizeTimer);
