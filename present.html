@@ -43,6 +43,17 @@
        kotaknya sendiri sebetulnya sudah center lewat left:50%+translate.
        1 = tidak mengecilkan sama sekali (nilai bawaan sebelum dihitung). */
     --p-timerclock-fit: 1;
+    /* DIPERBAIKI (12 Sep 2026 v3, laporan operator "tema Putih jadi
+       abu-abu") -- SEBELUMNYA vignette di bawah pakai rgba(0,0,0,0.28)
+       yang DITULIS LANGSUNG di background (bukan variabel), jadi sama
+       gelapnya di SEMUA tema -- di tema gelap nyaris tidak kelihatan,
+       tapi di tema terang (Putih/Krem/Terang/Sepia) bikin latar yang
+       harusnya putih bersih terlihat kotor/abu-abu, terutama di tepi
+       layar. Sekarang jadi variabel supaya applyTheme() (skrip bawah,
+       lihat vignetteForBg()) bisa MENGECILKAN opacity-nya otomatis
+       kalau warna latar tema terang -- tanpa itu (mis. sebelum
+       applyTheme() pernah dipanggil), tetap jatuh ke nilai lama ini. */
+    --p-vignette: rgba(0,0,0,0.28);
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -56,7 +67,7 @@
   body::before {
     content: "";
     position: fixed; inset: 0; pointer-events: none; z-index: 1;
-    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.28) 100%);
+    background: radial-gradient(ellipse at center, transparent 55%, var(--p-vignette) 100%);
   }
   /* BARU (28 Agu 2026) -- 🎥 Kamera Latar: video kamera hidup ditaruh
      SEBAGAI ANAK <body> paling awal, position:fixed z-index:0 -- di
@@ -1124,10 +1135,31 @@
   #timerAnalogClockSvg .ac-face { fill: none; stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 1.6; opacity: .85; }
   #timerAnalogClockSvg .ac-tick { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 1; opacity: .55; }
   #timerAnalogClockSvg .ac-tick-major { stroke-width: 2; opacity: .9; }
-  #timerAnalogClockSvg .ac-hand { stroke-linecap: round; transform-origin: 50px 50px; }
-  #timerAnalogClockSvg .ac-hour { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 4; }
-  #timerAnalogClockSvg .ac-minute { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 2.6; }
-  #timerAnalogClockSvg .ac-second { stroke: var(--p-accent, #d8b45c); stroke-width: 1.2; }
+  /* DIPERBAIKI (12 Sep 2026 v3, laporan operator "jarum jam analog
+     tidak kelihatan di tengah, sudah gonta-ganti tema") -- akar
+     masalahnya BUKAN warna/tema sama sekali: `transform-origin: 50px
+     50px` di bawah ini SEHARUSNYA berarti "putar dari titik (50,50) di
+     koordinat SVG (pas di tengah lingkaran jam, viewBox 0 0 100 100)"
+     -- tapi tanpa `transform-box: view-box` di browser tertentu,
+     "50px 50px" malah dihitung dari sudut kiri-atas KOTAK PEMBUNGKUS
+     (bounding box) masing-masing garis jarum, BUKAN dari (50,50) --
+     padahal kotak pembungkus tiap jarum beda-beda (jarum detik makin
+     lebar karena ujungnya melewati pusat ke arah 6, jarum jam/menit
+     tidak) -- jadi ketiganya berputar dari titik yang SALAH & BEDA-BEDA,
+     membuat jarumnya melenceng jauh dari tengah/nyaris hilang dari
+     pandangan pada beberapa jam. `transform-box: view-box` memaksa
+     titik (50,50) selalu berarti koordinat SVG yang sama seperti yang
+     dituliskan di viewBox, sama untuk ketiga jarum. Lebar jarum juga
+     sedikit ditambah (dari 4/2.6/1.2 jadi 5/3.2/1.6) supaya lebih tegas
+     kelihatan dari jarak jauh (proyektor), sesuai laporan operator. */
+  #timerAnalogClockSvg .ac-hand {
+    stroke-linecap: round;
+    transform-box: view-box;
+    transform-origin: 50px 50px;
+  }
+  #timerAnalogClockSvg .ac-hour { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 5; }
+  #timerAnalogClockSvg .ac-minute { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 3.2; }
+  #timerAnalogClockSvg .ac-second { stroke: var(--p-accent, #d8b45c); stroke-width: 1.6; }
   #timerAnalogClockSvg .ac-hub { fill: var(--p-timerclock-color, var(--p-ink)); }
 
   /* ============================================================
@@ -3423,6 +3455,21 @@
     const luma = 0.299 * r + 0.587 * g + 0.114 * b; // 0 (gelap) - 255 (terang)
     return luma > 170 ? "#8a6d00" : "#ffd84a";
   }
+  // BARU (12 Sep 2026 v3, laporan operator "tema Putih jadi abu-abu") --
+  // pakai luma yang sama seperti koorColorForBg() di atas untuk
+  // menentukan seberapa gelap vignette tepi layar (lihat catatan
+  // panjang --p-vignette di <style> atas). Tema gelap (mis. "Gelap")
+  // tetap dapat vignette penuh seperti sebelumnya (tidak berubah sama
+  // sekali) -- HANYA tema dengan latar terang (luma tinggi, mis.
+  // Putih/Krem/Terang/Sepia) yang vignette-nya dibikin jauh lebih tipis
+  // supaya latar tetap terlihat bersih/kontras, bukan abu-abu kotor.
+  function vignetteForBg(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "rgba(0,0,0,0.28)";
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b; // 0 (gelap) - 255 (terang)
+    return luma > 170 ? "rgba(0,0,0,0.08)" : "rgba(0,0,0,0.28)";
+  }
   // ------------------------------------------------------------
   // BARU (28 Agu 2026) -- 🎥 KAMERA LATAR. Menyalakan kamera PERANGKAT
   // YANG MEMBUKA JENDELA INI (laptop/HP yang tersambung ke proyektor)
@@ -3622,6 +3669,8 @@
     if (theme.bgColor) {
       root.setProperty("--p-bg", theme.bgColor);
       root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
+      // BARU (12 Sep 2026 v3) -- lihat catatan panjang vignetteForBg() di atas.
+      root.setProperty("--p-vignette", vignetteForBg(theme.bgColor));
     }
     // Perbaikan utama: dulu warna tulisan (--p-ink) TIDAK PERNAH ikut
     // berubah saat ganti tema -- jadi tema latar terang (Terang/Klasik
