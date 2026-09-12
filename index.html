@@ -1812,6 +1812,17 @@
             <button type="button" id="psYtBgPlayBtn" class="chip-btn small">▶ Play</button>
             <button type="button" id="psYtBgPauseBtn" class="chip-btn small">⏸ Pause</button>
             <button type="button" id="psYtBgStopBtn" class="chip-btn small danger">⏹ Stop</button>
+            <!-- BARU (12 Sep 2026, laporan operator "youtube latar
+                 belakang, ini tidak bisa di simpan") -- akar masalahnya:
+                 menekan "▶️ Tampilkan" sambil "Latar suara saja" dicentang
+                 TIDAK pernah masuk ke antrean/kotak yang dibaca tombol
+                 "💾 Simpan ke Media Tersimpan" di bawah (itu cuma untuk
+                 antrean "➕ Tambah ke Daftar") -- jadi link latar yang
+                 sedang main TIDAK PERNAH tersimpan lewat jalur mana pun.
+                 Tombol baru ini menyimpan LANGSUNG link yang sedang main
+                 sebagai latar sekarang (lihat wireYoutubeTab(), diisi
+                 dari psYtInput/lastBgEmbedUrl_ -- BUKAN queue). -->
+            <button type="button" id="psYtBgSaveBtn" class="chip-btn small">💾 Simpan Link Latar Ini</button>
           </div>
           <div class="ps-yt-hint" id="psYtBgStatus">Belum ada audio latar yang diputar.</div>
           <div class="ps-field-label">Pilih dari video yang sudah tersimpan</div>
@@ -2323,6 +2334,26 @@
             <input type="number" id="psContentScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="140" step="1" value="100" title="Ketik angka Ukuran Konten manual (60-140), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Mengatur seberapa lebar kotak teks memakai layar -- persempit supaya latar (Kamera/Gambar) lebih terlihat di tepi, atau lebarkan supaya teks memakai hampir seluruh layar.</div>
+          <!-- BARU (12 Sep 2026, permintaan operator "apa bisa saat pdf di
+               upload hasil tampilnya bisa di pilih, apa mau orisinil ...
+               atau strech atau bisa di zoom") -- 3 model ukuran untuk
+               gambar/PDF yang ditayangkan (tab File/Media Tersimpan/
+               Kumpulan Ayat), lihat getSlideDisplayMode_()/rawPost()
+               (js/presentation-studio.js) & .ps-slide-fitwidth/.ps-slide-
+               zoom (present.html). Pengaturan ini TERSIMPAN per perangkat
+               & otomatis dipakai lagi untuk halaman BERIKUTNYA saat ◀ ▶
+               ditekan (zoom & posisinya tidak reset). -->
+          <div class="ps-field-label">🖼️ Ukuran Gambar/PDF (Layar 2)</div>
+          <div class="ps-btn-row" id="psSlideDisplayModeRow">
+            <button type="button" class="chip-btn small" data-slide-mode="original">▭ Asli</button>
+            <button type="button" class="chip-btn small" data-slide-mode="fitwidth">📐 Sesuai Lebar</button>
+            <button type="button" class="chip-btn small" data-slide-mode="zoom">🔍 Zoom</button>
+          </div>
+          <div class="ps-btn-row" id="psSlideZoomRow" hidden>
+            <input type="range" id="psSlideZoomPct" min="100" max="400" value="150" style="flex:1;" />
+            <input type="number" id="psSlideZoomPctValue" class="ps-pen-size-value ps-pen-size-value-input" min="100" max="400" step="5" value="150" title="Ketik angka Zoom manual (100-400), lalu tekan Enter" />%
+          </div>
+          <div class="ps-pointer-hint">"Asli" = muat penuh dalam layar apa adanya (bawaan). "Sesuai Lebar" = lebar dipaksa penuh layar, nempel di atas. "Zoom" = diperbesar dari titik ATAS, sisi kelebihannya terpotong -- ketiganya berlaku untuk gambar/PDF berikutnya juga (◀ ▶), tidak perlu diatur ulang tiap halaman.</div>
           <!-- BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/
                Stopwatch (Layar 2)": SENGAJA dipisah dari "Ukuran Teks" di
                atas (yang untuk ayat/teks/pengumuman/kidung) -- angka
@@ -3069,6 +3100,10 @@
                  🥳 Bahagia = confetti + beberapa emoji ceria sekaligus
                  (playHappyBurst_()) untuk momen yang terasa lebih meriah. -->
             <button type="button" class="chip-btn small" data-effect="balon">🎈 Balon</button>
+            <!-- BARU (12 Sep 2026, permintaan operator "efek gelembung sabun
+                 yang naik dari bawah ke atas") -- pola SAMA dengan Balon di
+                 atas, lihat playBubbleEffect_() (present.html). -->
+            <button type="button" class="chip-btn small" data-effect="gelembung">🫧 Gelembung</button>
             <button type="button" class="chip-btn small" data-effect-emoji="👍">👍 Jempol</button>
             <button type="button" class="chip-btn small" data-effect="happy">🥳 Bahagia</button>
             <!-- BARU (12 Sep 2026, permintaan operator "efek gempa bumi") --
@@ -3089,6 +3124,29 @@
             <button type="button" class="chip-btn small" data-shout="PUJI TUHAN!">🙌 Puji Tuhan!</button>
             <button type="button" class="chip-btn small" data-shout="HALELUYA!">🙌 Haleluya!</button>
             <button type="button" class="chip-btn small" data-shout="AMIN!">🙌 Amin!</button>
+            <!-- BARU (12 Sep 2026, permintaan operator: "minta ada Amin,
+                 Halelulya, Oh Tuhan Yesus" -- 2 yang pertama sudah ada di
+                 atas (Haleluya/Amin), "Oh Tuhan Yesus" ditambahkan di sini
+                 sebagai seruan teks baru (BEDA dari efek suara "Oh Tuhan
+                 Yesus" yang sudah ada duluan di bagian "Efek Suara" di
+                 bawah, js/soundfx.js -- yang itu memutar SUARA, ini
+                 menampilkan TEKS besar). -->
+            <button type="button" class="chip-btn small" data-shout="OH TUHAN YESUS!">🙏 Oh Tuhan Yesus!</button>
+          </div>
+          <!-- BARU (12 Sep 2026, permintaan operator "bisa ganti warna,
+               bukan hanya warna kuning") -- pilihan warna untuk SEMUA
+               tombol seruan di atas (dipilih SEKALI, berlaku untuk seruan
+               berikutnya yang ditekan -- lihat wireEffectsTab(),
+               js/presentation-studio.js, & kelas .ms-shout-* di
+               present.html). Tersimpan per perangkat (localStorage) supaya
+               tidak perlu dipilih ulang tiap buka Studio. -->
+          <div class="ps-field-label" style="margin-top:6px; font-weight:400; font-size:.85em;">🎨 Warna teks seruan</div>
+          <div class="ps-btn-row" id="psShoutColorRow">
+            <button type="button" class="chip-btn small" data-shout-color="yellow">🟡 Kuning</button>
+            <button type="button" class="chip-btn small" data-shout-color="white-black">⚪ Putih + tepi hitam</button>
+            <button type="button" class="chip-btn small" data-shout-color="black-white">⚫ Hitam + tepi putih</button>
+            <button type="button" class="chip-btn small" data-shout-color="red-black">🔴 Merah + tepi hitam</button>
+            <button type="button" class="chip-btn small" data-shout-color="red">🔴 Merah polos</button>
           </div>
           <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
           <div class="ps-field-label" style="margin-top:0;">🔊 Efek Suara</div>
@@ -3186,7 +3244,7 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
-  <script src="js/soundfx.js?v=20260911c"></script>
+  <script src="js/soundfx.js?v=20260911cc"></script>
   <script src="js/presentation-studio.js?v=20260912b"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
