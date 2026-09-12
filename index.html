@@ -1490,6 +1490,16 @@
           <div class="ps-btn-row" id="psTimerModeRow">
             <button type="button" class="chip-btn small active" data-timer-mode="duration">⏱️ Durasi</button>
             <button type="button" class="chip-btn small" data-timer-mode="clock">🎯 Jam Target</button>
+            <!-- BARU (12 Sep 2026 v2, permintaan operator) -- mode ke-3:
+                 "🕐 Jam" = jam DINDING BERJALAN (JAM:MENIT:DETIK sekarang,
+                 terus berubah, BUKAN hitung mundur seperti 2 mode di
+                 atas). Dipakai kalau operator cuma mau menampilkan jam
+                 sekarang di Layar 2 (mis. "waktu istirahat sampai jam
+                 berapa" tanpa target pasti, atau sekadar penunjuk waktu
+                 untuk jemaat). Lihat setTimerMode_()/startTimerNow_()/
+                 stopTimerNow_() di bawah & showTimerClock() (present.html,
+                 cabang data.isNow). -->
+            <button type="button" class="chip-btn small" data-timer-mode="now">🕐 Jam</button>
           </div>
           <div id="psTimerLabelRow">
             <input type="text" id="psTimerLabel" class="columns-lang-select" value="Sesi Bagi Nikmat" placeholder="Teks timer" />
@@ -1572,6 +1582,22 @@
               <button type="button" class="chip-btn small" data-timerclock-pos="bottom" title="Bawah Tengah">⬇️</button>
               <button type="button" class="chip-btn small" data-timerclock-pos="bottom-right" title="Kanan Bawah">↘️</button>
             </div>
+          </div>
+          <!-- BARU (12 Sep 2026 v2) -- mode "🕐 Jam" (jam dinding berjalan,
+               lihat catatan panjang di tombol data-timer-mode="now" di
+               atas). Teks opsional di ATAS jam ("judul") + pilihan model
+               tampilan: Digital (angka JAM:MENIT:DETIK biasa) atau Analog
+               (jam bulat besar SATU LAYAR PENUH dengan 3 jarum, lihat
+               #timerAnalogClockWrap & tickAnalogClock() di present.html). -->
+          <div id="psTimerNowFields" hidden>
+            <div class="ps-field-label">Judul di atas jam (opsional)</div>
+            <input type="text" id="psTimerNowCaption" class="columns-lang-select" placeholder="mis. Waktu Istirahat" />
+            <div class="ps-field-label" style="margin-top:6px;">Model Jam</div>
+            <div class="ps-btn-row" id="psTimerNowStyleRow">
+              <button type="button" class="chip-btn small active" data-timernow-style="digital">🔢 Digital</button>
+              <button type="button" class="chip-btn small" data-timernow-style="analog">🕰️ Analog (1 layar)</button>
+            </div>
+            <div class="ps-pointer-hint">"Digital" = angka JAM:MENIT:DETIK besar di tengah, sama gayanya seperti 🎯 Jam Target. "Analog" = jam bulat SATU LAYAR PENUH dengan 3 jarum (jam/menit/detik) yang berjalan sungguhan mengikuti waktu perangkat ini.</div>
           </div>
           <div class="ps-timer-label-preview" id="psTimerLabelPreview">Sesi Bagi Nikmat</div>
           <div class="ps-timer-display" id="psTimerDisplay">00:00</div>
@@ -2330,6 +2356,30 @@
             <button type="button" class="chip-btn small" data-timer-style="bigcircle">⭕ Lingkaran Besar</button>
           </div>
           <div class="ps-pointer-hint">"Klasik" = tampilan bawaan sekarang (angka besar di tengah cincin). "⭕ Lingkaran Besar" = cincin dibuat jauh lebih besar sebagai fokus visual, angka waktu & judul sesi dibuat kecil di bagian bawahnya -- badge kuning "MULAI" yang berkedip sebelum ditekan "▶️ Mulai" tetap tampil seperti biasa di kedua gaya.</div>
+
+          <!-- BARU (12 Sep 2026 v2, permintaan operator "jam kecil di
+               pojok, aktif di ayat/kidung/PDF/apapun") -- BEDA TOTAL dari
+               Timer/Jam Target/mode Jam di atas: ini lapisan JAM KECIL
+               yang menempel di pojok Layar 2 & TETAP tampil di ATAS
+               konten apa pun yang sedang tayang (ayat, kidung,
+               pengumuman, gambar/PDF, video, dst) -- lihat
+               #cornerClockOverlay (present.html), independen dari
+               showMain()/showTimer()/dst. Cukup 1 sakelar Tampil/
+               Sembunyi + posisi pojok, TIDAK mematikan/mengganti apa pun
+               yang sedang tayang di tengah. -->
+          <div class="ps-field-label" style="margin-top:14px;">🕐 Jam Pojok (tampil di atas konten apa pun)</div>
+          <label class="more-menu-toggle" for="psCornerClockOn">
+            <span>Tampilkan jam pojok di Layar 2</span>
+            <span class="toggle-switch"><input type="checkbox" id="psCornerClockOn" /><span class="toggle-slider"></span></span>
+          </label>
+          <div class="ps-field-label" style="margin-top:6px;">Posisi</div>
+          <div class="ps-btn-row" id="psCornerClockPosRow">
+            <button type="button" class="chip-btn small active" data-corner-clock-pos="top-left">↖️ Kiri Atas</button>
+            <button type="button" class="chip-btn small" data-corner-clock-pos="top-right">↗️ Kanan Atas</button>
+            <button type="button" class="chip-btn small" data-corner-clock-pos="bottom-left">↙️ Kiri Bawah</button>
+            <button type="button" class="chip-btn small" data-corner-clock-pos="bottom-right">↘️ Kanan Bawah</button>
+          </div>
+          <div class="ps-pointer-hint">Jam kecil (format JAM:MENIT:DETIK) yang menempel di pojok Layar 2, mengikuti waktu perangkat ini -- tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, sampai disembunyikan lagi dari sini.</div>
         </div>
 
         <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
@@ -3102,7 +3152,7 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20260907aa"></script>
+  <script src="js/config.js?v=20260907a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260818b"></script>
   <script src="js/footnotes.js?v=20260826e"></script>
@@ -3137,7 +3187,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/presentation-studio.js?v=20260912bx"></script>
+  <script src="js/presentation-studio.js?v=20260912b"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
