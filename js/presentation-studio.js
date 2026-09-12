@@ -174,6 +174,15 @@ const PresentationStudio = (() => {
   // Kaca Pembesar di atas (cuma 1 yang boleh aktif dalam 1 waktu, sama
   // pola-nya dengan 3 yang sudah ada).
   let focusClickActive = false;
+  // BARU (12 Sep 2026, permintaan operator "kotak lebih terang, klik utk
+  // mengunci perbesaran") -- 🔲 Perbesar Kotak, mode ke-5 yang sama-sama
+  // saling eksklusif dengan 4 mode di atas. `boxZoomActive` = tombolnya
+  // sedang dinyalakan (mode ini yang aktif dipilih operator);
+  // `boxZoomLocked` = SUDAH diklik sekali & sedang mengunci perbesaran
+  // (beda dari `boxZoomActive` -- bisa aktif tapi BELUM dikunci, sedang
+  // "mencari" posisi kotak). Lihat wirePointerPen() di bawah.
+  let boxZoomActive = false;
+  let boxZoomLocked = false;
 
   function el(id) { return document.getElementById(id); }
   function isDesktop() { return window.innerWidth >= DESKTOP_MIN_WIDTH; }
@@ -639,6 +648,18 @@ const PresentationStudio = (() => {
         if (!(key in kidungGroupFirstIdx)) kidungGroupFirstIdx[key] = i;
       }
     });
+    // BARU (12 Sep 2026, laporan operator "hapus 26 halaman PDF sekaligus,
+    // dulu bisa sekarang tidak") -- SAMA PERSIS pola di atas (kidung), tapi
+    // untuk item "media" (PDF/gambar dari "➕ Semua Halaman"), dikelompokkan
+    // per mediaItemId -- lihat removeMediaGroupFromCollection() (js/collections.js).
+    const mediaGroupCount = {};
+    const mediaGroupFirstIdx = {};
+    items.forEach((it, i) => {
+      if (it && it.type === "media" && it.mediaItemId) {
+        mediaGroupCount[it.mediaItemId] = (mediaGroupCount[it.mediaItemId] || 0) + 1;
+        if (!(it.mediaItemId in mediaGroupFirstIdx)) mediaGroupFirstIdx[it.mediaItemId] = i;
+      }
+    });
     wrap.innerHTML = "";
     items.forEach((it, i) => {
       const ref = genericItemRefText(it);
@@ -650,10 +671,14 @@ const PresentationStudio = (() => {
       const kKey = isKidung ? (it.buku || "") + "|" + it.kidungNo : null;
       const groupN = isKidung ? kidungGroupCount[kKey] : 0;
       const showGroupDelete = isKidung && groupN > 1 && kidungGroupFirstIdx[kKey] === i;
+      const isMedia = it && it.type === "media" && it.mediaItemId;
+      const mediaGroupN = isMedia ? mediaGroupCount[it.mediaItemId] : 0;
+      const showMediaGroupDelete = isMedia && mediaGroupN > 1 && mediaGroupFirstIdx[it.mediaItemId] === i;
       row.innerHTML =
         `<div class="ps-verse-row-body"><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
+           ${showMediaGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="mediagroup" title="Hapus SEMUA ${mediaGroupN} halaman berkas ini dari kumpulan, sekali klik">🗑️ Hapus Semua ${mediaGroupN} Halaman Ini</button>` : ""}
            <button type="button" class="chip-btn small danger" data-del="one" title="Hapus item ini saja dari kumpulan">🗑️ Hapus Item Ini</button>
          </div>` +
         (reorderOn
@@ -685,6 +710,21 @@ const PresentationStudio = (() => {
           e.stopPropagation();
           if (!confirm(`Hapus SEMUA ${groupN} bait kidung "${it.title || ("No. " + it.kidungNo)}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
           const removed = removeKidungGroupFromCollection(username, sel.value, it.buku, it.kidungNo);
+          if (removed > 0) {
+            activePlaylist = null;
+            renderCollectionSelect();
+          }
+        });
+      }
+      // "🗑️ Hapus Semua N Halaman Ini" -- hapus SEMUA halaman berkas PDF/
+      // gambar yang sama sekaligus (permintaan operator: dulu bisa, lalu
+      // hilang -- lihat removeMediaGroupFromCollection(), js/collections.js).
+      const mediaGroupBtn = row.querySelector('[data-del="mediagroup"]');
+      if (mediaGroupBtn) {
+        mediaGroupBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!confirm(`Hapus SEMUA ${mediaGroupN} halaman "${it.name || "berkas ini"}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+          const removed = removeMediaGroupFromCollection(username, sel.value, it.mediaItemId);
           if (removed > 0) {
             activePlaylist = null;
             renderCollectionSelect();
@@ -2706,6 +2746,19 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------
   const TIMER_BELL_CHOICE_KEY = "ps_timer_bell_choice_v1";
 
+  // BARU (12 Sep 2026) -- SATU sumber daftar bel dipakai di SEMUA tempat
+  // di file ini (dropdown, grid "Bel Cepat", jalan pintas Alt+1..9) --
+  // numpang SoundFX.bellChoices() (js/soundfx.js) yang menggabungkan
+  // CONFIG.BELL_SOUNDS + SEMUA efek di SOUND_FX_LIST, lihat komentar
+  // panjang di bellChoices() untuk detail lengkapnya. Fallback ke
+  // CONFIG.BELL_SOUNDS/"Bel 1 (Bawaan)" saja kalau soundfx.js entah
+  // kenapa belum termuat (seharusnya tidak pernah terjadi).
+  function getBellChoices_() {
+    if (typeof SoundFX !== "undefined" && SoundFX.bellChoices) return SoundFX.bellChoices();
+    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [];
+    return list.length ? list : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }];
+  }
+
   function getSelectedBellKey_() {
     const sel = el("psTimerBellSelect");
     if (sel && sel.value) return sel.value;
@@ -2715,7 +2768,7 @@ const PresentationStudio = (() => {
   function populateBellSelect_() {
     const sel = el("psTimerBellSelect");
     if (!sel) return;
-    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)", url: "" }];
+    const list = getBellChoices_();
     let saved = "";
     try { saved = localStorage.getItem(TIMER_BELL_CHOICE_KEY) || ""; } catch (e) {}
     const fallback = (typeof CONFIG !== "undefined" && CONFIG.TIMER_BELL_DEFAULT_KEY) || list[0].key;
@@ -2776,6 +2829,21 @@ const PresentationStudio = (() => {
     });
     if (el("psTimerClockColorCustom")) {
       el("psTimerClockColorCustom").addEventListener("input", () => setTimerClockColor_(el("psTimerClockColorCustom").value));
+    }
+    // BARU (12 Sep 2026, permintaan operator "2 model tampilan untuk
+    // timer dan stopwatch") -- 2 tombol "Gaya Tampilan Timer/Stopwatch"
+    // (Klasik / ⭕ Lingkaran Besar), pola SAMA persis dengan tombol-
+    // tombol pilihan lain di sini (1 sumber kebenaran, dikirim via
+    // theme.timerStyle -- lihat CSS body.tv-bigcircle & applyTheme() di
+    // present.html). Berlaku untuk Timer & Stopwatch SEKALIGUS.
+    if (el("psTimerStyleRow")) {
+      const timerStyleBtns = Array.from(el("psTimerStyleRow").querySelectorAll("[data-timer-style]"));
+      timerStyleBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          saveAndSendTheme({ timerStyle: btn.dataset.timerStyle });
+          timerStyleBtns.forEach((b) => b.classList.toggle("active", b === btn));
+        });
+      });
     }
     // BARU (7 Sep 2026 v3, permintaan operator) -- WARNA STROKE (kontur
     // pinggiran) angka Jam Target, pola SAMA PERSIS dengan warna angka
@@ -5954,7 +6022,7 @@ const PresentationStudio = (() => {
   function renderBellShortcutRow() {
     const row = el("psBellShortcutRow");
     if (!row) return;
-    const list = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1", label: "🔔 Bel 1 (Bawaan)" }];
+    const list = getBellChoices_();
     // BARU (8 Sep 2026 v5) -- badge nomor Alt+N, pola SAMA seperti
     // renderModeShortcutRow() di atas (lihat catatan panjang di sana).
     row.innerHTML = list.map((b, i) => {
@@ -6062,7 +6130,7 @@ const PresentationStudio = (() => {
     // ---- Bel Cepat -- numpang CONFIG.BELL_SOUNDS yang SAMA dgn tab Bel Cepat ----
     const bellRow = el("psQuickBellRow");
     if (bellRow) {
-      const bells = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [];
+      const bells = getBellChoices_();
       bellRow.innerHTML = bells.map((b, i) =>
         `<button type="button" class="chip-btn small" data-quick-bell-key="${escapeHtml(b.key)}">${escapeHtml(b.label)}</button>`
       ).join("") || '<span class="ps-pointer-hint">Belum ada bel dikonfigurasi.</span>';
@@ -6209,7 +6277,7 @@ const PresentationStudio = (() => {
       if (!Number.isInteger(n) || n < 1 || n > 9) return;
       if (e.altKey) {
         // Alt+1..Alt+9 -> Bel Cepat ke-N
-        const bells = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS)) ? CONFIG.BELL_SOUNDS : [];
+        const bells = getBellChoices_();
         const bell = bells[n - 1];
         if (bell) { e.preventDefault(); rawPost({ type: "bell", action: "ring", key: bell.key }); }
       } else {
@@ -6540,7 +6608,7 @@ const PresentationStudio = (() => {
     }
     if (el("psQuickBellBtn")) {
       el("psQuickBellBtn").addEventListener("click", () => {
-        const bells = (typeof CONFIG !== "undefined" && Array.isArray(CONFIG.BELL_SOUNDS) && CONFIG.BELL_SOUNDS.length) ? CONFIG.BELL_SOUNDS : [{ key: "bell1" }];
+        const bells = getBellChoices_();
         rawPost({ type: "bell", action: "ring", key: bells[0].key });
       });
     }
@@ -9060,6 +9128,44 @@ const PresentationStudio = (() => {
       magnifyZoomValue.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); magnifyZoomValue.blur(); } });
     }
     const magnifyBtns = () => Array.from(document.querySelectorAll("[data-ps-magnify-toggle]"));
+    // BARU (12 Sep 2026, permintaan operator) -- 🔲 Perbesar Kotak: ukuran
+    // kotak viewfinder 10%-80% (default 35%), dikirim bersama posisi
+    // kursor tiap mousemove SELAGI belum dikunci (sama pola dengan
+    // `magnifyPercent` di atas).
+    let boxZoomSizePercent = 35;
+    const boxZoomSizeSlider = el("psBoxZoomSizeSlider");
+    const boxZoomSizeValue = el("psBoxZoomSizeValue");
+    if (boxZoomSizeSlider) {
+      boxZoomSizePercent = Number(boxZoomSizeSlider.value) || 35;
+      boxZoomSizeSlider.addEventListener("input", () => {
+        boxZoomSizePercent = Number(boxZoomSizeSlider.value) || 35;
+        if (boxZoomSizeValue) boxZoomSizeValue.value = boxZoomSizePercent;
+      });
+    }
+    if (boxZoomSizeValue) {
+      boxZoomSizeValue.addEventListener("change", () => {
+        let v = Math.round(Number(boxZoomSizeValue.value));
+        if (!Number.isFinite(v)) v = boxZoomSizePercent;
+        v = Math.min(80, Math.max(10, v));
+        boxZoomSizePercent = v;
+        boxZoomSizeValue.value = v;
+        if (boxZoomSizeSlider) boxZoomSizeSlider.value = v;
+      });
+      boxZoomSizeValue.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); boxZoomSizeValue.blur(); } });
+    }
+    const boxZoomBtns = () => Array.from(document.querySelectorAll("[data-ps-boxzoom-toggle]"));
+    // Dipakai SETIAP kali operator beralih ke mode lain (Penunjuk/Pen/
+    // Kaca Pembesar/Efek Fokus) ATAU mematikan tombol Perbesar Kotak itu
+    // sendiri -- mengembalikan #slideView ke ukuran normal DAN
+    // menyembunyikan kotak viewfinder, apa pun keadaan sebelumnya
+    // (sedang mencari posisi ATAU sudah terkunci).
+    function deactivateBoxZoom_() {
+      boxZoomActive = false;
+      boxZoomLocked = false;
+      boxZoomBtns().forEach((b) => b.classList.remove("active"));
+      rawPost({ type: "boxzoom", on: false });
+      rawPost({ type: "boxzoom_hover", on: false });
+    }
     // BARU (12 Sep 2026) -- 🎯 Efek Fokus, lihat catatan panjang di
     // deklarasi focusClickActive di atas & blok wrap.addEventListener("click", ...)
     // di bawah untuk pengirimannya.
@@ -9081,7 +9187,7 @@ const PresentationStudio = (() => {
     }
 
     function updateMode() {
-      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || magnifyActive || focusClickActive);
+      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || magnifyActive || focusClickActive || boxZoomActive);
     }
 
     document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((chip) => {
@@ -9100,6 +9206,7 @@ const PresentationStudio = (() => {
       penBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
+      deactivateBoxZoom_();
       if (!pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
       rawPost({ type: "magnify", on: false });
       updateMode();
@@ -9113,6 +9220,7 @@ const PresentationStudio = (() => {
       pointerBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
+      deactivateBoxZoom_();
       if (!penActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
       rawPost({ type: "magnify", on: false });
       updateMode();
@@ -9126,6 +9234,7 @@ const PresentationStudio = (() => {
       pointerBtns().forEach((b) => b.classList.remove("active"));
       penBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
+      deactivateBoxZoom_();
       if (!magnifyActive) rawPost({ type: "magnify", on: false });
       if (dot) dot.style.display = "none";
       rawPost({ type: "pointer", on: false });
@@ -9148,8 +9257,38 @@ const PresentationStudio = (() => {
       pointerBtns().forEach((b) => b.classList.remove("active"));
       penBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
+      deactivateBoxZoom_();
       rawPost({ type: "pointer", on: false });
       rawPost({ type: "magnify", on: false });
+      if (dot) dot.style.display = "none";
+      updateMode();
+    }));
+    // BARU (12 Sep 2026, permintaan operator "kotak lebih terang di
+    // sekitar area, klik utk mengunci perbesarannya") -- 🔲 Perbesar
+    // Kotak: BEDA dari 4 mode lain di atas. Menyalakan tombol ini HANYA
+    // menampilkan kotak viewfinder yang mengikuti kursor (lihat blok
+    // "mousemove" di bawah) -- belum ada apa pun yang membesar.
+    // Mengunci/melepas perbesaran sungguhan terjadi di listener "click"
+    // terpisah di bawah (mirip pola Efek Fokus di atas), BUKAN di sini --
+    // supaya menyalakan tombolnya sendiri (1x klik tombol ini) tidak
+    // langsung mengunci ke posisi kursor terakhir yang mungkin belum pas.
+    boxZoomBtns().forEach((btn) => btn.addEventListener("click", () => {
+      const turningOn = !boxZoomActive;
+      boxZoomActive = turningOn;
+      boxZoomLocked = false;
+      pointerActive = false;
+      penActive = false;
+      magnifyActive = false;
+      focusClickActive = false;
+      boxZoomBtns().forEach((b) => b.classList.toggle("active", boxZoomActive));
+      pointerBtns().forEach((b) => b.classList.remove("active"));
+      penBtns().forEach((b) => b.classList.remove("active"));
+      magnifyBtns().forEach((b) => b.classList.remove("active"));
+      focusClickBtns().forEach((b) => b.classList.remove("active"));
+      rawPost({ type: "pointer", on: false });
+      rawPost({ type: "magnify", on: false });
+      rawPost({ type: "boxzoom", on: false }); // matikan kunci lama (kalau ada) begitu mode diaktifkan/dimatikan ulang
+      if (!turningOn) rawPost({ type: "boxzoom_hover", on: false });
       if (dot) dot.style.display = "none";
       updateMode();
     }));
@@ -9195,6 +9334,17 @@ const PresentationStudio = (() => {
         if (magnifyActive) {
           rawPost({ type: "magnify", on: true, x, y, percent: magnifyPercent });
         }
+        // BARU (12 Sep 2026) -- 🔲 Perbesar Kotak: SELAGI belum dikunci
+        // (`!boxZoomLocked`), kotak viewfinder mengikuti kursor terus
+        // (sama pola dengan Kaca Pembesar di atas) supaya operator bisa
+        // "mencari" posisi yang pas SEBELUM klik utk mengunci. Begitu
+        // sudah terkunci, mousemove TIDAK mengirim apa pun lagi (kotak
+        // viewfinder-nya sudah disembunyikan sendiri oleh lockBoxZoom()
+        // di present.html) -- posisi kursor tidak relevan lagi sampai
+        // operator klik sekali lagi utk melepas kunci.
+        if (boxZoomActive && !boxZoomLocked) {
+          rawPost({ type: "boxzoom_hover", on: true, x, y, sizePercent: boxZoomSizePercent });
+        }
       });
       wrap.addEventListener("mousedown", () => { penStroke = []; });
       // BARU (12 Sep 2026) -- 🎯 Efek Fokus: 1 klik di kotak pratinjau
@@ -9203,17 +9353,50 @@ const PresentationStudio = (() => {
       // TERPISAH dari listener "mousemove" di atas supaya tidak mengirim
       // berkali-kali kalau operator cuma menggerakkan kursor tanpa klik.
       wrap.addEventListener("click", (e) => {
-        if (!focusClickActive) return;
-        const rect = wrap.getBoundingClientRect();
-        let x = (e.clientX - rect.left) / rect.width;
-        let y = (e.clientY - rect.top) / rect.height;
-        x = Math.min(1, Math.max(0, x));
-        y = Math.min(1, Math.max(0, y));
-        rawPost({ type: "clickfocus", x, y });
+        if (focusClickActive) {
+          const rect = wrap.getBoundingClientRect();
+          let x = (e.clientX - rect.left) / rect.width;
+          let y = (e.clientY - rect.top) / rect.height;
+          x = Math.min(1, Math.max(0, x));
+          y = Math.min(1, Math.max(0, y));
+          rawPost({ type: "clickfocus", x, y });
+          return;
+        }
+        // BARU (12 Sep 2026) -- 🔲 Perbesar Kotak: klik PERTAMA (belum
+        // terkunci) = kunci & perbesar bagian kotak persis di posisi
+        // klik ini. Klik KEDUA (sudah terkunci) = lepas kunci, balik ke
+        // ukuran normal & kotak viewfinder mengikuti kursor lagi (siap
+        // dipilih ulang) -- operator TIDAK perlu mematikan tombolnya
+        // dulu hanya utk memilih bagian lain.
+        if (boxZoomActive) {
+          const rect = wrap.getBoundingClientRect();
+          let x = (e.clientX - rect.left) / rect.width;
+          let y = (e.clientY - rect.top) / rect.height;
+          x = Math.min(1, Math.max(0, x));
+          y = Math.min(1, Math.max(0, y));
+          if (!boxZoomLocked) {
+            boxZoomLocked = true;
+            rawPost({ type: "boxzoom", on: true, x, y, sizePercent: boxZoomSizePercent });
+          } else {
+            boxZoomLocked = false;
+            rawPost({ type: "boxzoom", on: false });
+            // Kotak viewfinder langsung disegarkan di posisi klik ini
+            // juga (bukan menunggu mousemove berikutnya) supaya tidak
+            // ada "kekosongan" sesaat tanpa viewfinder maupun perbesaran.
+            rawPost({ type: "boxzoom_hover", on: true, x, y, sizePercent: boxZoomSizePercent });
+          }
+          return;
+        }
       });
       wrap.addEventListener("mouseleave", () => {
         if (pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
         if (magnifyActive) rawPost({ type: "magnify", on: false });
+        // Kotak viewfinder (BELUM terkunci) ikut sembunyi saat kursor
+        // keluar kotak pratinjau -- SAMA seperti Kaca Pembesar di atas.
+        // Kalau SUDAH terkunci, JANGAN disentuh -- perbesaran harus tetap
+        // menempel di Layar 2 walau kursor operator pindah ke tempat lain
+        // (mis. mau menulis pengumuman sambil bagian itu tetap membesar).
+        if (boxZoomActive && !boxZoomLocked) rawPost({ type: "boxzoom_hover", on: false });
       });
       window.addEventListener("resize", syncCanvasSize);
     }
@@ -9235,7 +9418,7 @@ const PresentationStudio = (() => {
   // video, teks tampil sebagai BAR SUBTITLE menempel di bawah, lihat
   // body.cam-subtitle). `camSplitPct`: tinggi zona kamera (%) untuk
   // mode "split", bisa diatur bebas lewat slider (bawaan 42).
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420 };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420 };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -9286,6 +9469,15 @@ const PresentationStudio = (() => {
     // psContentScale di atas.
     if (el("psTimerScale")) el("psTimerScale").value = String(Math.round((theme.timerScale || 1) * 100));
     if (el("psTimerScaleValue")) el("psTimerScaleValue").value = Math.round((theme.timerScale || 1) * 100);
+    // BARU (12 Sep 2026) -- pulihkan tombol gaya tampilan Timer/Stopwatch
+    // aktif ("Klasik"/"⭕ Lingkaran Besar") saat panel dibuka ulang, pola
+    // SAMA seperti tombol posisi Jam Target di bawah.
+    if (el("psTimerStyleRow")) {
+      const savedStyle = theme.timerStyle || "classic";
+      Array.from(el("psTimerStyleRow").querySelectorAll("[data-timer-style]")).forEach((b) => {
+        b.classList.toggle("active", b.dataset.timerStyle === savedStyle);
+      });
+    }
     // PERBAIKAN (7 Sep 2026) -- pulihkan juga tombol aktif "WARNA ANGKA
     // COUNTDOWN" (Jam Target) saat panel dibuka ulang -- sebelumnya tidak
     // dipulihkan sama sekali di sini (beda dari kirim ke Layar 2 di atas
@@ -9377,7 +9569,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
   }
 
   function saveAndSendTheme(partial) {
@@ -9401,7 +9593,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
