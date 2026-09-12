@@ -346,6 +346,11 @@ function addKidungToCollection(username, name, kidungItem) {
     ikon: kidungItem.ikon || "",
     bait: Array.isArray(kidungItem.bait) ? kidungItem.bait.map((b) => ({ noBait: b.noBait, teks: b.teks })) : [],
     koorTeks: kidungItem.koorTeks || null,
+    // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah" (lihat
+    // catatan panjang di splitKidungIntoSlides()/js/kidung.js) ikut
+    // disimpan supaya kidung yang ditambahkan ke Kumpulan Ayat tetap
+    // membawa pilihan tata letak koornya saat ditayangkan lagi nanti.
+    koorMid: !!kidungItem.koorMid,
     // BARU (4 Sep 2026) -- ikut disimpan supaya kidung yang ditambahkan ke
     // Kumpulan Ayat tetap membawa baris kecil "Pengarang Birama (N Bait)"
     // saat nanti ditayangkan lagi dari Kumpulan Ayat (lihat kidungSubLine()
