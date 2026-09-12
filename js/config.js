@@ -486,6 +486,18 @@ const CONFIG = {
   // tidak perlu ubah kode lain, cukup muat ulang (F5) untuk melihatnya
   // di dropdown.
   //
+  // CATATAN (12 Sep 2026) -- sejak ada js/soundfx.js, dropdown "🔔 Suara
+  // Bel" TIDAK LAGI cuma menampilkan baris di BELL_SOUNDS ini saja --
+  // SEMUA efek suara di SOUND_FX_LIST (js/soundfx.js, tab "🎉 Efek
+  // Panggung") ikut ditambahkan otomatis sebagai pilihan bel juga
+  // (lihat SoundFX.bellChoices()). Jadi kalau cuma butuh bel dari efek
+  // yang SUDAH ADA (Drumroll, Ding, Fanfare, dst -- tidak perlu link
+  // Google Drive/file baru sama sekali), TIDAK PERLU tambah apa pun di
+  // sini -- tinggal pilih langsung dari dropdown-nya, otomatis muncul.
+  // Array BELL_SOUNDS di bawah ini SEKARANG hanya perlu diisi kalau mau
+  // pakai suara bel dari LUAR soundfx.js (mis. rekaman sendiri lewat
+  // link Google Drive yang belum ada di assets/sounds/).
+  //
   // CARA MENAMBAH SUARA SENDIRI (mis. "Oh Tuhan Yesus", "Sudah Selesai"):
   //  1. Siapkan file .mp3 PENDEK (idealnya di bawah 1-2 MB / beberapa
   //     detik) -- makin kecil filenya, makin cepat & andal terputar
