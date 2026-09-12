@@ -1250,10 +1250,25 @@
     display: none; position: fixed; z-index: 45; pointer-events: none;
     font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
     font-size: clamp(14px, 2.2vw, 30px);
-    color: var(--p-ink); background: rgba(0,0,0,0.38);
+    /* DIPERBAIKI (12 Sep 2026 v5, laporan operator "tema Putih tapi jam
+       pojok tetap kotak abu-abu tulisan hitam, kalau kena gambar gelap
+       jadi tidak kelihatan sama sekali") -- SEBELUMNYA background SELALU
+       rgba(0,0,0,.38) (hitam tembus pandang tetap) berapa pun tema warna
+       yang aktif, jadi: (a) di tema terang (Putih/Krem/dst) kotaknya
+       kelihatan abu-abu gelap, bukan putih/terang seperti temanya, dan
+       (b) karena tembus pandang, saat konten di baliknya (foto/PDF/
+       video) SAMA-SAMA gelap, kotak + tulisan --p-ink gelap jadi hilang
+       total (gelap di atas gelap). Sekarang kotak dibuat SOLID/OPAQUE
+       memakai warna latar tema aktif sendiri (var(--p-bg), diperbarui
+       applyTheme() tiap ganti tema) -- kontras dgn var(--p-ink) (warna
+       tulisan tema) selalu terjaga oleh desain tema itu sendiri, APA
+       PUN yang tampil di baliknya (gambar gelap/terang, video, dst),
+       karena solid = tidak pernah "tembus" ke lapisan di bawahnya. */
+    color: var(--p-ink); background: var(--p-bg);
     padding: 0.35em 0.7em; border-radius: 10px;
     font-variant-numeric: tabular-nums;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    border: 1px solid color-mix(in srgb, var(--p-ink) 18%, transparent);
   }
   #cornerClockOverlay.cc-on { display: block; }
   #cornerClockOverlay.cc-pos-top-left { top: 3vh; left: 3vw; }
@@ -1513,6 +1528,48 @@
      sendiri (lihat playEffectVisual_() di skrip bawah). */
   #effectsLayer { position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden; }
   #effectsConfettiCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* PERBAIKAN (12 Sep 2026 v7) -- tombol "🌍 Gempa" di index.html (data-
+     effect="earthquake") sudah lama ADA & komentarnya menyebut
+     ".ms-earthquake-shake" + playEarthquakeEffect_() di file ini, tapi
+     KEDUANYA ternyata tidak pernah benar-benar ditulis di sini -- klik
+     tombolnya jatuh ke default (confetti) di playEffectVisual_() di
+     bawah, bukan guncangan seperti namanya. Ditambahkan sekarang: kelas
+     guncang numpang #stage APA ADANYA (persis seperti niat komentar
+     aslinya) -- getar cepat kiri-kanan-atas-bawah beberapa kali lalu
+     berhenti sendiri, TIDAK mengubah isi #stage sama sekali. */
+  @keyframes msEarthquakeShake {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-1.2vw, .6vh); }
+    20% { transform: translate(1.4vw, -.8vh); }
+    30% { transform: translate(-1vw, 1vh); }
+    40% { transform: translate(1.2vw, .4vh); }
+    50% { transform: translate(-.8vw, -1vh); }
+    60% { transform: translate(1vw, .8vh); }
+    70% { transform: translate(-1.2vw, -.4vh); }
+    80% { transform: translate(.8vw, 1vh); }
+    90% { transform: translate(-.6vw, -.6vh); }
+  }
+  .ms-earthquake-shake { animation: msEarthquakeShake .6s linear 0s 2; }
+
+  /* BARU (12 Sep 2026 v7, permintaan operator "efek zoom: semua tulisan
+     membesar sampai 500% dalam 2 detik, lalu mengecil sampai 20%, baru
+     kembali ke 100%") -- SAMA POLA dengan .ms-earthquake-shake di atas:
+     numpang #stage APA ADANYA (ayat/kidung/pengumuman/jam yang sedang
+     tayang ikut membesar/mengecil bersama, TIDAK mengubah isinya sama
+     sekali), transform-origin di tengah supaya membesar/mengecil dari
+     titik tengah layar (bukan dari sudut). Total 4 detik: 0-2 detik
+     1x->5x (sesuai "2 detik sampai 500%"), lanjut 5x->0.2x, lalu
+     0.2x->1x lagi di sisa waktu. Lihat playZoomPulse_() di skrip bawah
+     untuk cara menyalakan/mematikan kelas ini. */
+  @keyframes msZoomPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(5); }
+    75% { transform: scale(0.2); }
+    100% { transform: scale(1); }
+  }
+  .ms-zoom-pulse { animation: msZoomPulse 4s ease-in-out 1; transform-origin: center center; }
+
   .ms-effect-emoji {
     position: absolute; bottom: -60px; font-size: 48px; line-height: 1;
     animation: msEffectRise 3s ease-in forwards;
@@ -2471,11 +2528,50 @@
       setTimeout(() => playEmojiReaction_(emoji), i * 220);
     });
   }
+  // PERBAIKAN (12 Sep 2026 v7) -- lihat catatan panjang .ms-earthquake-
+  // shake di <style> atas: tombol "🌍 Gempa" sudah lama ada tapi
+  // fungsinya belum pernah ditulis. `stageEl` sudah ada (variabel
+  // #stage, dipakai di banyak tempat lain di file ini). Class dilepas
+  // via `animationend` (bukan setTimeout tetap) supaya PERSIS berhenti
+  // begitu animasinya sungguhan selesai, dan supaya klik "🌍 Gempa"
+  // berkali-kali beruntun tetap "reset" mulai dari awal tiap kali
+  // (class dilepas dulu + reflow paksa, baru dipasang ulang -- pola
+  // yang sama dipakai playShout_() di bawah untuk masalah serupa).
+  function playEarthquakeEffect_() {
+    if (!stageEl) return;
+    stageEl.classList.remove("ms-earthquake-shake");
+    void stageEl.offsetWidth; // paksa reflow supaya animasi restart kalau diklik lagi cepat
+    stageEl.classList.add("ms-earthquake-shake");
+    stageEl.addEventListener("animationend", function onDone(e) {
+      if (e.animationName !== "msEarthquakeShake") return;
+      stageEl.classList.remove("ms-earthquake-shake");
+      stageEl.removeEventListener("animationend", onDone);
+    });
+  }
+  // BARU (12 Sep 2026 v7, permintaan operator "efek zoom 100% -> 500%
+  // (2 detik) -> 20% -> 100%") -- pola IDENTIK dengan playEarthquakeEffect_()
+  // di atas, cuma beda kelas/keyframe (.ms-zoom-pulse/msZoomPulse, lihat
+  // <style>). "Tembak dan lupa" seperti efek lain di tab ini -- operator
+  // bisa klik berkali-kali, tiap klik restart dari awal (reflow paksa
+  // sama seperti gempa).
+  function playZoomPulse_() {
+    if (!stageEl) return;
+    stageEl.classList.remove("ms-zoom-pulse");
+    void stageEl.offsetWidth;
+    stageEl.classList.add("ms-zoom-pulse");
+    stageEl.addEventListener("animationend", function onDone(e) {
+      if (e.animationName !== "msZoomPulse") return;
+      stageEl.classList.remove("ms-zoom-pulse");
+      stageEl.removeEventListener("animationend", onDone);
+    });
+  }
   function playEffectVisual_(data) {
     if (data.effect === "emoji") playEmojiReaction_(data.emoji);
     else if (data.effect === "balon") playBalloonEffect_();
     else if (data.effect === "gelembung") playBubbleEffect_();
     else if (data.effect === "happy") playHappyBurst_();
+    else if (data.effect === "earthquake") playEarthquakeEffect_();
+    else if (data.effect === "zoompulse") playZoomPulse_();
     else playConfetti_(); // default/"confetti"
   }
 
