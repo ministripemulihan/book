@@ -1502,6 +1502,7 @@ const PresentationStudio = (() => {
           ${isYt ? `<button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai audio latar (video disembunyikan)">🎧</button>` : ""}
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="copyname" title="Salin nama file ini">📋</button>` : ""}
           <button type="button" class="chip-btn small" data-act="addcol" title="${isYt ? "Tambahkan video yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)" : "Tambahkan halaman yang sedang ditampilkan ke Kumpulan Ayat (kolom kiri)"}">➕ Kumpulan</button>
+          ${multi && !isYt ? `<button type="button" class="chip-btn small" data-act="addcolall" title="Tambahkan SEMUA ${images.length} halaman berkas ini ke Kumpulan Ayat sekaligus, sebagai ${images.length} item terpisah -- supaya panah/stylus bisa maju satu-per-satu lewat semua halamannya saat tayang">➕ Semua Halaman</button>` : ""}
           ${!isYt ? `<button type="button" class="chip-btn small" data-act="download" title="Unduh halaman yang sedang ditampilkan sebagai gambar">⬇️</button>` : ""}
           ${item.originalFile ? `<button type="button" class="chip-btn small" data-act="downloadOriginal" title="Unduh file PDF ASLI (utuh, bukan gambar per halaman)">⬇️ PDF Asli</button>` : ""}
           ${item.driveFileId ? `<button type="button" class="chip-btn small" data-act="publiclink" title="${item.publicUrl ? "Lihat/salin link publik, atau cabut supaya jadi privat lagi" : "Buat link Drive yang bisa dibuka SIAPA SAJA lewat browser mana pun, tanpa login ke aplikasi ini"}">${item.publicUrl ? "🔓 Link Publik" : "🔗 Buat Link Publik"}</button>` : ""}
@@ -1668,6 +1669,31 @@ const PresentationStudio = (() => {
         if (typeof renderCollectionSelect === "function") renderCollectionSelect();
         addColBtn.textContent = "✅ Ditambahkan";
         setTimeout(() => { addColBtn.textContent = "➕ Kumpulan"; }, 1200);
+      });
+      // "➕ Semua Halaman" -- BARU (12 Sep 2026). Keluhan pengguna: stylus/panah
+      // presentasi cuma bisa maju-mundur SEDIKIT (sebanyak item lain di Kumpulan
+      // Ayat) karena PDF banyak-halaman biasanya cuma masuk sebagai 1 item lewat
+      // "➕ Kumpulan" di atas (cuma halaman aktif saat itu, lihat catatan panjang
+      // di addMediaToCollection(), js/collections.js). Tombol ini memanggil
+      // addMediaToCollection() BERULANG untuk SETIAP halaman (pageIndex 0..N-1)
+      // sehingga tiap halaman jadi item playlist sendiri-sendiri -- setelah ini,
+      // panah kanan/kiri & stylus (wirePlaylistKeyNav(), lihat catatan di sana)
+      // otomatis bisa geser satu-per-satu lewat SEMUA halaman berkas ini.
+      const addColAllBtn = row.querySelector('[data-act="addcolall"]');
+      if (addColAllBtn) addColAllBtn.addEventListener("click", async () => {
+        if (typeof addMediaToCollection !== "function") return;
+        const sel = el("psCollectionSelect");
+        const name = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+          ? loadCollections(username)[sel.value].name
+          : await promptCollectionName(username);
+        if (!name) return;
+        if (!confirm(`Tambahkan SEMUA ${images.length} halaman "${item.name}" ke kumpulan "${name}"?\n\nIni akan membuat ${images.length} item terpisah (satu per halaman) di kumpulan itu.`)) return;
+        for (let i = 0; i < images.length; i++) {
+          addMediaToCollection(username, name, item, i);
+        }
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        addColAllBtn.textContent = "✅ Ditambahkan";
+        setTimeout(() => { addColAllBtn.textContent = "➕ Semua Halaman"; }, 1200);
       });
       // "⬇️" Unduh halaman/gambar yang SEDANG ditampilkan (idx saat ini).
       // PENTING: untuk PDF yang diunggah, aplikasi ini menyimpan hasil
