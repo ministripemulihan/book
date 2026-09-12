@@ -3776,6 +3776,20 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 .ps-pen-size-label { font-size: 11px; color: var(--ps-ink-soft, #888); line-height: 1; user-select: none; }
 .ps-pen-size-label-big { font-size: 20px; }
 .ps-pen-size-value { font-size: 12px; font-weight: 700; color: var(--ps-ink, #222); min-width: 38px; text-align: right; }
+/* BARU (12 Sep 2026) -- .ps-pen-size-value-input: versi <input type="number">
+   dari .ps-pen-size-value di atas (dipakai khusus kolom zoom Kaca Pembesar,
+   supaya angkanya bisa DIKETIK manual, bukan cuma tampilan slider) -- gaya
+   dibuat SEMIRIP mungkin dengan <span> aslinya (ukuran, warna, rata kanan)
+   supaya tidak "melompat" secara visual dibanding kolom Ukuran Pen/Penunjuk
+   di atasnya yang masih <span> biasa, cuma ditambah bingkai tipis + latar
+   supaya jelas kelihatan itu bisa diklik/diketik. */
+.ps-pen-size-value-input {
+  font-size: 12px; font-weight: 700; color: var(--ps-ink, #222); text-align: right;
+  width: 56px; padding: 2px 4px; border: 1px solid var(--ps-dropzone-border, #cbb894);
+  border-radius: 6px; background: var(--ps-panel-bg, #fff); font-family: inherit;
+}
+.ps-pen-size-value-input::-webkit-inner-spin-button,
+.ps-pen-size-value-input::-webkit-outer-spin-button { opacity: .6; }
 
 .ps-timer-box { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ps-border); }
 .ps-timer-label-preview {
