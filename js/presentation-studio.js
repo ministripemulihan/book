@@ -5389,8 +5389,18 @@ const PresentationStudio = (() => {
   // yang sedang tayang (present.html sendiri yang menjaga/abaikan kalau
   // ytEl kosong; iframe pratinjau juga dicek dulu keberadaannya).
   function wireYtControls() {
-    const playBtn = el("psYtPlayBtn");
-    const pauseBtn = el("psYtPauseBtn");
+    // BARU (12 Sep 2026 v3, laporan operator "tekan P jadi play-play-play
+    // baru pause, tidak tentu") -- ▶️ Play & ⏸️ Pause DIGABUNG jadi SATU
+    // tombol (#psYtPlayPauseBtn, lihat index.html) supaya cuma ADA SATU
+    // jalur kode yang mengubah status main/jeda, dipakai SAMA PERSIS baik
+    // diklik mouse MAUPUN ditekan lewat pintasan keyboard "P" -- lihat
+    // doYtPlay_()/doYtPause_()/refreshPlayPauseBtnUi_() di bawah. Sebelum
+    // ini, 2 tombol terpisah membuat status `ytIsPlaying` bisa TIDAK
+    // SINKRON kalau operator memulai video lewat klik mouse tombol
+    // ▶️ Play (yang TIDAK pernah menyentuh `ytIsPlaying`) -- giliran "P"
+    // ditekan, toggle salah membaca status LAMA (masih false) sehingga
+    // malah main lagi (bukan jeda) di penekanan pertama.
+    const playPauseBtn = el("psYtPlayPauseBtn");
     const muteBtn = el("psYtMuteBtn");
     // BARU (28 Agu 2026) -- ⏹️ Stop & 🔁 Ulang (Repeat), lihat catatan
     // panjang di present.html (handler "yt_control" action "stop" &
@@ -5564,74 +5574,28 @@ const PresentationStudio = (() => {
     // walau video di-play/pause lewat cara lain (mis. operator sempat
     // klik langsung tombol bawaan YouTube di pratinjau mini).
     let ytIsPlaying = false;
-    window.toggleYtPlayPause_ = function toggleYtPlayPause_() {
-      // BARU (12 Sep 2026, laporan operator "tekan P malah pause lalu
-      // main sendiri lagi") -- `ytIsPlaying` di-set LANGSUNG (optimis)
-      // di sini, TIDAK menunggu laporan balik asli dari Layar 2 lewat
-      // postMessage (yang perlu waktu tempuh jaringan antar-jendela +
-      // jeda maks 200ms, lihat reportYtProgress()/present.html) --
-      // sebelumnya, kalau P ditekan 2x SANGAT cepat berturutan (mis.
-      // gara-gara "key repeat" tombol tertahan, sekarang sudah dijaga
-      // lewat e.repeat di wireModeAndBellKeyboardShortcuts(), TAPI
-      // 2x tekan BENERAN cepat dari operator sendiri juga tetap bisa
-      // kena race yang sama), keydown ke-2 masih membaca status LAMA
-      // (laporan baru belum sempat sampai) sehingga toggle malah
-      // "membalik 2x" (Pause lalu Play lagi) alih-alih 1x sesuai niat.
-      // Dengan di-set optimis di sini, keydown ke-2 (secepat apa pun)
-      // SELALU membaca status TERBARU yang SUDAH benar. Listener
-      // "ps-yt-progress" di bawah tetap jalan sebagai KOREKSI kalau
-      // ternyata video diubah lewat cara lain (mis. operator klik
-      // langsung kontrol bawaan YouTube di pratinjau) -- 2 sumber ini
-      // saling melengkapi, bukan saling menggantikan.
-      if (ytIsPlaying) { if (pauseBtn) pauseBtn.click(); ytIsPlaying = false; }
-      else { if (playBtn) playBtn.click(); ytIsPlaying = true; }
-    };
-    window.addEventListener("ps-yt-progress", (e) => {
-      const d = (e && e.detail) || {};
-      if (typeof d.duration === "number" && d.duration > 0 && Math.round(d.duration) !== liveDurationSeconds) {
-        liveDurationSeconds = Math.round(d.duration);
-        if (liveRange) liveRange.max = String(liveDurationSeconds);
-        refreshLiveDurationLabel();
-      }
-      if (typeof d.currentTime === "number" && !liveEditing && !liveDragging) {
-        const secs = Math.max(0, Math.round(d.currentTime));
-        if (liveRange) liveRange.value = String(secs);
-        if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(secs);
-      }
-      if (typeof d.state === "number") ytIsPlaying = d.state === 1;
-    });
 
-    if (liveTimeInput) {
-      // Selagi kolom ini difokus, JANGAN ditimpa laporan posisi live --
-      // operator sedang menulis detik tujuan sendiri.
-      liveTimeInput.addEventListener("focus", () => { liveEditing = true; });
-      liveTimeInput.addEventListener("blur", () => { liveEditing = false; });
-      // Enter = langsung sama seperti menekan ▶️ Play (lompat + main).
-      liveTimeInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); liveTimeInput.blur(); if (playBtn) playBtn.click(); }
-      });
+    // BARU (12 Sep 2026 v3, laporan operator "tekan P jadi play-play-
+    // play baru pause") -- tampilan tombol tunggal ini SELALU disamakan
+    // dengan `ytIsPlaying` lewat 1 fungsi ini saja, dipanggil dari SETIAP
+    // tempat yang mengubah status (klik tombol, pintasan "P", maupun
+    // koreksi dari laporan status asli "ps-yt-progress" di bawah) --
+    // supaya labelnya ("▶️ Play" / "⏸️ Pause") tidak pernah "ketinggalan"
+    // dari status yang sebenarnya.
+    function refreshPlayPauseBtnUi_() {
+      if (!playPauseBtn) return;
+      playPauseBtn.textContent = ytIsPlaying ? "⏸️ Pause" : "▶️ Play";
+      playPauseBtn.title = ytIsPlaying
+        ? "Jeda video YouTube di Layar 2 (pintasan: P)"
+        : "Putar video YouTube di Layar 2 (pintasan: P)";
     }
-    if (liveRange) {
-      const startDrag = () => { liveDragging = true; };
-      liveRange.addEventListener("mousedown", startDrag);
-      liveRange.addEventListener("touchstart", startDrag);
-      liveRange.addEventListener("input", () => {
-        if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(parseInt(liveRange.value, 10) || 0);
-      });
-      const commitDrag = () => {
-        liveDragging = false;
-        sendYtCommand("seek", parseInt(liveRange.value, 10) || 0);
-      };
-      liveRange.addEventListener("change", commitDrag);
-      liveRange.addEventListener("mouseup", commitDrag);
-      liveRange.addEventListener("touchend", commitDrag);
-    }
+    refreshPlayPauseBtnUi_();
 
-    if (playBtn) playBtn.addEventListener("click", () => {
-      // BARU (4 Sep 2026 v2) -- baca kolom waktu LIVE dulu: kalau isinya
-      // format waktu yang valid, lompat (seek) ke situ SEBELUM main --
-      // kosong/format tidak dikenali = perilaku LAMA (main/lanjut apa
-      // adanya dari posisi sekarang, tanpa melompat).
+    // BARU (4 Sep 2026 v2) -- baca kolom waktu LIVE dulu: kalau isinya
+    // format waktu yang valid, lompat (seek) ke situ SEBELUM main --
+    // kosong/format tidak dikenali = perilaku LAMA (main/lanjut apa
+    // adanya dari posisi sekarang, tanpa melompat).
+    function doYtPlay_() {
       const typed = liveTimeInput ? liveTimeInput.value : "";
       const secs = parseDHMSToSeconds(typed);
       if (secs != null) {
@@ -5668,8 +5632,72 @@ const PresentationStudio = (() => {
       } else {
         sendYtCommand("play");
       }
+      ytIsPlaying = true;
+      refreshPlayPauseBtnUi_();
+    }
+    function doYtPause_() {
+      sendYtCommand("pause");
+      ytIsPlaying = false;
+      refreshPlayPauseBtnUi_();
+    }
+
+    // SATU tombol, SATU fungsi toggle -- dipakai SAMA PERSIS baik diklik
+    // mouse (listener di bawah) maupun ditekan lewat pintasan keyboard
+    // "P" (window.toggleYtPlayPause_, dipanggil dari
+    // wireModeAndBellKeyboardShortcuts()). Sebelumnya (2 tombol terpisah
+    // ▶️ Play & ⏸️ Pause) status `ytIsPlaying` bisa tidak sinkron kalau
+    // operator memulai video lewat klik mouse -- sekarang klik mouse pun
+    // SELALU lewat toggle yang sama, jadi tidak ada lagi jalur yang
+    // "lupa" memperbarui status.
+    window.toggleYtPlayPause_ = function toggleYtPlayPause_() {
+      if (ytIsPlaying) doYtPause_(); else doYtPlay_();
+    };
+    if (playPauseBtn) playPauseBtn.addEventListener("click", () => window.toggleYtPlayPause_());
+
+    window.addEventListener("ps-yt-progress", (e) => {
+      const d = (e && e.detail) || {};
+      if (typeof d.duration === "number" && d.duration > 0 && Math.round(d.duration) !== liveDurationSeconds) {
+        liveDurationSeconds = Math.round(d.duration);
+        if (liveRange) liveRange.max = String(liveDurationSeconds);
+        refreshLiveDurationLabel();
+      }
+      if (typeof d.currentTime === "number" && !liveEditing && !liveDragging) {
+        const secs = Math.max(0, Math.round(d.currentTime));
+        if (liveRange) liveRange.value = String(secs);
+        if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(secs);
+      }
+      if (typeof d.state === "number" && d.state !== 1 && d.state !== 2) return; // hanya playing(1)/paused(2) yang relevan utk toggle
+      if (typeof d.state === "number") {
+        const nowPlaying = d.state === 1;
+        if (nowPlaying !== ytIsPlaying) { ytIsPlaying = nowPlaying; refreshPlayPauseBtnUi_(); }
+      }
     });
-    if (pauseBtn) pauseBtn.addEventListener("click", () => sendYtCommand("pause"));
+
+    if (liveTimeInput) {
+      // Selagi kolom ini difokus, JANGAN ditimpa laporan posisi live --
+      // operator sedang menulis detik tujuan sendiri.
+      liveTimeInput.addEventListener("focus", () => { liveEditing = true; });
+      liveTimeInput.addEventListener("blur", () => { liveEditing = false; });
+      // Enter = langsung sama seperti menekan ▶️ Play (lompat + main).
+      liveTimeInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); liveTimeInput.blur(); doYtPlay_(); }
+      });
+    }
+    if (liveRange) {
+      const startDrag = () => { liveDragging = true; };
+      liveRange.addEventListener("mousedown", startDrag);
+      liveRange.addEventListener("touchstart", startDrag);
+      liveRange.addEventListener("input", () => {
+        if (liveTimeInput) liveTimeInput.value = formatSecondsToDHMS(parseInt(liveRange.value, 10) || 0);
+      });
+      const commitDrag = () => {
+        liveDragging = false;
+        sendYtCommand("seek", parseInt(liveRange.value, 10) || 0);
+      };
+      liveRange.addEventListener("change", commitDrag);
+      liveRange.addEventListener("mouseup", commitDrag);
+      liveRange.addEventListener("touchend", commitDrag);
+    }
     if (stopBtn) stopBtn.addEventListener("click", () => {
       sendYtCommand("stop");
       // "Stop" (beda dari Pause) mengembalikan video ke keadaan belum-
@@ -5679,6 +5707,11 @@ const PresentationStudio = (() => {
       // cuma diulang dari awal).
       if (liveRange) liveRange.value = "0";
       if (liveTimeInput) liveTimeInput.value = "00:00:00";
+      // Stop = video berhenti main -- tombol tunggal ikut disamakan
+      // balik ke "▶️ Play" (bukan dibiarkan menampilkan "⏸️ Pause" yang
+      // sudah tidak sesuai keadaan sebenarnya).
+      ytIsPlaying = false;
+      refreshPlayPauseBtnUi_();
     });
     if (muteBtn) muteBtn.addEventListener("click", () => {
       muted = !muted;
