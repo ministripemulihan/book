@@ -5565,8 +5565,26 @@ const PresentationStudio = (() => {
     // klik langsung tombol bawaan YouTube di pratinjau mini).
     let ytIsPlaying = false;
     window.toggleYtPlayPause_ = function toggleYtPlayPause_() {
-      if (ytIsPlaying) { if (pauseBtn) pauseBtn.click(); }
-      else { if (playBtn) playBtn.click(); }
+      // BARU (12 Sep 2026, laporan operator "tekan P malah pause lalu
+      // main sendiri lagi") -- `ytIsPlaying` di-set LANGSUNG (optimis)
+      // di sini, TIDAK menunggu laporan balik asli dari Layar 2 lewat
+      // postMessage (yang perlu waktu tempuh jaringan antar-jendela +
+      // jeda maks 200ms, lihat reportYtProgress()/present.html) --
+      // sebelumnya, kalau P ditekan 2x SANGAT cepat berturutan (mis.
+      // gara-gara "key repeat" tombol tertahan, sekarang sudah dijaga
+      // lewat e.repeat di wireModeAndBellKeyboardShortcuts(), TAPI
+      // 2x tekan BENERAN cepat dari operator sendiri juga tetap bisa
+      // kena race yang sama), keydown ke-2 masih membaca status LAMA
+      // (laporan baru belum sempat sampai) sehingga toggle malah
+      // "membalik 2x" (Pause lalu Play lagi) alih-alih 1x sesuai niat.
+      // Dengan di-set optimis di sini, keydown ke-2 (secepat apa pun)
+      // SELALU membaca status TERBARU yang SUDAH benar. Listener
+      // "ps-yt-progress" di bawah tetap jalan sebagai KOREKSI kalau
+      // ternyata video diubah lewat cara lain (mis. operator klik
+      // langsung kontrol bawaan YouTube di pratinjau) -- 2 sumber ini
+      // saling melengkapi, bukan saling menggantikan.
+      if (ytIsPlaying) { if (pauseBtn) pauseBtn.click(); ytIsPlaying = false; }
+      else { if (playBtn) playBtn.click(); ytIsPlaying = true; }
     };
     window.addEventListener("ps-yt-progress", (e) => {
       const d = (e && e.detail) || {};
@@ -6048,6 +6066,20 @@ const PresentationStudio = (() => {
       if (!studio || studio.hidden) return;
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+      // BARU (12 Sep 2026, laporan operator "tekan P malah pause lalu
+      // main sendiri lagi") -- `e.repeat` TRUE berarti event ini bukan
+      // penekanan baru, tapi "gema" otomatis dari OS/browser karena
+      // tombolnya masih tertekan sedikit lebih lama dari sepersekian
+      // detik (atau keyboard yang nge-bounce, kirim keydown dobel utk
+      // 1x tekan fisik). Kalau ini dibiarkan lolos, toggle Play/Pause
+      // (P) bisa "gantian 2x" dalam waktu SANGAT singkat -- keydown ke-2
+      // masih membaca status LAMA (laporan status baru dari Layar 2
+      // belum sempat sampai lewat postMessage), sehingga malah
+      // membalik toggle 2x (Pause lalu Play lagi) alih-alih 1x seperti
+      // niat penekanan aslinya. Diabaikan SEKALIGUS untuk SEMUA
+      // pintasan di bawah (P, M, Alt+H, Alt+C, 1-9, Alt+1-9) -- bukan
+      // cuma P -- supaya semuanya konsisten aman dari gema yang sama.
+      if (e.repeat) return;
       // BARU (10 Sep 2026, sesi ke-10, permintaan operator "defaultnya
       // show, dan misalnya ditekan Alt+H maka hide semua ... vertikal
       // scroll atau horizontal scroll") -- Alt+H sengaja dipakai (bukan
