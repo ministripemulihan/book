@@ -3896,6 +3896,10 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   background: var(--ps-card-bg); border: 1px solid var(--ps-card-border); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;
 }
 .ps-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* BARU (12 Sep 2026, permintaan operator "PDF ... bisa kelihatan
+   gambarnya" di daftar Media Tersimpan) -- lihat renderMediaList()
+   (js/presentation-studio.js). */
+.ps-file-thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 5px; flex: 0 0 auto; border: 1px solid var(--ps-card-border); background: #fff; }
 .ps-file-actions { display: flex; gap: 4px; flex: 0 0 auto; align-items: center; }
 .ps-file-status { font-style: normal; font-size: 11px; color: var(--ps-muted); margin-left: 6px; }
 .ps-file-slide-count { font-size: 11px; color: var(--ps-ink-soft); min-width: 34px; text-align: center; }
