@@ -405,6 +405,10 @@ const Presentation = (() => {
     post({
       type: "kidung", ref: data.ref || "", bait: data.bait || [], koorTeks: data.koorTeks || null,
       pengarang: data.pengarang || "", birama: data.birama || "", jumlahBait: data.jumlahBait || 0,
+      // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah"
+      // (lihat showMain() kind "kidung" di present.html & koorMid di
+      // splitKidungIntoSlides()/js/kidung.js).
+      koorMid: !!data.koorMid,
     });
     flashSendFeedback();
   }
