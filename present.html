@@ -689,6 +689,36 @@
      per-slide) -- tampil penuh 1 layar, beda dari #logoView yang
      sengaja dibatasi kecil di tengah. */
   #slideView { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
+  /* BARU (12 Sep 2026, permintaan operator "3 model ukuran gambar/PDF:
+     asli, sesuai lebar/stretch, atau zoom terserah") -- 2 mode tambahan
+     di luar bawaan (.slideView polos di atas = "Asli", object-fit:contain
+     terpusat, TIDAK BERUBAH). Kelas ditambah/dilepas oleh showMain()
+     kind "slide" di bawah sesuai data.displayMode yang dikirim dari
+     Studio (lihat rawPost() & panel "🎨 Tampilan", js/presentation-
+     studio.js) -- pengaturannya TERSIMPAN per perangkat & otomatis ikut
+     terpakai untuk SEMUA gambar/PDF berikutnya (termasuk saat ◀ ▶
+     pindah halaman), sesuai permintaan "saat di klik next zoomnya tetap
+     di posisi itu".
+     - .ps-slide-fitwidth ("Sesuai Lebar/Stretch"): lebar dipaksa 100vw,
+       tinggi menyesuaikan (rasio gambar TETAP terjaga, tidak gepeng),
+       nempel di ATAS (top:0) -- kalau hasilnya lebih tinggi dari layar,
+       sisanya di bawah otomatis terpotong body {overflow:hidden}.
+     - .ps-slide-zoom ("Zoom Nx"): dimulai dari ukuran "Asli" (contain,
+       muat penuh dalam layar), lalu diperbesar lewat transform scale()
+       dari titik ATAS-TENGAH (transform-origin: top center) sebesar
+       --ps-slide-zoom (diisi showMain()) -- sisi yang keluar layar ikut
+       terpotong body {overflow:hidden}, sama seperti fitwidth. */
+  #slideView.ps-slide-fitwidth {
+    position: fixed; top: 0; left: 0; right: 0;
+    width: 100vw; height: auto; max-width: none; max-height: none;
+    object-fit: contain; object-position: top;
+  }
+  #slideView.ps-slide-zoom {
+    position: fixed; top: 0; left: 50%;
+    transform: translateX(-50%) scale(var(--ps-slide-zoom, 1.5));
+    transform-origin: top center;
+    max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain;
+  }
   /* Video YouTube -- penuh 1 layar, sama seperti #slideView. */
   /* PERBAIKAN (4 Sep 2026, permintaan operator): dulu iframe ini BISA
      diklik langsung (kontrol bawaan YouTube-nya sendiri, termasuk
@@ -1541,6 +1571,45 @@
     from { text-shadow: 0 0 24px rgba(255, 210, 63, 0.85), 0 4px 18px rgba(0,0,0,.55); }
     to { text-shadow: 0 0 46px rgba(255, 210, 63, 1), 0 4px 18px rgba(0,0,0,.55); }
   }
+  /* BARU (12 Sep 2026, permintaan operator "Amin/Halelulya/Oh Tuhan
+     Yesus bisa ganti warna") -- varian warna teks seruan (.ms-shout-text
+     di atas, warna bawaan kuning TETAP jadi default kalau tidak ada
+     kelas warna apa pun, lihat playShout_()). 4 varian baru ditambah:
+     putih+garis-tepi-hitam, hitam+garis-tepi-putih, merah+garis-tepi-
+     hitam, & merah polos -- garis tepi lewat -webkit-text-stroke
+     (didukung semua browser berbasis Chromium/Safari, yang dipakai
+     proyek ini) + text-shadow tipis sebagai cadangan di browser yang
+     tidak mendukung -webkit-text-stroke sama sekali (Firefox lama)
+     supaya tulisan tetap kebaca, bukan cuma polos tanpa tepi. */
+  .ms-shout-text.ms-shout-white-black { color: #ffffff; -webkit-text-stroke: 2.5px #000; text-shadow: 0 0 24px rgba(0,0,0,.55), 0 4px 18px rgba(0,0,0,.55); }
+  .ms-shout-text.ms-shout-black-white { color: #000000; -webkit-text-stroke: 2.5px #fff; text-shadow: 0 0 24px rgba(255,255,255,.55), 0 4px 18px rgba(0,0,0,.35); }
+  .ms-shout-text.ms-shout-red-black { color: #e6261f; -webkit-text-stroke: 2.5px #000; text-shadow: 0 0 24px rgba(0,0,0,.55), 0 4px 18px rgba(0,0,0,.55); }
+  .ms-shout-text.ms-shout-red { color: #e6261f; text-shadow: 0 0 24px rgba(230,38,31,.85), 0 4px 18px rgba(0,0,0,.55); }
+  @keyframes msShoutGlowWhite { from { text-shadow: 0 0 24px rgba(0,0,0,.55), 0 4px 18px rgba(0,0,0,.55); } to { text-shadow: 0 0 46px rgba(0,0,0,.7), 0 4px 18px rgba(0,0,0,.55); } }
+  @keyframes msShoutGlowBlack { from { text-shadow: 0 0 24px rgba(255,255,255,.55), 0 4px 18px rgba(0,0,0,.35); } to { text-shadow: 0 0 46px rgba(255,255,255,.8), 0 4px 18px rgba(0,0,0,.35); } }
+  @keyframes msShoutGlowRed { from { text-shadow: 0 0 24px rgba(230,38,31,.85), 0 4px 18px rgba(0,0,0,.55); } to { text-shadow: 0 0 46px rgba(230,38,31,1), 0 4px 18px rgba(0,0,0,.55); } }
+  .ms-shout-text.ms-shout-white-black, .ms-shout-text.ms-shout-red-black { animation-name: msShoutPop, msShoutGlowWhite; }
+  .ms-shout-text.ms-shout-black-white { animation-name: msShoutPop, msShoutGlowBlack; }
+  .ms-shout-text.ms-shout-red { animation-name: msShoutPop, msShoutGlowRed; }
+  /* BARU (12 Sep 2026, permintaan operator "efek gelembung sabun dari
+     bawah ke atas") -- sama pola dengan .ms-effect-balloon di atas
+     (naik dari bawah, ayunan kiri-kanan), tapi lebih kecil/lebih
+     banyak/lebih cepat supaya terasa seperti gelembung sabun ringan,
+     bukan balon berat -- pakai emoji 🫧 (bubble), transparansi diacak
+     sedikit lewat opacity puncak <1 di beberapa elemen (lihat
+     playBubbleEffect_()). */
+  .ms-effect-bubble {
+    position: absolute; bottom: -60px; font-size: 30px; line-height: 1;
+    animation: msBubbleRise 4.5s ease-in forwards;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.15));
+  }
+  @keyframes msBubbleRise {
+    0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+    10% { opacity: var(--ms-bubble-opacity, 0.9); }
+    35% { transform: translate(var(--ms-bubble-drift1, 30px), -40vh) scale(1); }
+    70% { transform: translate(var(--ms-bubble-drift2, -30px), -80vh) scale(1.05); }
+    100% { transform: translate(var(--ms-bubble-drift1, 30px), -115vh) scale(0.9); opacity: 0; }
+  }
 
   /* DIPERBAIKI (10 Sep 2026, lanjutan, permintaan operator "mengganggu,
      harus klik, mendingan langsung aktif") -- browser (kebijakan
@@ -2320,16 +2389,46 @@
   // animationend, aman dipencet berkali-kali beruntun (tiap panggilan
   // bikin elemen baru, tidak saling mengganggu kalau operator memencet
   // lagi sebelum animasi sebelumnya selesai).
-  function playShout_(text) {
+  // DIPERBARUI (12 Sep 2026, permintaan operator "bisa ganti warna,
+  // bukan hanya kuning") -- parameter `color` baru, salah satu dari
+  // "yellow" (bawaan/kalau kosong), "white-black", "black-white",
+  // "red-black", "red" -- lihat kelas .ms-shout-* di atas. Dikirim
+  // dari wireEffectsTab() (js/presentation-studio.js) lewat payload
+  // {type:"shout", text, color}.
+  function playShout_(text, color) {
     const layer = document.getElementById("effectsLayer");
     if (!layer || !text) return;
     const span = document.createElement("span");
     span.className = "ms-shout-text";
+    if (color && color !== "yellow") span.classList.add("ms-shout-" + color);
     span.textContent = text;
     span.addEventListener("animationend", (e) => {
       if (e.animationName === "msShoutPop") span.remove();
     });
     layer.appendChild(span);
+  }
+  // BARU (12 Sep 2026, permintaan operator "efek gelembung sabun dari
+  // bawah ke atas") -- lihat .ms-effect-bubble/@keyframes msBubbleRise
+  // di atas untuk penjelasan visual. Sama pola "tembak dan lupa" dengan
+  // playBalloonEffect_() di atasnya.
+  function playBubbleEffect_() {
+    const layer = document.getElementById("effectsLayer");
+    if (!layer) return;
+    const count = 22;
+    for (let i = 0; i < count; i++) {
+      const span = document.createElement("span");
+      span.className = "ms-effect-bubble";
+      span.textContent = "🫧";
+      const startX = 2 + Math.random() * 96; // vw
+      span.style.left = startX + "vw";
+      span.style.setProperty("--ms-bubble-drift1", (Math.random() * 90 - 45) + "px");
+      span.style.setProperty("--ms-bubble-drift2", (Math.random() * 90 - 45) + "px");
+      span.style.setProperty("--ms-bubble-opacity", (0.6 + Math.random() * 0.4).toFixed(2));
+      span.style.animationDelay = (Math.random() * 2.2) + "s";
+      span.style.fontSize = (18 + Math.random() * 26) + "px";
+      span.addEventListener("animationend", () => span.remove());
+      layer.appendChild(span);
+    }
   }
   // BARU (10 Sep 2026, permintaan operator "balon dari bawah") -- balon
   // naik dari bawah layar, lebih sedikit & lebih besar dari reaksi emoji
@@ -2375,6 +2474,7 @@
   function playEffectVisual_(data) {
     if (data.effect === "emoji") playEmojiReaction_(data.emoji);
     else if (data.effect === "balon") playBalloonEffect_();
+    else if (data.effect === "gelembung") playBubbleEffect_();
     else if (data.effect === "happy") playHappyBurst_();
     else playConfetti_(); // default/"confetti"
   }
@@ -4251,6 +4351,21 @@
       // videoTextOverlayOn menyala, JANGAN kosongkan #ref/#text --
       // ayat/kidung/pengumuman tetap tampil DI ATAS gambar/slide/PDF ini.
       if (!videoTextOverlayOn) { refEl.hidden = true; refEl.textContent = ""; textEl.textContent = ""; }
+      // BARU (12 Sep 2026, permintaan operator "3 model ukuran gambar/
+      // PDF") -- lihat .ps-slide-fitwidth/.ps-slide-zoom di atas.
+      // `displayMode` bawaan "original" kalau tidak dikirim sama sekali
+      // (payload lama/tempat lain yang belum tahu field ini) -- perilaku
+      // TIDAK BERUBAH untuk itu.
+      slideEl.classList.remove("ps-slide-fitwidth", "ps-slide-zoom");
+      slideEl.style.removeProperty("--ps-slide-zoom");
+      const dispMode = data.displayMode || "original";
+      if (dispMode === "fitwidth") {
+        slideEl.classList.add("ps-slide-fitwidth");
+      } else if (dispMode === "zoom") {
+        const zoomFactor = Math.max(1, (data.zoomPct || 150) / 100);
+        slideEl.style.setProperty("--ps-slide-zoom", String(zoomFactor));
+        slideEl.classList.add("ps-slide-zoom");
+      }
       if (data.imageUrl) { slideEl.src = data.imageUrl; slideEl.hidden = false; }
     } else if (kind === "youtube") {
       // Video YouTube penuh 1 layar (tab "▶️ YouTube" di Studio Presentasi).
@@ -4416,7 +4531,7 @@
     }
     // BARU (9 Sep 2026, sesi ke-9) -- lihat playShout_() & wireEffectsTab()
     // (js/presentation-studio.js).
-    if (data.type === "shout") { playShout_(data.text); return; }
+    if (data.type === "shout") { playShout_(data.text, data.color); return; }
     // BARU (10 Sep 2026, sesi ke-12) -- lihat catatan panjang
     // setEffectsMuted_()/getEffectsMasterGain_() dekat beep() di atas --
     // dikirim bareng tombol/pintasan "M" Mute di Studio
