@@ -448,6 +448,36 @@ function removeKidungGroupFromCollection(username, id, buku, kidungNo) {
   return removed;
 }
 
+// BARU (12 Sep 2026, permintaan operator "hapus langsung seluruh isi
+// PDF dari Kumpulan Ayat, dulu bisa sekarang tidak") -- item "media"
+// (PDF/gambar) yang ditambahkan lewat "➕ Semua Halaman" (lihat catatan
+// panjang di addMediaToCollection() di atas) tersimpan sebagai BANYAK
+// item TERPISAH (1 per halaman) -- PERSIS seperti kidung "➕ Semua" di
+// atas, sehingga menghapus SATU berkas PDF banyak-halaman berarti
+// menekan "Hapus Item Ini" berkali-kali satu per satu (utk PDF 26
+// halaman, 26 kali). Fungsi ini (meniru removeKidungGroupFromCollection()
+// tepat di atas) menghapus SEMUA item media yang mediaItemId-nya SAMA
+// dalam 1 kumpulan sekaligus lewat SATU panggilan -- dipakai tombol
+// "🗑️ Hapus Semua Halaman Berkas Ini" (lihat js/presentation-studio.js
+// renderCollectionList() & js/app.js buildCollectionItemRow()).
+// Mengembalikan JUMLAH item yang terhapus (0 kalau tidak ada yang cocok /
+// kumpulan tidak ditemukan) -- dipakai pemanggil utk pesan konfirmasi.
+function removeMediaGroupFromCollection(username, id, mediaItemId) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !Array.isArray(col.items)) return 0;
+  const before = col.items.length;
+  col.items = col.items.filter((it) => !(it && it.type === "media" && it.mediaItemId === mediaItemId));
+  const removed = before - col.items.length;
+  if (removed > 0) {
+    _migrateCollection(col);
+    col.updatedAt = new Date().toISOString();
+    saveCollections(username, collections);
+    _pushCollectionRemote(username, id, col);
+  }
+  return removed;
+}
+
 function moveItemInCollection(username, id, index, direction) {
   const collections = loadCollections(username);
   const col = collections[id];
