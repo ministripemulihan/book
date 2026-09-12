@@ -2204,6 +2204,30 @@
             <button type="button" id="psFocusClickToggle" class="chip-btn small" data-ps-focusclick-toggle>🎯 Efek Fokus</button>
           </div>
           <div class="ps-pointer-hint">Saat aktif, KLIK (bukan sekadar gerakkan kursor) di kotak pratinjau "Tayang" di atas -- di titik itu akan muncul cincin kuning yang mengembang lalu hilang sendiri di Layar 2.</div>
+
+          <!-- BARU (12 Sep 2026, permintaan operator "kotak lebih terang
+               di sekitar area yang mau diperbesar, klik utk mengunci
+               perbesarannya") -- 🔲 Perbesar Kotak: BEDA dari 🔍 Kaca
+               Pembesar (lensa mengikuti kursor terus, gambarnya sendiri
+               TIDAK diubah) MAUPUN 🎯 Efek Fokus (ring sekali, tidak ada
+               perbesaran sungguhan) -- di sini: gerakkan kursor sampai
+               kotak terang menutupi bagian yang diinginkan, klik SEKALI
+               utk MENGUNCI & memperbesar (crop-zoom) bagian itu sampai
+               memenuhi Layar 2 -- klik lagi utk lepas kunci & pilih
+               bagian lain, matikan tombol ini utk balik ke ukuran normal
+               sepenuhnya. Lihat wirePointerPen() (js/presentation-studio.js)
+               & showBoxZoomHover()/lockBoxZoom() (present.html). -->
+          <div class="ps-field-label" style="margin-top:14px;">🔲 Perbesar Kotak (pilih kotak area, klik utk mengunci perbesarannya)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psBoxZoomToggle" class="chip-btn small" data-ps-boxzoom-toggle>🔲 Perbesar Kotak</button>
+          </div>
+          <div class="ps-pen-size-row">
+            <span class="ps-pen-size-label" title="Kotak kecil (10%)">🔲<sub>-</sub></span>
+            <input type="range" id="psBoxZoomSizeSlider" min="10" max="80" step="5" value="35" />
+            <span class="ps-pen-size-label ps-pen-size-label-big" title="Kotak besar (80%)">🔲<sup>+</sup></span>
+            <input type="number" id="psBoxZoomSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="10" max="80" step="5" value="35" title="Ketik ukuran kotak manual (10-80), lalu tekan Enter" />%
+          </div>
+          <div class="ps-pointer-hint">Gerakkan kursor di kotak pratinjau "Tayang" sampai kotak terang menutupi bagian yang mau diperbesar, lalu KLIK SEKALI utk mengunci & memperbesarnya di Layar 2 -- klik lagi utk lepas & pilih bagian lain, matikan tombol ini utk balik ke ukuran normal.</div>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="tampilan" hidden>
@@ -2292,6 +2316,20 @@
             <input type="number" id="psTimerScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="50" max="1000" step="10" value="100" title="Ketik angka Ukuran Timer/Stopwatch manual (50-1000), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Khusus memperbesar/memperkecil angka ⏱️ Timer & Stopwatch di Layar 2 (tidak memengaruhi ukuran ayat/teks/kidung) -- bisa sampai 10x lebih besar, cocok untuk permainan/aktivitas yang perlu terlihat dari jauh.</div>
+          <!-- BARU (12 Sep 2026, permintaan operator "2 model tampilan
+               untuk timer dan stopwatch") -- pilihan GAYA tampilan,
+               terpisah dari "Ukuran" di atas (yang cuma memperbesar/
+               memperkecil, bukan mengubah TATA LETAKnya). Berlaku untuk
+               Timer & Stopwatch SEKALIGUS (1 pengaturan global, sama
+               seperti slider Ukuran di atas) -- lihat
+               body.tv-bigcircle (present.html) & wireTimer()
+               (js/presentation-studio.js) untuk detail penerapannya. -->
+          <div class="ps-field-label" style="margin-top:14px;">Gaya Tampilan Timer/Stopwatch</div>
+          <div class="ps-btn-row" id="psTimerStyleRow">
+            <button type="button" class="chip-btn small active" data-timer-style="classic">🔵 Klasik</button>
+            <button type="button" class="chip-btn small" data-timer-style="bigcircle">⭕ Lingkaran Besar</button>
+          </div>
+          <div class="ps-pointer-hint">"Klasik" = tampilan bawaan sekarang (angka besar di tengah cincin). "⭕ Lingkaran Besar" = cincin dibuat jauh lebih besar sebagai fokus visual, angka waktu & judul sesi dibuat kecil di bagian bawahnya -- badge kuning "MULAI" yang berkedip sebelum ditekan "▶️ Mulai" tetap tampil seperti biasa di kedua gaya.</div>
         </div>
 
         <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
