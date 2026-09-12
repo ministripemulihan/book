@@ -1115,7 +1115,28 @@
      50,50), diputar lewat `transform: rotate(...)` yang dihitung ulang
      tiap detik lewat tickAnalogClock() (skrip bawah) -- BUKAN CSS
      animation (supaya selalu tepat mengikuti waktu SUNGGUHAN perangkat,
-     bukan animasi berulang generik). -->
+     bukan animasi berulang generik).
+     DIPERBAIKI (12 Sep 2026 v3, akar masalah SEBENARNYA di balik semua
+     laporan jam analog kecil / jarum tidak kelihatan / muka jam jadi
+     bulatan hitam polos) -- komentar CSS ini SEBELUMNYA ditutup pakai
+     tanda penutup komentar HTML (panah, bukan bintang-garis-miring
+     yang benar untuk CSS). Karena CSS sama sekali tidak mengenal
+     tanda panah sebagai penutup komentar, browser diam-diam
+     menganggap SEMUA kode CSS sesudahnya (termasuk #timerAnalogClockWrap,
+     #timerAnalogClockSvg beserta ukurannya, #timerAnalogCaption, & gaya
+     muka jam ac-face/ac-tick) masih bagian dari komentar ini -- jadi
+     tidak pernah benar-benar diterapkan sama sekali, tanpa pesan error
+     apa pun (CSS tidak pernah gagal, cuma diam-diam diabaikan). Baru
+     berhenti menelan kode di komentar valid berikutnya yang kebetulan
+     ditemukan jauh di bawah (aturan ac-hand dst) -- itulah sebabnya
+     jarum jam sempat kelihatan (aturan ac-hand dst lolos) tapi
+     ukurannya tetap kecil & muka jam tetap bulatan hitam polos (aturan
+     ukuran svg & ac-face fill:none ikut termakan). CATATAN PENTING
+     buat siapa pun yang mengedit komentar ini lagi nanti: JANGAN
+     pernah menuliskan tanda bintang-garis-miring sungguhan di ISI
+     kalimat penjelasan (seperti yang barusan menyebabkan masalah ini
+     dijelaskan) -- itu akan menutup komentar ini lebih awal dari
+     yang dimaksud, persis bug yang sama terulang lagi. */
   #timerAnalogClockWrap {
     display: none; position: absolute; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
