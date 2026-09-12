@@ -2180,6 +2180,22 @@
             <span id="psMagnifyZoomValue" class="ps-pen-size-value">100%</span>
           </div>
           <div class="ps-pointer-hint">Gerakkan kursor di atas kotak pratinjau "Tayang" saat Kaca Pembesar aktif -- kotak kecil di Layar 2 menunjukkan besar zoom saat ini (10%–10000%).</div>
+
+          <!-- BARU (12 Sep 2026, permintaan operator "diklik pakai mouse
+               akan timbul gambar lingkaran yang bergerak dari titik yang
+               ditekan sampai keluar") -- 🎯 Efek Fokus: BEDA dari Penunjuk
+               di atas (titik yang MENEMPEL & ikut kursor terus-menerus),
+               ini cuma menunggu 1 KLIK di kotak pratinjau "Tayang" --
+               tiap klik mengirim 1 cincin yang mengembang lalu memudar
+               sendiri di Layar 2, dipakai untuk menyorot 1 titik penting
+               sekali tekan (mis. detail di PDF/gambar). Lihat
+               wirePointerPen() (js/presentation-studio.js) &
+               playFocusRipple_() (present.html). -->
+          <div class="ps-field-label" style="margin-top:14px;">🎯 Efek Fokus (klik = lingkaran mengembang sekali, di titik itu saja)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psFocusClickToggle" class="chip-btn small" data-ps-focusclick-toggle>🎯 Efek Fokus</button>
+          </div>
+          <div class="ps-pointer-hint">Saat aktif, KLIK (bukan sekadar gerakkan kursor) di kotak pratinjau "Tayang" di atas -- di titik itu akan muncul cincin kuning yang mengembang lalu hilang sendiri di Layar 2.</div>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="tampilan" hidden>
@@ -2959,6 +2975,12 @@
             <button type="button" class="chip-btn small" data-effect="balon">🎈 Balon</button>
             <button type="button" class="chip-btn small" data-effect-emoji="👍">👍 Jempol</button>
             <button type="button" class="chip-btn small" data-effect="happy">🥳 Bahagia</button>
+            <!-- BARU (12 Sep 2026, permintaan operator "efek gempa bumi") --
+                 numpang #stage APA ADANYA (gambar/ayat/kidung/apa pun yang
+                 sedang tayang ikut bergoyang), TIDAK ganggu isinya, cuma
+                 guncangan sesaat lalu berhenti sendiri. Lihat
+                 playEarthquakeEffect_() & .ms-earthquake-shake (present.html). -->
+            <button type="button" class="chip-btn small" data-effect="earthquake">🌍 Gempa</button>
           </div>
           <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "seru nama
                Tuhan") -- BEDA dari emoji terbang di atas: teks BESAR
@@ -3034,7 +3056,7 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20260907a6"></script>
+  <script src="js/config.js?v=20260907a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260818b"></script>
   <script src="js/footnotes.js?v=20260826e"></script>
@@ -3054,7 +3076,7 @@
   <script src="js/highlights.js?v=20260818b"></script>
   <script src="js/settings.js?v=20260907a"></script>
   <script src="js/plans.js?v=20260818b"></script>
-  <script src="js/media.js?v=20260821b5"></script>
+  <script src="js/media.js?v=20260821b"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260908b"></script>
   <script src="js/kidung-ui.js?v=20260911b"></script>
@@ -3069,7 +3091,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260910a"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/presentation-studio.js?v=20260912b2"></script>
+  <script src="js/presentation-studio.js?v=20260912b"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
@@ -3078,7 +3100,7 @@
   <script src="js/media-library.js?v=20260912b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260827b"></script>
-  <script src="js/app.js?v=20260910c4"></script>
+  <script src="js/app.js?v=20260910c"></script>
   <script src="js/curhat.js?v=20260818b"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
