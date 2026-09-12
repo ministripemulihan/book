@@ -1172,6 +1172,74 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* ============================================================
+     BARU (12 Sep 2026, permintaan operator "2 model tampilan untuk
+     timer dan stopwatch") -- gaya tampilan KEDUA "⭕ Lingkaran Besar",
+     dipilih lewat 2 tombol "Gaya Tampilan Timer/Stopwatch" (index.html,
+     dekat slider "Ukuran Timer/Stopwatch") & dikirim lewat
+     theme.timerStyle (saveAndSendTheme(), js/presentation-studio.js) --
+     diterapkan di sini sebagai class "tv-bigcircle" di <body> (lihat
+     applyTheme() di skrip bawah). Gaya "Klasik" (bawaan, timerStyle
+     kosong/"classic") TIDAK BERUBAH SAMA SEKALI dari sebelumnya -- CSS
+     di bawah ini SEMUANYA hanya berlaku selama body.tv-bigcircle aktif,
+     jadi operator yang tidak pernah menyentuh tombol barunya tetap
+     melihat tampilan lama persis seperti biasa.
+
+     IDE gaya ini (permintaan operator): cincinnya dibuat JAUH lebih
+     besar (fokus visual utama, enak dilihat dari jarak jauh), sedangkan
+     angka waktu & judul sesi dibuat KECIL di bagian BAWAH -- badge
+     kuning "MULAI" yang berkedip sebelum operator menekan "▶️ Mulai"
+     TETAP ada seperti gaya Klasik (elemen #timerStatusBadge/
+     #stopwatchStatusBadge & class .ps-standby TIDAK disentuh sama
+     sekali oleh CSS di bawah -- otomatis ikut tampil di gaya manapun).
+     ============================================================ */
+  body.tv-bigcircle #timerRing {
+    width: calc(min(66vh, 62vw) * var(--p-timer-scale));
+    height: calc(min(66vh, 62vw) * var(--p-timer-scale));
+    max-width: 92vw; max-height: 78vh;
+  }
+  body.tv-bigcircle #timerRing circle { stroke-width: 4; }
+  /* Angka BESAR bawaan di DALAM cincin disembunyikan total di gaya ini
+     (diganti #timerTimeBelow, kecil, di bawah cincin -- lihat HTML
+     #timerWrap & style #timerTimeBelow di bawah). */
+  body.tv-bigcircle #timerTime { display: none; }
+  #timerTimeBelow {
+    display: none; /* hanya tampil di gaya Lingkaran Besar, lihat rule di bawah */
+  }
+  body.tv-bigcircle #timerTimeBelow {
+    display: block;
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
+    font-size: calc(clamp(16px, 2.6vw, 34px) * var(--p-timer-scale) * var(--p-scale));
+    color: var(--p-ink); font-variant-numeric: tabular-nums; opacity: .95;
+    margin-top: .6vh;
+  }
+  body.tv-bigcircle #timerTimeBelow.done-text { color: #d9463a; }
+  /* Judul sesi ("Sesi Bagi Nikmat" dst) ikut dikecilkan di gaya ini --
+     di gaya Klasik ukurannya tetap seperti sebelumnya (rule #timerLabel
+     di atas). */
+  body.tv-bigcircle #timerLabel { font-size: calc(clamp(15px, 2vw, 26px) * var(--p-scale)); }
+
+  /* ---- Stopwatch, gaya "⭕ Lingkaran Besar" -- pola SAMA dengan Timer
+     di atas, BEDANYA cincinnya TIDAK progres (lihat catatan panjang di
+     HTML #stopwatchRing) & Stopwatch tidak punya angka "di dalam
+     cincin" sama sekali di gaya Klasik (beda dari Timer) -- jadi cukup
+     tampilkan cincin dekoratif ini DI ATAS label+angka yang sudah ada,
+     lalu kecilkan label+angkanya supaya proporsional dengan cincin
+     besar di atasnya. ---- */
+  #stopwatchRing {
+    display: none; /* disembunyikan total di gaya Klasik */
+  }
+  body.tv-bigcircle #stopwatchRing {
+    display: block;
+    width: calc(min(66vh, 62vw) * var(--p-timer-scale));
+    height: calc(min(66vh, 62vw) * var(--p-timer-scale));
+    max-width: 92vw; max-height: 70vh;
+    filter: drop-shadow(0 4px 24px rgba(0,0,0,0.3));
+  }
+  body.tv-bigcircle #stopwatchRing circle { fill: none; stroke-width: 4; stroke: var(--p-accent); opacity: .55; }
+  body.tv-bigcircle #stopwatchLabel { font-size: calc(clamp(15px, 2vw, 26px) * var(--p-scale)); margin-top: 1.2vh; }
+  body.tv-bigcircle #stopwatchTime { font-size: calc(clamp(16px, 2.8vw, 36px) * var(--p-timer-scale)); }
+
   /* ---- Pointer (Penunjuk) ---- */
   #pointerDot {
     position: fixed; width: 22px; height: 22px; border-radius: 50%;
@@ -1181,53 +1249,6 @@
   }
   /* ---- Pen (coret-coret) ---- */
   #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
-
-  /* ---- 🎯 Efek Fokus (klik = lingkaran mengembang) -- BARU (12 Sep 2026,
-     permintaan operator "diklik pakai mouse akan timbul gambar lingkaran
-     yang bergerak dari titik yang ditekan sampai keluar"). Koordinat SAMA
-     seperti Penunjuk/Kaca Pembesar di atas (fraction dari window penuh,
-     dikirim dari kotak pratinjau "Tayang" Studio saat mode ini aktif --
-     lihat wirePointerPen(), js/presentation-studio.js), TAPI beda dari
-     Penunjuk (nempel terus mengikuti kursor): ini "tembak dan lupa" --
-     SATU cincin muncul PERSIS di titik yang diklik, mengembang & memudar
-     sendiri lalu hilang, dipakai untuk menyorot 1 titik penting sekali
-     tekan (mis. menunjuk detail di PDF/gambar), bukan menunjuk terus-
-     menerus. Lihat playFocusRipple_() di bawah. */
-  .ms-focus-ripple {
-    position: fixed; width: 40px; height: 40px; border-radius: 50%;
-    border: 5px solid #ffd23f; box-shadow: 0 0 18px 2px rgba(255,210,63,.6);
-    pointer-events: none; z-index: 56; transform: translate(-50%, -50%) scale(0.3);
-    opacity: 1; animation: msFocusRippleExpand 0.9s ease-out forwards;
-  }
-  @keyframes msFocusRippleExpand {
-    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(6); opacity: 0; }
-  }
-
-  /* ---- 🌍 Efek Gempa (Earthquake) -- BARU (12 Sep 2026, permintaan
-     operator "gambar bergerak dan beraturan lalu berhenti lagi"). Numpang
-     #stage APA ADANYA (isinya boleh ayat/kidung/gambar PDF/apa pun yang
-     sedang tayang, tidak perlu tahu isinya) -- cuma menambah class
-     ".ms-earthquake-shake" sesaat lewat playEarthquakeEffect_() di bawah,
-     "tembak dan lupa" sama seperti efek 🎊 Reaksi Visual lain. Guncangan
-     dibuat MENGECIL BERTAHAP (kuat di awal, mereda, berhenti total di
-     akhir) supaya terasa seperti gempa sungguhan, bukan getaran rata. */
-  .ms-earthquake-shake { animation: msEarthquakeShake 1.6s ease-out; }
-  @keyframes msEarthquakeShake {
-    0%   { transform: translate(0, 0) rotate(0deg); }
-    8%   { transform: translate(-18px, 10px) rotate(-1.2deg); }
-    16%  { transform: translate(16px, -12px) rotate(1.1deg); }
-    24%  { transform: translate(-14px, 8px) rotate(-1deg); }
-    32%  { transform: translate(12px, -9px) rotate(0.9deg); }
-    40%  { transform: translate(-10px, 7px) rotate(-0.7deg); }
-    48%  { transform: translate(8px, -6px) rotate(0.6deg); }
-    56%  { transform: translate(-6px, 5px) rotate(-0.5deg); }
-    64%  { transform: translate(5px, -4px) rotate(0.4deg); }
-    72%  { transform: translate(-3px, 3px) rotate(-0.25deg); }
-    80%  { transform: translate(2px, -2px) rotate(0.15deg); }
-    88%  { transform: translate(-1px, 1px) rotate(-0.08deg); }
-    100% { transform: translate(0, 0) rotate(0deg); }
-  }
 
   /* ---- 🔍 Kaca Pembesar (BARU 27 Agu 2026) -- lihat showMagnify()/
      hideMagnify() di bawah & wirePointerPen() di js/presentation-studio.js.
@@ -1245,6 +1266,30 @@
     font-size: 13px; padding: 4px 11px; border-radius: 999px; transform: translate(-50%, -100%);
     white-space: nowrap;
   }
+
+  /* ---- 🔲 Perbesar Kotak (BARU 12 Sep 2026) -- BEDA dari 🔍 Kaca
+     Pembesar di atas: bukan lensa yang mengikuti kursor terus-menerus,
+     tapi kotak "viewfinder" yang ditempatkan operator (#boxZoomHover di
+     bawah, cuma tampil SELAGI belum dikunci), lalu 1 klik MENGUNCI &
+     benar-benar memperbesar (scale) #slideView itu sendiri via
+     lockBoxZoom() (bukan cuma overlay lensa) -- lihat showBoxZoomHover()/
+     hideBoxZoomHover()/lockBoxZoom()/hideBoxZoomLock() di bawah &
+     wirePointerPen() di js/presentation-studio.js. `box-shadow` dengan
+     spread SANGAT besar (100vmax) di bawah ini SENGAJA dipakai sebagai
+     trik "spotlight" -- area DALAM kotak tetap normal/terang, SEMUA yang
+     di luar kotak jadi temaram, supaya kotaknya kelihatan jelas "lebih
+     terang" dibanding sekitarnya sesuai permintaan operator. */
+  #boxZoomHover {
+    position: fixed; z-index: 56; display: none; pointer-events: none;
+    border: 3px solid rgba(255,255,255,.95); border-radius: 6px;
+    box-shadow: 0 0 0 100vmax rgba(0,0,0,.5), inset 0 0 14px rgba(0,0,0,.2);
+    transition: left .05s linear, top .05s linear;
+  }
+  /* Transform dipasang lewat JS (lockBoxZoom()) begitu operator klik utk
+     mengunci -- transition di sini membuat perbesarannya terasa halus
+     (bukan lompat mendadak), sama untuk saat dilepas (transform balik ke
+     kosong = ukuran semula). */
+  #slideView { transition: transform .3s ease; }
 
   /* ---- BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung ----
      Satu lapisan TETAP (tidak pernah hidden/dilepas) yang menumpuk di
@@ -1427,6 +1472,16 @@
       </svg>
       <div>
         <div id="timerLabel"></div>
+        <!-- BARU (12 Sep 2026, permintaan operator "2 model tampilan") --
+             angka waktu KEDUA, kecil, khusus gaya "⭕ Lingkaran Besar"
+             (lihat CSS body.tv-bigcircle #timerTime/#timerTimeBelow di
+             atas & applyTheme() di skrip bawah) -- disembunyikan total
+             (display:none) selama gaya "Klasik" (bawaan) masih dipakai,
+             supaya TIDAK ada tampilan dobel. Isinya disalin bareng
+             #timerTime tiap tick lewat tickTimer()/showTimerStandby() di
+             skrip bawah, jadi selalu sinkron TANPA perlu tahu gaya mana
+             yang sedang aktif. -->
+        <div id="timerTimeBelow"></div>
         <!-- BARU (7 Sep 2026) -- lihat catatan CSS #timerStatusBadge di atas. -->
         <div id="timerStatusBadge"></div>
       </div>
@@ -1456,6 +1511,18 @@
     </div>
     <!-- BARU (27 Agu 2026) -- lihat catatan CSS #stopwatchWrap di atas. -->
     <div id="stopwatchWrap" hidden>
+      <!-- BARU (12 Sep 2026, permintaan operator "2 model tampilan") --
+           cincin dekoratif KHUSUS gaya "⭕ Lingkaran Besar" -- BEDA dari
+           #timerRing (Timer mundur), cincin ini TIDAK progres (Stopwatch
+           hitung MAJU tanpa target, tidak ada "persentase" yang bisa
+           digambar) -- cuma bulatan diam sebagai bingkai visual besar di
+           belakang angka. Disembunyikan total (display:none) selama
+           gaya "Klasik" (bawaan) masih dipakai -- lihat CSS
+           body.tv-bigcircle #stopwatchRing di atas & applyTheme() di
+           skrip bawah. -->
+      <svg id="stopwatchRing" viewBox="0 0 100 100" hidden>
+        <circle id="stopwatchRingBg" cx="50" cy="50" r="44"></circle>
+      </svg>
       <div id="stopwatchLabel"></div>
       <div id="stopwatchTime">00:00</div>
       <!-- BARU (7 Sep 2026) -- lihat catatan CSS #stopwatchLapBadge/#stopwatchStatusBadge di atas. -->
@@ -1480,6 +1547,7 @@
   <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
   <div id="magnifierLens"></div>
   <div id="magnifierBadge"></div>
+  <div id="boxZoomHover"></div>
 
   <!-- BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung (confetti
        & reaksi emoji terbang). SATU lapisan di ATAS SEMUANYA (z-index
@@ -1587,6 +1655,10 @@
   const imgBgEl = document.getElementById("imgBg"); // BARU (28 Agu 2026) -- lihat applyBgImagePayload() di bawah.
   const timerWrap = document.getElementById("timerWrap");
   const timerTimeEl = document.getElementById("timerTime");
+  // BARU (12 Sep 2026) -- angka kecil di bawah cincin, khusus gaya "⭕
+  // Lingkaran Besar" -- lihat catatan panjang di HTML #timerWrap & CSS
+  // body.tv-bigcircle #timerTimeBelow di atas.
+  const timerTimeBelowEl = document.getElementById("timerTimeBelow");
   const timerLabelEl = document.getElementById("timerLabel");
   const timerRingFg = document.getElementById("timerRingFg");
   const timerStatusBadgeEl = document.getElementById("timerStatusBadge"); // BARU 7 Sep 2026
@@ -1613,6 +1685,7 @@
   const pointerDot = document.getElementById("pointerDot");
   const magnifierLens = document.getElementById("magnifierLens");
   const magnifierBadge = document.getElementById("magnifierBadge");
+  const boxZoomHover = document.getElementById("boxZoomHover");
   const penCanvas = document.getElementById("penCanvas");
   const penCtx = penCanvas.getContext("2d");
   penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
@@ -1659,6 +1732,70 @@
     magnifierBadge.style.left = px + "px";
     magnifierBadge.style.top = (py - lensSize / 2 - 10) + "px";
     magnifierBadge.textContent = "🔍 " + Math.round(percent) + "%";
+  }
+
+  // ------------------------------------------------------------
+  // BARU (12 Sep 2026, permintaan operator) -- 🔲 Perbesar Kotak. BEDA
+  // dari 🔍 Kaca Pembesar di atas (lensa lingkaran yang mengikuti kursor
+  // TERUS-MENERUS, gambarnya sendiri TIDAK diubah -- cuma overlay).
+  // Fitur ini 2 langkah:
+  //   (1) SELAGI belum dikunci -- showBoxZoomHover() menampilkan kotak
+  //       "viewfinder" (#boxZoomHover) yang mengikuti kursor operator,
+  //       dengan trik spotlight (box-shadow spread besar) supaya
+  //       terlihat lebih terang dibanding sekelilingnya -- MURNI
+  //       tampilan bantu posisi, #slideView belum disentuh sama sekali.
+  //   (2) Begitu operator KLIK (mengunci) -- lockBoxZoom() menyembunyikan
+  //       kotak viewfinder itu DAN benar-benar memperbesar #slideView
+  //       ITU SENDIRI lewat CSS transform:scale(), dengan transform-
+  //       origin persis di titik yang diklik -- sehingga bagian yang
+  //       "dikotaki" itu yang membesar mengisi layar, bagian lain di
+  //       luar kotak otomatis "terpotong" keluar layar (body sudah
+  //       overflow:hidden). hideBoxZoomLock() mengembalikan transform
+  //       ke kosong (ukuran semula) begitu fitur dimatikan/dilepas --
+  //       dibantu transition CSS di #slideView supaya halus, bukan
+  //       lompat mendadak.
+  // ------------------------------------------------------------
+  function hideBoxZoomHover() {
+    if (boxZoomHover) boxZoomHover.style.display = "none";
+  }
+  function showBoxZoomHover(xFrac, yFrac, sizePercent) {
+    if (!slideEl || slideEl.hidden || !slideEl.src) { hideBoxZoomHover(); return; }
+    const rect = slideEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) { hideBoxZoomHover(); return; }
+    const px = xFrac * window.innerWidth;
+    const py = yFrac * window.innerHeight;
+    const sizeFrac = Math.max(0.1, Math.min(0.8, (Number(sizePercent) || 35) / 100));
+    const boxW = rect.width * sizeFrac;
+    const boxH = rect.height * sizeFrac;
+    boxZoomHover.style.display = "block";
+    boxZoomHover.style.left = px + "px";
+    boxZoomHover.style.top = py + "px";
+    boxZoomHover.style.width = boxW + "px";
+    boxZoomHover.style.height = boxH + "px";
+    boxZoomHover.style.transform = "translate(-50%, -50%)";
+  }
+  function hideBoxZoomLock() {
+    if (!slideEl) return;
+    slideEl.style.transform = "";
+    slideEl.style.transformOrigin = "";
+    slideEl.classList.remove("ps-boxzoom-locked");
+  }
+  function lockBoxZoom(xFrac, yFrac, sizePercent) {
+    if (!slideEl || slideEl.hidden || !slideEl.src) return;
+    const rect = slideEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const px = xFrac * window.innerWidth;
+    const py = yFrac * window.innerHeight;
+    let ix = (px - rect.left) / rect.width;
+    let iy = (py - rect.top) / rect.height;
+    ix = Math.min(1, Math.max(0, ix));
+    iy = Math.min(1, Math.max(0, iy));
+    const sizeFrac = Math.max(0.1, Math.min(0.8, (Number(sizePercent) || 35) / 100));
+    const scale = Math.min(10, 1 / sizeFrac); // kotak 35% -> ~2.9x, dibatasi maks 10x supaya tidak pecah
+    slideEl.style.transformOrigin = `${ix * 100}% ${iy * 100}%`;
+    slideEl.style.transform = `scale(${scale})`;
+    slideEl.classList.add("ps-boxzoom-locked");
+    hideBoxZoomHover();
   }
 
   // Sekali diklik, browser akan menganggap operator sudah "berinteraksi"
@@ -1791,8 +1928,13 @@
     return m ? ("https://drive.google.com/uc?export=download&id=" + m[1]) : s;
   }
 
+  // DIPERBARUI (12 Sep 2026, permintaan operator) -- daftar bel SEKARANG
+  // numpang SoundFX.bellChoices() (js/soundfx.js), gabungan CONFIG.BELL_SOUNDS
+  // + SEMUA efek di SOUND_FX_LIST (lihat komentar panjang bellChoices()) --
+  // otomatis ikut bertambah tanpa perlu sentuh present.html sama sekali
+  // tiap kali ada efek suara baru ditambahkan di soundfx.js.
   function findBellSound_(key) {
-    const list = (window.CONFIG && Array.isArray(CONFIG.BELL_SOUNDS)) ? CONFIG.BELL_SOUNDS : [];
+    const list = (typeof SoundFX !== "undefined" && SoundFX.bellChoices) ? SoundFX.bellChoices() : ((window.CONFIG && Array.isArray(CONFIG.BELL_SOUNDS)) ? CONFIG.BELL_SOUNDS : []);
     return list.find((b) => b.key === key) || list[0] || null;
   }
 
@@ -1811,6 +1953,18 @@
 
   function ringBell(bellKey) {
     const sound = findBellSound_(bellKey);
+    // BARU (12 Sep 2026) -- kalau pilihan bel ini sebenarnya salah satu
+    // efek di SOUND_FX_LIST (js/soundfx.js, ditandai isFx:true oleh
+    // SoundFX.bellChoices()), putar lewat SoundFX.play() -- SAMA
+    // persis dengan cara "🎉 Efek Panggung" diputar (sintesis Web Audio
+    // ATAU file mp3 di assets/sounds/, tetap ikut sakelar mute "M" lewat
+    // getEffectsMasterGain_(), lihat SoundFX.configure() di atas) --
+    // BUKAN lewat elemen <audio>/link Drive di bawah (jalur itu HANYA
+    // untuk bel custom lama yang link-nya dari Google Drive).
+    if (sound && sound.isFx) {
+      if (typeof SoundFX !== "undefined") SoundFX.play(sound.key); else beep();
+      return;
+    }
     const url = resolveBellAudioUrl_(sound && sound.url);
     if (!url) { beep(); return; } // "Bel 1 (Bawaan)" / key tidak dikenal -> bunyi denting bawaan
     try {
@@ -1979,51 +2133,10 @@
       setTimeout(() => playEmojiReaction_(emoji), i * 220);
     });
   }
-  // BARU (12 Sep 2026, permintaan operator "efek gempa bumi") -- lihat
-  // catatan CSS .ms-earthquake-shake/@keyframes msEarthquakeShake di atas
-  // untuk gaya guncangannya. `stageEl` (elemen #stage) SUDAH ada dari
-  // deklarasi lain di file ini (dipakai luas untuk tampilkan ayat/kidung/
-  // gambar dst) -- fungsi ini TIDAK membuat elemen baru, cuma menambah/
-  // menghapus 1 class di elemen yang sudah ada. `void stageEl.offsetWidth`
-  // MEMAKSA browser membaca ulang layout sebelum class dipasang lagi --
-  // trik supaya kalau operator memencet "🌍 Gempa" 2x beruntun SEBELUM
-  // animasi pertama selesai, animasinya benar-benar mengulang dari awal
-  // (bukan diam karena browser menganggap class-nya "tidak berubah").
-  function playEarthquakeEffect_() {
-    if (!stageEl) return;
-    stageEl.classList.remove("ms-earthquake-shake");
-    void stageEl.offsetWidth;
-    stageEl.classList.add("ms-earthquake-shake");
-    stageEl.addEventListener("animationend", function onEnd(e) {
-      if (e.animationName !== "msEarthquakeShake") return;
-      stageEl.classList.remove("ms-earthquake-shake");
-      stageEl.removeEventListener("animationend", onEnd);
-    });
-  }
-  // BARU (12 Sep 2026, permintaan operator "🎯 Efek Fokus") -- lihat CSS
-  // .ms-focus-ripple/@keyframes msFocusRippleExpand di atas. Koordinat
-  // `xFrac`/`yFrac` SAMA persis cara hitungnya dengan pointerDot/showMagnify
-  // di atas (fraction 0-1 dari window PENUH, bukan dari #stage), dikirim
-  // dari 1 KLIK (bukan gerak kursor terus-menerus) di kotak pratinjau
-  // "Tayang" Studio saat mode "🎯 Efek Fokus" aktif -- lihat wirePointerPen()
-  // (js/presentation-studio.js). Elemen ring dibuang sendiri lewat
-  // animationend (fire-and-forget, aman diklik berkali-kali beruntun --
-  // tiap klik bikin ring BARU, tidak saling mengganggu ring sebelumnya).
-  function playFocusRipple_(xFrac, yFrac) {
-    const layer = document.getElementById("effectsLayer");
-    if (!layer) return;
-    const ring = document.createElement("div");
-    ring.className = "ms-focus-ripple";
-    ring.style.left = (xFrac * window.innerWidth) + "px";
-    ring.style.top = (yFrac * window.innerHeight) + "px";
-    ring.addEventListener("animationend", () => ring.remove());
-    layer.appendChild(ring);
-  }
   function playEffectVisual_(data) {
     if (data.effect === "emoji") playEmojiReaction_(data.emoji);
     else if (data.effect === "balon") playBalloonEffect_();
     else if (data.effect === "happy") playHappyBurst_();
-    else if (data.effect === "earthquake") playEarthquakeEffect_();
     else playConfetti_(); // default/"confetti"
   }
 
@@ -2091,12 +2204,20 @@
     if (!timerState) return;
     const remain = (timerState.endAt - Date.now()) / 1000;
     const remainClamped = Math.max(0, remain);
-    timerTimeEl.textContent = fmtMMSS(remainClamped);
+    const remainText = fmtMMSS(remainClamped);
+    timerTimeEl.textContent = remainText;
+    // BARU (12 Sep 2026) -- disalin bareng, dipakai gaya "⭕ Lingkaran
+    // Besar" (lihat catatan panjang di HTML #timerWrap) -- SELALU
+    // disalin di sini terlepas dari gaya mana yang aktif sekarang,
+    // supaya kalau operator ganti gaya SAAT timer sedang berjalan,
+    // angkanya sudah pasti sinkron tanpa perlu tunggu tick berikutnya.
+    if (timerTimeBelowEl) timerTimeBelowEl.textContent = remainText;
     const frac = timerState.totalSeconds > 0 ? remainClamped / timerState.totalSeconds : 0;
     timerRingFg.style.strokeDashoffset = String(RING_LEN * (1 - frac));
     const isDone = remain <= 0;
     timerRingFg.classList.toggle("done", isDone);
     timerTimeEl.classList.toggle("done-text", isDone);
+    if (timerTimeBelowEl) timerTimeBelowEl.classList.toggle("done-text", isDone);
     if (isDone && !timerState._rang) {
       timerState._rang = true;
       if (timerState.bell) ringBell(timerState.bellKey);
@@ -2123,7 +2244,7 @@
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
-    hideMagnify(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
     timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerLabelEl.textContent = timerState.label;
     // BARU (7 Sep 2026) -- beneran Mulai/Lanjut: lepas status
@@ -2178,11 +2299,13 @@
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     stopModeScreen(false); // BARU (9 Sep 2026)
     stopMap(false); // BARU (9 Sep 2026)
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     timerState = null; // BUKAN sedang menghitung -- tickTimer() sengaja TIDAK dipanggil/di-interval-kan di sini
     timerLabelEl.textContent = data.label || "";
     timerTimeEl.textContent = fmtMMSS(data.totalSeconds || 0);
     timerTimeEl.classList.remove("done-text");
+    // BARU (12 Sep 2026) -- lihat catatan panjang di tickTimer().
+    if (timerTimeBelowEl) { timerTimeBelowEl.textContent = fmtMMSS(data.totalSeconds || 0); timerTimeBelowEl.classList.remove("done-text"); }
     timerRingFg.classList.remove("done");
     timerRingFg.style.strokeDashoffset = "0"; // cincin penuh, belum berkurang
     timerWrap.classList.add("ps-standby");
@@ -2286,7 +2409,7 @@
     stopStopwatch(false); // BARU -- Timer/Stopwatch/Countdown Jam Target berbagi ruang tengah yang sama, tidak boleh berbarengan
     stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     timerClockState = { endAt: data.endAt, caption: data.caption || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerClockCaptionEl.textContent = timerClockState.caption;
     timerClockCaptionEl.hidden = !timerClockState.caption;
@@ -2358,7 +2481,7 @@
     stopLocalVideo(false);
     if (typeof stopMap === "function") stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
@@ -2621,7 +2744,7 @@
     stopLocalVideo(false);
     stopModeScreen(false);
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
@@ -2822,7 +2945,7 @@
     stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
     if (typeof stopModeScreen === "function") stopModeScreen(false);
     if (typeof stopMap === "function") stopMap(false);
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
@@ -2930,7 +3053,7 @@
   // seek dari Studio tanpa reload.
   // ------------------------------------------------------------
   function showLocalVideo(data) {
-    stopTimer(false); stopStopwatch(false); stopTimerClock(false); hideMagnify();
+    stopTimer(false); stopStopwatch(false); stopTimerClock(false); hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // Video Lokal & YouTube tidak boleh berbarengan
     if (localVideoObjectUrl_) { URL.revokeObjectURL(localVideoObjectUrl_); localVideoObjectUrl_ = null; }
     idleEl.hidden = true;
@@ -2999,7 +3122,7 @@
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     stopModeScreen(false); // BARU (9 Sep 2026)
     stopMap(false); // BARU (9 Sep 2026)
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
     stopwatchLabelEl.textContent = stopwatchState.label;
     // BARU (7 Sep 2026) -- beneran Mulai/Lanjut: lepas status standby/
@@ -3037,7 +3160,7 @@
     stopMap(false); // BARU (9 Sep 2026)
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
     stopwatchState = null;
-    hideMagnify();
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     stopwatchLabelEl.textContent = data.label || "";
     stopwatchTimeEl.textContent = "00:00";
     stopwatchWrap.classList.add("ps-standby");
@@ -3289,6 +3412,14 @@
     // BARU (6 Sep 2026) -- lihat catatan panjang --p-timer-scale di
     // <style> atas.
     if (theme.timerScale) root.setProperty("--p-timer-scale", theme.timerScale);
+    // BARU (12 Sep 2026, permintaan operator "2 model tampilan untuk
+    // timer dan stopwatch") -- gaya tampilan Timer/Stopwatch ("classic"
+    // bawaan / "bigcircle" = "⭕ Lingkaran Besar"), lihat catatan
+    // panjang CSS body.tv-bigcircle di atas & tombol
+    // [data-timer-style] (index.html, wireTimer() di
+    // js/presentation-studio.js). document.body sudah pasti ada
+    // sebelum applyTheme() pernah dipanggil, tidak perlu dicek null.
+    document.body.classList.toggle("tv-bigcircle", theme.timerStyle === "bigcircle");
     // BARU (7 Sep 2026, permintaan operator) -- warna khusus angka 🎯 Jam
     // Target (terpisah dari --p-accent umum), lihat psTimerClockColor
     // (index.html) & wireTimerClockColor() (js/presentation-studio.js).
@@ -3704,7 +3835,7 @@
     if (typeof stopModeScreen === "function") stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     if (typeof stopMap === "function") stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
-    hideMagnify(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
     setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
     idleEl.hidden = true;
     logoEl.hidden = true;
@@ -3904,7 +4035,7 @@
       stopModeScreen(true); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
       stopMap(true); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
       if (typeof stopWheel === "function") stopWheel(true); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
-      hideMagnify();
+      hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
       setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
     }
@@ -4066,10 +4197,21 @@
       showMagnify(data.x, data.y, data.percent || 100);
       return;
     }
-    // BARU (12 Sep 2026) -- "🎯 Efek Fokus", lihat playFocusRipple_() di
-    // atas & wirePointerPen() (js/presentation-studio.js) untuk tombol
-    // toggle & klik di kotak pratinjau Studio yang mengirim payload ini.
-    if (data.type === "clickfocus") { playFocusRipple_(data.x, data.y); return; }
+    // BARU (12 Sep 2026) -- 🔲 Perbesar Kotak: "boxzoom_hover" = kotak
+    // viewfinder yang mengikuti kursor (belum mengubah #slideView sama
+    // sekali), "boxzoom" = kunci/lepas perbesaran sungguhan. Lihat
+    // catatan panjang di showBoxZoomHover()/lockBoxZoom() di atas &
+    // wirePointerPen() (js/presentation-studio.js).
+    if (data.type === "boxzoom_hover") {
+      if (!data.on) { hideBoxZoomHover(); return; }
+      showBoxZoomHover(data.x, data.y, data.sizePercent || 35);
+      return;
+    }
+    if (data.type === "boxzoom") {
+      if (!data.on) { hideBoxZoomLock(); return; }
+      lockBoxZoom(data.x, data.y, data.sizePercent || 35);
+      return;
+    }
     if (data.type === "yt_control") {
       // Kontrol Play/Pause/Mute dari tombol di Studio Presentasi -- dikirim
       // lewat postMessage standar YouTube IFrame Player API. Butuh embedUrl
