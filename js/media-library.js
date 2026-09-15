@@ -57,6 +57,10 @@ const MediaLibrary = (() => {
       const params = new URLSearchParams({ type: "media_list", username: currentUser || "" });
       if (o.jenis) params.set("jenis", o.jenis);
       if (o.kidungRef) params.set("kidungRef", o.kidungRef);
+      // BARU (14 Sep 2026) -- o.ayatRef boleh string tunggal ATAU array
+      // (dipakai js/app.js buat minta referensi media untuk SEMUA ayat
+      // 1 pasal sekaligus, lihat buildVerseRefSection di bawah).
+      if (o.ayatRef) params.set("ayatRef", Array.isArray(o.ayatRef) ? o.ayatRef.join(",") : o.ayatRef);
       const res = await fetch(CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL + "?" + params.toString(), { cache: "no-store" });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
@@ -188,6 +192,61 @@ const MediaLibrary = (() => {
   }
 
   // ------------------------------------------------------------
+  // 3c) REFERENSI AYAT ALKITAB di form tambah/edit (BARU 14 Sep 2026,
+  //     permintaan operator "syair YouTube + tautan 2 arah ke Alkitab").
+  //     Berbeda dari kidungRef ({buku}|{noKidung}), yang disimpan di
+  //     sini murni "Verse ID" MENTAH (kolom ke-2 sheet Alkitab, lihat
+  //     normalizeVerseRecord() js/csv.js) -- id itu SAMA untuk semua
+  //     bahasa (Inggris/Recovery Indonesia/dst cuma beda baris "Bahasa"
+  //     dengan Verse ID yang sama), jadi 1 tautan otomatis berlaku
+  //     lintas bahasa tanpa operator perlu mengulang per bahasa.
+  //     Fungsi-fungsi Alkitab (parseReference/getChapterVerses/verseById)
+  //     didefinisikan di js/app.js -- yang di HTML dimuat SESUDAH file
+  //     ini, TAPI fungsi-fungsi di bawah ini hanya benar-benar dipanggil
+  //     saat pengguna membuka/mengisi form (jauh setelah semua skrip
+  //     selesai dimuat), jadi aman -- tetap dijaga `typeof ... !==
+  //     "function"` untuk berjaga-jaga.
+  // ------------------------------------------------------------
+  function parseAyatRefString_(str) {
+    return String(str || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((verseId) => ({ verseId, label: "" }));
+  }
+  function joinAyatRefs_(list) {
+    return (list || []).map((a) => a.verseId).join(",");
+  }
+  // Cari label "Nama Kitab Pasal:Ayat" enak-dibaca dari Verse ID mentah,
+  // pakai data Alkitab yang SEDANG termuat (bahasa aktif operator, atau
+  // bahasa bawaan aplikasi kalau bahasa aktif belum ada) -- kalau tidak
+  // ketemu (mis. data Alkitab belum sempat termuat), tampilkan id mentah
+  // apa adanya daripada kosong.
+  function labelForVerseId_(verseId) {
+    if (typeof verseById === "undefined") return verseId;
+    const lang = (typeof currentLang !== "undefined" && currentLang) || (CONFIG.DEFAULT_LANGUAGE || "ind");
+    const v = verseById[lang + "_" + verseId] || verseById[(CONFIG.DEFAULT_LANGUAGE || "ind") + "_" + verseId];
+    return v ? `${v.bookName} ${v.chapter}:${v.verse}` : verseId;
+  }
+  // Ubah teks ketikan operator (mis. "Yohanes 3:16" atau "Yohanes
+  // 3:16-18" untuk beberapa ayat sekaligus) jadi daftar {verseId, label}
+  // -- pakai parseReference() (pencarian referensi ayat yang SUDAH ADA
+  // di js/app.js, bagian 7) supaya aturan pengenalan nama kitab & alias
+  // SAMA PERSIS dengan kotak pencarian Alkitab biasa, tidak dobel logika.
+  function resolveVersesFromQuery_(query) {
+    if (typeof parseReference !== "function" || typeof getChapterVerses !== "function") return [];
+    const ref = parseReference(query);
+    if (!ref || !ref.verseStart) return []; // wajib ada nomor ayat, mis. "Yohanes 3:16" (bukan cuma "Yohanes 3")
+    const lang = (typeof currentLang !== "undefined" && currentLang) || (CONFIG.DEFAULT_LANGUAGE || "ind");
+    const verses = getChapterVerses(lang, ref.book.num, ref.chapter);
+    if (!verses.length) return [];
+    const vEnd = ref.verseEnd || ref.verseStart;
+    return verses
+      .filter((v) => v.verse >= ref.verseStart && v.verse <= vEnd)
+      .map((v) => ({ verseId: v.verseId, label: `${v.bookName} ${v.chapter}:${v.verse}` }));
+  }
+
+  // ------------------------------------------------------------
   // 4) TEBAK `sumber` DARI BENTUK LINK (bagian 14.3 rencana, sudah
   //    dikonfirmasi operator -- lihat STATUS-PUSTAKA-MEDIA.md)
   // ------------------------------------------------------------
@@ -312,6 +371,12 @@ const MediaLibrary = (() => {
     activeTab: "semua",
     search: "",
     error: "",
+    // BARU (14 Sep 2026) -- filter khusus tab "🎬 YouTube" (permintaan
+    // operator: sortir/filter berdasarkan kategori ATAU nama channel).
+    // Direset ke "" tiap ganti tab (lihat renderTabs_()) supaya tidak
+    // "nyangkut" saat pindah ke tab lain lalu balik lagi ke YouTube.
+    filterKategori: "",
+    filterChannel: "",
   };
 
   function el_(id) { return document.getElementById(id); }
@@ -481,6 +546,17 @@ const MediaLibrary = (() => {
       meta.textContent = metaBits.join(" · ");
       body.appendChild(meta);
     }
+    // BARU (14 Sep 2026) -- tombol "📝 Syair" HANYA muncul kalau item ini
+    // memang sudah diisi syair/liriknya (spec.onShowSyair kosong kalau
+    // tidak ada, lihat itemToCard_()).
+    if (spec.onShowSyair) {
+      const syairBtn = document.createElement("button");
+      syairBtn.type = "button";
+      syairBtn.className = "chip-btn small ml-card-syair-btn";
+      syairBtn.textContent = "📝 Syair";
+      syairBtn.addEventListener("click", (e) => { e.stopPropagation(); spec.onShowSyair(); });
+      body.appendChild(syairBtn);
+    }
     card.appendChild(body);
     return card;
   }
@@ -596,6 +672,34 @@ const MediaLibrary = (() => {
     ov.hidden = true;
   }
 
+  // BARU (14 Sep 2026) -- kotak "📝 Syair" (tombol di kartu, lihat
+  // buildCard_() -- terpisah dari pemutar video/suara di atas supaya
+  // syair bisa dibaca berdampingan SAAT video/lagu sedang diputar
+  // (operator bisa buka keduanya sekaligus), bukan saling menutup.
+  function showSyairDialog_(item) {
+    let ov = el_("mlSyairOverlay");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "mlSyairOverlay";
+      ov.className = "info-kami-overlay";
+      ov.hidden = true;
+      document.body.appendChild(ov);
+      ov.addEventListener("click", (e) => { if (e.target === ov) ov.hidden = true; });
+    }
+    ov.innerHTML = `
+      <div class="info-kami-box ml-syair-box">
+        <div class="info-kami-header">
+          <h2>📝 Syair — ${escapeHtml_(item.nama || "")}</h2>
+          <div class="info-kami-header-actions">
+            <button type="button" id="mlSyairCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
+          </div>
+        </div>
+        <div class="ml-syair-body">${escapeHtml_(item.syair || "").replace(/\n/g, "<br>")}</div>
+      </div>`;
+    ov.hidden = false;
+    el_("mlSyairCloseBtn").addEventListener("click", () => { ov.hidden = true; });
+  }
+
   // ------------------------------------------------------------
   // 8) TAB "Semua" / "🎬 YouTube" / "🔊 Efek Suara" / "Kidung"
   // ------------------------------------------------------------
@@ -618,7 +722,49 @@ const MediaLibrary = (() => {
       onPlay: () => playItem_(item),
       onEdit: () => openAddForm_({ jenis: item.jenis, editItem: item }),
       onDelete: () => confirmDelete_(item),
+      onShowSyair: item.syair ? () => showSyairDialog_(item) : null,
     });
+  }
+
+  // BARU (14 Sep 2026) -- dipakai js/app.js (renderChapter()) buat
+  // menampilkan "🔗 Media terkait pasal ini" di layar baca Alkitab,
+  // SAMA pola dengan buildKidungMediaRefSection() js/kidung-ui.js tapi
+  // untuk arah Alkitab -> media. `items` = hasil Sync.list({ayatRef}),
+  // `versesInChapter` = array ayat pasal yang SEDANG dibuka (dari
+  // getChapterVerses() js/app.js, tiap ayat punya .verseId & .verse) --
+  // dipakai untuk mencocokkan ayat MANA di pasal ini yang jadi alasan
+  // item itu muncul (1 item bisa cocok ke lebih dari 1 ayat di pasal
+  // yang sama).
+  function buildVerseRefSection_(items, versesInChapter) {
+    const section = document.createElement("div");
+    section.className = "kidung-media-ref-section";
+    const head = document.createElement("div");
+    head.className = "kidung-media-ref-head";
+    const heading = document.createElement("h4");
+    heading.textContent = "🔗 Media terkait pasal ini";
+    head.appendChild(heading);
+    section.appendChild(head);
+    const grid = document.createElement("div");
+    grid.className = "ml-grid kidung-media-ref-grid";
+    section.appendChild(grid);
+    items.forEach((it) => {
+      const refs = String(it.ayatRef || "").split(",").map((s) => s.trim());
+      const matchedVerseNums = versesInChapter
+        .filter((v) => refs.indexOf(String(v.verseId)) !== -1)
+        .map((v) => v.verse)
+        .sort((a, b) => a - b);
+      const wrap = document.createElement("div");
+      wrap.className = "ml-verse-ref-item";
+      if (matchedVerseNums.length) {
+        const tag = document.createElement("div");
+        tag.className = "ml-verse-ref-tag";
+        tag.textContent = (matchedVerseNums.length > 1 ? "Ayat " : "Ayat ") + matchedVerseNums.join(", ");
+        wrap.appendChild(tag);
+      }
+      wrap.appendChild(itemToCard_(it));
+      grid.appendChild(wrap);
+    });
+    return section;
   }
 
   function builtinSoundToCard_(fx) {
@@ -649,6 +795,33 @@ const MediaLibrary = (() => {
     if (!state.search) return true;
     const q = state.search.toLowerCase();
     return [item.nama, item.channel, item.kategori, item.keterangan].filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
+  }
+
+  // ------------------------------------------------------------
+  // 8b) FILTER TAB "🎬 YouTube" (BARU, 14 Sep 2026) -- kategori & nama
+  // channel. Daftar opsi diambil dari data yang BENAR-BENAR ada (bukan
+  // daftar baku), jadi otomatis ikut kalau kategori/channel baru
+  // muncul -- tidak perlu ubah kode.
+  // ------------------------------------------------------------
+  function distinctYoutubeKategori_() {
+    const set = new Set();
+    state.items.filter((it) => it.jenis === "youtube").forEach((it) => parseKategoriString(it.kategori).forEach((k) => set.add(k)));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+  }
+
+  function distinctYoutubeChannels_() {
+    const set = new Set();
+    state.items.filter((it) => it.jenis === "youtube").forEach((it) => {
+      const c = (it.channel || "").trim();
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
+  }
+
+  function matchesYoutubeFilters_(item) {
+    if (state.filterKategori && parseKategoriString(item.kategori).indexOf(state.filterKategori) === -1) return false;
+    if (state.filterChannel && (item.channel || "").trim().toLowerCase() !== state.filterChannel.toLowerCase()) return false;
+    return true;
   }
 
   function renderGrid_(container, cards, emptyMsg) {
@@ -694,6 +867,45 @@ const MediaLibrary = (() => {
       renderGridForTab_(grid);
     });
 
+    // BARU (14 Sep 2026) -- baris filter Kategori + Channel, HANYA di
+    // tab "🎬 YouTube" (permintaan operator). Opsi diisi dari
+    // distinctYoutubeKategori_()/distinctYoutubeChannels_() supaya
+    // otomatis ikut kategori/channel baru tanpa ubah kode.
+    if (state.activeTab === "youtube") {
+      const kategoriOpts = distinctYoutubeKategori_();
+      const channelOpts = distinctYoutubeChannels_();
+      const filterRow = document.createElement("div");
+      filterRow.className = "ml-filter-row";
+      filterRow.innerHTML = `
+        <select id="mlFilterKategori" aria-label="Filter kategori">
+          <option value="">Semua kategori</option>
+          ${kategoriOpts.map((k) => `<option value="${escapeAttr_(k)}" ${state.filterKategori === k ? "selected" : ""}>${escapeHtml_(k)}</option>`).join("")}
+        </select>
+        <select id="mlFilterChannel" aria-label="Filter channel">
+          <option value="">Semua channel</option>
+          ${channelOpts.map((c) => `<option value="${escapeAttr_(c)}" ${state.filterChannel === c ? "selected" : ""}>${escapeHtml_(c)}</option>`).join("")}
+        </select>
+        ${(state.filterKategori || state.filterChannel) ? `<button type="button" id="mlFilterClear" class="chip-btn small">✕ Bersihkan filter</button>` : ""}
+      `;
+      body.appendChild(filterRow);
+      filterRow.querySelector("#mlFilterKategori").addEventListener("change", (e) => {
+        state.filterKategori = e.target.value;
+        renderActiveTab_();
+      });
+      filterRow.querySelector("#mlFilterChannel").addEventListener("change", (e) => {
+        state.filterChannel = e.target.value;
+        renderActiveTab_();
+      });
+      const clearBtn = filterRow.querySelector("#mlFilterClear");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          state.filterKategori = "";
+          state.filterChannel = "";
+          renderActiveTab_();
+        });
+      }
+    }
+
     const grid = document.createElement("div");
     grid.className = "ml-grid";
     body.appendChild(grid);
@@ -709,8 +921,9 @@ const MediaLibrary = (() => {
       state.items.filter((it) => it.jenis === "youtube" || (it.jenis === "sound" && canSeeSound())).filter(matchesSearch_).forEach((it) => cards.push(itemToCard_(it)));
       renderGrid_(grid, cards, "Belum ada media. Tekan \"➕ Tambah\" untuk menambah yang pertama.");
     } else if (tab === "youtube") {
-      const cards = state.items.filter((it) => it.jenis === "youtube").filter(matchesSearch_).map(itemToCard_);
-      renderGrid_(grid, cards, "Belum ada video/audio YouTube. Tekan \"➕ Tambah\" untuk menambah.");
+      const cards = state.items.filter((it) => it.jenis === "youtube").filter(matchesSearch_).filter(matchesYoutubeFilters_).map(itemToCard_);
+      const filterActive = !!(state.filterKategori || state.filterChannel);
+      renderGrid_(grid, cards, filterActive ? "Tidak ada video yang cocok dengan filter ini." : "Belum ada video/audio YouTube. Tekan \"➕ Tambah\" untuk menambah.");
     } else if (tab === "sound") {
       const cards = [];
       if (typeof SoundFX !== "undefined") {
@@ -1054,6 +1267,20 @@ const MediaLibrary = (() => {
             <div class="ml-kidung-results" id="mlFormKidungResults" hidden></div>
           </fieldset>
           <fieldset class="ml-kategori-fieldset">
+            <legend>📖 Ayat Alkitab terkait (opsional, boleh lebih dari satu)</legend>
+            <p class="ml-hint">Ketik referensi ayat (mis. "Yohanes 3:16", atau "Yohanes 3:16-18" untuk beberapa ayat sekaligus), lalu tekan "➕". Berlaku otomatis untuk SEMUA bahasa Alkitab (Inggris, Recovery, dst) -- tidak perlu diulang per bahasa. Nanti muncul di bagian "🔗 Media terkait pasal ini" saat ayat itu dibuka.</p>
+            <div class="ml-kidung-chips" id="mlFormAyatChips"></div>
+            <div class="ml-ayat-search-row">
+              <input type="text" id="mlFormAyatSearch" placeholder='mis. "Yohanes 3:16"' autocomplete="off" />
+              <button type="button" id="mlFormAyatAddBtn" class="chip-btn small">➕ Tambah</button>
+            </div>
+            <p id="mlFormAyatError" class="ml-error" hidden></p>
+          </fieldset>
+          ${jenis === "youtube" ? `
+          <label>📝 Syair/Lirik (opsional)
+            <textarea id="mlFormSyair" rows="4" placeholder="Tempel syair/lirik lagu di sini...">${escapeHtml_(editItem ? editItem.syair : "")}</textarea>
+          </label>` : ""}
+          <fieldset class="ml-kategori-fieldset">
             <legend>Kategori</legend>
             <div class="ml-kategori-checks">
               ${KATEGORI_BAKU.map((k) => `<label class="ml-kategori-chk"><input type="checkbox" value="${k}" ${kategoriTerpilih.includes(k) ? "checked" : ""}/> ${k}</label>`).join("")}
@@ -1208,6 +1435,60 @@ const MediaLibrary = (() => {
       });
     }
 
+    // ---- Ayat Alkitab terkait (chip + pencarian referensi, lihat
+    //      parseAyatRefString_/resolveVersesFromQuery_ di atas) ----
+    let ayatRefState = parseAyatRefString_(editItem ? editItem.ayatRef : (o.ayatRef || ""));
+    const ayatChipsEl = el_("mlFormAyatChips");
+    const ayatSearchInput = el_("mlFormAyatSearch");
+    const ayatAddBtn = el_("mlFormAyatAddBtn");
+    const ayatErrorEl = el_("mlFormAyatError");
+
+    function renderAyatChips_() {
+      if (!ayatChipsEl) return;
+      if (!ayatRefState.length) { ayatChipsEl.innerHTML = ""; return; }
+      ayatChipsEl.innerHTML = ayatRefState.map((a, i) => {
+        const label = a.label || labelForVerseId_(a.verseId);
+        return `<span class="ml-kidung-chip" data-idx="${i}">${escapeHtml_(label)} <button type="button" data-ml-ayat-remove="${i}" aria-label="Hapus">✕</button></span>`;
+      }).join("");
+      ayatChipsEl.querySelectorAll("[data-ml-ayat-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.mlAyatRemove, 10);
+          ayatRefState.splice(idx, 1);
+          renderAyatChips_();
+        });
+      });
+    }
+    // Isi label yang datang cuma berupa Verse ID mentah (mode edit) --
+    // aman dipanggil langsung (bukan lewat .then seperti kidung) karena
+    // data Alkitab (verseById) sudah pasti termuat duluan sebelum
+    // pengguna sempat membuka form ini.
+    ayatRefState.forEach((a) => { if (!a.label) a.label = labelForVerseId_(a.verseId); });
+    renderAyatChips_();
+
+    function handleAyatAdd_() {
+      if (!ayatSearchInput) return;
+      if (ayatErrorEl) ayatErrorEl.hidden = true;
+      const q = ayatSearchInput.value.trim();
+      if (!q) return;
+      const found = resolveVersesFromQuery_(q);
+      if (!found.length) {
+        if (ayatErrorEl) {
+          ayatErrorEl.hidden = false;
+          ayatErrorEl.textContent = `Ayat "${q}" tidak ditemukan -- pastikan formatnya "Nama Kitab Pasal:Ayat", mis. "Yohanes 3:16".`;
+        }
+        return;
+      }
+      found.forEach((f) => { if (!ayatRefState.some((sel) => sel.verseId === f.verseId)) ayatRefState.push(f); });
+      ayatSearchInput.value = "";
+      renderAyatChips_();
+    }
+    if (ayatAddBtn) ayatAddBtn.addEventListener("click", handleAyatAdd_);
+    if (ayatSearchInput) {
+      ayatSearchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); handleAyatAdd_(); }
+      });
+    }
+
     el_("mlForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const errEl = el_("mlFormError");
@@ -1228,6 +1509,8 @@ const MediaLibrary = (() => {
         kategori,
         link,
         kidungRef: joinKidungRefs_(kidungRefState),
+        ayatRef: joinAyatRefs_(ayatRefState),
+        syair: jenis === "youtube" ? (el_("mlFormSyair") ? el_("mlFormSyair").value.trim() : "") : "",
         visibility,
       };
       const submitBtn = el_("mlFormSubmitBtn");
@@ -1301,6 +1584,10 @@ const MediaLibrary = (() => {
       btn.addEventListener("click", () => {
         state.activeTab = t.key;
         state.search = "";
+        // BARU (14 Sep 2026) -- filter kategori/channel cuma relevan di
+        // tab YouTube, reset tiap pindah tab supaya tidak "nyangkut".
+        state.filterKategori = "";
+        state.filterChannel = "";
         renderTabs_();
         renderActiveTab_();
       });
@@ -1376,5 +1663,8 @@ const MediaLibrary = (() => {
     // ke bentuk unduhan langsung SEBELUM dikirim ke Layar 2 sungguhan,
     // konsisten dengan pemutaran pratinjau di menu ini.
     resolvePlayableUrl: resolvePlayableUrl_,
+    // BARU (14 Sep 2026) -- dipakai js/app.js (renderChapter()) untuk
+    // menampilkan "🔗 Media terkait pasal ini" di layar baca Alkitab.
+    buildVerseRefSection: buildVerseRefSection_,
   };
 })();
