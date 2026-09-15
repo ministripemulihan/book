@@ -1943,6 +1943,20 @@ input { font-family: inherit; }
 }
 .inline-media-nowplaying-range { font-size: 13px; font-weight: 700; color: var(--ink); }
 .inline-media-nowplaying-part { font-size: 11.5px; color: var(--ink-soft); }
+/* BARU (15 Sep 2026, permintaan operator "jump langsung ke bagian yang
+   dibaca") -- kedipan singkat penanda segmen yang baru saja digulir-ke
+   otomatis dari tombol "🎧 Dengar dari sini" (lihat
+   scrollToMediaSegmentForVerse(), js/media.js), supaya jelas segmen MANA
+   yang dimaksud di antara beberapa Bagian yang mungkin ada. Dilepas lagi
+   otomatis via setTimeout di JS -- kelas ini SENGAJA tidak pakai
+   animasi CSS keyframe berulang (@keyframes) supaya tidak perlu
+   dibersihkan manual kalau operator berpindah pasal sebelum kedipannya
+   selesai (elemen lama itu sendiri yang akan dibuang oleh renderChapter()). */
+.inline-media-segment-flash {
+  outline: 3px solid var(--petrol); outline-offset: 4px; border-radius: 10px;
+  background: color-mix(in srgb, var(--petrol) 10%, transparent);
+  transition: outline-color 1.4s ease, background 1.4s ease;
+}
 .round-media-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .round-media-btn {
   width: 46px; height: 46px; border-radius: 50%;
