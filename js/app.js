@@ -2785,6 +2785,35 @@ function openHighlightPopup(anchorEl, block, v) {
 // kolom yang MANA yang harus dibacakan (lihat playTTSFromVerse() di bawah).
 // Kalau tidak diisi (dipanggil dari kode lama yang belum diperbarui),
 // otomatis jatuh ke `currentChapterVerses` (perilaku lama, bahasa utama).
+// BARU (15 Sep 2026, permintaan operator "saat voice note diputar, ada
+// tombol jump ke ayat sesuai yang ditulis di voice note itu") --
+// kebalikan dari scrollToMediaSegmentForVerse() (js/media.js, ayat ->
+// voice note): ini voice note -> ayat. Mencari tombol nomor ayat
+// (".verse-num-btn", lihat buildVerseBlock() di bawah) yang teksnya
+// PERSIS sama dengan nomor ayat yang dicari, lalu menggulir ke blok
+// ayat (".verse-block") terdekat & memberi kedipan penanda sebentar.
+// TIDAK memakai `chapter` sama sekali (dibiarkan sebagai parameter utk
+// jaga-jaga/kejelasan pemanggil) -- karena halaman baca cuma pernah
+// menampilkan SATU pasal dalam satu waktu, jadi nomor ayat saja sudah
+// pasti unik di halaman ini. Kalau tampilan sedang multi-kolom (mis.
+// Indonesia + Mandarin berdampingan), SEMUA kolom yang punya ayat itu
+// dilompati sekaligus (bukan cuma kolom pertama) supaya konsisten
+// dgn ayat mana pun yang sedang dilihat operator.
+function scrollToVerseInReader_(chapter, verseNum) {
+  const btns = Array.from(document.querySelectorAll(".verse-num-btn")).filter(
+    (b) => b.textContent.trim() === String(verseNum)
+  );
+  if (!btns.length) return false;
+  const blocks = btns.map((b) => b.closest(".verse-block")).filter(Boolean);
+  if (!blocks.length) return false;
+  blocks[0].scrollIntoView({ behavior: "smooth", block: "center" });
+  blocks.forEach((block) => {
+    block.classList.add("verse-block-flash");
+    setTimeout(() => block.classList.remove("verse-block-flash"), 1600);
+  });
+  return true;
+}
+
 function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   const block = document.createElement("div");
   block.className = "verse-block";
