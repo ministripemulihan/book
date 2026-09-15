@@ -1957,6 +1957,16 @@ input { font-family: inherit; }
   background: color-mix(in srgb, var(--petrol) 10%, transparent);
   transition: outline-color 1.4s ease, background 1.4s ease;
 }
+/* BARU (15 Sep 2026) -- kedipan penanda ayat tujuan dari tombol "⬇️
+   Lompat ke ayat N" (lihat scrollToVerseInReader_(), js/app.js) --
+   pola SAMA persis dgn .inline-media-segment-flash di atas, cuma
+   ditempelkan ke ".verse-block" (blok ayat), bukan segmen media. */
+.verse-block-flash {
+  outline: 3px solid var(--petrol); outline-offset: 4px; border-radius: 10px;
+  background: color-mix(in srgb, var(--petrol) 10%, transparent);
+  transition: outline-color 1.4s ease, background 1.4s ease;
+}
+.inline-media-jump-verse { margin-left: auto; }
 .round-media-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .round-media-btn {
   width: 46px; height: 46px; border-radius: 50%;
