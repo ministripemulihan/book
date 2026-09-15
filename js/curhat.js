@@ -183,6 +183,37 @@ function isCurhatGembala() {
   return (currentUserLevels || []).some((l) => allowed.includes(l));
 }
 
+// BARU (15 Sep 2026, permintaan operator "notifikasi kalau ada yang
+// curhat, ke level administrator dan gembala") -- dipanggil
+// AdminBell.refresh() (js/adminbell.js) supaya badge 🔔 ikut menghitung
+// curhat yang BELUM DIBALAS dari jemaat yang boleh dipantau akun ini.
+// "Belum dibalas" dipakai sbg penanda "baru/belum ditangani" -- BUKAN
+// penanda baru dibuat sendiri (localStorage seperti pengumuman), tapi
+// memakai kolom `tanggalDibaca` yang SUDAH ADA di server (cuma terisi
+// saat gembala mengirim balasan lewat CurhatSync.respond(), lihat
+// apps-script/CurhatCode.gs baris ~298) -- lebih tepat & otomatis SAMA
+// di semua perangkat/gembala manapun, tidak perlu tanda "sudah dilihat"
+// terpisah per akun seperti pengumuman (curhat memang harus ditangani
+// SATU KALI oleh SIAPA PUN gembala yang berwenang, bukan "dilihat
+// masing-masing", makanya polanya sengaja dibedakan dari lonceng
+// pengumuman).
+// Siapa pun yang login boleh curhat (domba/kosong level/"bukan
+// gembala") -- saringan `monitorable` di bawah ini SAMA seperti
+// renderCurhatGembalaView() di atas, supaya gembala hanya diberitahu
+// soal jemaat yang memang boleh ia pantau.
+async function getPendingCurhatForBell() {
+  if (!CurhatSync.enabled() || !isCurhatGembala()) return [];
+  try {
+    let items = await CurhatSync.listAllForGembala(currentUser);
+    const monitorable = await getMonitorableUsers();
+    const monitorableUsernames = new Set(monitorable.map((u) => u.username));
+    items = items.filter((it) => monitorableUsernames.has(it.username) || it.username === currentUser);
+    return items.filter((it) => !it.tanggalDibaca);
+  } catch (e) {
+    return []; // diamkan -- badge cuma "pengingat", jangan sampai gagal memuat halaman lain
+  }
+}
+
 function curhatStatusLabel(key) {
   const found = (CONFIG.CURHAT_STATUSES || []).find((s) => s.key === key);
   return found ? found.label : key;
