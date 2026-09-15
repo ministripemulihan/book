@@ -1123,6 +1123,35 @@ input { font-family: inherit; }
   box-sizing: border-box;
 }
 
+/* BARU (15 Sep 2026) -- dialog "Atur Tanggal Mulai" rencana baca, lihat
+   #planStartOverlay (index.html) & openPlanStartPicker() (js/app.js).
+   Kerangka dialog (kotak/tombol) memakai .guest-modal-* yang sudah ada
+   di atas -- di sini cuma bagian ISI yang beda (baris tombol cepat,
+   input tanggal, kotak centang "kejar ketinggalan"). */
+.plan-start-box { max-width: 400px; text-align: left; }
+.plan-start-box h2, .plan-start-box p { text-align: center; }
+.plan-start-quick-row { display: flex; gap: 8px; margin-bottom: 12px; justify-content: center; flex-wrap: wrap; }
+.plan-start-date-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--rule);
+  font-size: 14px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+  color: var(--ink);
+  background: var(--paper);
+}
+.plan-start-catchup-box {
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.plan-start-catchup-label { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.plan-start-catchup-label input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+
 /* ============================================================
    PANEL "INFO KAMI" -- Versi, Amanat Kami, Misi Kami, Donasi, dst.
    Bisa dibuka SEBELUM login (layar Masuk) MAUPUN SETELAH login (menu
@@ -1420,27 +1449,50 @@ input { font-family: inherit; }
    menambah efek suara baru), tanpa perlu sinkron ulang seluruh
    Alkitab. Lihat #soundFxDownloadSection di index.html & wiring-nya
    di js/app.js.
-   ============================================================ */
-.soundfx-dl-card {
+
+   DIUBAH (14 Sep 2026, permintaan operator "bisa dibedakan antara
+   kidung, alkitab, suara offline... checklist... unduh ulang per
+   bagian saja") -- nama class digenerikkan jadi ".datadl-*" (dulu
+   ".soundfx-dl-*") supaya kartu Alkitab & Kidung yang baru (lihat
+   #dataDownloadSection di index.html) bisa numpang tampilan yang
+   SAMA PERSIS, bukan cuma efek suara. ".soundfx-dl-*" TETAP dipertahankan
+   sbg alias (selector gabung, lihat koma di bawah) supaya HTML lama
+   yang masih memakai nama itu (#soundFxDlCard dkk.) tidak perlu diubah
+   sama sekali & tetap tampil identik seperti sebelumnya. */
+.datadl-card, .soundfx-dl-card {
   border: 1px solid var(--rule);
   border-radius: 12px;
   background: linear-gradient(160deg, var(--paper-raised), var(--paper));
   padding: 12px 14px;
   display: flex; flex-direction: column; gap: 10px;
 }
-.soundfx-dl-status-row { display: flex; align-items: center; gap: 10px; }
-.soundfx-dl-icon {
+.datadl-status-row, .soundfx-dl-status-row { display: flex; align-items: center; gap: 10px; }
+.datadl-icon, .soundfx-dl-icon {
   font-size: 20px; line-height: 1; flex-shrink: 0;
   width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: var(--brass-soft); transition: background .25s ease;
 }
-.soundfx-dl-card.is-ready .soundfx-dl-icon { background: var(--petrol); }
-.soundfx-dl-text { font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
-.soundfx-dl-text strong { color: var(--ink); }
-.soundfx-dl-card .progress-track { margin-top: 2px; }
-.soundfx-dl-btn-row { display: flex; }
-.soundfx-dl-btn-row .chip-btn { flex: 1; justify-content: center; }
+.datadl-card.is-ready .datadl-icon, .soundfx-dl-card.is-ready .soundfx-dl-icon { background: var(--petrol); }
+.datadl-text, .soundfx-dl-text { font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
+.datadl-text strong, .soundfx-dl-text strong { color: var(--ink); }
+.datadl-card .progress-track, .soundfx-dl-card .progress-track { margin-top: 2px; }
+.datadl-btn-row, .soundfx-dl-btn-row { display: flex; gap: 6px; }
+.datadl-btn-row .chip-btn, .soundfx-dl-btn-row .chip-btn { flex: 1; justify-content: center; }
+/* Grup "📥 Unduh Data (per Bagian)" -- bungkus 3 kartu (Alkitab/Kidung/
+   Efek Suara) supaya terlihat 1 kelompok checklist, bukan 3 hal
+   terpisah tanpa hubungan. */
+.datadl-group { display: flex; flex-direction: column; gap: 10px; }
+
+/* BARU (15 Sep 2026) -- checklist "pilih bagian yang mau diunduh" di
+   dalam dialog unduh/sinkron (showBibleSyncPrompt di js/app.js). */
+.dlpick-box {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--rule); background: var(--paper-raised); text-align: left;
+}
+.dlpick-title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.dlpick-quick-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.dlpick-box .more-menu-checkbox-row { align-items: flex-start; }
 
 /* ============================================================
    Daftar unduh SATU-SATU (BARU, tambahan) -- pasangan
@@ -1797,6 +1849,36 @@ input { font-family: inherit; }
 .chapter-grid button:hover { border-color: var(--petrol); color: var(--petrol); }
 
 /* ============================================================
+   SARAN OTOMATIS NAMA KITAB (book-suggest) -- lihat
+   js/book-suggest.js. Dropdown position:fixed, ditempel & diikuti
+   lewat JS (reposition()) supaya tidak perlu mengubah struktur
+   HTML kotak aslinya (#searchInput / #psQuickRef).
+   ------------------------------------------------------------
+   - [data-context="search"] (bawaan) -- dipakai kotak pencarian
+     utama, memakai palet warna tema utama (--paper/--ink/dst).
+   - [data-context="studio"] -- dipakai kotak Ayat Cepat Studio
+     Presentasi, memakai palet --ps-* biar konsisten dgn panel
+     Studio (yang punya tema terang/gelapnya sendiri).
+   ============================================================ */
+.book-suggest-list {
+  position: fixed; z-index: 9999;
+  background: var(--paper-raised, #fff);
+  border: 1px solid var(--rule, #ddd);
+  border-radius: 8px;
+  box-shadow: var(--shadow, 0 8px 24px rgba(0,0,0,.15));
+  max-height: 260px; overflow-y: auto;
+  font-family: var(--font-ui, sans-serif); font-size: 14px;
+}
+.book-suggest-list[data-context="studio"] {
+  background: var(--ps-card-bg, #221b12);
+  border-color: var(--ps-card-border, #382c1c);
+  color: var(--ps-ink, #f1ece0);
+}
+.book-suggest-item { padding: 8px 12px; cursor: pointer; color: var(--ink, #222); }
+.book-suggest-list[data-context="studio"] .book-suggest-item { color: var(--ps-ink, #f1ece0); }
+.book-suggest-item:hover, .book-suggest-item.active { background: var(--petrol, #2F6F63); color: #fff; }
+
+/* ============================================================
    HASIL PENCARIAN KATA
    ============================================================ */
 .search-results h2 {
@@ -1832,7 +1914,35 @@ input { font-family: inherit; }
 .search-font-size-control { display: flex !important; flex-shrink: 0; }
 
 /* ---------------- Pemutar media sebaris (tombol bulat) ---------------- */
-.inline-media-block { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.inline-media-block { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+/* Satu bacaan bisa punya lebih dari satu voice note (mis. "Matius 5"
+   Bagian 1 & 2) -- tiap segmen dapat baris tombol + pemutar sendiri,
+   dipisah garis tipis supaya kelihatan jelas beda bagian. */
+.inline-media-segment { display: flex; flex-direction: column; gap: 8px; }
+.inline-media-segment-label {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+  padding-top: 8px; border-top: 1px dashed var(--rule);
+}
+.inline-media-segment-label:first-child { padding-top: 0; border-top: none; }
+/* BARU (15 Sep 2026) -- label bagian sekarang 2 bagian: nomor bagian di
+   kiri, RENTANG bacaan voice note itu di kanan (mis. "Matius 5:27–6:4").
+   Di layar sempit otomatis turun jadi 2 baris, tidak terpotong. */
+.inline-media-segment-label {
+  display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap;
+}
+.inline-media-segment-range {
+  font-weight: 700; color: var(--petrol); font-size: 12.5px;
+}
+/* Baris "sedang diputar" di atas pemutar yang baru dibuka. */
+.inline-media-nowplaying {
+  display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap;
+  padding: 7px 10px; border-radius: 8px; margin-bottom: 2px;
+  background: rgba(127, 127, 127, .12); /* cadangan utk browser lama tanpa color-mix */
+  background: color-mix(in srgb, var(--petrol) 12%, transparent);
+  border-left: 3px solid var(--petrol);
+}
+.inline-media-nowplaying-range { font-size: 13px; font-weight: 700; color: var(--ink); }
+.inline-media-nowplaying-part { font-size: 11.5px; color: var(--ink-soft); }
 .round-media-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .round-media-btn {
   width: 46px; height: 46px; border-radius: 50%;
@@ -1944,6 +2054,17 @@ select.chip-select:hover { border-color: var(--petrol); }
 .plan-day-reading { font-size: 14px; color: var(--ink); }
 .plan-day-row.done .plan-day-reading { text-decoration: line-through; }
 .plan-day-row-media { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 10px 66px; }
+/* BARU (15 Sep 2026) -- tanggal per hari + penanda baris "Hari Ini",
+   dan keterangan tanggal mulai di kepala panel rencana. */
+.plan-day-date { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+.plan-day-today-tag {
+  display: inline-block; margin-left: 4px; padding: 1px 6px; border-radius: 999px;
+  background: var(--petrol); color: #fff; font-size: 10.5px; font-weight: 700;
+}
+.plan-day-row.is-today { border-color: var(--petrol); box-shadow: 0 0 0 1px var(--petrol) inset; }
+.plan-head-meta {
+  margin-top: 6px; font-size: 12px; color: var(--ink-soft); line-height: 1.45;
+}
 
 .reader-verses {
   font-family: var(--font-body);
@@ -3670,10 +3791,25 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
    `hidden` bawaan (dilepas oleh fillCollectionThumbnails_ begitu
    gambarnya siap dimuat dari IndexedDB) -- baris tetap terlihat rapi
    sebelum thumbnail selesai dimuat, tidak ada kotak kosong menganga. */
+/* DIUBAH (14 Sep 2026, permintaan operator "kalau bentuk isi file pdf
+   nya landscape maka tampilnya landscape, kalau 1:1 maka tampilnya
+   1:1, kalau portrait maka tampilnya portrait -- sekarang semua
+   dianggap 1:1") -- dulu width+height SAMA (kotak persegi paksa) +
+   object-fit:cover (motong isi biar pas persegi), jadi halaman apa pun
+   bentuk aslinya (landscape/portrait) selalu kelihatan sebagai potongan
+   persegi. Sekarang cuma TINGGI yang dikunci ke --ps-thumb-size, LEBAR
+   mengikuti rasio asli gambarnya sendiri (width:auto, dibaca dari
+   naturalWidth/naturalHeight <img> -- gambar halaman PDF memang sudah
+   dirender dgn rasio aslinya oleh pdfFileToImages(), jadi tidak perlu
+   dihitung manual di sini). object-fit:contain (bukan cover) + max-width
+   sbg jaring pengaman supaya halaman landscape yang SANGAT lebar (mis.
+   3:1) tidak mendominasi baris -- di atas situ baru dikecilkan dgn
+   sedikit ruang kosong kiri-kanan, TETAP tanpa isi terpotong. */
 .ps-verse-thumb {
-  float: left; width: var(--ps-thumb-size, 44px); height: var(--ps-thumb-size, 44px); margin: 0 8px 4px 0;
-  object-fit: cover; border-radius: 6px; border: 1px solid var(--ps-card-border);
-  background: #fff; transition: width .15s ease, height .15s ease;
+  float: left; height: var(--ps-thumb-size, 44px); width: auto;
+  max-width: calc(var(--ps-thumb-size, 44px) * 1.8); margin: 0 8px 4px 0;
+  object-fit: contain; border-radius: 6px; border: 1px solid var(--ps-card-border);
+  background: #fff; transition: height .15s ease, max-width .15s ease;
 }
 /* Bagian yang bisa diklik untuk tayang (dulu seluruh baris <button>,
    sekarang dipecah supaya tombol mini ⏮️⬆️⬇️⏭️ di sebelahnya -- lihat
@@ -4523,6 +4659,15 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   border-radius: 10px; background: var(--paper); color: var(--ink);
   font-family: var(--font-ui); font-size: 14px;
 }
+/* BARU (14 Sep 2026) -- baris filter Kategori/Channel di tab "🎬 YouTube" */
+.ml-filter-row {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+}
+.ml-filter-row select {
+  padding: 7px 10px; border: 1px solid var(--rule); border-radius: 10px;
+  background: var(--paper); color: var(--ink); font-family: var(--font-ui);
+  font-size: 13px; max-width: 220px;
+}
 .ml-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -4596,6 +4741,18 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .kidung-media-ref-grid.ml-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .kidung-media-ref-grid .ml-empty, .kidung-media-ref-grid .ml-loading { padding: 10px 0; font-size: 12px; }
 .ml-form-box.info-kami-box { max-width: 480px; height: auto; max-height: 92vh; border-radius: 16px; border-width: 2px; box-shadow: var(--shadow); }
+
+/* BARU (14 Sep 2026) -- fieldset "Ayat Alkitab terkait" & tombol/kotak
+   "Syair" (permintaan operator: syair YouTube + tautan 2 arah ke
+   Alkitab), lihat js/media-library.js */
+.ml-ayat-search-row { display: flex; gap: 6px; }
+.ml-ayat-search-row input { flex: 1; }
+.ml-card-syair-btn { margin-top: 6px; align-self: flex-start; }
+.ml-syair-box { max-width: 480px; height: auto; max-height: 82vh; border-radius: 16px; border-width: 2px; box-shadow: var(--shadow); }
+.ml-syair-body { padding: 16px 22px 22px; overflow-y: auto; white-space: pre-wrap; line-height: 1.7; font-size: 15px; }
+.ml-verse-ref-item { display: flex; flex-direction: column; gap: 4px; }
+.ml-verse-ref-tag { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+
 .ml-form { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 22px; overflow-y: auto; }
 .ml-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-soft); }
 .ml-form input[type="text"], .ml-form input[type="url"], .ml-form select, .ml-form textarea {
