@@ -731,6 +731,28 @@ function buildInlineMediaSegment_(media, titleForSession, info) {
       sub.textContent = info.positionText;
       bar.appendChild(sub);
     }
+    // BARU (15 Sep 2026, permintaan operator "saat voice note diputar,
+    // ada tombol langsung jump ke ayat 21, sesuai ayat yang ditulis di
+    // voice note itu") -- lompat ke AYAT AWAL rentang voice note ini
+    // (bukan mengikuti posisi detik audio yang sedang berjalan -- itu
+    // tidak bisa ditebak karena tidak ada penanda waktu per-ayat di
+    // dalam rekaman audionya, cuma satu rentang awal-akhir per voice
+    // note). Cukup ditampilkan kalau `media.ref.startVerse` diketahui
+    // (hasil parseReferenceRange() di buildMediaScheduleFromRows()) --
+    // data lama/tidak terbaca (mis. cuma "Matius 5" tanpa ayat) tidak
+    // dapat tombol ini, karena tidak ada ayat spesifik utk dituju.
+    if (media && media.ref && media.ref.startVerse != null && typeof scrollToVerseInReader_ === "function") {
+      const jumpBtn = document.createElement("button");
+      jumpBtn.type = "button";
+      jumpBtn.className = "chip-btn small inline-media-jump-verse";
+      jumpBtn.textContent = "⬇️ Lompat ke ayat " + media.ref.startVerse;
+      jumpBtn.title = "Gulir teks Alkitab ke ayat awal voice note ini";
+      jumpBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        scrollToVerseInReader_(media.ref.startChapter, media.ref.startVerse);
+      });
+      bar.appendChild(jumpBtn);
+    }
     return bar;
   }
 
