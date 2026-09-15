@@ -85,6 +85,48 @@
 //      sendGenericItemLive(), wirePlaylistKeyNav().
 // ============================================================
 
+// ------------------------------------------------------------
+// window.PSCore & window.GameOffline -- BARU (15 Sep 2026), dibuat saat
+// memindahkan 🎡 Roda Undian ke js/games/roda-putar.js sebagai modul
+// "Game Offline" pertama yang berdiri sendiri. Tujuan 2 objek ini:
+// supaya presentation-studio.js TIDAK perlu tahu nama game satu-satu
+// (dan tidak perlu diedit lagi tiap kali ada game offline baru), dan
+// supaya file game (js/games/*.js) punya cara resmi memakai
+// el()/rawPost()/renderStudioPreview() milik Studio tanpa menulis
+// ulang sendiri. Dideklarasikan di LUAR closure PresentationStudio
+// (jadi tersedia global) tapi diisi (PSCore) di AKHIR file ini,
+// setelah semua fungsi terkait sudah terdefinisi -- lihat
+// "Object.assign(window.PSCore, ...)" di dekat "return {...}" di
+// bawah.
+//
+// Cara pakai dari file game baru (lihat js/games/roda-putar.js untuk
+// contoh lengkap):
+//   1. Muat file game itu di index.html SESUDAH presentation-studio.js.
+//   2. Di dalam file game: const { el, rawPost, renderStudioPreview } = window.PSCore;
+//   3. Di akhir file game: window.GameOffline.register({ id, label, wireTab, handleMessage });
+//      - wireTab() dipanggil otomatis oleh init() (lihat GameOffline.wireAll()).
+//      - handleMessage(data) dipanggil tiap ada pesan postMessage dari
+//        Layar 2 (present.html) -- modul game WAJIB menyaring sendiri
+//        pesan yang bukan buat dia (cek data.type).
+// ------------------------------------------------------------
+window.PSCore = window.PSCore || {};
+window.GameOffline = window.GameOffline || {
+  _games: [],
+  register(game) { this._games.push(game); },
+  wireAll() {
+    this._games.forEach((g) => {
+      try { g.wireTab && g.wireTab(); }
+      catch (e) { console.error("[GameOffline] wireTab gagal:", g.id, e); }
+    });
+  },
+  handleMessage(data) {
+    this._games.forEach((g) => {
+      try { g.handleMessage && g.handleMessage(data); }
+      catch (e) { console.error("[GameOffline] handleMessage gagal:", g.id, e); }
+    });
+  },
+};
+
 const PresentationStudio = (() => {
   const THEME_KEY = "bible_app_studio_theme_v1";
   const LOGO_KEY = "bible_app_studio_logo_url_v1";
@@ -438,7 +480,7 @@ const PresentationStudio = (() => {
       return;
     }
     // BARU (9 Sep 2026) -- pratinjau ringkas untuk "🎡 Roda Undian" di
-    // kotak "Tayang" Studio (lihat wireWheelTab() untuk pemanggilnya).
+    // kotak "Tayang" Studio (dipanggil dari js/games/roda-putar.js).
     if (payload.type === "wheel") {
       box.innerHTML = `<div class="present-preview-idle">🎡 Roda Undian — tayang di Layar 2</div>`;
       return;
@@ -6972,131 +7014,13 @@ const PresentationStudio = (() => {
   }
 
   // ------------------------------------------------------------
-  // BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian (versi
-  // TEKS SAJA -- versi "1 lingkaran = 1 foto orang" direncanakan tahap
-  // berikutnya, lihat jawaban chat). 100% OFFLINE: daftar nama diketik
-  // langsung di sini, pemenang diacak dengan Math.random() DI SISI INI
-  // (bukan di Layar 2) supaya Studio langsung tahu siapa pemenangnya
-  // untuk mode "buang pemenang" tanpa perlu menunggu animasi 4 detik
-  // selesai dulu. Layar 2 (present.html, lihat showWheel()/spinWheel())
-  // hanya menerima INDEKS pemenang & menganimasikan visual+suara ke
-  // sana, lalu mengonfirmasi balik lewat postMessage
-  // "present_wheel_result" (ditangani listener "message" di init(), di
-  // bawah file ini) -- dipakai untuk menyalakan lagi tombol "🎲 Putar!"
-  // & (kalau mode "buang pemenang" aktif) menghapus nama itu dari
-  // daftar supaya tidak menang 2x di sesi undian yang sama.
-  //
-  // Payload ke Layar 2: { type:"wheel", action:"show", entries } saat
-  // "🎡 Tampilkan Roda" ditekan, { type:"wheel", action:"spin",
-  // winnerIndex, spinId } saat "🎲 Putar!" ditekan.
+  // 🎡 Roda Undian -- DIPINDAH (15 Sep 2026) ke js/games/roda-putar.js
+  // sebagai modul "Game Offline" pertama. Lihat window.GameOffline di
+  // bawah file ini untuk cara modul game mendaftar diri, dan init()
+  // (GameOffline.wireAll() / GameOffline.handleMessage()) untuk cara
+  // mereka dipanggil. Kode lama (wireWheelTab/handleWheelResult_) TIDAK
+  // diubah, cuma dipindah + dibungkus modul sendiri.
   // ------------------------------------------------------------
-  let wheelCurrentEntries_ = []; // daftar nama yang SEDANG ditampilkan di roda (setelah "Tampilkan Roda" ditekan) -- dipakai untuk tahu indeks pemenang & untuk mode "buang pemenang"
-  let wheelSpinning_ = false; // true di antara tombol "Putar!" ditekan sampai present_wheel_result balik -- mencegah operator memicu 2 putaran sekaligus (bisa membuat animasi Layar 2 saling tabrak)
-  function wireWheelTab() {
-    const entriesTa = el("psWheelEntries");
-    const applyBtn = el("psWheelApplyBtn");
-    const spinBtn = el("psWheelSpinBtn");
-    const resetBtn = el("psWheelResetBtn");
-    const removeWinnerChk = el("psWheelRemoveWinnerChk");
-    const winnerBox = el("psWheelWinnerBox");
-    if (!entriesTa || !applyBtn || !spinBtn) return; // panel belum ada di HTML (mis. versi lama index.html) -- diamkan
-
-    function parseEntries_() {
-      return String(entriesTa.value || "")
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-
-    applyBtn.addEventListener("click", () => {
-      const entries = parseEntries_();
-      if (entries.length < 2) { alert("Isi minimal 2 nama (1 nama per baris) dulu."); return; }
-      wheelCurrentEntries_ = entries;
-      if (winnerBox) { winnerBox.hidden = true; winnerBox.textContent = ""; }
-      spinBtn.disabled = false;
-      rawPost({ type: "wheel", action: "show", entries: wheelCurrentEntries_ });
-      renderStudioPreview({ type: "wheel" });
-    });
-
-    spinBtn.addEventListener("click", () => {
-      if (wheelSpinning_) return; // sedang berputar -- abaikan klik dobel supaya tidak memicu 2 animasi sekaligus di Layar 2
-      if (!wheelCurrentEntries_.length) { alert("Tekan \"🎡 Tampilkan Roda\" dulu sebelum memutar."); return; }
-      const winnerIndex = Math.floor(Math.random() * wheelCurrentEntries_.length);
-      const spinId = "wh_" + Date.now();
-      wheelSpinning_ = true;
-      wheelPendingSpin_ = { spinId, winnerIndex, removeWinner: !!(removeWinnerChk && removeWinnerChk.checked) };
-      spinBtn.disabled = true;
-      if (winnerBox) { winnerBox.hidden = true; winnerBox.textContent = ""; }
-      rawPost({ type: "wheel", action: "spin", winnerIndex, spinId });
-    });
-
-    resetBtn.addEventListener("click", () => {
-      wheelCurrentEntries_ = [];
-      wheelSpinning_ = false;
-      wheelPendingSpin_ = null;
-      spinBtn.disabled = true;
-      if (winnerBox) { winnerBox.hidden = true; winnerBox.textContent = ""; }
-      rawPost({ type: "wheel", action: "stop" });
-    });
-  }
-
-  // Diisi wireWheelTab() (di atas) tiap kali "🎲 Putar!" ditekan, dibaca
-  // & dikosongkan lagi oleh listener "message" (window.addEventListener
-  // di init(), lihat "present_wheel_result") begitu Layar 2 selesai
-  // menganimasikan & mengonfirmasi balik pemenangnya -- lihat catatan
-  // panjang di wireWheelTab() di atas untuk alasan pola ini (Studio
-  // yang menentukan pemenang lebih dulu, Layar 2 cuma menganimasikannya).
-  let wheelPendingSpin_ = null;
-  // PERBAIKAN (12 Sep 2026, laporan operator: "saat di check list buang
-  // pemenang, saat di putar, langsung tidak sampai 1 detik hilang
-  // namanya") -- akar masalahnya: begitu Layar 2 selesai menganimasikan
-  // & melapor balik (present_wheel_result), fungsi ini LANGSUNG (tanpa
-  // jeda sama sekali) membuang nama pemenang dari daftar & mengirim
-  // ULANG {type:"wheel", action:"show", ...} ke Layar 2 -- showWheel()
-  // di present.html MENGOSONGKAN #wheelWinnerBanner tiap kali menerima
-  // "show" (supaya bersih untuk putaran berikutnya), jadi nama pemenang
-  // yang BARU SAJA muncul langsung tertimpa hilang dalam hitungan
-  // milidetik, sebelum penonton sempat membacanya. SEKARANG: bagian
-  // "buang pemenang" ini ditunda WHEEL_WINNER_HOLD_MS (2.5 detik) --
-  // nama pemenang tetap tampil di Layar 2 (banner dari spinWheel() di
-  // present.html sendiri, TIDAK disentuh selama jeda ini) sebelum roda
-  // disegarkan tanpa nama itu. Tombol "🎲 Putar!" juga baru dinyalakan
-  // lagi SESUDAH jeda ini (bukan sebelumnya) supaya operator tidak
-  // keburu memutar ulang sebelum nama pemenang sempat terbaca.
-  const WHEEL_WINNER_HOLD_MS = 2500;
-  function handleWheelResult_(data) {
-    if (!wheelPendingSpin_ || wheelPendingSpin_.spinId !== data.spinId) return; // hasil dari putaran LAMA (mis. Reset ditekan di tengah animasi) -- abaikan
-    const { winnerIndex, removeWinner } = wheelPendingSpin_;
-    const winnerName = wheelCurrentEntries_[winnerIndex] || "?";
-    wheelPendingSpin_ = null;
-    const spinBtn = el("psWheelSpinBtn");
-    const winnerBox = el("psWheelWinnerBox");
-    const entriesTa = el("psWheelEntries");
-    if (winnerBox) { winnerBox.hidden = false; winnerBox.textContent = "🏆 Pemenang: " + winnerName; }
-    const finishUp_ = () => {
-      wheelSpinning_ = false;
-      if (removeWinner) {
-        // Buang nama pemenang dari daftar (mode gugur) -- textarea &
-        // roda yang tampil di Layar 2 ikut disegarkan TANPA memutar
-        // ulang, supaya siap untuk "Putar!" berikutnya tanpa nama yang
-        // sudah menang muncul lagi.
-        wheelCurrentEntries_ = wheelCurrentEntries_.filter((_, i) => i !== winnerIndex);
-        if (entriesTa) entriesTa.value = wheelCurrentEntries_.join("\n");
-        if (wheelCurrentEntries_.length >= 2) {
-          rawPost({ type: "wheel", action: "show", entries: wheelCurrentEntries_ });
-        }
-      }
-      if (spinBtn) spinBtn.disabled = wheelCurrentEntries_.length < 2;
-    };
-    if (removeWinner) {
-      // Tombol tetap dikunci sampai jeda selesai (mencegah klik ganda
-      // di tengah jeda "tahan nama pemenang").
-      if (spinBtn) spinBtn.disabled = true;
-      setTimeout(finishUp_, WHEEL_WINNER_HOLD_MS);
-    } else {
-      finishUp_();
-    }
-  }
 
   // ------------------------------------------------------------
   // BARU (9 Sep 2026, permintaan operator) -- 🗺️ Peta Interaktif,
@@ -10462,7 +10386,11 @@ const PresentationStudio = (() => {
     wireModeScreenTab(); // BARU (9 Sep 2026) -- tab "🖥️ Mode & Peta": Welcome/Next Up
     wireMapTab(); // BARU (9 Sep 2026) -- tab "🖥️ Mode & Peta": Peta Interaktif
     wireEffectsTab(); // BARU (9 Sep 2026) -- tab "🎉 Efek Panggung": confetti/reaksi & efek suara
-    wireWheelTab(); // BARU (9 Sep 2026) -- tab "🎡 Roda Undian" (versi teks, 100% offline)
+    // 🎡 Roda Undian dulu di sini (wireWheelTab()) -- sekarang modul
+    // "Game Offline" mendaftar diri sendiri lewat window.GameOffline,
+    // lihat js/games/roda-putar.js. Baris ini memanggil SEMUA game
+    // yang terdaftar (jadi game baru tidak perlu baris tambahan di sini).
+    if (window.GameOffline) window.GameOffline.wireAll();
     wireKidungTab();
     wireLinkTab(); // BARU (4 Sep 2026) -- tab "🔗 Link" (Canva & SoundCloud)
     wireAiPresentationTab(); // BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation"
@@ -10506,14 +10434,19 @@ const PresentationStudio = (() => {
         refreshStatusUi();
         applyStoredTheme();
       }
-      // BARU (9 Sep 2026) -- 🎡 Roda Undian: Layar 2 mengonfirmasi balik
-      // begitu animasi putaran selesai, lihat catatan panjang
-      // wireWheelTab()/handleWheelResult_() di atas.
-      if (data.source === "bibleAppPresenter" && data.type === "present_wheel_result") {
-        handleWheelResult_(data);
-      }
+      // Diteruskan ke semua modul "Game Offline" terdaftar (mis. 🎡 Roda
+      // Undian di js/games/roda-putar.js) -- tiap modul menyaring sendiri
+      // pesan yang relevan buat dia lewat handleMessage(data).
+      if (window.GameOffline) window.GameOffline.handleMessage(data);
     });
   }
+
+  // Bagikan helper inti ke modul luar (mis. js/games/*.js) lewat
+  // window.PSCore, supaya modul-modul itu tidak perlu menulis ulang
+  // el()/rawPost()/renderStudioPreview() sendiri. Diisi di sini (akhir
+  // file, setelah semua fungsi di atas sudah terdefinisi) -- lihat
+  // deklarasi "window.PSCore = {}" di paling atas file ini.
+  Object.assign(window.PSCore, { el, rawPost, renderStudioPreview });
 
   return { init, openStudio, closeStudio, refreshGuestGate, applySharedTheme };
 })();
