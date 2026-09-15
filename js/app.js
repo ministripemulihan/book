@@ -471,6 +471,19 @@ async function startApp() {
   // "Mode Tamu" & menu abu-abu langsung tampil begitu masuk aplikasi.
   if (!currentUser && typeof Guest !== "undefined" && Guest.isGuest()) {
     if (typeof updateStatusPanel === "function") updateStatusPanel();
+    // BARU (15 Sep 2026, permintaan operator: "kalau ada pengumuman baru,
+    // semua orang ada info") -- sebelumnya checkAnnouncementsAtStart()
+    // HANYA dipanggil di dalam blok `if (currentUser)` di bawah, jadi mode
+    // Tamu (tidak pernah punya currentUser) tidak pernah melihat pengumuman
+    // besar sama sekali walau administrator sudah menayangkannya untuk
+    // "Semua Pengguna (@all)". Sisi server (apps-script/Code.gs, endpoint
+    // type=announcements) sudah dibuka juga untuk permintaan tanpa username
+    // -- lihat catatan di sana -- jadi tinggal panggil fungsi yang sama di
+    // sini. Jeda 400ms sama seperti pemanggilan untuk pengguna login di
+    // bawah, supaya tidak "berebut" dengan showEmptyState().
+    if (typeof checkAnnouncementsAtStart === "function") {
+      setTimeout(() => checkAnnouncementsAtStart(), 400);
+    }
   }
 
   // Tarik catatan pribadi & progres rencana baca dari Google Sheet (kalau
@@ -4807,6 +4820,30 @@ async function checkAnnouncementsAtStart() {
   if (hasUnseen && el("appRoot") && !el("appRoot").hidden) {
     showBigAnnouncementBanner(live);
     markAnnouncementsSeen(live);
+  }
+}
+
+// BARU (15 Sep 2026, permintaan operator "badge/tanda di ikon 🔔 lonceng,
+// bukan cuma popup") -- versi TIDAK MENGUBAH APA PUN (tidak menandai
+// "sudah dilihat"), dipanggil AdminBell.refresh() (js/adminbell.js)
+// tiap polling supaya badge angka 🔔 ikut menghitung pengumuman baru
+// yang BELUM DIBACA -- beda dari checkAnnouncementsAtStart() di atas
+// (yang otomatis menandai sudah dilihat begitu popup besar ditampilkan
+// sekali di awal). Popup besar TETAP jalan seperti biasa (sekali per
+// pengumuman, lewat checkAnnouncementsAtStart()); badge lonceng ini
+// cuma "pengingat kecil yang menempel" sampai operator benar-benar
+// membuka panel 📢 Pengumuman (lewat tombol di panel lonceng, yang
+// memanggil showAnnouncementPanel() -- itu yang menandai sudah dilihat).
+async function getUnseenAnnouncementsForBell() {
+  if (typeof Sync === "undefined" || !Sync.enabled()) return [];
+  try {
+    const list = await Sync.pullAnnouncements(currentUser);
+    const live = list.filter(announcementShouldShow);
+    if (!live.length) return [];
+    const lastSeen = localStorage.getItem(announcementSeenKey()) || "0";
+    return live.filter((a) => String(a.id) > lastSeen);
+  } catch (e) {
+    return []; // diamkan -- badge cuma "pengingat", jangan sampai gagal memuat halaman lain
   }
 }
 
