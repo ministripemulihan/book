@@ -915,10 +915,71 @@ function buildInlineMediaBlock(media, titleForSession) {
     const segTitle = showBagianLabel
       ? `${rangeText || titleForSession} — Bagian ${bagianNo} dari ${withContent.length}`
       : (rangeText || titleForSession);
-    wrap.appendChild(buildInlineMediaSegment_(seg, segTitle, { rangeText, positionText }));
+    const segEl = buildInlineMediaSegment_(seg, segTitle, { rangeText, positionText });
+    // BARU (15 Sep 2026, permintaan operator "jump langsung ke bagian
+    // yang dibaca") -- simpan rentang pasal/ayat segmen ini sebagai
+    // data-attribute di elemen DOM-nya sendiri, supaya
+    // scrollToMediaSegmentForVerse() di bawah bisa mencari elemen yang
+    // TEPAT cocok dengan ayat yang sedang dibaca TANPA perlu menyimpan
+    // state terpisah di tempat lain (elemen ini yang jadi "sumber
+    // kebenaran"-nya, dibuat ulang tiap kali pasal dibuka lagi).
+    if (seg.ref) {
+      segEl.dataset.startChapter = String(seg.ref.startChapter);
+      segEl.dataset.endChapter = String(seg.ref.endChapter);
+      if (seg.ref.startVerse != null) segEl.dataset.startVerse = String(seg.ref.startVerse);
+      if (seg.ref.endVerse != null) segEl.dataset.endVerse = String(seg.ref.endVerse);
+    }
+    wrap.appendChild(segEl);
   });
 
   return wrap;
+}
+
+// ------------------------------------------------------------
+// BARU (15 Sep 2026, permintaan operator: "apa bisa jump langsung ke
+// bagian yang dibaca, tergantung mulai dari baca mana") -- dipanggil
+// dari tombol "🎧 Dengar dari sini" (js/app.js, buildNoteQuickActionsRow())
+// yang muncul di panel catatan tiap ayat. Mencari segmen (elemen
+// ".inline-media-segment" hasil buildInlineMediaBlock() di atas, lihat
+// data-attribute yang ditulis di sana) yang RENTANGnya mencakup
+// pasal+ayat yang sedang dibaca, lalu:
+//  1. gulir halaman ke situ (supaya kelihatan, tidak perlu cari manual),
+//  2. beri kedipan sebentar (class "inline-media-segment-flash", lihat
+//     css/style.css) supaya jelas segmen MANA yang dimaksud,
+//  3. otomatis "menekan" tombol putar PERTAMA (MP3/MP4/YouTube, bukan
+//     tombol share) di segmen itu -- sama seperti operator menekannya
+//     sendiri.
+// Kalau tidak ada segmen yang rentangnya cocok PERSIS (mis. data lama
+// yang belum berupa `segments`, atau ayatnya di luar rentang yang
+// tercatat), fallback membuka segmen PERTAMA saja -- tetap lebih
+// berguna daripada tidak melakukan apa-apa.
+// Mengembalikan true kalau berhasil menemukan & membuka sesuatu, false
+// kalau memang tidak ada voice note sama sekali untuk pasal ini
+// (mis. `mediaSlotEl` masih kosong -- belum selesai dicari, atau
+// pasal ini memang belum ada datanya).
+// ------------------------------------------------------------
+function scrollToMediaSegmentForVerse(mediaSlotEl, chapter, verseNum) {
+  if (!mediaSlotEl) return false;
+  const segs = Array.from(mediaSlotEl.querySelectorAll(".inline-media-segment"));
+  if (!segs.length) return false;
+  let target = segs.find((seg) => {
+    const sc = seg.dataset.startChapter ? parseInt(seg.dataset.startChapter, 10) : null;
+    if (sc == null) return false;
+    const ec = seg.dataset.endChapter ? parseInt(seg.dataset.endChapter, 10) : sc;
+    if (chapter < sc || chapter > ec) return false;
+    const sv = seg.dataset.startVerse != null && seg.dataset.startVerse !== "" ? parseInt(seg.dataset.startVerse, 10) : null;
+    const ev = seg.dataset.endVerse != null && seg.dataset.endVerse !== "" ? parseInt(seg.dataset.endVerse, 10) : null;
+    if (chapter === sc && sv != null && verseNum < sv) return false;
+    if (chapter === ec && ev != null && verseNum > ev) return false;
+    return true;
+  });
+  if (!target) target = segs[0]; // tidak ketemu rentang PERSIS -- buka yang pertama saja daripada diam
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  target.classList.add("inline-media-segment-flash");
+  setTimeout(() => target.classList.remove("inline-media-segment-flash"), 1600);
+  const playBtn = target.querySelector(".round-media-btn:not(.share-variant)");
+  if (playBtn) playBtn.click();
+  return true;
 }
 
 // ------------------------------------------------------------
