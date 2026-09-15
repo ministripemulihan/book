@@ -658,7 +658,7 @@ const SoundFX = (() => {
   // TIDAK PEDULI SUDAH JADI BERAPA BANYAK baris di SOUND_FX_LIST.
   // Dipakai oleh: js/presentation-studio.js (dropdown & grid "Bel
   // Cepat" tab Studio + jalan pintas Alt+1..9), js/presentation.js
-  // (dropdown panel sederhana HP), present.html (ringBell() saat
+  // (dropdown panel sederhana HP), present.html (ringBell() saat 
   // benar-benar membunyikannya).
   // ------------------------------------------------------------
   function bellChoices() {
