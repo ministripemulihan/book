@@ -967,17 +967,44 @@ function buildInlineMediaBlock(media, titleForSession) {
 // harus sama -- kalau tidak, dianggap bacaan baru. Ini sengaja dibuat
 // ketat supaya sheet lama yang kolom Bagian-nya diisi asal-asalan (atau
 // tidak ada sama sekali) tidak ikut tergabung tanpa sengaja.
+// CARA 3 (BARU, 15 Sep 2026 -- laporan operator: "voice note Matius
+// 5:21-48 tidak ketemu, padahal linknya sudah diisi di Sheet"). Sheet
+// "Isi Alkitab"-nya menulis 1 pasal yang punya beberapa voice note
+// sebagai BEBERAPA BARIS BERURUTAN dengan teks Pembacaan BERBEDA per
+// baris (mis. "Matius 5:1-20" lalu "Matius 5:21-48") dan TANPA kolom
+// "Bagian" diisi sama sekali -- jadi tidak kena CARA 1 (labelnya tidak
+// persis sama) ataupun CARA 2 (Bagian kosong). Akibatnya baris kedua
+// dianggap "hari"/bacaan BARU yang kebetulan pasalnya tumpang tindih
+// dengan bacaan sebelumnya -- lalu findMediaLinkForReference() cuma
+// mengembalikan kecocokan PERTAMA yang ditemukan (lihat schedule.find()
+// di atas), jadi voice note baris kedua itu TIDAK PERNAH muncul sama
+// sekali saat pasalnya dibuka, walau linknya sudah benar di Sheet.
+// Perbaikannya: kalau baris baru ini masih KITAB YANG SAMA & pasal
+// AWALnya tidak lebih jauh dari pasal AKHIR bacaan sebelumnya (artinya
+// tumpang tindih/menyambung, bukan pasal baru yang terpisah), otomatis
+// digabung jadi segmen tambahan -- TIDAK perlu isi kolom Bagian maupun
+// menyamakan teks Pembacaan sama sekali. Baris yang pasalnya sudah
+// benar-benar lebih jauh (mis. "Matius 6" setelah "Matius 5:21-48")
+// tetap dianggap bacaan/hari baru seperti biasa, jadi sheet lama (1
+// baris = 1 hari, tidak ada tumpang tindih pasal antar baris berurutan)
+// tetap berjalan PERSIS seperti sebelumnya, tidak ada yang berubah.
 function rowContinuesReading_(lastItem, row, ref, label) {
   if (!lastItem) return false;
   if (label && lastItem.label === label) return true; // CARA 1
   const bagianNum = parseInt(row.bagian, 10);
-  if (!Number.isFinite(bagianNum) || bagianNum < 2) return false;
-  const segs = lastItem.segments || [];
-  const prevNum = segs.length ? parseInt(segs[segs.length - 1].bagian, 10) : NaN;
-  const expected = Number.isFinite(prevNum) ? prevNum + 1 : segs.length + 1;
-  if (bagianNum !== expected) return false;
-  if (ref && lastItem.bookNum && ref.book.num !== lastItem.bookNum) return false; // CARA 2
-  return true;
+  if (Number.isFinite(bagianNum) && bagianNum >= 2) {
+    const segs = lastItem.segments || [];
+    const prevNum = segs.length ? parseInt(segs[segs.length - 1].bagian, 10) : NaN;
+    const expected = Number.isFinite(prevNum) ? prevNum + 1 : segs.length + 1;
+    if (bagianNum === expected && !(ref && lastItem.bookNum && ref.book.num !== lastItem.bookNum)) {
+      return true; // CARA 2
+    }
+  }
+  if (ref && lastItem.bookNum != null && lastItem.endChapter != null &&
+      ref.book.num === lastItem.bookNum && ref.startChapter <= lastItem.endChapter) {
+    return true; // CARA 3
+  }
+  return false;
 }
 
 function buildMediaScheduleFromRows(rows) {
