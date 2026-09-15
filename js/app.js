@@ -670,16 +670,83 @@ async function showBibleSyncPrompt(opts) {
   // diteruskan ke syncFromServer(). Disembunyikan kalau SoundFX belum
   // termuat sama sekali (mis. present.html/window lain yang tidak
   // memuat js/soundfx.js) atau tidak ada 1 pun efek MP3 terdaftar.
+  // DIPERLUAS (15 Sep 2026, permintaan operator: "kalau di awal bisa
+  // pilih semua download atau hanya alkitab aja, atau sound effect
+  // aja") -- dulu di sini cuma ADA SATU centang (efek suara), sedangkan
+  // Alkitab & Kidung SELALU ikut terunduh tanpa bisa dipilih. Sekarang
+  // ketiganya jadi CHECKLIST yang berdiri sendiri, ditambah baris tombol
+  // cepat di atasnya (Semua / Alkitab saja / Kidung saja / Efek Suara
+  // saja) supaya tidak perlu centang-centang satu-satu.
+  //
+  // Hasil centang ini diteruskan ke syncFromServer() sebagai objek
+  // { bible, kidung, sounds } -- tiap bagian diunduh SENDIRI-SENDIRI di
+  // sana. Ini pilihan untuk unduhan SEKALIGUS; kalau nanti cuma mau
+  // memperbarui 1 bagian saja, kartu "📥 Unduh Data (per Bagian)" di
+  // menu ⋮ tetap ada seperti biasa.
   const hasMp3Effects = typeof SoundFX !== "undefined" && SoundFX.LIST.some((it) => it.src);
-  if (hasMp3Effects) {
-    const soundRow = document.createElement("label");
-    soundRow.className = "more-menu-checkbox-row";
-    soundRow.style.marginTop = "10px";
-    soundRow.innerHTML =
-      '<input type="checkbox" id="bibleSyncIncludeSoundsBox" /> ' +
-      '<span>🔊 Sertakan juga 14 efek suara "Efek Panggung" (MP3, ~1,1 MB) supaya siap dipakai offline dari awal</span>';
-    box.appendChild(soundRow);
+  const mp3Count = hasMp3Effects ? SoundFX.LIST.filter((it) => it.src).length : 0;
+  const kidungAvailable = dlInfo.hasAccess && typeof resyncKidungSheet === "function";
+
+  const pickBox = document.createElement("div");
+  pickBox.className = "dlpick-box";
+
+  const pickTitle = document.createElement("div");
+  pickTitle.className = "dlpick-title";
+  pickTitle.textContent = "Pilih bagian yang mau diunduh:";
+  pickBox.appendChild(pickTitle);
+
+  const quickRow = document.createElement("div");
+  quickRow.className = "dlpick-quick-row";
+  pickBox.appendChild(quickRow);
+
+  const checkList = document.createElement("div");
+  checkList.className = "more-menu-checkbox-list";
+  pickBox.appendChild(checkList);
+
+  function addPickRow_(id, checked, hidden, html) {
+    const row = document.createElement("label");
+    row.className = "more-menu-checkbox-row";
+    row.innerHTML = `<input type="checkbox" id="${id}" ${checked ? "checked" : ""} /> <span>${html}</span>`;
+    if (hidden) row.hidden = true;
+    checkList.appendChild(row);
+    return row.querySelector("input");
   }
+
+  const bibleBox = addPickRow_(
+    "dlPickBible", true, false,
+    `📖 <strong>Alkitab</strong> (semua bahasa + Pokok Kitab/Garis Besar/Peta) — ~${sizeMB} MB`
+  );
+  const kidungBox = addPickRow_(
+    "dlPickKidung", kidungAvailable, !kidungAvailable,
+    `🎵 <strong>Kidung</strong> (Kidung + Suplemen) — ~${dlInfo.kidungMb} MB`
+  );
+  const soundsBox = addPickRow_(
+    "dlPickSounds", false, !hasMp3Effects,
+    `🔊 <strong>Efek Suara</strong> "Efek Panggung" (${mp3Count} file MP3) — ~1,1 MB`
+  );
+
+  // Tombol cepat: sekali tekan langsung mengatur ketiga centang di atas.
+  [
+    { key: "all", label: "✅ Semua", set: { bible: true, kidung: kidungAvailable, sounds: hasMp3Effects } },
+    { key: "bible", label: "📖 Alkitab saja", set: { bible: true, kidung: false, sounds: false } },
+    { key: "kidung", label: "🎵 Kidung saja", set: { bible: false, kidung: true, sounds: false }, need: kidungAvailable },
+    { key: "sounds", label: "🔊 Efek Suara saja", set: { bible: false, kidung: false, sounds: true }, need: hasMp3Effects },
+  ].forEach((opt) => {
+    if (opt.need === false) return;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip-btn small";
+    b.textContent = opt.label;
+    b.addEventListener("click", () => {
+      bibleBox.checked = !!opt.set.bible;
+      kidungBox.checked = !!opt.set.kidung && kidungAvailable;
+      soundsBox.checked = !!opt.set.sounds && hasMp3Effects;
+      refreshPickTotal_();
+    });
+    quickRow.appendChild(b);
+  });
+
+  box.appendChild(pickBox);
 
   const btnRow = document.createElement("div");
   btnRow.className = "round-media-row";
@@ -706,13 +773,35 @@ async function showBibleSyncPrompt(opts) {
 
   const nowBtn = document.createElement("button");
   nowBtn.className = "chip-btn primary";
-  nowBtn.textContent = isFirstTime ? `📥 Mulai Unduh (~${sizeMB} MB)` : `📥 Lanjutkan Sekarang (~${dlInfo.totalMb} MB)`;
   nowBtn.addEventListener("click", () => {
     overlay.hidden = true;
-    const includeSoundsBox = el("bibleSyncIncludeSoundsBox");
-    syncFromServer(!!isFirstTime, !!(includeSoundsBox && includeSoundsBox.checked));
+    syncFromServer(!!isFirstTime, {
+      bible: bibleBox.checked,
+      kidung: kidungBox.checked && kidungAvailable,
+      sounds: soundsBox.checked && hasMp3Effects,
+    });
   });
   btnRow.appendChild(nowBtn);
+
+  // Teks tombol utama mengikuti centang -- angka MB-nya dijumlah dari
+  // bagian yang benar-benar dipilih saja, jadi kalau cuma efek suara
+  // yang dicentang tidak lagi tertulis "~62 MB" yang menyesatkan.
+  // Kalau semua centang dikosongkan, tombolnya dimatikan (tidak ada
+  // yang bisa diunduh).
+  function refreshPickTotal_() {
+    let mb = 0;
+    if (bibleBox.checked) mb += sizeMB;
+    if (kidungBox.checked && kidungAvailable) mb += dlInfo.kidungMb;
+    if (soundsBox.checked && hasMp3Effects) mb += 1.1;
+    const any = bibleBox.checked || (kidungBox.checked && kidungAvailable) || (soundsBox.checked && hasMp3Effects);
+    nowBtn.disabled = !any;
+    const rounded = Math.round(mb * 10) / 10;
+    nowBtn.textContent = !any
+      ? "Belum ada bagian yang dipilih"
+      : (isFirstTime ? `📥 Mulai Unduh (~${rounded} MB)` : `📥 Lanjutkan Sekarang (~${rounded} MB)`);
+  }
+  [bibleBox, kidungBox, soundsBox].forEach((cb) => cb.addEventListener("change", refreshPickTotal_));
+  refreshPickTotal_();
 
   box.appendChild(btnRow);
   overlay.appendChild(box);
@@ -955,15 +1044,45 @@ async function getInitialDownloadInfo() {
   };
 }
 
-async function syncFromServer(isFirstTime, includeSounds) {
+// DIPERLUAS (15 Sep 2026, permintaan operator: "kalau di awal bisa pilih
+// semua download atau hanya alkitab aja, atau sound effect aja") --
+// parameter ke-2 dulu bernama `includeSounds` dan isinya cuma true/false
+// (efek suara ikut atau tidak), sedangkan Alkitab & Kidung SELALU
+// diunduh tanpa bisa dipilih. Sekarang parameter ini objek pilihan
+// { bible, kidung, sounds } dari checklist di showBibleSyncPrompt().
+//
+// Bentuk LAMA (boolean) tetap diterima supaya pemanggil lama tidak
+// perlu diubah semua sekaligus: true/false ditafsirkan sebagai
+// "Alkitab + Kidung seperti dulu, efek suara ikut/tidak". Pemanggil
+// yang tidak mengirim apa-apa sama sekali (mis. tombol "📥 Unduh Data
+// Alkitab Sekarang" di layar kosong) juga tetap dapat perilaku lama.
+function normalizeSyncParts_(parts) {
+  if (parts && typeof parts === "object") {
+    return { bible: !!parts.bible, kidung: !!parts.kidung, sounds: !!parts.sounds };
+  }
+  return { bible: true, kidung: true, sounds: !!parts };
+}
+
+async function syncFromServer(isFirstTime, partsArg) {
+  const parts = normalizeSyncParts_(partsArg);
   const overlay = el("loadingOverlay");
   overlay.hidden = false;
   const dlInfo = await getInitialDownloadInfo();
   const sizeMB = dlInfo.bibleMb;
+  // Daftar nama bagian yang benar-benar dipilih -- dipakai untuk teks
+  // layar loading supaya tidak lagi selalu tertulis "data Alkitab"
+  // walaupun yang dipilih cuma Kidung / efek suara saja.
+  const chosenNames = [];
+  if (parts.bible) chosenNames.push("Alkitab");
+  if (parts.kidung) chosenNames.push("Kidung");
+  if (parts.sounds) chosenNames.push("Efek Suara");
+  const chosenText = chosenNames.length ? chosenNames.join(" + ") : "";
+  if (!chosenNames.length) { overlay.hidden = true; return; } // tidak ada yang dicentang -- tidak ada yang perlu dikerjakan
+
   setLoadingText(
     isFirstTime
-      ? `Mengunduh data awal (${dlInfo.label}) dari server — hanya sekali ini saja, mohon tunggu…`
-      : `Menyinkronkan ulang data Alkitab dari server… (${dlInfo.label})`
+      ? `Mengunduh data awal (${chosenText}) dari server — mohon tunggu…`
+      : `Menyinkronkan ulang ${chosenText} dari server…`
   );
   setLoadingProgress(1);
 
@@ -975,6 +1094,13 @@ async function syncFromServer(isFirstTime, includeSounds) {
     // gantinya, supaya angka "dari ... MB"-nya tetap masuk akal.
     // Timeout 2 menit — cukup longgar untuk file besar (puluhan MB), tapi
     // tetap menampilkan pesan error jelas kalau server benar-benar macet.
+    // `allRecords` tetap null kalau bagian Alkitab TIDAK dicentang --
+    // dipakai di bawah sebagai penanda supaya `bibleData` yang sudah ada
+    // di memori TIDAK ditimpa jadi kosong (dulu selalu ditimpa karena
+    // Alkitab memang selalu ikut diunduh).
+    let allRecords = null;
+
+    if (parts.bible) {
     const approxTotalBytes = sizeMB * 1024 * 1024;
     const csvText = await fetchTextWithProgress(CONFIG.BIBLE_SHEET_CSV_URL, 120000, (received, total) => {
       const totalForDisplay = total || approxTotalBytes;
@@ -992,7 +1118,7 @@ async function syncFromServer(isFirstTime, includeSounds) {
 
     // Baca & simpan bertahap (per ~3000 baris), supaya browser tidak membeku dan
     // progress bar benar-benar mengikuti proses asli — bukan lompat tiba-tiba.
-    const allRecords = [];
+    allRecords = [];
     let savedCount = 0;
 
     await parseCSVChunked(csvText, {
@@ -1038,6 +1164,21 @@ async function syncFromServer(isFirstTime, includeSounds) {
       await resyncAllOutlineSheets().catch(() => {});
     }
 
+    // UKURAN ASLI TOTAL yang baru saja diunduh (Alkitab utama + ketiga
+    // sheet outline) -- dihitung dari byte SUNGGUHAN (Blob), lalu disimpan
+    // otomatis lewat saveMeasuredBibleSizeMb_() di atas. Ini yang membuat
+    // perkiraan "~X MB" di dialog unduhan berikutnya SELALU angka nyata
+    // hasil kalkulasi program, bukan angka yang diketik manual di Sheet.
+    // Ada DI DALAM blok Alkitab -- kalau yang dipilih cuma Kidung/efek
+    // suara, tidak ada yang perlu (dan tidak boleh) diukur di sini.
+    try {
+      const bibleBytes = new Blob([csvText]).size;
+      const outlineBytes = typeof totalOutlineBytesLastSync === "function" ? totalOutlineBytesLastSync() : 0;
+      const measuredMb = Math.round(((bibleBytes + outlineBytes) / 1024 / 1024) * 10) / 10;
+      saveMeasuredBibleSizeMb_(measuredMb);
+    } catch (e) { /* pengukuran gagal -- tidak menggagalkan sinkron yang sudah berhasil */ }
+    } // ← akhir blok "kalau bagian Alkitab dicentang"
+
     // Kidung/Hymn (opsional -- lihat js/kidung.js). Diam-diam dilewati
     // kalau CONFIG.KIDUNG_SHEET_CSV_URL masih kosong (fitur belum
     // diaktifkan admin), atau kalau gagal (mis. sheet belum ada isinya)
@@ -1048,8 +1189,11 @@ async function syncFromServer(isFirstTime, includeSounds) {
     // pernah dipakai (hemat kuota + storage perangkat tamu). Kalau
     // tamu ini nanti LOGIN (jadi bukan tamu lagi), sinkron berikutnya
     // otomatis ikut mengambil Kidung seperti biasa.
-    if (typeof resyncKidungSheet === "function" && dlInfo.hasAccess) {
+    // DIPERLUAS 15 Sep 2026 -- sekarang juga menunggu centang "🎵 Kidung"
+    // di dialog pilih bagian (parts.kidung), bukan lagi selalu ikut.
+    if (parts.kidung && typeof resyncKidungSheet === "function" && dlInfo.hasAccess) {
       setLoadingText("Menyinkronkan data Kidung…");
+      setLoadingProgress(98);
       await resyncKidungSheet().catch(() => {});
     }
 
@@ -1060,7 +1204,7 @@ async function syncFromServer(isFirstTime, includeSounds) {
     // TIDAK menggagalkan sinkron Alkitab yang sudah berhasil kalau ada
     // file yang gagal diunduh (mis. koneksi putus di tengah) -- lihat
     // .catch() di dalam SoundFX.predownloadAll() sendiri (js/soundfx.js).
-    if (includeSounds && typeof SoundFX !== "undefined") {
+    if (parts.sounds && typeof SoundFX !== "undefined") {
       await SoundFX.predownloadAll((done, total) => {
         setLoadingText(`🔊 Mengunduh efek suara… ${done} dari ${total}`);
       }).catch(() => {});
@@ -1068,22 +1212,23 @@ async function syncFromServer(isFirstTime, includeSounds) {
     }
     setLoadingProgress(100);
 
-    // UKURAN ASLI TOTAL yang baru saja diunduh (Alkitab utama + ketiga
-    // sheet outline) -- dihitung dari byte SUNGGUHAN (Blob), lalu disimpan
-    // otomatis lewat saveMeasuredBibleSizeMb_() di atas. Ini yang membuat
-    // perkiraan "~X MB" di dialog unduhan berikutnya SELALU angka nyata
-    // hasil kalkulasi program, bukan angka yang diketik manual di Sheet.
-    try {
-      const bibleBytes = new Blob([csvText]).size;
-      const outlineBytes = typeof totalOutlineBytesLastSync === "function" ? totalOutlineBytesLastSync() : 0;
-      const measuredMb = Math.round(((bibleBytes + outlineBytes) / 1024 / 1024) * 10) / 10;
-      saveMeasuredBibleSizeMb_(measuredMb);
-    } catch (e) { /* pengukuran gagal -- tidak menggagalkan sinkron yang sudah berhasil */ }
-
-    bibleData = allRecords;
+    // Hanya timpa data di memori kalau bagian Alkitab memang baru saja
+    // diunduh. Kalau yang dipilih cuma Kidung / efek suara, `bibleData`
+    // yang sudah ada dibiarkan apa adanya -- kalau ditimpa larik kosong,
+    // aplikasi akan terlihat seperti "data Alkitab hilang" padahal
+    // isinya masih utuh tersimpan di IndexedDB.
+    if (allRecords) bibleData = allRecords;
     setTimeout(() => {
       overlay.hidden = true;
-      afterDataReady();
+      if (allRecords) {
+        afterDataReady();
+      } else {
+        // Tidak perlu membangun ulang seluruh tampilan -- cukup
+        // segarkan kartu status unduhan supaya centang ✅-nya ikut
+        // berubah setelah Kidung/efek suara selesai diunduh.
+        if (typeof refreshDataDownloadUi_ === "function") refreshDataDownloadUi_();
+        if (typeof updateStatusPanel === "function") updateStatusPanel();
+      }
     }, 250);
   } catch (err) {
     setLoadingText("Gagal mengambil data: " + err.message + ". Periksa URL Google Sheet Alkitab di config.js, lalu muat ulang halaman.");
@@ -1110,6 +1255,7 @@ function afterDataReady() {
   initVerseModeControl();
   updateStatusPanel();
   updateResyncBtnLabel();
+  if (typeof refreshDataDownloadUi_ === "function") refreshDataDownloadUi_();
   showEmptyState();
 }
 
@@ -1179,7 +1325,7 @@ function wireBibleLangFilterUi() {
 // ------------------------------------------------------------
 // BARU (10 Sep 2026, permintaan operator: "cara download suara lebih
 // mudah, UI/UX menarik") -- panel mandiri "🔊 Efek Suara Offline" di
-// menu ⋮ (#soundFxDownloadSection di index.html), terpisah dari dialog
+// menu ⋮ (#soundFxDlCard di dalam #dataDownloadSection), terpisah dari dialog
 // besar "Unduh Data Alkitab" supaya bisa dipakai kapan saja (mis.
 // operator baru menambah efek MP3 baru ke assets/sounds/) tanpa perlu
 // sinkron ulang seluruh Alkitab. Admin-only (disembunyikan utk Tamu --
@@ -1202,13 +1348,18 @@ async function countCachedSoundEffects_() {
 }
 
 async function refreshSoundFxDownloadUi_() {
-  const section = el("soundFxDownloadSection");
-  if (!section || typeof SoundFX === "undefined") return;
+  // DIUBAH (15 Sep 2026) -- kartu efek suara SEKARANG berada di dalam
+  // grup "📥 Unduh Data (per Bagian)" bersama kartu Alkitab & Kidung
+  // (dulu section sendiri #soundFxDownloadSection yang sudah dihapus).
+  // Jadi yang disembunyikan/ditampilkan sekarang KARTUnya sendiri, bukan
+  // section pembungkusnya -- kalau section yang disembunyikan, kartu
+  // Alkitab & Kidung ikut hilang.
+  const card = el("soundFxDlCard");
+  if (!card || typeof SoundFX === "undefined") return;
   const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
   const { done, total } = await countCachedSoundEffects_();
-  if (isGuestNow || total === 0) { section.hidden = true; return; }
-  section.hidden = false;
-  const card = el("soundFxDlCard");
+  if (isGuestNow || total === 0) { card.hidden = true; return; }
+  card.hidden = false;
   const icon = el("soundFxDlIcon");
   const statusText = el("soundFxDlStatusText");
   const btn = el("soundFxDlBtn");
@@ -1242,6 +1393,166 @@ function wireSoundFxDownloadUi_() {
     await refreshSoundFxDownloadUi_();
   });
   refreshSoundFxDownloadUi_();
+}
+
+// ============================================================
+//  UNDUH DATA PER BAGIAN (BARU 14 Sep 2026, permintaan operator: "bisa
+//  dibedakan antara kidung, alkitab, suara offline... checklist...
+//  kalau sudah update, bisa unduh ulang HANYA bagian itu saja") --
+//  lihat #dataDownloadSection di index.html untuk kartu Alkitab &
+//  Kidung (kartu Efek Suara memakai countCachedSoundEffects_()/
+//  refreshSoundFxDownloadUi_() yang SUDAH ADA sejak 10 Sep, tidak
+//  disentuh lagi di sini).
+//
+//  "🔄 Sinkronkan ulang Alkitab" (resyncBtn) yang LAMA tetap dibiarkan
+//  apa adanya (tetap memanggil syncFromServer(), yang mengunduh
+//  Alkitab+Outline+Kidung+opsional Suara SEKALIGUS -- dipakai juga
+//  saat pertama kali daftar/masuk lewat showBibleSyncPrompt()). Kartu
+//  di sini TAMBAHAN murni untuk operator yang cuma mau memperbarui 1
+//  bagian saja tanpa menunggu semuanya diunduh ulang -- makanya
+//  syncBibleOnly_() di bawah SENGAJA duplikat kecil dari isi
+//  syncFromServer() (bagian Alkitab+Outline saja, TANPA Kidung/Suara)
+//  drpd merombak syncFromServer() itu sendiri (yang sudah dipakai di
+//  banyak alur lama & berisiko kalau diubah strukturnya).
+// ============================================================
+
+// Sama seperti bagian Alkitab+Outline di dalam syncFromServer() di atas,
+// tapi TIDAK menyentuh Kidung/Efek Suara sama sekali, & pakai callback
+// progres teks polos (bukan overlay besar #loadingOverlay) supaya bisa
+// dipakai dari kartu kecil di menu ⋮ tanpa menutupi seluruh layar.
+async function syncBibleOnly_(onProgress) {
+  const dlInfo = await getInitialDownloadInfo();
+  const approxTotalBytes = dlInfo.bibleMb * 1024 * 1024;
+  const csvText = await fetchTextWithProgress(CONFIG.BIBLE_SHEET_CSV_URL, 120000, (received, total) => {
+    const totalForDisplay = total || approxTotalBytes;
+    const mbDone = (received / 1024 / 1024).toFixed(1);
+    const mbTotal = (totalForDisplay / 1024 / 1024).toFixed(1);
+    if (onProgress) onProgress(`📥 Mengunduh… ${mbDone} MB dari ~${mbTotal} MB`, total ? received / totalForDisplay : null);
+  });
+  await LocalDB.clearAll();
+  const allRecords = [];
+  let savedCount = 0;
+  await parseCSVChunked(csvText, {
+    batchSize: 3000,
+    onProgress: (done, total) => {
+      if (onProgress) onProgress(`Menyimpan… (${savedCount.toLocaleString("id-ID")} ayat)`, done / total);
+    },
+    onBatch: async (rawBatch) => {
+      let normalized = rawBatch.map(normalizeVerseRecord).filter((v) => v.verseId);
+      const filterUsername = typeof currentUser !== "undefined" ? currentUser : null;
+      const langFilter = typeof getSetting === "function" ? (getSetting(filterUsername, "bibleLangFilter") || []) : [];
+      if (langFilter.length) {
+        const allowed = new Set(langFilter);
+        normalized = normalized.filter((v) => allowed.has(v.lang));
+      }
+      allRecords.push(...normalized);
+      await LocalDB.bulkPut(normalized);
+      savedCount += normalized.length;
+    },
+  });
+  await LocalDB.setMeta("lastSync", new Date().toISOString());
+  if (typeof resyncAllOutlineSheets === "function") {
+    if (onProgress) onProgress("Menyinkronkan Pokok Kitab, Garis Besar & Peta/Gambar…", null);
+    await resyncAllOutlineSheets().catch(() => {});
+  }
+  try {
+    const bibleBytes = new Blob([csvText]).size;
+    const outlineBytes = typeof totalOutlineBytesLastSync === "function" ? totalOutlineBytesLastSync() : 0;
+    const measuredMb = Math.round(((bibleBytes + outlineBytes) / 1024 / 1024) * 10) / 10;
+    saveMeasuredBibleSizeMb_(measuredMb);
+  } catch (e) { /* pengukuran gagal -- tidak menggagalkan sinkron yang sudah berhasil */ }
+  bibleData = allRecords;
+  buildIndexes();
+  updateResyncBtnLabel();
+  return allRecords.length;
+}
+
+async function refreshDataDownloadUi_() {
+  const section = el("dataDownloadSection");
+  if (!section) return;
+
+  // Kartu Alkitab -- status dari jumlah baris TERSIMPAN LOKAL (LocalDB,
+  // bukan hanya bibleData di memori, supaya tetap akurat sebelum
+  // afterDataReady() sempat memuat ulang) + penanda waktu "lastSync".
+  const bibleCard = el("dlBibleCard");
+  if (bibleCard) {
+    const lastBible = await LocalDB.getMeta("lastSync");
+    const bibleCount = typeof LocalDB.count === "function" ? await LocalDB.count() : bibleData.length;
+    const ready = bibleCount > 0;
+    bibleCard.classList.toggle("is-ready", ready);
+    el("dlBibleIcon").textContent = ready ? "✅" : "📖";
+    el("dlBibleStatusText").innerHTML = ready
+      ? `<strong>Alkitab siap dipakai offline.</strong>${lastBible ? " Terakhir diunduh " + new Date(lastBible).toLocaleString("id-ID") + "." : ""}`
+      : `<strong>Alkitab belum diunduh</strong> ke perangkat ini.`;
+    el("dlBibleBtn").textContent = ready ? "🔄 Unduh Ulang Alkitab" : "📥 Unduh Alkitab";
+  }
+
+  // Kartu Kidung -- sama polanya, dari countKidungRows()+"kidungLastSync".
+  // Disembunyikan utk Tamu (fitur Kidung sendiri memang disembunyikan
+  // dari Tamu di Studio Presentasi -- lihat currentUserHasFullAccess_()).
+  const kidungCard = el("dlKidungCard");
+  if (kidungCard) {
+    const isGuestNow = typeof Guest !== "undefined" && Guest.isGuest();
+    kidungCard.hidden = isGuestNow;
+    if (!isGuestNow) {
+      const lastKidung = await LocalDB.getMeta("kidungLastSync");
+      const kidungCount = typeof LocalDB.countKidungRows === "function" ? await LocalDB.countKidungRows() : 0;
+      const ready = kidungCount > 0;
+      kidungCard.classList.toggle("is-ready", ready);
+      el("dlKidungIcon").textContent = ready ? "✅" : "🎵";
+      el("dlKidungStatusText").innerHTML = ready
+        ? `<strong>Kidung siap dipakai offline.</strong>${lastKidung ? " Terakhir diunduh " + new Date(lastKidung).toLocaleString("id-ID") + "." : ""}`
+        : `<strong>Kidung belum diunduh</strong> ke perangkat ini.`;
+      el("dlKidungBtn").textContent = ready ? "🔄 Unduh Ulang Kidung" : "📥 Unduh Kidung";
+    }
+  }
+}
+
+function wireDataDownloadUi_() {
+  const bibleBtn = el("dlBibleBtn");
+  if (bibleBtn) {
+    bibleBtn.addEventListener("click", async () => {
+      const track = el("dlBibleProgressTrack");
+      const fill = el("dlBibleProgressFill");
+      const statusText = el("dlBibleStatusText");
+      bibleBtn.disabled = true;
+      track.hidden = false;
+      fill.style.width = "0%";
+      try {
+        await syncBibleOnly_((text, frac) => {
+          statusText.innerHTML = "📥 " + text;
+          if (typeof frac === "number") fill.style.width = Math.round(frac * 100) + "%";
+        });
+        if (typeof updateStatusPanel === "function") updateStatusPanel();
+      } catch (err) {
+        statusText.innerHTML = `<strong>Gagal mengunduh:</strong> ${err.message}`;
+      }
+      track.hidden = true;
+      bibleBtn.disabled = false;
+      await refreshDataDownloadUi_();
+    });
+  }
+  const kidungBtn = el("dlKidungBtn");
+  if (kidungBtn) {
+    kidungBtn.addEventListener("click", async () => {
+      const track = el("dlKidungProgressTrack");
+      const fill = el("dlKidungProgressFill");
+      const statusText = el("dlKidungStatusText");
+      kidungBtn.disabled = true;
+      track.hidden = false;
+      fill.style.width = "60%"; // Kidung 1 file kecil, tidak ada progres bertahap -- cukup indikasi "sedang jalan"
+      statusText.innerHTML = "📥 Mengunduh data Kidung…";
+      try {
+        if (typeof resyncKidungSheet === "function") await resyncKidungSheet();
+      } catch (err) {
+        statusText.innerHTML = `<strong>Gagal mengunduh:</strong> ${err.message}`;
+      }
+      track.hidden = true;
+      kidungBtn.disabled = false;
+      await refreshDataDownloadUi_();
+    });
+  }
+  refreshDataDownloadUi_();
 }
 
 async function updateStatusPanel() {
@@ -3233,10 +3544,37 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
     if (typeof findMediaLinkForReference === "function") {
       findMediaLinkForReference(bookNum, chapter, currentLang).then((media) => {
         if (renderChapter._mediaToken !== requestToken) return; // pasal sudah berpindah lagi
-        if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
+        if (!mediaBlockHasContent(media)) return;
         mediaSlot.appendChild(buildInlineMediaBlock(media, `${displayName} ${chapter}`));
         mediaSlot.hidden = false;
       }).catch(() => {});
+    }
+  }
+
+  // BARU (14 Sep 2026, permintaan operator "syair YouTube + tautan 2
+  // arah ke Alkitab") -- "🔗 Media terkait pasal ini": tampilkan item
+  // Pustaka Media (js/media-library.js) yang sudah ditandai (fieldset
+  // "Ayat Alkitab terkait" di form tambah/edit) ke salah satu ayat di
+  // pasal yang sedang dibuka ini. TERPISAH TOTAL dari blok
+  // readerMediaSlot di atas (itu "Bacaan Bersuara Harian", sistem lama,
+  // tidak disentuh) -- pola token & guard `typeof` SAMA supaya konsisten
+  // & aman kalau Pustaka Media belum disetel (CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL
+  // kosong) atau pasal berpindah lagi sebelum permintaan ini selesai.
+  const mlSlot = el("readerMediaLibrarySlot");
+  if (mlSlot) {
+    mlSlot.hidden = true;
+    mlSlot.innerHTML = "";
+    const mlToken = (renderChapter._mlToken = (renderChapter._mlToken || 0) + 1);
+    if (typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled()) {
+      const verseIdsCsv = verses.map((v) => v.verseId).filter(Boolean).join(",");
+      if (verseIdsCsv) {
+        MediaLibrary.Sync.list({ ayatRef: verseIdsCsv }).then((items) => {
+          if (renderChapter._mlToken !== mlToken) return; // pasal sudah berpindah lagi
+          if (!items || !items.length) return;
+          mlSlot.appendChild(MediaLibrary.buildVerseRefSection(items, verses));
+          mlSlot.hidden = false;
+        }).catch(() => {});
+      }
     }
   }
 
@@ -3857,6 +4195,160 @@ function renderPlanPanel() {
   }
 }
 
+// BARU (15 Sep 2026, permintaan operator) -- dialog "Atur Tanggal Mulai"
+// sebelum rencana baca dibuat: Hari Ini / 1 Januari tahun ini / tanggal
+// bebas (termasuk yang SUDAH LEWAT). Kalau tanggal yang dipilih ada di
+// masa lalu, dihitung berapa hari sudah "seharusnya" terbaca sampai hari
+// ini -- operator lalu memilih (lewat centang, bukan langkah terpisah):
+//   - DICENTANG (bawaan) -- hari-hari yang terlewat itu langsung
+//     ditandai selesai, jadi begitu rencana dibuat operator langsung ada
+//     di "Hari ke-N" yang sesuai hari ini (contoh operator: rencana
+//     setahun, baru diisi 15 Sep -> ~8 bulan lebih otomatis tercentang).
+//   - TIDAK dicentang -- semua hari TETAP kosong (belum tercentang),
+//     operator mulai membaca dari Hari 1 apa adanya walau tanggalnya
+//     sudah lewat jauh (dipakai kalau memang niatnya "ketinggalan,
+//     tapi tetap mau baca urut dari awal").
+// Overlay HTML: #planStartOverlay (index.html, gaya sama seperti
+// #collectionNamePicker -- class .guest-modal-overlay/.guest-modal-box).
+// DIPERLUAS (15 Sep 2026) -- `def` cukup berisi { label, days }, dan
+// `onConfirm(startDate, markCatchupDone)` boleh diisi supaya dialog yang
+// SAMA bisa dipakai untuk tiga hal sekaligus, tidak ditulis ulang:
+//   1. Membuat rencana baca biasa (PLAN_DEFINITIONS)   -> createPlanFromDef_
+//   2. Membuat rencana 🎧 Bacaan Bersuara (sheet MP3/MP4/YouTube)
+//   3. MENGUBAH tanggal mulai rencana yang SUDAH berjalan (tombol
+//      "📅 Ubah Tanggal Mulai" di panel rencana) -- ini yang membuat
+//      pilihan "mau langsung diselesaikan sampai hari ini atau tidak"
+//      bisa diubah KAPAN SAJA, bukan cuma sekali saat rencana dibuat.
+function openPlanStartPicker(def, onConfirm) {
+  const confirmFn = onConfirm || ((startDate, markCatchup) => createPlanFromDef_(def, startDate, markCatchup));
+  const overlay = el("planStartOverlay");
+  const dateInput = el("planStartDateInput");
+  const catchupBox = el("planStartCatchupBox");
+  const catchupChk = el("planStartCatchupChk");
+  const catchupText = el("planStartCatchupText");
+  const createBtn = el("planStartCreateBtn");
+  const cancelBtn = el("planStartCancelBtn");
+  const titleEl = el("planStartTitle");
+  if (!overlay || !dateInput || !createBtn || !cancelBtn) {
+    // Fallback kalau markup belum ada (mis. versi lama) -- perilaku LAMA:
+    // langsung buat rencana mulai hari ini, tanpa dialog ini sama sekali.
+    confirmFn(new Date(), false);
+    return;
+  }
+  if (titleEl) titleEl.textContent = `${def.titlePrefix || "📅 Atur Tanggal Mulai"} — ${def.label}`;
+  createBtn.textContent = def.confirmLabel || "✅ Buat Rencana";
+
+  function todayLocalStr_() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function parseLocalDate_(str) {
+    // "YYYY-MM-DD" -> Date jam 00:00 WAKTU SETEMPAT (BUKAN new Date(str)
+    // yang oleh browser ditafsirkan sebagai UTC tengah malam -- bisa
+    // "mundur" 1 hari di zona waktu Indonesia kalau dipakai apa adanya).
+    const [y, m, d] = str.split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  }
+  function daysBetween_(fromDate, toDate) {
+    const MS_PER_DAY = 86400000;
+    const a = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+    const b = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+    return Math.round((b - a) / MS_PER_DAY);
+  }
+
+  dateInput.max = todayLocalStr_(); // BUKAN dipaksa -- cuma batas wajar (tidak ada gunanya "mulai" di masa depan utk fitur kejar-ketinggalan ini)
+  dateInput.value = todayLocalStr_();
+
+  function refreshCatchupUi_() {
+    if (!dateInput.value) { if (catchupBox) catchupBox.hidden = true; return; }
+    const chosen = parseLocalDate_(dateInput.value);
+    const elapsed = Math.max(0, daysBetween_(chosen, new Date()));
+    const clamped = Math.min(elapsed, def.days - 1);
+    if (clamped > 0 && catchupBox && catchupText) {
+      catchupBox.hidden = false;
+      catchupText.textContent = `Ada ${clamped.toLocaleString("id-ID")} hari yang sudah lewat dari tanggal ini sampai hari ini -- tandai selesai supaya langsung mulai dari Hari ${(clamped + 1).toLocaleString("id-ID")} (sesuai hari ini)?`;
+    } else if (catchupBox) {
+      catchupBox.hidden = true;
+    }
+  }
+  refreshCatchupUi_();
+
+  function onQuick(e) {
+    const btn = e.target.closest("[data-plan-start-quick]");
+    if (!btn) return;
+    const kind = btn.dataset.planStartQuick;
+    if (kind === "today") dateInput.value = todayLocalStr_();
+    else if (kind === "jan1") dateInput.value = `${new Date().getFullYear()}-01-01`;
+    refreshCatchupUi_();
+  }
+  const quickRow = overlay.querySelector(".plan-start-quick-row");
+  if (quickRow) quickRow.addEventListener("click", onQuick);
+  dateInput.addEventListener("change", refreshCatchupUi_);
+
+  function cleanup() {
+    overlay.hidden = true;
+    if (quickRow) quickRow.removeEventListener("click", onQuick);
+    dateInput.removeEventListener("change", refreshCatchupUi_);
+    createBtn.removeEventListener("click", onCreate);
+    cancelBtn.removeEventListener("click", onCancel);
+  }
+  function onCreate() {
+    if (!dateInput.value) { alert("Pilih tanggal mulai dulu."); return; }
+    const chosen = parseLocalDate_(dateInput.value);
+    const markCatchup = !catchupBox.hidden && catchupChk && catchupChk.checked;
+    cleanup();
+    confirmFn(chosen, markCatchup);
+  }
+  function onCancel() { cleanup(); }
+  createBtn.addEventListener("click", onCreate);
+  cancelBtn.addEventListener("click", onCancel);
+  overlay.hidden = false;
+}
+
+// Membangun & menyimpan rencana baca dari PLAN_DEFINITIONS, dipisah dari
+// openPlanStartPicker() di atas supaya jalur fallback (markup lama/belum
+// ada) tetap bisa langsung buat rencana tanpa dialog.
+// Berapa hari yang SUDAH lewat antara tanggal mulai dan hari ini --
+// dipotong maksimal (days - 1) supaya selalu tersisa minimal satu hari
+// yang belum dicentang (hari ini), bukan rencana yang langsung 100%
+// selesai begitu dibuat.
+function elapsedPlanDays_(days, startDate) {
+  const MS_PER_DAY = 86400000;
+  const a = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const b = new Date();
+  const bMid = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  const elapsed = Math.max(0, Math.round((bMid - a) / MS_PER_DAY));
+  return Math.min(elapsed, Math.max(0, days - 1));
+}
+
+// Larik centang awal: kalau markCatchupDone true, hari-hari yang sudah
+// terlewat langsung ditandai selesai (jadi langsung masuk ke "Hari ke-N"
+// yang pas dengan tanggal hari ini); kalau false, semua kosong dan
+// pembacaan tetap mulai dari Hari 1 apa adanya.
+function buildCatchupCompleted_(days, startDate, markCatchupDone) {
+  const completed = new Array(days).fill(false);
+  if (!markCatchupDone) return completed;
+  const clamped = elapsedPlanDays_(days, startDate);
+  for (let i = 0; i < clamped; i++) completed[i] = true;
+  return completed;
+}
+
+function createPlanFromDef_(def, startDate, markCatchupDone) {
+  const items = buildScheduleForScope(def.scope);
+  const schedule = distributeIntoDays(items, def.days);
+  const completed = buildCatchupCompleted_(def.days, startDate, markCatchupDone);
+  const plan = {
+    planId: def.id,
+    label: def.label,
+    days: def.days,
+    startDate: startDate.toISOString(),
+    schedule,
+    completed,
+  };
+  savePlan(currentUser, plan);
+  renderPlanPanel();
+}
+
 function renderPlanChooser(container) {
   const intro = document.createElement("p");
   intro.className = "plan-intro";
@@ -3869,20 +4361,15 @@ function renderPlanChooser(container) {
     const card = document.createElement("button");
     card.className = "plan-option-card";
     card.innerHTML = `<div class="plan-option-title">${def.label}</div><div class="plan-option-sub">${def.days.toLocaleString("id-ID")} hari bacaan</div>`;
-    card.addEventListener("click", () => {
-      const items = buildScheduleForScope(def.scope);
-      const schedule = distributeIntoDays(items, def.days);
-      const plan = {
-        planId: def.id,
-        label: def.label,
-        days: def.days,
-        startDate: new Date().toISOString(),
-        schedule,
-        completed: new Array(def.days).fill(false),
-      };
-      savePlan(currentUser, plan);
-      renderPlanPanel();
-    });
+    // BARU (15 Sep 2026, permintaan operator) -- dulu langsung membuat
+    // rencana begitu kartu ditekan (startDate selalu "sekarang", Hari 1
+    // = hari ini, TIDAK ada pilihan lain). Sekarang membuka dialog
+    // "Atur Tanggal Mulai" dulu (openPlanStartPicker() di bawah) --
+    // operator bisa pilih Hari Ini / 1 Januari tahun ini / tanggal bebas
+    // lain (termasuk tanggal yang SUDAH LEWAT, mis. mulai rencana
+    // setahun tapi baru diisi 15 September -- lihat catatan panjang di
+    // openPlanStartPicker() untuk pilihan "tandai selesai s/d hari ini").
+    card.addEventListener("click", () => openPlanStartPicker(def));
     grid.appendChild(card);
   });
 
@@ -3905,8 +4392,24 @@ function renderPlanChooser(container) {
       card.innerHTML = `<div class="plan-option-title">Memuat…</div>`;
       try {
         const plan = await buildMediaPlan(sheet);
-        savePlan(currentUser, plan);
-        renderPlanPanel();
+        card.disabled = false;
+        card.innerHTML = originalHtml;
+        // BARU (15 Sep 2026) -- rencana 🎧 Bacaan Bersuara dulu LANGSUNG
+        // dibuat mulai hari ini tanpa pilihan apa pun. Sekarang lewat
+        // dialog yang SAMA dengan rencana baca biasa: Hari Ini /
+        // 1 Januari / tanggal bebas yang sudah lewat, lengkap dengan
+        // pilihan menandai hari-hari yang terlewat sebagai selesai.
+        // Jumlah harinya (plan.days) baru diketahui SETELAH sheet
+        // diambil, makanya dialog dibuka di sini, bukan sebelum fetch.
+        openPlanStartPicker(
+          { label: plan.label, days: plan.days },
+          (startDate, markCatchup) => {
+            plan.startDate = startDate.toISOString();
+            plan.completed = buildCatchupCompleted_(plan.days, startDate, markCatchup);
+            savePlan(currentUser, plan);
+            renderPlanPanel();
+          }
+        );
       } catch (e) {
         alert("Gagal mengambil data Bacaan Bersuara: " + e.message);
         card.disabled = false;
@@ -3926,6 +4429,31 @@ function renderPlanChooser(container) {
   }
 }
 
+// Tanggal mulai rencana sebagai objek Date tengah malam waktu setempat
+// (null kalau rencana lama belum menyimpan startDate sama sekali).
+function planStartDate_(plan) {
+  if (!plan || !plan.startDate) return null;
+  const d = new Date(plan.startDate);
+  if (isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Tanggal yang jatuh pada hari ke-(idx+1) sebuah rencana.
+function planDateForIndex_(plan, idx) {
+  const start = planStartDate_(plan);
+  if (!start) return null;
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + idx);
+}
+
+function formatPlanDate_(d) {
+  if (!d) return "";
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function isSameDay_(a, b) {
+  return !!a && !!b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 function renderPlanDetail(container, plan) {
   const doneCount = plan.completed.filter(Boolean).length;
   const pct = plan.days ? Math.round((doneCount / plan.days) * 100) : 0;
@@ -3938,6 +4466,25 @@ function renderPlanDetail(container, plan) {
     <div class="plan-progress-track"><div class="plan-progress-fill" style="width:${pct}%"></div></div>
     <div class="plan-progress-text">${doneCount} dari ${plan.days} hari selesai (${pct}%)</div>
   `;
+  // BARU (15 Sep 2026) -- baris keterangan tanggal: kapan rencana ini
+  // dianggap mulai, dan hari ke berapa yang SEHARUSNYA dibaca hari ini
+  // menurut tanggal itu. Berguna terutama untuk rencana yang tanggal
+  // mulainya mundur ke belakang (mis. mulai 1 Januari padahal baru
+  // dibuat September) -- langsung kelihatan apakah sudah sesuai jadwal,
+  // ketinggalan, atau justru lebih cepat.
+  const startDateObj = planStartDate_(plan);
+  if (startDateObj) {
+    const todayIdx = elapsedPlanDays_(plan.days, startDateObj); // index hari yang pas dgn hari ini
+    const meta = document.createElement("div");
+    meta.className = "plan-head-meta";
+    const behind = todayIdx + 1 - doneCount;
+    let statusText = "Pas dengan jadwal.";
+    if (behind > 0) statusText = `Tertinggal ${behind.toLocaleString("id-ID")} hari dari jadwal.`;
+    else if (behind < 0) statusText = `Lebih cepat ${Math.abs(behind).toLocaleString("id-ID")} hari dari jadwal.`;
+    meta.textContent =
+      `📅 Mulai ${formatPlanDate_(startDateObj)} — menurut tanggal, hari ini adalah Hari ${(todayIdx + 1).toLocaleString("id-ID")}. ${statusText}`;
+    head.appendChild(meta);
+  }
   container.appendChild(head);
 
   const actions = document.createElement("div");
@@ -3953,6 +4500,67 @@ function renderPlanDetail(container, plan) {
       renderChapter(nextFirst.bookNum, nextFirst.chapter);
     });
     actions.appendChild(continueBtn);
+  }
+
+  // BARU (15 Sep 2026, permintaan operator: "ada kolom pilihan mau
+  // diselesaikan sebelum tanggal atau tidak") -- pilihan itu sekarang
+  // TIDAK hanya ada sekali saat rencana dibuat, tapi bisa diubah kapan
+  // saja di sini, TANPA menghapus rencana & mulai dari nol:
+  //   • "📅 Ubah Tanggal Mulai" -- buka dialog yang sama (Hari Ini /
+  //     1 Januari / tanggal bebas) lalu hitung ulang centangnya.
+  //   • "✅ Tandai selesai s/d hari ini" -- centang semua hari yang
+  //     tanggalnya sudah lewat (kejar ketinggalan sekali tekan).
+  //   • "↩️ Kosongkan centang" -- kebalikannya, mulai baca urut dari
+  //     Hari 1 lagi walau tanggalnya sudah lewat jauh.
+  const startForActions = planStartDate_(plan);
+
+  const changeStartBtn = document.createElement("button");
+  changeStartBtn.className = "chip-btn small";
+  changeStartBtn.textContent = "📅 Ubah Tanggal Mulai";
+  changeStartBtn.addEventListener("click", () => {
+    openPlanStartPicker(
+      { label: plan.label, days: plan.days, titlePrefix: "📅 Ubah Tanggal Mulai", confirmLabel: "💾 Simpan Tanggal" },
+      (startDate, markCatchup) => {
+        plan.startDate = startDate.toISOString();
+        if (markCatchup) {
+          const clamped = elapsedPlanDays_(plan.days, startDate);
+          for (let i = 0; i < clamped; i++) plan.completed[i] = true;
+        }
+        savePlan(currentUser, plan);
+        renderPlanPanel();
+      }
+    );
+  });
+  actions.appendChild(changeStartBtn);
+
+  if (startForActions) {
+    const catchupIdx = elapsedPlanDays_(plan.days, startForActions);
+    if (catchupIdx > 0) {
+      const allDone = plan.completed.slice(0, catchupIdx).every(Boolean);
+      if (!allDone) {
+        const catchBtn = document.createElement("button");
+        catchBtn.className = "chip-btn small";
+        catchBtn.textContent = `✅ Tandai selesai s/d hari ini (${catchupIdx.toLocaleString("id-ID")} hari)`;
+        catchBtn.addEventListener("click", () => {
+          for (let i = 0; i < catchupIdx; i++) plan.completed[i] = true;
+          savePlan(currentUser, plan);
+          renderPlanPanel();
+        });
+        actions.appendChild(catchBtn);
+      }
+      if (plan.completed.some(Boolean)) {
+        const resetBtn = document.createElement("button");
+        resetBtn.className = "chip-btn small";
+        resetBtn.textContent = "↩️ Kosongkan centang";
+        resetBtn.addEventListener("click", () => {
+          if (!confirm("Kosongkan SEMUA centang rencana ini dan mulai baca dari Hari 1 lagi? Tanggal mulai tidak berubah.")) return;
+          plan.completed = new Array(plan.days).fill(false);
+          savePlan(currentUser, plan);
+          renderPlanPanel();
+        });
+        actions.appendChild(resetBtn);
+      }
+    }
   }
 
   const changeBtn = document.createElement("button");
@@ -4013,9 +4621,20 @@ function renderPlanDetail(container, plan) {
       renderPlanPanel();
     });
 
+    // BARU (15 Sep 2026) -- tiap hari ikut menampilkan TANGGALnya
+    // (dihitung dari tanggal mulai), dan baris yang jatuh PAS hari ini
+    // diberi penanda "Hari Ini" supaya langsung ketemu di tengah daftar
+    // yang panjang (rencana setahun = 365 baris).
+    const dayDate = planDateForIndex_(plan, idx);
+    const isToday = isSameDay_(dayDate, new Date());
+    if (isToday) row.classList.add("is-today");
+
     const label = document.createElement("button");
     label.className = "plan-day-label";
-    label.innerHTML = `<span class="plan-day-num">Hari ${idx + 1}</span><span class="plan-day-reading">${readingLabel}</span>`;
+    const dateHtml = dayDate
+      ? `<span class="plan-day-date">${formatPlanDate_(dayDate)}${isToday ? ' <span class="plan-day-today-tag">Hari Ini</span>' : ""}</span>`
+      : "";
+    label.innerHTML = `<span class="plan-day-num">Hari ${idx + 1}</span>${dateHtml}<span class="plan-day-reading">${readingLabel}</span>`;
     label.addEventListener("click", () => {
       if (first.bookNum && first.chapter) {
         if (!bookAvailableInLang(currentLang, first.bookNum)) { showLangUnavailable(); return; }
@@ -4033,7 +4652,10 @@ function renderPlanDetail(container, plan) {
     // Link dengar/tonton (kalau rencana ini berbasis Bacaan Bersuara dan
     // baris ini punya link) -- ditempel langsung di bawah baris harinya,
     // memakai tombol yang sama seperti bekas menu 🎧 Bacaan Bersuara.
-    if (first.mp3 || first.mp4 || first.youtube) {
+    // mediaBlockHasContent() mengecek `first.segments` (bentuk BARU, bisa
+    // lebih dari satu voice note) MAUPUN mp3/mp4/youtube langsung (plan
+    // lama yang masih tersimpan di perangkat sebelum sinkron ulang).
+    if (typeof mediaBlockHasContent === "function" ? mediaBlockHasContent(first) : (first.mp3 || first.mp4 || first.youtube)) {
       const mediaRow = document.createElement("div");
       mediaRow.className = "plan-day-row-media";
       mediaRow.appendChild(buildInlineMediaBlock(first, `${plan.label} — Hari ${idx + 1}: ${readingLabel}`));
@@ -5460,7 +6082,7 @@ function buildCollectionItemRow(id, col, it, i, opts) {
   // di sini, bukan tab baru.
   if (v && typeof findMediaLinkForReference === "function") {
     findMediaLinkForReference(v.bookNumber, v.chapter, v.lang).then((media) => {
-      if (!media || (!media.mp3 && !media.mp4 && !media.youtube)) return;
+      if (!mediaBlockHasContent(media)) return;
       const actions = item.querySelector(".collection-verse-actions");
       if (!actions) return;
       actions.appendChild(buildInlineMediaBlock(media, `${v.bookName} ${v.chapter}:${v.verse}`));
@@ -8598,6 +9220,7 @@ function initUIEvents() {
     });
   }
   if (typeof wireBibleLangFilterUi === "function") wireBibleLangFilterUi();
+  if (typeof wireDataDownloadUi_ === "function") wireDataDownloadUi_();
   if (typeof wireSoundFxDownloadUi_ === "function") wireSoundFxDownloadUi_();
   initChangePasswordUI();
   el("logoutBtn").addEventListener("click", () => {
