@@ -87,12 +87,27 @@ const AdminBell = (() => {
       // panjang di index.html dekat #adminBellBtn) -- supaya siapa pun
       // yang login, di perangkat apa pun, tetap bisa melihat & merespons
       // permintaan yang butuh persetujuannya.
-      const [pendingShares, pendingMediaDeletes] = await Promise.all([
+      const [pendingShares, pendingMediaDeletes, unseenAnnouncements, pendingCurhat] = await Promise.all([
         (typeof checkPendingCollectionShares === "function") ? checkPendingCollectionShares(username).catch(() => []) : [],
         (typeof checkPendingMediaDeleteRequests === "function") ? checkPendingMediaDeleteRequests(username).catch(() => []) : [],
+        // BARU (15 Sep 2026, permintaan operator) -- pengumuman baru yang
+        // belum dibaca akun ini, ikut ditambahkan ke badge angka 🔔 (lihat
+        // getUnseenAnnouncementsForBell() js/app.js) -- berlaku untuk
+        // SEMUA orang yang login (bukan cuma administrator/gembala),
+        // sesuai permintaan "untuk setiap orang, kalau ada pengumuman
+        // baru, semua orang ada info".
+        (typeof getUnseenAnnouncementsForBell === "function") ? getUnseenAnnouncementsForBell().catch(() => []) : [],
+        // BARU (15 Sep 2026, permintaan operator) -- curhat jemaat yang
+        // BELUM DIBALAS, KHUSUS level administrator/gembala (lihat
+        // getPendingCurhatForBell() js/curhat.js -- sudah memeriksa
+        // isCurhatGembala() sendiri di dalamnya, aman dipanggil siapa
+        // pun, akan balik [] kalau bukan gembala/curhat belum aktif).
+        (typeof getPendingCurhatForBell === "function") ? getPendingCurhatForBell().catch(() => []) : [],
       ]);
       lastPendingShares = pendingShares || [];
       lastPendingMediaDeletes = pendingMediaDeletes || [];
+      lastUnseenAnnouncements = unseenAnnouncements || [];
+      lastPendingCurhat = pendingCurhat || [];
       if (isAdminMode) {
         const res = await Sync._get({ type: "search_stats_today", username });
         if (res && res.ok) renderAdmin(res);
@@ -112,6 +127,10 @@ const AdminBell = (() => {
   // admin / login terakhir), bukan menggantikannya.
   let lastPendingShares = [];
   let lastPendingMediaDeletes = [];
+  // BARU (15 Sep 2026) -- lihat getUnseenAnnouncementsForBell() js/app.js.
+  let lastUnseenAnnouncements = [];
+  // BARU (15 Sep 2026) -- lihat getPendingCurhatForBell() js/curhat.js.
+  let lastPendingCurhat = [];
   function pendingApprovalsHtml() {
     const total = lastPendingShares.length + lastPendingMediaDeletes.length;
     if (!total) return "";
@@ -126,8 +145,38 @@ const AdminBell = (() => {
     return html;
   }
 
+  // BARU (15 Sep 2026, permintaan operator) -- "📢 Pengumuman Baru" di
+  // panel lonceng, tampil untuk SIAPA PUN yang login (bukan cuma
+  // administrator/gembala) selama masih ada pengumuman live yang belum
+  // dibaca. Tombol "Baca sekarang" membuka panel 📢 Pengumuman yang
+  // sudah ada (showAnnouncementPanel(), js/app.js) -- panel itu SENDIRI
+  // yang menandai "sudah dilihat" begitu dibuka, badge di sini ikut
+  // hilang di refresh berikutnya.
+  function announcementsPendingHtml() {
+    if (!lastUnseenAnnouncements.length) return "";
+    const n = lastUnseenAnnouncements.length;
+    return `<div class="admin-bell-pending">` +
+      `<p class="admin-bell-total">📢 <strong>${n}</strong> pengumuman baru belum dibaca</p>` +
+      `<button type="button" class="chip-btn small" id="adminBellOpenAnnouncementsBtn">Baca sekarang</button>` +
+      `</div>`;
+  }
+
   function totalBadgeCount(base) {
-    return (base || 0) + lastPendingShares.length + lastPendingMediaDeletes.length;
+    return (base || 0) + lastPendingShares.length + lastPendingMediaDeletes.length + lastUnseenAnnouncements.length + lastPendingCurhat.length;
+  }
+
+  // BARU (15 Sep 2026, permintaan operator) -- "💬 Curhat Jemaat Baru"
+  // di panel lonceng, KHUSUS level administrator/gembala (lihat
+  // getPendingCurhatForBell()) -- tombol "Buka & balas" langsung
+  // membuka tab "📥 Balas Curhat Jemaat" di panel Curhat (bukan tab
+  // "📝 Curhat Saya" bawaan), lihat wireCurhatOpenBtn_() di bawah.
+  function curhatPendingHtml() {
+    if (!lastPendingCurhat.length) return "";
+    const n = lastPendingCurhat.length;
+    return `<div class="admin-bell-pending">` +
+      `<p class="admin-bell-total">💬 <strong>${n}</strong> curhat jemaat belum dibalas</p>` +
+      `<button type="button" class="chip-btn small" id="adminBellOpenCurhatBtn">Buka &amp; balas</button>` +
+      `</div>`;
   }
 
   function renderAdmin(stats) {
@@ -141,12 +190,16 @@ const AdminBell = (() => {
     if (body) {
       body.innerHTML =
         pendingApprovalsHtml() +
+        announcementsPendingHtml() +
+        curhatPendingHtml() +
         `<p class="admin-bell-total">🔎 <strong>${stats.total || 0}</strong> pencarian ayat hari ini` +
         (stats.date ? ` (${escapeHtml(stats.date)})` : "") + `</p>` +
         `<ul class="admin-bell-breakdown">` +
         `<li>Pengguna masuk (login): <strong>${stats.loggedInCount || 0}</strong></li>` +
         `<li>Mode Tamu (belum login): <strong>${stats.guestCount || 0}</strong></li>` +
         `</ul>`;
+      wireAnnouncementsOpenBtn_();
+      wireCurhatOpenBtn_();
     }
   }
 
@@ -171,9 +224,45 @@ const AdminBell = (() => {
     if (body) {
       body.innerHTML =
         pendingApprovalsHtml() +
+        announcementsPendingHtml() +
+        curhatPendingHtml() +
         `<p class="admin-bell-total">🕒 Login terakhir Anda:</p>` +
         `<p class="admin-bell-total"><strong>${escapeHtml(formatLastLogin(data.lastLogin))}</strong></p>`;
+      wireAnnouncementsOpenBtn_();
+      wireCurhatOpenBtn_();
     }
+  }
+
+  // BARU (15 Sep 2026) -- tombol "Buka & balas" di curhatPendingHtml()
+  // di atas, pola SAMA seperti wireAnnouncementsOpenBtn_(): innerHTML
+  // dirender ulang tiap refresh, jadi listener dipasang ULANG di sini
+  // tiap kali juga. Set _curhatState.view = "gembala" LEBIH DULU
+  // (variabel global punya js/curhat.js) sebelum showCurhatPanel()
+  // supaya panel langsung terbuka di tab "📥 Balas Curhat Jemaat",
+  // bukan tab "📝 Curhat Saya" bawaan.
+  function wireCurhatOpenBtn_() {
+    const btn = el("adminBellOpenCurhatBtn");
+    if (!btn) return;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (el("adminBellPanel")) el("adminBellPanel").hidden = true;
+      if (typeof _curhatState !== "undefined") _curhatState.view = "gembala";
+      if (typeof showCurhatPanel === "function") showCurhatPanel();
+    });
+  }
+
+  // BARU (15 Sep 2026) -- tombol "Baca sekarang" di announcementsPendingHtml()
+  // di atas dibuat lewat innerHTML (dirender ulang tiap refresh), jadi
+  // listener-nya dipasang ULANG di sini tiap kali juga (elemen lamanya
+  // sudah dibuang bersama innerHTML lama, tidak ada double-listener).
+  function wireAnnouncementsOpenBtn_() {
+    const btn = el("adminBellOpenAnnouncementsBtn");
+    if (!btn) return;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (el("adminBellPanel")) el("adminBellPanel").hidden = true;
+      if (typeof showAnnouncementPanel === "function") showAnnouncementPanel();
+    });
   }
 
   // Hitung posisi panel (position:fixed, lihat catatan CSS) berdasarkan
