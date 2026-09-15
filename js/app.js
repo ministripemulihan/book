@@ -2491,6 +2491,33 @@ function buildNoteQuickActionsRow(v, refLabel, hasAdminNote, liveDraftEl, source
     row.appendChild(readFromBtn);
   }
 
+  // BARU (15 Sep 2026, permintaan operator "jump langsung ke bagian yang
+  // dibaca, tergantung mulai dari baca mana") -- "🎧 Dengar dari sini":
+  // BEDA dari "▶️ Baca dari sini" di atas (itu TTS suara komputer,
+  // membaca TEKS ayat) -- tombol ini membuka VOICE NOTE/YouTube
+  // SUNGGUHAN (rekaman manusia dari sheet Bacaan Bersuara, kalau ada)
+  // yang mencakup ayat ini, lalu gulir halaman ke situ & langsung
+  // memutar -- lihat scrollToMediaSegmentForVerse() (js/media.js).
+  // Hanya ditampilkan kalau blok "readerMediaSlot" di atas pasal
+  // memang sudah terisi (pasal ini punya voice note) -- kalau pasal
+  // ini tidak ada voice note-nya sama sekali, tombol tidak usah
+  // ditampilkan daripada menekan tombol tapi tidak terjadi apa-apa.
+  const readerMediaSlotEl = typeof el === "function" ? el("readerMediaSlot") : null;
+  if (readerMediaSlotEl && !readerMediaSlotEl.hidden && readerMediaSlotEl.querySelector(".inline-media-segment")) {
+    const listenFromBtn = document.createElement("button");
+    listenFromBtn.type = "button";
+    listenFromBtn.className = "chip-btn small";
+    listenFromBtn.textContent = "🎧 Dengar dari sini";
+    listenFromBtn.title = "Buka & putar voice note/YouTube yang mencakup ayat ini (kalau pasal ini punya lebih dari 1 bagian, langsung lompat ke bagian yang tepat)";
+    listenFromBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof scrollToMediaSegmentForVerse === "function") {
+        scrollToMediaSegmentForVerse(readerMediaSlotEl, v.chapter, v.verse);
+      }
+    });
+    row.appendChild(listenFromBtn);
+  }
+
   return row;
 }
 
