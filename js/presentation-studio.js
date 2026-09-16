@@ -485,6 +485,22 @@ const PresentationStudio = (() => {
       box.innerHTML = `<div class="present-preview-idle">🎡 Roda Undian — tayang di Layar 2</div>`;
       return;
     }
+    // PERBAIKAN (16 Sep 2026, laporan operator) -- 🧩 Kuis 9 Kotak &
+    // 📊 Survei Membuktikan sebelumnya TIDAK punya blok di sini sama
+    // sekali, padahal broadcast_() di kedua file game (js/games/
+    // kuis-9-kotak.js & js/games/survei-membuktikan.js) SELALU memanggil
+    // renderStudioPreview({type:"quiz9"|"survei"}) tiap ada perubahan.
+    // Akibatnya kotak pratinjau "Tayang" di panel Studio diam saja tidak
+    // ter-update sama sekali untuk 2 game ini (padahal Layar 2 sendiri
+    // sudah benar) -- terlihat seperti gamenya "tidak tampil".
+    if (payload.type === "quiz9") {
+      box.innerHTML = `<div class="present-preview-idle">🧩 Kuis 9 Kotak — tayang di Layar 2</div>`;
+      return;
+    }
+    if (payload.type === "survei") {
+      box.innerHTML = `<div class="present-preview-idle">📊 Survei Membuktikan — tayang di Layar 2</div>`;
+      return;
+    }
     if (payload.type === "verse" || payload.type === "text") {
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
