@@ -813,18 +813,23 @@ const PresentationStudio = (() => {
       const isMedia = it && it.type === "media" && it.mediaItemId;
       const mediaGroupN = isMedia ? mediaGroupCount[it.mediaItemId] : 0;
       const showMediaGroupDelete = isMedia && mediaGroupN > 1 && mediaGroupFirstIdx[it.mediaItemId] === i;
-      // BARU (12 Sep 2026 v6, permintaan operator "kok tidak keluar
-      // gambar detil setiap halaman, cuma tulisan") -- untuk item
-      // "media" (halaman PDF/gambar), tampilkan THUMBNAIL kecil isi
-      // halaman itu sendiri di samping tulisan referensinya, bukan
-      // cuma teks "WG 260906 (hal 2/7)" polos. `src` thumbnail diisi
-      // BELAKANGAN secara async oleh fillCollectionThumbnails_() di
-      // bawah (gambar aslinya tersimpan di IndexedDB Media Tersimpan,
-      // bukan di objek `it` ini sendiri -- lihat sendMediaSlideFromCollection()
-      // di atas untuk pola async yang sama) -- di sini cukup taruh
-      // elemen <img> kosong dengan data-atribut penanda posisinya.
+      // BARU (16 Sep 2026, permintaan operator "kumpulan ayat yang sudah
+      // tersimpan youtubenya, yang pakai link, apa bisa dibuat gambar
+      // thumbnailnya youtube tampil di sana, jadi tidak hanya tulisan")
+      // -- item "youtube_link" (lihat addYoutubeLinkToCollection(), js/
+      // collections.js) SUDAH menyimpan `embedUrl` LANGSUNG di dalam
+      // item itu sendiri (bukan referensi ke Media Tersimpan seperti
+      // "media"), jadi thumbnail-nya BISA langsung disusun SINKRON di
+      // sini juga (tidak perlu nunggu async fillCollectionThumbnails_()
+      // seperti "media" yang baca IndexedDB) -- pakai thumbnail resmi
+      // YouTube (i.ytimg.com/vi/<id>/mqdefault.jpg), id videonya
+      // diekstrak dari embedUrl lewat extractYoutubeId() yang sudah ada
+      // (dipakai juga oleh tab "▶️ YouTube").
+      const ytLinkId = it && it.type === "youtube_link" ? extractYoutubeId(it.embedUrl) : null;
       const thumbHtml = isMedia
         ? `<img class="ps-verse-thumb" alt="" data-thumb-media-id="${escapeHtml(it.mediaItemId)}" data-thumb-page="${it.pageIndex || 0}" hidden />`
+        : ytLinkId
+        ? `<img class="ps-verse-thumb" alt="" src="https://i.ytimg.com/vi/${escapeHtml(ytLinkId)}/mqdefault.jpg" />`
         : "";
       row.innerHTML =
         thumbHtml +
@@ -935,7 +940,27 @@ const PresentationStudio = (() => {
     (mediaItems || []).forEach((m) => { byId[m.id] = m; });
     thumbEls.forEach((imgEl) => {
       const found = byId[imgEl.dataset.thumbMediaId];
-      if (!found || found.type === "youtube" || !found.images || !found.images.length) return;
+      if (!found) return;
+      // DIUBAH (16 Sep 2026, permintaan operator, lihat catatan
+      // "ytLinkId" di renderCollectionList() di atas) -- dulu item
+      // Media Tersimpan bertipe "youtube" SENGAJA dilewati di sini
+      // (baris ini dulu langsung `return`) karena `images[pageIdx]`
+      // isinya embed-URL video, bukan URL gambar biasa -- jadi kalau
+      // dipasang apa adanya ke <img src>, rusak/kosong. Sekarang: kalau
+      // jenisnya "youtube", ekstrak video-ID dari embed-URL itu dulu
+      // (extractYoutubeId(), fungsi yang sama dipakai tab "▶️ YouTube"),
+      // baru susun thumbnail resmi YouTube-nya -- pola SAMA dgn
+      // "ytLinkId" untuk item "youtube_link" di renderCollectionList().
+      if (found.type === "youtube") {
+        const pageIdx = Math.min(parseInt(imgEl.dataset.thumbPage, 10) || 0, (found.images || []).length - 1);
+        const embedUrl = (found.images || [])[pageIdx];
+        const vid = embedUrl ? extractYoutubeId(embedUrl) : null;
+        if (!vid) return;
+        imgEl.src = `https://i.ytimg.com/vi/${vid}/mqdefault.jpg`;
+        imgEl.hidden = false;
+        return;
+      }
+      if (!found.images || !found.images.length) return;
       const pageIdx = Math.min(parseInt(imgEl.dataset.thumbPage, 10) || 0, found.images.length - 1);
       const src = found.images[pageIdx];
       if (!src) return;
@@ -5674,13 +5699,13 @@ const PresentationStudio = (() => {
         // Yang mau diantre dulu ("standby"), pakai "👁️ Pratinjau" di bawah.
         row.querySelector('[data-act="show"]').addEventListener("click", () => {
           const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
-          const queue = videos.map((q) => ({ embedUrl: q.embedUrl }));
+          const queue = videos.map((q) => ({ embedUrl: q.embedUrl, title: q.title || "" }));
           rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
           renderStudioPreview({ type: "youtube", embedUrl });
         });
         row.querySelector('[data-act="preview"]').addEventListener("click", () => {
           const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
-          const queue = videos.map((q) => ({ embedUrl: q.embedUrl }));
+          const queue = videos.map((q) => ({ embedUrl: q.embedUrl, title: q.title || "" }));
           stageNext(v.title, v.title, () => {
             rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
             renderStudioPreview({ type: "youtube", embedUrl });
@@ -9230,6 +9255,14 @@ const PresentationStudio = (() => {
         });
       });
     }
+    // BARU (16 Sep 2026, permintaan operator "jam hh:mm:ss:msms di
+    // tengah layar") -- 🕐 Jam Tengah: pola SAMA persis dgn toggle Jam
+    // Pojok di atas, lihat #centerClockOverlay & applyTheme() (present.html).
+    if (el("psCenterClockOn")) {
+      el("psCenterClockOn").addEventListener("change", () => {
+        saveAndSendTheme({ centerClockOn: el("psCenterClockOn").checked });
+      });
+    }
     // BARU (9 Sep 2026) -- "🔁 Balik sisi" khusus mode "Kamera Kiri,
     // Konten Kanan", lihat body.cam-split-lr-reverse (present.html).
     if (el("psCamSplitReverse")) {
@@ -9767,7 +9800,7 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left" };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -9916,6 +9949,8 @@ const PresentationStudio = (() => {
         b.classList.toggle("active", b.dataset.cornerClockPos === savedCcPos);
       });
     }
+    // BARU (16 Sep 2026) -- pulihkan sakelar 🕐 Jam Tengah.
+    if (el("psCenterClockOn")) el("psCenterClockOn").checked = !!theme.centerClockOn;
     applyThemeToStudioPreview(theme);
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- `camSplitReverse` ("🔁 Balik
     // Sisi" mode split kiri-kanan) SEBELUMNYA tidak pernah ikut daftar
@@ -9926,7 +9961,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn } });
   }
 
   function saveAndSendTheme(partial) {
@@ -9950,7 +9985,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
