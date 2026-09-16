@@ -2244,6 +2244,8 @@
                Offline" pertama, kodenya di js/games/roda-putar.js
                (lihat window.GameOffline di js/presentation-studio.js). -->
           <button type="button" class="ps-tab" data-ps-right-tab="roda">🎡 Roda Undian</button>
+          <button type="button" class="ps-tab" data-ps-right-tab="kuis9">🧩 Kuis 9 Kotak</button>
+          <button type="button" class="ps-tab" data-ps-right-tab="survei">📊 Survei Membuktikan</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="teks">
@@ -3331,6 +3333,225 @@
           <div id="psWheelWinnerBox" class="ps-pointer-hint" hidden style="margin-top:10px; font-weight:700; font-size:15px;"></div>
           <div class="ps-pointer-hint" style="margin-top:14px;">Catatan: versi ini dipakai LANGSUNG dari sini setiap acara (belum bisa disimpan sebagai item di "📚 Kumpulan Ayat" seperti Peta/Mode Layar -- ini bisa ditambahkan di tahap berikutnya kalau diperlukan).</div>
         </div>
+        <!-- BARU (16 Sep 2026, permintaan operator) -- 🧩 Kuis 9 Kotak &
+             🎲 Tak Tik Boom. SATU MESIN dua mode -- lihat catatan
+             panjang js/games/kuis-9-kotak.js untuk aturan lengkap &
+             showQuiz9()/renderQuiz9Board_() di present.html untuk sisi
+             Layar 2. 100% OFFLINE, dinilai manual oleh operator lewat
+             tombol ✅/❌ (bisa dari sini ATAU langsung dari Layar 2). -->
+        <div class="ps-tab-panel" data-ps-right-panel="kuis9" hidden>
+          <div class="ps-field-label" style="margin-top:0;">🧩 Kuis 9 Kotak / 🎲 Tak Tik Boom</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">2 kelompok (X/O), 9 kotak topik+pertanyaan+poin, menang instan kalau dapat 3 tanda sejajar -- kalau 9 kotak habis tanpa garis, poin tertinggi menang. Mode "Tak Tik Boom" menyembunyikan 3 kotak rahasia (TAK/TIK/BOOM) bahkan dari operator sendiri sampai kotak itu dibuka, supaya tidak ada yang bisa curang.</p>
+
+          <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+            <label style="display:flex; align-items:center; gap:6px;">
+              Mode:
+              <select id="psQuiz9Mode">
+                <option value="tictactoe">Kuis 9 Kotak (poin manual)</option>
+                <option value="taktikboom">Tak Tik Boom (3 kotak rahasia)</option>
+              </select>
+            </label>
+            <label id="psQuiz9BonusWrap" hidden style="display:flex; align-items:center; gap:6px;">
+              Bonus TAK+TIK lengkap:
+              <input type="number" id="psQuiz9Bonus" value="500" style="width:80px;" />
+            </label>
+          </div>
+
+          <div class="ps-field-label" style="margin-top:0;">Isi 9 Kotak (Topik + Pertanyaan + Poin)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Poin boleh negatif (mis. -10) -- kotak bernilai negatif otomatis jadi kotak instan TANPA pertanyaan (langsung final ke kelompok yang membukanya, tidak dilempar ke lawan). Untuk mode Tak Tik Boom, isi semua 9 seperti biasa -- JANGAN coba menebak/mengatur sendiri kotak mana yang nanti jadi TAK/TIK/BOOM, itu diacak mesin sendiri saat "Acak &amp; Mulai" ditekan.</p>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik1" placeholder="Topik #1" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal1" placeholder="Pertanyaan #1 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin1" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik2" placeholder="Topik #2" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal2" placeholder="Pertanyaan #2 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin2" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik3" placeholder="Topik #3" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal3" placeholder="Pertanyaan #3 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin3" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik4" placeholder="Topik #4" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal4" placeholder="Pertanyaan #4 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin4" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik5" placeholder="Topik #5" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal5" placeholder="Pertanyaan #5 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin5" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik6" placeholder="Topik #6" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal6" placeholder="Pertanyaan #6 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin6" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik7" placeholder="Topik #7" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal7" placeholder="Pertanyaan #7 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin7" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik8" placeholder="Topik #8" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal8" placeholder="Pertanyaan #8 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin8" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
+              <input type="text" id="psQuiz9Topik9" placeholder="Topik #9" style="width:100%; box-sizing:border-box;" />
+              <input type="text" id="psQuiz9Soal9" placeholder="Pertanyaan #9 (kosongkan kalau kotak ini nanti poinnya negatif)" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psQuiz9Poin9" placeholder="Poin" value="100" style="width:100%; box-sizing:border-box;" />
+            </div>
+
+          <div class="ps-btn-row" style="margin-top:10px;">
+            <button type="button" class="chip-btn small" id="psQuiz9StartBtn">🎲 Acak &amp; Mulai</button>
+            <button type="button" class="chip-btn small" id="psQuiz9ResetBtn" hidden>🔁 Reset Game</button>
+          </div>
+
+          <div id="psQuiz9GameArea" hidden style="margin-top:14px;">
+            <div id="psQuiz9ScoreLine" class="ps-pointer-hint" style="font-weight:700;"></div>
+            <div id="psQuiz9MiniBoard" style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; max-width:360px;"></div>
+            <div id="psQuiz9CurrentQ" class="ps-pointer-hint" hidden style="margin-top:10px; font-weight:700;"></div>
+            <div class="ps-btn-row" style="margin-top:8px;">
+              <button type="button" class="chip-btn small" id="psQuiz9CorrectBtn" disabled>✅ Benar</button>
+              <button type="button" class="chip-btn small" id="psQuiz9WrongBtn" disabled>❌ Salah</button>
+            </div>
+            <div id="psQuiz9WinnerBox" class="ps-pointer-hint" hidden style="margin-top:10px; font-weight:700; font-size:15px;"></div>
+          </div>
+        </div>
+        <!-- BARU (16 Sep 2026, permintaan operator) -- 📊 Survei
+             Membuktikan (Family 100). Bank survei disiapkan manual
+             (topik + 6 jawaban + poin, total <=100), skor total
+             MENUMPUK sepanjang acara (disimpan localStorage, lihat
+             js/games/survei-membuktikan.js). Sistem pengumpulan survei
+             online/offline sungguhan (link publik dst) BELUM ada di
+             tahap ini -- direncanakan proyek terpisah berikutnya. -->
+        <div class="ps-tab-panel" data-ps-right-panel="survei" hidden>
+          <div class="ps-field-label" style="margin-top:0;">📊 Survei Membuktikan (Family 100)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">2 kelompok (X/O), bel duluan menjawab, 3x salah pindah ke lawan (1x kesempatan curi SELURUH poin ronde). Skor total di sini MENUMPUK sepanjang acara -- kalau main 5 survei berturut-turut, di akhir ada 1 pemenang keseluruhan.</p>
+          <div id="psSurveiScoreLine" class="ps-pointer-hint" style="font-weight:700; margin-bottom:10px;"></div>
+          <div id="psSurveiSesiSelesaiBox" class="ps-pointer-hint" hidden style="margin-bottom:10px; font-weight:700; padding:8px; border-radius:8px; background:rgba(226,194,61,.15);"></div>
+          <div class="ps-btn-row" style="margin-bottom:10px;">
+            <button type="button" class="chip-btn small" id="psSurveiResetScoreBtn">🔄 Reset Skor Acara</button>
+            <button type="button" class="chip-btn small" id="psSurveiSesiBaruBtn">🏁 Sesi Baru</button>
+            <!-- PERBAIKAN (16 Sep 2026, laporan operator) -- tombol ini
+                 sebelumnya TIDAK ADA sama sekali di markup, padahal
+                 js/games/survei-membuktikan.js (wireTab()) sudah
+                 menunggu id="psFmStartSetupBtn" utk memasang
+                 startFastMoneySetup_(). Tanpa tombol ini, #psFmArea di
+                 bawah (dulu selalu hidden sampai `fastMoney` terisi)
+                 TIDAK PERNAH bisa terbuka -- Babak Cepat mustahil
+                 dijangkau sama sekali walau Sesi 1 sudah tembus 200. -->
+            <button type="button" class="chip-btn small primary" id="psFmStartSetupBtn">⚡ Mulai Babak Cepat</button>
+          </div>
+          <p class="announcement-compose-hint" style="margin-top:0;">"🔄 Reset Skor Acara" cuma reset X/O ke 0. "🏁 Sesi Baru" reset SEMUANYA (skor, nomor ronde, status Sesi 1/Babak Cepat) untuk acara berikutnya -- bank survei tidak ikut terhapus.</p>
+
+          <!-- BARU (16 Sep 2026, permintaan operator) -- Sesi 2: Babak
+               Cepat/"Fast Money". Lihat catatan panjang di js/games/
+               survei-membuktikan.js untuk aturan lengkap. -->
+          <div id="psFmArea" hidden style="margin-top:14px; padding:10px; border-radius:10px; background:rgba(255,255,255,.04);">
+            <div class="ps-field-label" style="margin-top:0;">⚡ Babak Cepat (Fast Money)</div>
+
+            <div id="psFmSetupArea">
+              <p class="announcement-compose-hint" style="margin-top:0;">Pilih PERSIS 5 survei dari bank untuk Babak Cepat ini (bisa dari survei yang sama dipakai Sesi 1).</p>
+              <div class="ps-btn-row">
+                <input type="text" id="psFmP1Name" placeholder="Nama Peserta 1" style="flex:1 1 160px;" />
+                <input type="text" id="psFmP2Name" placeholder="Nama Peserta 2" style="flex:1 1 160px;" />
+              </div>
+              <div id="psFmPickCount" class="ps-pointer-hint" style="margin:8px 0;"></div>
+              <div id="psFmPickList" style="max-height:220px; overflow-y:auto; border:1px solid rgba(255,255,255,.1); border-radius:6px; padding:6px;"></div>
+              <div class="ps-btn-row" style="margin-top:8px;">
+                <button type="button" class="chip-btn small" id="psFmRerollBtn">🎲 Acak Ulang 5</button>
+                <button type="button" class="chip-btn small primary" id="psFmStartPlayBtn">▶️ Mulai Babak Cepat</button>
+                <button type="button" class="chip-btn small" id="psFmCancelSetupBtn">Batal</button>
+              </div>
+            </div>
+
+            <div id="psFmPlayArea" hidden>
+              <div id="psFmPlayerLabel" style="font-weight:800; font-size:15px; margin-bottom:6px;"></div>
+              <div id="psFmQuestionTopik" style="font-weight:700; margin-bottom:8px;"></div>
+              <div id="psFmAnswersWrap" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;"></div>
+              <div class="ps-btn-row">
+                <button type="button" class="chip-btn small" id="psFmNotFoundBtn">❌ Tidak ada di daftar</button>
+                <button type="button" class="chip-btn small" id="psFmRestartTimerBtn">🔁 Ulang Timer</button>
+              </div>
+              <p class="announcement-compose-hint">Timer di Layar 2 murni tampilan+bunyi untuk PESERTA -- panel ini TIDAK dibatasi waktu, ambil waktu secukupnya untuk mencari jawaban yang tepat.</p>
+            </div>
+
+            <div id="psFmRevealArea" hidden>
+              <div id="psFmP2Summary" style="font-weight:700; margin-bottom:8px;"></div>
+              <div class="ps-field-label" style="margin-top:0;">Jawaban Peserta 1 (buka satu-satu)</div>
+              <div id="psFmRevealList" style="margin-bottom:8px;"></div>
+              <div class="ps-btn-row">
+                <button type="button" class="chip-btn small primary" id="psFmRevealNextBtn">🔓 Buka Jawaban Berikutnya</button>
+              </div>
+              <div id="psFmDoneBox" class="ps-pointer-hint" hidden style="margin-top:10px; font-weight:700; font-size:15px;"></div>
+              <div class="ps-btn-row" style="margin-top:8px;">
+                <button type="button" class="chip-btn small" id="psFmFinishBtn">🏠 Selesai, Kembali</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="psSurveiFormArea">
+            <div class="ps-field-label" style="margin-top:0;">Tambah Survei ke Bank</div>
+            <input type="text" id="psSurveiTopik" placeholder="Topik/Pertanyaan survei" style="width:100%; box-sizing:border-box; margin-bottom:8px;" />
+            <p class="announcement-compose-hint" style="margin-top:0;">Isi 6 jawaban + poin (poin boleh tidak genap 100, TIDAK BOLEH lebih dari 100 -- mewakili "dari 100 orang disurvei"). Urutan pengisian bebas, sistem otomatis mengurutkan dari poin terbesar saat ditampilkan.</p>
+            <div style="display:grid; grid-template-columns:2fr 70px; gap:6px; margin-bottom:6px;">
+              <input type="text" id="psSurveiLabel1" placeholder="Jawaban #1" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psSurveiPoin1" placeholder="Poin" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 70px; gap:6px; margin-bottom:6px;">
+              <input type="text" id="psSurveiLabel2" placeholder="Jawaban #2" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psSurveiPoin2" placeholder="Poin" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 70px; gap:6px; margin-bottom:6px;">
+              <input type="text" id="psSurveiLabel3" placeholder="Jawaban #3" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psSurveiPoin3" placeholder="Poin" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 70px; gap:6px; margin-bottom:6px;">
+              <input type="text" id="psSurveiLabel4" placeholder="Jawaban #4" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psSurveiPoin4" placeholder="Poin" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 70px; gap:6px; margin-bottom:6px;">
+              <input type="text" id="psSurveiLabel5" placeholder="Jawaban #5" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psSurveiPoin5" placeholder="Poin" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div style="display:grid; grid-template-columns:2fr 70px; gap:6px; margin-bottom:6px;">
+              <input type="text" id="psSurveiLabel6" placeholder="Jawaban #6" style="width:100%; box-sizing:border-box;" />
+              <input type="number" id="psSurveiPoin6" placeholder="Poin" style="width:100%; box-sizing:border-box;" />
+            </div>
+            <div id="psSurveiFormTotal" style="font-weight:700; margin:6px 0;">Total poin: 0 / 100</div>
+            <div class="ps-btn-row">
+              <button type="button" class="chip-btn small" id="psSurveiAddBtn">+ Tambah ke Bank</button>
+              <button type="button" class="chip-btn small" id="psSurveiCancelEditBtn">Batal Edit</button>
+            </div>
+
+            <div class="ps-field-label" style="margin-top:16px;">Bank Survei Tersimpan</div>
+            <div id="psSurveiBankList"></div>
+          </div>
+
+          <div id="psSurveiRoundArea" hidden>
+            <div id="psSurveiRoundTopik" style="font-weight:800; font-size:16px; margin-bottom:8px;"></div>
+            <div id="psSurveiBuzzerWrap" class="ps-btn-row" style="margin-bottom:10px;">
+              <span class="ps-pointer-hint">Siapa duluan pencet bel?</span>
+              <button type="button" class="chip-btn small" id="psSurveiBuzzerX">🔔 X duluan</button>
+              <button type="button" class="chip-btn small" id="psSurveiBuzzerO">🔔 O duluan</button>
+            </div>
+            <div id="psSurveiTurnLine" class="ps-pointer-hint" style="font-weight:700;"></div>
+            <div id="psSurveiPotLine" class="ps-pointer-hint" style="margin-bottom:8px;"></div>
+            <div id="psSurveiMiniBoard" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; max-width:420px; margin-bottom:10px;"></div>
+            <div class="ps-btn-row">
+              <button type="button" class="chip-btn small" id="psSurveiWrongBtn">❌ Salah</button>
+              <button type="button" class="chip-btn small" id="psSurveiUndoBtn">↩️ Undo</button>
+            </div>
+            <div id="psSurveiWinnerBox" class="ps-pointer-hint" hidden style="margin-top:10px; font-weight:700; font-size:15px;"></div>
+            <div class="ps-btn-row" style="margin-top:8px;">
+              <button type="button" class="chip-btn small" id="psSurveiFinishBtn" hidden>✅ Selesai, Kembali ke Daftar Survei</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -3376,7 +3597,9 @@
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
        di sini + 1 file baru di js/games/, tanpa mengubah presentation-studio.js. -->
-  <script src="js/games/roda-putar.js?v=20260915a"></script>
+  <script src="js/games/roda-putar.js?v=20260916a"></script>
+  <script src="js/games/kuis-9-kotak.js?v=20260916a"></script>
+  <script src="js/games/survei-membuktikan.js?v=20260916a"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
