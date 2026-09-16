@@ -2565,6 +2565,20 @@
             <button type="button" class="chip-btn small" data-corner-clock-pos="bottom-right">↘️ Kanan Bawah</button>
           </div>
           <div class="ps-pointer-hint">Jam kecil (format JAM:MENIT:DETIK) yang menempel di pojok Layar 2, mengikuti waktu perangkat ini -- tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, sampai disembunyikan lagi dari sini.</div>
+
+          <!-- BARU (16 Sep 2026, permintaan operator "tulisan jam
+               hh:mm:ss:msms di tengah layar") -- 🕐 Jam Tengah: SAMA
+               arsitekturnya dgn Jam Pojok di atas (independen dari
+               showMain()/showTimer()/dst, selalu di ATAS konten apa
+               pun), BEDANYA posisi selalu di TENGAH layar & formatnya
+               menampilkan milidetik juga -- lihat #centerClockOverlay
+               (present.html). -->
+          <div class="ps-field-label" style="margin-top:14px;">🕐 Jam Tengah (JAM:MENIT:DETIK:MILIDETIK, di tengah layar)</div>
+          <label class="more-menu-toggle" for="psCenterClockOn">
+            <span>Tampilkan jam tengah di Layar 2</span>
+            <span class="toggle-switch"><input type="checkbox" id="psCenterClockOn" /><span class="toggle-slider"></span></span>
+          </label>
+          <div class="ps-pointer-hint">Jam besar di tengah Layar 2, termasuk milidetik (JAM:MENIT:DETIK:MS) -- berguna untuk acuan sinkronisasi presisi tinggi (mis. dgn kamera/software lain). Tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, boleh menyala bersamaan dengan Jam Pojok di atas.</div>
         </div>
 
         <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
