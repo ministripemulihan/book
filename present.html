@@ -1489,6 +1489,55 @@
   #cornerClockOverlay.cc-pos-bottom-left { bottom: 3vh; left: 3vw; }
   #cornerClockOverlay.cc-pos-bottom-right { bottom: 3vh; right: 3vw; }
 
+  /* BARU (16 Sep 2026, permintaan operator "tulisan jam hh:mm:ss:msms di
+     tengah layar") -- 🕐 Jam Tengah: sama arsitekturnya persis dengan
+     #cornerClockOverlay di atas (lapisan TERPISAH dari #stage, fixed ke
+     jendela, pointer-events:none, independen dari showMain()/dst,
+     digerakkan interval sendiri, lihat tickCenterClock() di skrip
+     bawah) -- BEDANYA cuma di posisi (selalu tengah layar, bukan salah 1
+     pojok) & formatnya menyertakan milidetik (HH:MM:SS:ms, lihat
+     fmtWallClockMs_()) supaya berguna sebagai acuan sinkronisasi presisi
+     tinggi (mis. sinkron dgn software lain/kamera), bukan cuma jam
+     biasa. z-index SAMA dgn jam pojok (keduanya boleh menyala bersamaan,
+     tidak saling tumpang tindih posisi). */
+  #centerClockOverlay {
+    display: none; position: fixed; z-index: 45; pointer-events: none;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
+    font-size: clamp(20px, 5vw, 72px);
+    color: var(--p-ink); background: var(--p-bg);
+    padding: 0.25em 0.6em; border-radius: 14px;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.35);
+    border: 1px solid color-mix(in srgb, var(--p-ink) 18%, transparent);
+  }
+  #centerClockOverlay.cc-on { display: block; }
+  #centerClockOverlay .cc-ms { font-size: 0.55em; opacity: 0.75; }
+
+  /* BARU (16 Sep 2026, permintaan operator "30 detik terakhir sebelum
+     video B, apa bisa info, ada semacam card reminder... lalu ada count
+     down") -- kartu kecil pemberitahuan "Berikutnya: <judul video>" +
+     hitung mundur, HANYA muncul 30 detik terakhir sebelum video YouTube
+     yang sedang tayang otomatis berpindah ke video berikutnya (dipicu
+     "🔁 Ulang: Semua" -- lihat maybeShowYtNextUpCard_() di skrip bawah).
+     Lapisan TERPISAH dari #stage, sama arsitekturnya dgn jam pojok/
+     tengah di atas (fixed, pointer-events:none, z-index sama). Posisi
+     bawah-tengah (BUKAN pojok, supaya tidak tabrakan dgn Jam Pojok/CC
+     bawaan YouTube yang juga sering di pojok bawah). */
+  #ytNextUpCard {
+    display: none; position: fixed; z-index: 45; pointer-events: none;
+    bottom: 4vh; left: 50%; transform: translateX(-50%);
+    max-width: min(560px, 80vw);
+    font-family: "Inter", Arial, sans-serif; color: var(--p-ink); background: var(--p-bg);
+    padding: 0.6em 1em; border-radius: 12px; text-align: center;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+    border: 1px solid color-mix(in srgb, var(--p-ink) 18%, transparent);
+  }
+  #ytNextUpCard.show { display: block; }
+  #ytNextUpCard .nu-label { font-size: 0.85em; opacity: 0.75; letter-spacing: 0.03em; }
+  #ytNextUpCard .nu-title { font-size: 1.15em; font-weight: 700; margin: 0.15em 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #ytNextUpCard .nu-count { font-size: 1.4em; font-weight: 800; font-variant-numeric: tabular-nums; }
+
   /* BARU (7 Sep 2026, laporan operator) -- ikon bendera gambar utk teks
      Pengumuman/Teks Cepat. Lihat catatan panjang di flagifyAnnouncementText_()
      (skrip bawah) untuk KENAPA ini perlu (emoji bendera 🇮🇩 dkk. jadi cuma
@@ -2191,6 +2240,10 @@
        aktif di ayat/kidung/PDF/apapun") -- lihat catatan panjang CSS
        #cornerClockOverlay di atas & tickCornerClock() di skrip bawah. -->
   <div id="cornerClockOverlay"><span id="cornerClockTimeEl">00:00:00</span></div>
+  <!-- BARU (16 Sep 2026) -- lihat catatan CSS #centerClockOverlay di atas. -->
+  <div id="centerClockOverlay"><span id="centerClockTimeEl">00:00:00</span><span class="cc-ms" id="centerClockMsEl">:000</span></div>
+  <!-- BARU (16 Sep 2026) -- lihat catatan CSS #ytNextUpCard di atas. -->
+  <div id="ytNextUpCard"><div class="nu-label">▶️ Berikutnya</div><div class="nu-title" id="ytNextUpTitle"></div><div class="nu-count" id="ytNextUpCount"></div></div>
 
   <!-- DIPERBAIKI (10 Sep 2026, lanjutan) -- pita kecil di pojok bawah
        (bukan lagi menutup seluruh layar), teks diperpendek & tidak lagi
@@ -2280,6 +2333,57 @@
   let ytQueue = [];
   let ytQueueIndex = 0;
   let ytLastState = null; // state terakhir yang dilaporkan player (lihat infoDelivery di bawah)
+  // PERBAIKAN (16 Sep 2026, laporan operator "pindah dari video A ke B lalu
+  // balik ke A, detiknya malah kebawa detik terakhir video B") -- akar
+  // masalah: saat `ytEl.src` diganti ke video BARU, iframe LAMA belum tentu
+  // langsung berhenti mengirim postMessage "infoDelivery"-nya (network/GC
+  // butuh sepersekian detik) -- karena `contentWindow` iframe ini TETAP
+  // objek yang SAMA lintas pergantian src (bukan re-created), listener di
+  // bawah (window.addEventListener("message")) tidak bisa membedakan pesan
+  // itu masih dari video LAMA atau sudah dari video BARU, cuma dari
+  // `e.source`. Akibatnya posisi/waktu video LAMA yang masih nyasar sempat
+  // dianggap milik video BARU & ditampilkan sekilas -- kalau kebetulan itu
+  // pesan TERAKHIR yang sampai sebelum video baru sungguh mulай melapor,
+  // angka basi itu "nyangkut" beberapa saat.
+  // PERBAIKAN: setiap kali src diganti (lewat setYtSrc_() di bawah, dipakai
+  // GANTI LANGSUNG utk semua tempat yang sebelumnya menulis `ytEl.src = ...`
+  // untuk video baru), pesan infoDelivery DIABAIKAN dulu selama jendela
+  // singkat (400ms) -- cukup untuk membuang sisa pesan iframe lama, TIDAK
+  // kerasa oleh operator (progress bar toh sudah direset ke 00:00 duluan
+  // oleh resetYtLiveBar()/syncYtLiveBarVisibility di Studio).
+  let ytIgnoreInfoUntil_ = 0;
+  function setYtSrc_(url) {
+    ytIgnoreInfoUntil_ = Date.now() + 400;
+    if (ytNextUpCardEl) ytNextUpCardEl.classList.remove("show"); // video baru mulai -- sembunyikan kartu "Berikutnya" sisa video lama
+    ytEl.src = url;
+  }
+  // BARU (16 Sep 2026, permintaan operator "30 detik terakhir apa bisa
+  // info, ada semacam card reminder, tampil youtube B dengan judul....
+  // lalu ada count down") -- kartu kecil "▶️ Berikutnya: <judul>" +
+  // hitung mundur 30..1, HANYA muncul kalau "🔁 Ulang: Semua" AKTIF dan
+  // ada lebih dari 1 video di antrean (ytQueue, lihat "DAFTAR VIDEO" &
+  // "PLAYLIST VIDEO" -- keduanya mengisi ytQueue lewat payload
+  // {type:"youtube", queue, queueIndex}, lihat handler kind==="youtube"
+  // di atas) -- KARENA cuma situasi itu yang video-nya akan BERPINDAH
+  // OTOMATIS sendiri saat video sekarang berakhir (lihat percabangan
+  // "state === 0" di listener infoDelivery di bawah). Kalau operator
+  // pindah manual (klik Kumpulan Ayat/Media Tersimpan), TIDAK relevan
+  // menghitung mundur ke "video berikutnya" karena tidak ada kepastian
+  // video apa yang akan ditayangkan selanjutnya.
+  const YT_NEXTUP_WINDOW_SEC_ = 30;
+  function updateYtNextUpCard_(currentTime, duration) {
+    if (!ytNextUpCardEl) return;
+    const eligible = ytRepeatMode === "all" && ytQueue.length > 1 &&
+      typeof currentTime === "number" && typeof duration === "number" && duration > 0;
+    if (!eligible) { ytNextUpCardEl.classList.remove("show"); return; }
+    const remaining = duration - currentTime;
+    if (remaining > YT_NEXTUP_WINDOW_SEC_ || remaining <= 0) { ytNextUpCardEl.classList.remove("show"); return; }
+    const next = ytQueue[(ytQueueIndex + 1) % ytQueue.length];
+    if (!next) { ytNextUpCardEl.classList.remove("show"); return; }
+    if (ytNextUpTitleEl) ytNextUpTitleEl.textContent = next.title || "Video berikutnya";
+    if (ytNextUpCountEl) ytNextUpCountEl.textContent = String(Math.max(1, Math.ceil(remaining)));
+    ytNextUpCardEl.classList.add("show");
+  }
   // BARU (28 Agu 2026) -- lihat wireCamera()/applyCamera-nya di bawah.
   const camBgEl = document.getElementById("camBg");
   const imgBgEl = document.getElementById("imgBg"); // BARU (28 Agu 2026) -- lihat applyBgImagePayload() di bawah.
@@ -2305,6 +2409,12 @@
   const acSecondHandEl = document.getElementById("acSecondHand");
   const cornerClockOverlayEl = document.getElementById("cornerClockOverlay");
   const cornerClockTimeEl = document.getElementById("cornerClockTimeEl");
+  const centerClockOverlayEl = document.getElementById("centerClockOverlay");
+  const centerClockTimeEl = document.getElementById("centerClockTimeEl");
+  const centerClockMsEl = document.getElementById("centerClockMsEl");
+  const ytNextUpCardEl = document.getElementById("ytNextUpCard");
+  const ytNextUpTitleEl = document.getElementById("ytNextUpTitle");
+  const ytNextUpCountEl = document.getElementById("ytNextUpCount");
   // BARU (27 Agu 2026) -- lihat showStopwatch()/tickStopwatch() di bawah.
   const stopwatchWrap = document.getElementById("stopwatchWrap");
   const stopwatchTimeEl = document.getElementById("stopwatchTime");
@@ -4671,6 +4781,13 @@
       cornerClockOverlayEl.className = cornerClockOverlayEl.className.replace(/\bcc-pos-\S+/g, "").trim();
       cornerClockOverlayEl.classList.add("cc-pos-" + (theme.cornerClockPos || "top-left"));
     }
+    // BARU (16 Sep 2026, permintaan operator "jam hh:mm:ss:msms di
+    // tengah layar") -- 🕐 Jam Tengah: sama pola ON/OFF-nya dgn Jam
+    // Pojok di atas, lihat #centerClockOverlay & tickCenterClock() di
+    // skrip bawah.
+    if (centerClockOverlayEl) {
+      centerClockOverlayEl.classList.toggle("cc-on", !!theme.centerClockOn);
+    }
     // DIPERBAIKI (7 Sep 2026, laporan operator) -- akar masalah "Jam
     // Target kepinggir kanan bawah" yang SEBENARNYA: fitTimerClockNumber_()
     // (lihat catatan panjang di situ) cuma dipanggil ulang saat JUMLAH
@@ -5179,7 +5296,7 @@
       }
       pendingOfflineYoutube_ = null;
       if (data.embedUrl) {
-        ytEl.src = data.embedUrl;
+        setYtSrc_(data.embedUrl);
         ytEl.hidden = false;
         // BARU (28 Agu 2026) -- daftar putar utk "Ulang: Semua" (Repeat
         // All). Kalau pengirim tidak menyertakan queue (mis. 1 video
@@ -5739,7 +5856,9 @@
     let data;
     try { data = JSON.parse(e.data); } catch (err) { return; }
     if (!data || data.event !== "infoDelivery" || !data.info) return;
+    if (Date.now() < ytIgnoreInfoUntil_) return; // buang sisa pesan video LAMA (lihat setYtSrc_())
     reportYtProgress(data.info);
+    updateYtNextUpCard_(data.info.currentTime, typeof data.info.duration === "number" ? data.info.duration : 0);
     if (typeof data.info.playerState !== "number") return;
     const state = data.info.playerState;
     if (state === ytLastState) return;
@@ -5752,7 +5871,7 @@
       } else if (ytRepeatMode === "all" && ytQueue.length > 1) {
         ytQueueIndex = (ytQueueIndex + 1) % ytQueue.length;
         const next = ytQueue[ytQueueIndex];
-        if (next && next.embedUrl) { ytEl.src = appendAutoplay(next.embedUrl); }
+        if (next && next.embedUrl) { setYtSrc_(appendAutoplay(next.embedUrl)); }
       } else if (ytRepeatMode === "all" && ytQueue.length === 1) {
         // Cuma 1 video di daftar -- "Ulang: Semua" berarti sama seperti
         // "Ulang: Satu" untuk kasus ini.
@@ -5811,6 +5930,22 @@
     const tickCornerClock = () => { cornerClockTimeEl.textContent = fmtWallClock_(new Date()); };
     tickCornerClock();
     setInterval(tickCornerClock, 1000);
+  }
+  // BARU (16 Sep 2026, permintaan operator "jam hh:mm:ss:msms di tengah
+  // layar") -- 🕐 Jam Tengah: interval TERPISAH dari jam pojok di atas,
+  // sengaja di-tick tiap 30ms (bukan tiap detik) supaya angka milidetiknya
+  // sungguh terlihat berjalan -- murah (cuma ganti textContent 2 elemen
+  // kecil), sama filosofinya dgn jam pojok: jalan terus sejak halaman
+  // dimuat, terlepas dari status nyala/mati (disembunyikan CSS lewat
+  // "cc-on" selama theme.centerClockOn belum aktif -- lihat applyTheme()).
+  if (centerClockTimeEl && centerClockMsEl) {
+    const tickCenterClock = () => {
+      const d = new Date();
+      centerClockTimeEl.textContent = fmtWallClock_(d);
+      centerClockMsEl.textContent = ":" + String(d.getMilliseconds()).padStart(3, "0");
+    };
+    tickCenterClock();
+    setInterval(tickCenterClock, 30);
   }
 
   let geomResizeTimer = null;
