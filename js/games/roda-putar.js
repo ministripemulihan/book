@@ -30,6 +30,7 @@
 
   const ENTRIES_KEY = "bible_app_wheel_entries_v1";
   const REMOVE_WINNER_KEY = "bible_app_wheel_remove_winner_v1";
+  const WINNER_DISPLAY_DELAY_MS = 2500; // jeda sebelum roda digambar ulang (mode "buang pemenang"), supaya nama pemenang sempat terbaca
 
   let lastSpinId_ = null; // dipakai menyaring balasan "present_wheel_result" -- abaikan kalau bukan balasan spin TERAKHIR (jaga-jaga kalau ada balasan "telat"/dobel)
   let spinning_ = false;
@@ -139,18 +140,25 @@
 
     // Mode "buang pemenang" -- hapus nama pemenang dari daftar &
     // gambar ulang roda TANPA nama itu, supaya undian berikutnya tidak
-    // bisa menang 2x. Kalau sisa nama < 2, tombol "Putar!" otomatis
+    // bisa menang 2x. Diberi jeda WINNER_DISPLAY_DELAY_MS dulu sebelum
+    // roda digambar ulang -- kalau langsung (tanpa jeda), penonton di
+    // Layar 2 cuma sempat lihat nama pemenang sekilas sebelum roda
+    // berubah lagi. Kalau sisa nama < 2, tombol "Putar!" otomatis
     // nonaktif lagi lewat setSpinEnabled_() di bawah (tidak perlu
     // penanganan khusus).
     if (removeWinnerChk && removeWinnerChk.checked && entriesEl) {
-      const remaining = entries.filter((_, i) => i !== data.winnerIndex);
-      entriesEl.value = remaining.join("\n");
-      try { localStorage.setItem(ENTRIES_KEY, entriesEl.value); } catch (e) {}
-      if (remaining.length >= 1) {
-        rawPost({ type: "wheel", action: "show", entries: remaining });
-      }
+      setTimeout(() => {
+        const remaining = entries.filter((_, i) => i !== data.winnerIndex);
+        entriesEl.value = remaining.join("\n");
+        try { localStorage.setItem(ENTRIES_KEY, entriesEl.value); } catch (e) {}
+        if (remaining.length >= 1) {
+          rawPost({ type: "wheel", action: "show", entries: remaining });
+        }
+        setSpinEnabled_(parseEntries_(entriesEl.value).length);
+      }, WINNER_DISPLAY_DELAY_MS);
+    } else {
+      setSpinEnabled_(entriesEl ? parseEntries_(entriesEl.value).length : 0);
     }
-    setSpinEnabled_(entriesEl ? parseEntries_(entriesEl.value).length : 0);
   }
 
   window.GameOffline.register({ id: "roda-undian", label: "🎡 Roda Undian", wireTab, handleMessage });
