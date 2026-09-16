@@ -538,6 +538,201 @@
     min-height: 1em;
   }
 
+  /* BARU (16 Sep 2026, permintaan operator) -- 🧩 Kuis 9 Kotak & 🎲 Tak
+     Tik Boom. SATU MESIN dua mode (lihat js/games/kuis-9-kotak.js) --
+     z-index SAMA dengan #stage/#mapView/#wheelView (2), saling
+     meniadakan lewat show*/stop* seperti game lain. #quiz9QuestionView
+     lapisan TERPISAH di atasnya (z-index 3) supaya papan tetap kelihatan
+     redup di belakang saat 1 pertanyaan sedang ditampilkan besar --
+     TIDAK menggambar ulang papan. #quiz9JudgeBar (z-index 4, paling
+     atas) sengaja auto-redup setelah 3 detik tidak disentuh (lihat
+     q9ShowJudgeBar_() di skrip bawah) supaya tombol ✅/❌ operator TIDAK
+     mengganggu pemandangan 1000 orang -- muncul lagi begitu mouse
+     digerakkan atau tombol H ditekan. */
+  #quiz9View {
+    display: none; position: fixed; inset: 0; z-index: 2;
+    background: #0b0e14; flex-direction: column; align-items: center; justify-content: center;
+    padding: 3vh 2vw; box-sizing: border-box;
+  }
+  #quiz9View:not([hidden]) { display: flex; animation: fadeInOnly .4s ease both; }
+  #quiz9Scoreboard {
+    display: flex; gap: 6vw; margin-bottom: 2.6vh;
+    font: 800 clamp(20px, 3vw, 42px)/1.1 "Inter", Arial, sans-serif;
+  }
+  #quiz9Scoreboard .q9-score-x { color: #3d8ee2; }
+  #quiz9Scoreboard .q9-score-o { color: #e2483d; }
+  #quiz9Board {
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    gap: 1.4vh; width: min(78vh, 86vw); height: min(78vh, 86vw);
+  }
+  .q9-cell {
+    position: relative; border-radius: 14px; background: rgba(255,255,255,.06);
+    border: 2px solid rgba(255,255,255,.14); display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 1vh; font: 700 clamp(11px, 1.6vw, 20px)/1.25 "Inter", Arial, sans-serif;
+    color: #f5f2e8; overflow: hidden;
+  }
+  .q9-cell.q9-owner-X { background: rgba(61,142,226,.28); border-color: #3d8ee2; }
+  .q9-cell.q9-owner-O { background: rgba(226,72,61,.28); border-color: #e2483d; }
+  .q9-cell.q9-owner-neutral { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.08); color: rgba(245,242,232,.35); }
+  .q9-cell .q9-mark {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 900 clamp(40px, 8vw, 110px)/1 "Inter", Arial, sans-serif;
+  }
+  .q9-cell.q9-owner-X .q9-mark { color: #3d8ee2; }
+  .q9-cell.q9-owner-O .q9-mark { color: #e2483d; }
+  #quiz9Turn {
+    margin-top: 2.2vh; font: 700 clamp(14px, 1.8vw, 24px)/1.3 "Inter", Arial, sans-serif;
+    color: var(--p-accent); text-align: center; min-height: 1.4em;
+  }
+  #quiz9WinnerBanner {
+    margin-top: .6vh; font: 900 clamp(24px, 4.2vw, 58px)/1.15 "Inter", Arial, sans-serif;
+    color: #ffd23d; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,.6); min-height: 1em;
+  }
+  #quiz9QuestionView {
+    display: none; position: fixed; inset: 0; z-index: 3;
+    background: rgba(5,7,12,.96); flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 4vh 5vw; box-sizing: border-box;
+  }
+  #quiz9QuestionView:not([hidden]) { display: flex; animation: fadeInOnly .3s ease both; }
+  #quiz9QTopik {
+    font: 800 clamp(16px, 2.4vw, 30px)/1.3 "Inter", Arial, sans-serif;
+    color: var(--p-accent); margin-bottom: 1.6vh; text-transform: uppercase; letter-spacing: .04em;
+  }
+  #quiz9QSoal {
+    font: 600 clamp(22px, 3.6vw, 52px)/1.35 "Literata", Georgia, serif; color: #f5f2e8; max-width: 78vw;
+  }
+  #quiz9QSpecialBanner {
+    margin-top: 2vh; min-height: 1.2em;
+    font: 900 clamp(24px, 4vw, 56px)/1.1 "Inter", Arial, sans-serif; color: #ffd23d;
+    text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  #quiz9QAnswerer {
+    margin-top: 2.6vh; font: 700 clamp(14px, 1.8vw, 22px)/1.3 "Inter", Arial, sans-serif; color: #fff;
+  }
+  #quiz9JudgeBar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+    display: flex; gap: 2vw; justify-content: center; padding: 2.2vh 0;
+    transition: opacity .3s ease;
+  }
+  #quiz9JudgeBar[hidden] { display: none; }
+  #quiz9JudgeBar.q9-hide { opacity: 0; pointer-events: none; }
+  #quiz9JudgeBar button {
+    font: 700 clamp(14px, 1.6vw, 20px)/1.2 "Inter", Arial, sans-serif;
+    padding: 1.5vh 3.2vw; border-radius: 999px; border: none; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  #quiz9CorrectBtn2 { background: #2fae66; color: #fff; }
+  #quiz9WrongBtn2 { background: #d13b3b; color: #fff; }
+
+  /* BARU (16 Sep 2026, permintaan operator) -- 📊 Survei Membuktikan
+     (Family 100). z-index SAMA dengan game lain (2) -- saling
+     meniadakan lewat stopSurvei()/showSurvei() seperti biasa. Kotak
+     yang BELUM terbuka HANYA menampilkan nomor urut (1-6) -- label &
+     poin aslinya TIDAK PERNAH dikirim ke Layar 2 sebelum terbuka,
+     lihat catatan publicState_() di js/games/survei-membuktikan.js. */
+  #surveiView {
+    display: none; position: fixed; inset: 0; z-index: 2;
+    background: #0b0e14; flex-direction: column; align-items: center; justify-content: center;
+    padding: 3vh 2vw; box-sizing: border-box; text-align: center;
+  }
+  #surveiView:not([hidden]) { display: flex; animation: fadeInOnly .4s ease both; }
+  #surveiScoreLine {
+    font: 700 clamp(14px, 1.8vw, 22px)/1.2 "Inter", Arial, sans-serif; color: rgba(245,242,232,.75);
+    margin-bottom: 1vh;
+  }
+  #surveiTopik {
+    font: 800 clamp(18px, 2.6vw, 34px)/1.35 "Inter", Arial, sans-serif; color: var(--p-accent);
+    max-width: 82vw; margin-bottom: 2vh;
+  }
+  #surveiPot {
+    font: 900 clamp(26px, 4vw, 54px)/1.1 "Inter", Arial, sans-serif; color: #ffd23d;
+    margin-bottom: 2.2vh; text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  #surveiBoard {
+    display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr;
+    gap: 1.4vh; width: min(70vh, 84vw); margin-bottom: 2.2vh;
+  }
+  .sv-cell {
+    position: relative; border-radius: 12px; background: rgba(255,255,255,.06);
+    border: 2px solid rgba(255,255,255,.16); display: flex; align-items: center; justify-content: space-between;
+    padding: 1.6vh 2.2vw; font: 700 clamp(14px, 2vw, 26px)/1.3 "Inter", Arial, sans-serif; color: #f5f2e8;
+    cursor: pointer;
+  }
+  .sv-cell.sv-closed { color: rgba(245,242,232,.45); justify-content: center; }
+  .sv-cell.sv-open { background: rgba(47,174,102,.24); border-color: #2fae66; }
+  .sv-cell .sv-poin { font-weight: 900; color: #ffd23d; }
+  #surveiStrikes {
+    font: 900 clamp(24px, 3.6vw, 46px)/1 "Inter", Arial, sans-serif; letter-spacing: .3em; color: #d13b3b;
+    margin-bottom: 1.2vh; min-height: 1.2em;
+  }
+  #surveiStealBanner {
+    font: 900 clamp(18px, 2.8vw, 38px)/1.2 "Inter", Arial, sans-serif; color: #ffd23d;
+    min-height: 1.4em; text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  #surveiWinnerBanner {
+    font: 900 clamp(22px, 3.8vw, 50px)/1.15 "Inter", Arial, sans-serif; color: #ffd23d;
+    text-shadow: 0 2px 10px rgba(0,0,0,.6); min-height: 1em; margin-top: .6vh;
+  }
+  #surveiActionBar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 4;
+    display: flex; gap: 2vw; justify-content: center; padding: 2.2vh 0;
+    transition: opacity .3s ease;
+  }
+  #surveiActionBar[hidden] { display: none; }
+  #surveiActionBar.sv-hide { opacity: 0; pointer-events: none; }
+  #surveiActionBar button {
+    font: 700 clamp(13px, 1.5vw, 18px)/1.2 "Inter", Arial, sans-serif;
+    padding: 1.3vh 2.6vw; border-radius: 999px; border: none; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  #surveiWrongBtn2 { background: #d13b3b; color: #fff; }
+  #surveiUndoBtn2 { background: #555; color: #fff; }
+
+  /* BARU (16 Sep 2026, permintaan operator) -- indikator ronde/pengali
+     x2/target 200 (Sesi 1) & seluruh tampilan Babak Cepat/"Fast Money"
+     (Sesi 2). Lihat catatan panjang publicState_()/publicFastMoney_()
+     di js/games/survei-membuktikan.js. */
+  #surveiRoundLine {
+    font: 700 clamp(12px, 1.5vw, 18px)/1.2 "Inter", Arial, sans-serif; color: rgba(245,242,232,.6);
+    margin-bottom: 1.4vh; min-height: 1em;
+  }
+  #surveiSesiSelesaiBanner {
+    font: 800 clamp(16px, 2.2vw, 30px)/1.3 "Inter", Arial, sans-serif; color: #ffd23d;
+    max-width: 84vw; margin-top: 1.4vh; min-height: 1em;
+  }
+  #fmView { display: flex; flex-direction: column; align-items: center; width: 100%; }
+  #fmPlayerLabel {
+    font: 800 clamp(18px, 2.6vw, 32px)/1.3 "Inter", Arial, sans-serif; color: var(--p-accent);
+    margin-bottom: 1vh;
+  }
+  #fmTimerNum {
+    font: 900 clamp(40px, 8vw, 110px)/1 "Inter", Arial, sans-serif; color: #ffd23d;
+    text-shadow: 0 3px 14px rgba(0,0,0,.6); margin-bottom: 1vh; font-variant-numeric: tabular-nums;
+  }
+  #fmTimerNum.fm-timeup { color: #d13b3b; }
+  #fmQuestionTopik {
+    font: 700 clamp(16px, 2.2vw, 28px)/1.35 "Inter", Arial, sans-serif; color: #f5f2e8;
+    max-width: 84vw; margin-bottom: 2.4vh;
+  }
+  .fm-row { display: flex; flex-direction: column; gap: 6px; width: min(70vh, 88vw); margin-bottom: 1.6vh; }
+  .fm-row-label { font: 700 clamp(12px, 1.5vw, 16px)/1.2 "Inter", Arial, sans-serif; color: rgba(245,242,232,.6); text-align: left; }
+  .fm-cell {
+    display: flex; justify-content: space-between; align-items: center;
+    border-radius: 10px; background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.14);
+    padding: 1vh 1.6vw; font: 700 clamp(13px, 1.8vw, 20px)/1.3 "Inter", Arial, sans-serif; color: #f5f2e8;
+  }
+  .fm-cell.fm-locked { color: rgba(245,242,232,.4); justify-content: center; }
+  .fm-cell.fm-open { background: rgba(47,174,102,.24); border-color: #2fae66; }
+  .fm-cell .fm-poin { font-weight: 900; color: #ffd23d; }
+  #fmTotalsLine {
+    font: 900 clamp(20px, 3vw, 40px)/1.2 "Inter", Arial, sans-serif; color: #ffd23d;
+    margin-top: .8vh; text-shadow: 0 2px 10px rgba(0,0,0,.6);
+  }
+  #fmDoneBanner {
+    font: 900 clamp(22px, 3.8vw, 50px)/1.15 "Inter", Arial, sans-serif; color: #ffd23d;
+    text-shadow: 0 2px 10px rgba(0,0,0,.6); margin-top: 1vh; min-height: 1em;
+  }
+
   #stage {
     position: relative; z-index: 2;
     height: 100%;
@@ -1763,6 +1958,66 @@
     <div id="wheelWinnerBanner"></div>
   </div>
 
+  <!-- BARU (16 Sep 2026, permintaan operator) -- 🧩 Kuis 9 Kotak & 🎲 Tak
+       Tik Boom, lihat catatan panjang CSS #quiz9View di atas &
+       showQuiz9()/renderQuiz9Board_() di skrip bawah. -->
+  <div id="quiz9View" hidden>
+    <div id="quiz9Scoreboard">
+      <span class="q9-score-x">X: <span id="quiz9ScoreX">0</span></span>
+      <span class="q9-score-o">O: <span id="quiz9ScoreO">0</span></span>
+    </div>
+    <div id="quiz9Board"></div>
+    <div id="quiz9Turn"></div>
+    <div id="quiz9WinnerBanner"></div>
+  </div>
+  <div id="quiz9QuestionView" hidden>
+    <div id="quiz9QTopik"></div>
+    <div id="quiz9QSoal"></div>
+    <div id="quiz9QSpecialBanner"></div>
+    <div id="quiz9QAnswerer"></div>
+  </div>
+  <div id="quiz9JudgeBar" hidden>
+    <button type="button" id="quiz9CorrectBtn2">✅ Benar</button>
+    <button type="button" id="quiz9WrongBtn2">❌ Salah</button>
+  </div>
+
+  <!-- BARU (16 Sep 2026, permintaan operator) -- 📊 Survei Membuktikan
+       (Family 100), lihat catatan panjang CSS #surveiView di atas &
+       showSurvei()/renderSurveiBoard_() di skrip bawah. -->
+  <div id="surveiView" hidden>
+    <div id="surveiScoreLine"></div>
+    <div id="surveiRoundLine"></div>
+    <div id="surveiTopik"></div>
+    <div id="surveiPot"></div>
+    <div id="surveiBoard"></div>
+    <div id="surveiStrikes"></div>
+    <div id="surveiStealBanner"></div>
+    <div id="surveiWinnerBanner"></div>
+    <div id="surveiSesiSelesaiBanner"></div>
+
+    <!-- BARU (16 Sep 2026, permintaan operator) -- Babak Cepat, lihat
+         catatan panjang CSS #fmView dkk di atas. -->
+    <div id="fmView" hidden>
+      <div id="fmPlayerLabel"></div>
+      <div id="fmTimerNum"></div>
+      <div id="fmQuestionTopik"></div>
+      <div class="fm-row">
+        <div class="fm-row-label" id="fmP1RowLabel"></div>
+        <div id="fmP1Row"></div>
+      </div>
+      <div class="fm-row">
+        <div class="fm-row-label" id="fmP2RowLabel"></div>
+        <div id="fmP2Row"></div>
+      </div>
+      <div id="fmTotalsLine"></div>
+      <div id="fmDoneBanner"></div>
+    </div>
+  </div>
+  <div id="surveiActionBar" hidden>
+    <button type="button" id="surveiWrongBtn2">❌ Salah</button>
+    <button type="button" id="surveiUndoBtn2">↩️ Undo</button>
+  </div>
+
   <div id="stage">
     <div id="ref" hidden></div>
     <!-- BARU (4 Sep 2026) -- baris kecil kedua di bawah judul kidung
@@ -2697,6 +2952,8 @@
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock(); // BARU -- lensa cuma relevan saat gambar (#slideView) tayang
     timerState = { totalSeconds: data.totalSeconds, endAt: data.endAt, label: data.label || "", bell: !!data.bell, bellKey: data.bellKey || "", _rang: false };
     timerLabelEl.textContent = timerState.label;
@@ -2903,6 +3160,8 @@
     stopStopwatch(false); // BARU -- Timer/Stopwatch/Countdown Jam Target berbagi ruang tengah yang sama, tidak boleh berbarengan
     stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     idleEl.hidden = true;
     refEl.hidden = true; textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
@@ -2997,6 +3256,8 @@
     stopLocalVideo(false);
     if (typeof stopMap === "function") stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -3260,6 +3521,8 @@
     stopLocalVideo(false);
     stopModeScreen(false);
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -3461,6 +3724,8 @@
     stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
     if (typeof stopModeScreen === "function") stopModeScreen(false);
     if (typeof stopMap === "function") stopMap(false);
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga (celah lama, ikut dirapikan)
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -3535,8 +3800,405 @@
     clearWheelTimers_();
     wheelViewEl.hidden = true;
     wheelWinnerBannerEl.textContent = "";
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // jaga-jaga kalau roda dipicu saat kuis 9 kotak sedang tayang
     if (showIdle) idleEl.hidden = false;
   }
+
+  // ------------------------------------------------------------
+  // 🧩 Kuis 9 Kotak & 🎲 Tak Tik Boom (BARU 16 Sep 2026, permintaan
+  // operator) -- SATU MESIN dua mode. Layar 2 di sini HANYA menggambar
+  // dari `state` yang dikirim Studio (js/games/kuis-9-kotak.js) --
+  // TIDAK pernah menghitung skor/giliran/menang sendiri, supaya Studio
+  // & Layar 2 selalu 1 sumber kebenaran yang sama (pola "satu otak, dua
+  // remote" -- lihat catatan kontrak lengkap di kuis-9-kotak.js).
+  //
+  // Payload dari Studio: { type:"quiz9", action:"state", state:{...} }
+  //   atau { type:"quiz9", action:"reset" } (sembunyikan, kembali idle).
+  // Balasan dari SINI ke Studio (tombol ✅/❌ di Layar 2 SENDIRI, selain
+  // tombol yang sama di panel Studio): { source:"bibleAppPresenter",
+  //   type:"present_quiz9_judge", boxIndex, correct }.
+  // ------------------------------------------------------------
+  const quiz9ViewEl = document.getElementById("quiz9View");
+  const quiz9BoardEl = document.getElementById("quiz9Board");
+  const quiz9ScoreXEl = document.getElementById("quiz9ScoreX");
+  const quiz9ScoreOEl = document.getElementById("quiz9ScoreO");
+  const quiz9TurnEl = document.getElementById("quiz9Turn");
+  const quiz9WinnerBannerEl = document.getElementById("quiz9WinnerBanner");
+  const quiz9QuestionViewEl = document.getElementById("quiz9QuestionView");
+  const quiz9QTopikEl = document.getElementById("quiz9QTopik");
+  const quiz9QSoalEl = document.getElementById("quiz9QSoal");
+  const quiz9QSpecialBannerEl = document.getElementById("quiz9QSpecialBanner");
+  const quiz9QAnswererEl = document.getElementById("quiz9QAnswerer");
+  const quiz9JudgeBarEl = document.getElementById("quiz9JudgeBar");
+  const quiz9CorrectBtn2 = document.getElementById("quiz9CorrectBtn2");
+  const quiz9WrongBtn2 = document.getElementById("quiz9WrongBtn2");
+
+  let quiz9State_ = null;
+  let quiz9HideTimer_ = null;
+
+  function q9SpecialLabel_(sp) {
+    if (sp === "tak") return "🎲 TAK!";
+    if (sp === "tik") return "🎲 TIK!";
+    if (sp === "boom") return "💣 BOOM!";
+    return "";
+  }
+
+  function renderQuiz9Board_() {
+    if (!quiz9State_) return;
+    quiz9ScoreXEl.textContent = quiz9State_.scores.X;
+    quiz9ScoreOEl.textContent = quiz9State_.scores.O;
+    quiz9BoardEl.innerHTML = "";
+    quiz9State_.boxes.forEach((b) => {
+      const cell = document.createElement("div");
+      cell.className = "q9-cell" + (b.status !== "empty" ? " q9-owner-" + b.status : "");
+      if (b.status === "empty") {
+        cell.textContent = b.topik;
+      } else {
+        cell.innerHTML = '<span class="q9-mark">' + (b.status === "neutral" ? "—" : b.status) + "</span>";
+      }
+      quiz9BoardEl.appendChild(cell);
+    });
+    if (quiz9State_.gameOver) {
+      const w = quiz9State_.winner;
+      quiz9TurnEl.textContent = "";
+      if (!w || w.by === "tie") quiz9WinnerBannerEl.textContent = "🤝 SERI! Skor sama.";
+      else quiz9WinnerBannerEl.textContent = "🏆 Kelompok " + w.group + " MENANG! (" + (w.by === "line" ? "3 sejajar" : "poin tertinggi") + ")";
+      if (typeof SoundFX !== "undefined") SoundFX.play("tada");
+      if (typeof playConfetti_ === "function") playConfetti_();
+    } else {
+      quiz9WinnerBannerEl.textContent = "";
+      quiz9TurnEl.textContent = "Giliran memilih kotak: Kelompok " + quiz9State_.activeGroup;
+    }
+  }
+
+  function q9ShowJudgeBar_() {
+    quiz9JudgeBarEl.classList.remove("q9-hide");
+    if (quiz9HideTimer_) clearTimeout(quiz9HideTimer_);
+    quiz9HideTimer_ = setTimeout(() => quiz9JudgeBarEl.classList.add("q9-hide"), 3000);
+  }
+
+  function showQuiz9Question_(q) {
+    quiz9QTopikEl.textContent = q.topik;
+    quiz9QSoalEl.textContent = q.soal || "";
+    const box = quiz9State_.boxes[q.boxIndex];
+    quiz9QSpecialBannerEl.textContent = box && box.special ? q9SpecialLabel_(box.special) : "";
+    quiz9QAnswererEl.textContent = (q.isSteal ? "🔁 Rebutan! " : "") + "Menjawab: Kelompok " + q.answeringGroup;
+    quiz9QuestionViewEl.hidden = false;
+    quiz9JudgeBarEl.hidden = false;
+    q9ShowJudgeBar_();
+  }
+
+  function hideQuiz9Question_() {
+    quiz9QuestionViewEl.hidden = true;
+    quiz9JudgeBarEl.hidden = true;
+    if (quiz9HideTimer_) { clearTimeout(quiz9HideTimer_); quiz9HideTimer_ = null; }
+  }
+
+  function showQuiz9(data) {
+    stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
+    if (typeof stopModeScreen === "function") stopModeScreen(false);
+    if (typeof stopMap === "function") stopMap(false);
+    if (typeof stopWheel === "function") stopWheel(false);
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; refEl.textContent = "";
+    refSubEl.hidden = true; refSubEl.textContent = "";
+    textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+
+    quiz9State_ = data.state;
+    quiz9ViewEl.hidden = false;
+    renderQuiz9Board_();
+    if (quiz9State_.activeQuestion) showQuiz9Question_(quiz9State_.activeQuestion);
+    else hideQuiz9Question_();
+  }
+
+  function stopQuiz9(showIdle) {
+    quiz9ViewEl.hidden = true;
+    hideQuiz9Question_();
+    quiz9State_ = null;
+    if (typeof stopSurvei === "function") stopSurvei(false); // jaga-jaga kalau dipicu saat survei sedang tayang
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  function q9SendJudge_(correct) {
+    if (!quiz9State_ || !quiz9State_.activeQuestion) return;
+    if (window.opener) {
+      try {
+        window.opener.postMessage({ source: "bibleAppPresenter", type: "present_quiz9_judge", boxIndex: quiz9State_.activeQuestion.boxIndex, correct: correct }, location.origin);
+      } catch (e) {}
+    }
+  }
+  quiz9CorrectBtn2.addEventListener("click", () => q9SendJudge_(true));
+  quiz9WrongBtn2.addEventListener("click", () => q9SendJudge_(false));
+  // Gerakan mouse/tombol H membangunkan lagi bar ✅/❌ yang sudah meredup
+  // (lihat catatan panjang CSS #quiz9JudgeBar di atas).
+  document.addEventListener("mousemove", () => { if (!quiz9JudgeBarEl.hidden) q9ShowJudgeBar_(); });
+  document.addEventListener("keydown", (e) => {
+    if ((e.key === "h" || e.key === "H") && !quiz9JudgeBarEl.hidden) q9ShowJudgeBar_();
+  });
+
+  // ------------------------------------------------------------
+  // 📊 Survei Membuktikan / Family 100 (BARU 16 Sep 2026, permintaan
+  // operator). Sama seperti Kuis 9 Kotak, Layar 2 di sini HANYA
+  // menggambar dari `state` kiriman Studio (js/games/survei-
+  // membuktikan.js) -- tidak pernah menghitung pot/strike/menang
+  // sendiri.
+  //
+  // Payload dari Studio: { type:"survei", action:"state", state:{...} }
+  //   atau { type:"survei", action:"reset" }.
+  // Balasan dari SINI ke Studio (klik kotak/❌/↩️ di Layar 2 SENDIRI,
+  // selain tombol yang sama di panel Studio): { source:
+  //   "bibleAppPresenter", type:"present_survei_action",
+  //   action:"reveal"|"wrong"|"undo", boxIndex }.
+  // ------------------------------------------------------------
+  const surveiViewEl = document.getElementById("surveiView");
+  const surveiScoreLineEl = document.getElementById("surveiScoreLine");
+  const surveiRoundLineEl = document.getElementById("surveiRoundLine"); // BARU
+  const surveiTopikEl = document.getElementById("surveiTopik");
+  const surveiPotEl = document.getElementById("surveiPot");
+  const surveiBoardEl = document.getElementById("surveiBoard");
+  const surveiStrikesEl = document.getElementById("surveiStrikes");
+  const surveiStealBannerEl = document.getElementById("surveiStealBanner");
+  const surveiWinnerBannerEl = document.getElementById("surveiWinnerBanner");
+  const surveiSesiSelesaiBannerEl = document.getElementById("surveiSesiSelesaiBanner"); // BARU
+  const surveiActionBarEl = document.getElementById("surveiActionBar");
+  const surveiWrongBtn2 = document.getElementById("surveiWrongBtn2");
+  const surveiUndoBtn2 = document.getElementById("surveiUndoBtn2");
+  // BARU (16 Sep 2026) -- elemen Babak Cepat (Fast Money), lihat
+  // catatan panjang CSS #fmView dkk di atas.
+  const fmViewEl = document.getElementById("fmView");
+  const fmPlayerLabelEl = document.getElementById("fmPlayerLabel");
+  const fmTimerNumEl = document.getElementById("fmTimerNum");
+  const fmQuestionTopikEl = document.getElementById("fmQuestionTopik");
+  const fmP1RowLabelEl = document.getElementById("fmP1RowLabel");
+  const fmP1RowEl = document.getElementById("fmP1Row");
+  const fmP2RowLabelEl = document.getElementById("fmP2RowLabel");
+  const fmP2RowEl = document.getElementById("fmP2Row");
+  const fmTotalsLineEl = document.getElementById("fmTotalsLine");
+  const fmDoneBannerEl = document.getElementById("fmDoneBanner");
+
+  let surveiState_ = null;
+  let surveiHideTimer_ = null;
+  let fmTimerInterval_ = null; // BARU -- loop lokal Layar 2, murni tampilan+bunyi, TIDAK dikirim balik ke Studio
+  let fmLastSecondShown_ = null; // BARU -- supaya bunyi "tik" cuma sekali per detik, bukan tiap tick interval
+
+  function svShowActionBar_() {
+    // BARU (16 Sep 2026) -- action bar (❌ Salah/↩️ Undo) HANYA relevan
+    // di Sesi 1 (kotak diklik langsung) -- Babak Cepat tidak punya
+    // tombol apa pun di Layar 2 (lihat catatan panjang di atas kenapa),
+    // jadi disembunyikan total selagi mode "fastmoney".
+    if (surveiState_ && surveiState_.mode === "fastmoney") { surveiActionBarEl.hidden = true; return; }
+    surveiActionBarEl.hidden = false;
+    surveiActionBarEl.classList.remove("sv-hide");
+    if (surveiHideTimer_) clearTimeout(surveiHideTimer_);
+    surveiHideTimer_ = setTimeout(() => surveiActionBarEl.classList.add("sv-hide"), 3000);
+  }
+
+  function renderSurveiBoard_() {
+    if (!surveiState_) return;
+    const s = surveiState_;
+
+    if (s.mode === "fastmoney") {
+      surveiViewEl.classList.add("sv-fastmoney-mode");
+      fmViewEl.hidden = false;
+      surveiTopikEl.hidden = true; surveiPotEl.hidden = true; surveiBoardEl.hidden = true;
+      surveiStrikesEl.hidden = true; surveiStealBannerEl.hidden = true; surveiWinnerBannerEl.hidden = true;
+      surveiRoundLineEl.textContent = ""; surveiSesiSelesaiBannerEl.textContent = "";
+      surveiScoreLineEl.textContent = "⚡ Babak Cepat -- Skor total sebelumnya X: " + s.totalScores.X + " | O: " + s.totalScores.O;
+      renderFastMoney_(s.fastMoney);
+      return;
+    }
+
+    fmViewEl.hidden = true;
+    surveiTopikEl.hidden = false; surveiPotEl.hidden = false; surveiBoardEl.hidden = false;
+    surveiStrikesEl.hidden = false; surveiStealBannerEl.hidden = false; surveiWinnerBannerEl.hidden = false;
+    stopFmTimerLoop_();
+
+    if (s.mode !== "sesi1") return; // "idle" -- tidak ada apa-apa utk digambar
+
+    surveiScoreLineEl.textContent = "Skor total acara -- X: " + s.totalScores.X + "  |  O: " + s.totalScores.O;
+    surveiRoundLineEl.textContent = s.roundNumber > 0
+      ? `Ronde ke-${s.roundNumber}${s.multiplier > 1 ? " (nilai x2)" : ""} -- target 200`
+      : "";
+    surveiTopikEl.textContent = s.topik;
+    surveiPotEl.textContent = "POT: " + s.pot;
+    surveiBoardEl.innerHTML = "";
+    s.answers.forEach((a, i) => {
+      const cell = document.createElement("div");
+      if (a.revealed) {
+        cell.className = "sv-cell sv-open";
+        cell.innerHTML = "<span>" + a.label + "</span><span class=\"sv-poin\">" + a.poin + "</span>";
+      } else {
+        cell.className = "sv-cell sv-closed";
+        cell.textContent = i + 1;
+        if (s.phase === "playing" || s.phase === "stealing") {
+          cell.addEventListener("click", () => svSendAction_("reveal", i));
+        }
+      }
+      surveiBoardEl.appendChild(cell);
+    });
+    surveiStrikesEl.textContent = "❌".repeat(s.strikes);
+    if (s.phase === "stealing") surveiStealBannerEl.textContent = "🔁 KESEMPATAN MENCURI -- Kelompok " + s.activeTeam + "!";
+    else if (s.phase === "playing") surveiStealBannerEl.textContent = "Menjawab: Kelompok " + s.activeTeam;
+    else surveiStealBannerEl.textContent = "";
+    if (s.phase === "roundOver") {
+      const mult = s.multiplierApplied || 1;
+      surveiWinnerBannerEl.textContent = "🏆 Kelompok " + s.winner + " dapat +" + (s.pot * mult) + " poin!" + (mult > 1 ? ` (${s.pot} x2)` : "");
+      if (typeof SoundFX !== "undefined") SoundFX.play("tada");
+      if (typeof playConfetti_ === "function") playConfetti_();
+    } else {
+      surveiWinnerBannerEl.textContent = "";
+    }
+    // BARU -- begitu tembus 200, kasih tahu penonton mereka maju ke Babak Cepat.
+    surveiSesiSelesaiBannerEl.textContent = s.sesiSelesai
+      ? `🎉 Kelompok ${s.finalWinnerSesi1} tembus 200! Bersiap untuk Babak Cepat...`
+      : "";
+    surveiWrongBtn2.disabled = s.phase !== "playing" && s.phase !== "stealing";
+    surveiUndoBtn2.disabled = !s.canUndo;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (16 Sep 2026) -- render Babak Cepat + loop timer LOKAL (murni
+  // tampilan+bunyi, TIDAK ada logika skor/giliran di sini -- semua itu
+  // dari `fm` yang dikirim Studio, lihat publicFastMoney_() di js/
+  // games/survei-membuktikan.js). Loop dihidupkan/dimatikan otomatis
+  // tiap kali `fm.timerDeadline` berubah (pertanyaan baru/timer diulang
+  // dari Studio) lewat perbandingan referensi timestamp, BUKAN dibuat
+  // ulang tiap render supaya tidak "berkedip"/lompat tiap ada broadcast
+  // lain yang tidak terkait timer.
+  // ------------------------------------------------------------
+  let fmLastDeadline_ = undefined;
+
+  function stopFmTimerLoop_() {
+    if (fmTimerInterval_) { clearInterval(fmTimerInterval_); fmTimerInterval_ = null; }
+    fmLastDeadline_ = undefined;
+    fmLastSecondShown_ = null;
+  }
+
+  function fmTick_() {
+    if (!surveiState_ || surveiState_.mode !== "fastmoney" || !surveiState_.fastMoney || surveiState_.fastMoney.timerDeadline == null) {
+      fmTimerNumEl.textContent = "";
+      return;
+    }
+    const remainMs = surveiState_.fastMoney.timerDeadline - Date.now();
+    const remainSec = Math.max(0, Math.ceil(remainMs / 1000));
+    fmTimerNumEl.textContent = String(remainSec);
+    fmTimerNumEl.classList.toggle("fm-timeup", remainSec <= 0);
+    if (remainSec !== fmLastSecondShown_) {
+      fmLastSecondShown_ = remainSec;
+      if (remainSec > 0 && remainSec <= 3) { if (typeof playNote_ === "function") playNote_(1600, 0, 0.03, "square", 0.06); }
+      else if (remainSec === 0) { if (typeof SoundFX !== "undefined") SoundFX.play("fail"); }
+    }
+  }
+
+  function renderFastMoney_(fm) {
+    if (!fm) return;
+    if (fm.timerDeadline !== fmLastDeadline_) {
+      fmLastDeadline_ = fm.timerDeadline;
+      fmLastSecondShown_ = null;
+      if (fmTimerInterval_) clearInterval(fmTimerInterval_);
+      fmTimerInterval_ = fm.timerDeadline != null ? setInterval(fmTick_, 200) : null;
+      fmTick_();
+    }
+
+    if (fm.phase === "playing") {
+      fmPlayerLabelEl.textContent = (fm.currentParticipant === 0 ? fm.p1Name : fm.p2Name) + ` -- Pertanyaan ${fm.currentQ + 1} dari 5`;
+      fmQuestionTopikEl.textContent = fm.topik || "";
+      fmQuestionTopikEl.hidden = false;
+      fmTimerNumEl.hidden = false;
+    } else {
+      fmQuestionTopikEl.hidden = true;
+      fmTimerNumEl.hidden = true;
+      fmPlayerLabelEl.textContent = (fm.phase === "reveal" || fm.phase === "done") ? "Hasil Babak Cepat" : "";
+    }
+
+    fmP1RowLabelEl.textContent = fm.p1Name + " (" + (fm.p1Total || 0) + " poin)";
+    fmP1RowEl.innerHTML = "";
+    (fm.p1Answers || []).forEach((a, i) => {
+      const cell = document.createElement("div");
+      if (a) {
+        cell.className = "fm-cell fm-open";
+        cell.innerHTML = "<span>" + (a.label || "(tidak ada)") + "</span><span class=\"fm-poin\">" + a.poin + "</span>";
+      } else {
+        cell.className = "fm-cell fm-locked";
+        cell.textContent = "🔒";
+      }
+      fmP1RowEl.appendChild(cell);
+    });
+
+    fmP2RowLabelEl.textContent = fm.p2Name + " (" + (fm.p2Total || 0) + " poin)";
+    fmP2RowEl.innerHTML = "";
+    (fm.p2Answers || []).forEach((a) => {
+      const cell = document.createElement("div");
+      if (a) {
+        cell.className = "fm-cell fm-open";
+        cell.innerHTML = "<span>" + (a.label || "(tidak ada)") + "</span><span class=\"fm-poin\">" + a.poin + "</span>";
+      } else {
+        cell.className = "fm-cell fm-locked";
+        cell.textContent = "🔒";
+      }
+      fmP2RowEl.appendChild(cell);
+    });
+
+    if (fm.phase === "done") {
+      fmTotalsLineEl.textContent = "Total gabungan: " + fm.grandTotal + " poin";
+      fmDoneBannerEl.textContent = fm.won ? "🏆 TEMBUS 200! MENANG!" : "Belum tembus 200.";
+      if (typeof SoundFX !== "undefined") SoundFX.play(fm.won ? "tada" : "fail");
+      if (fm.won && typeof playConfetti_ === "function") playConfetti_();
+    } else {
+      fmTotalsLineEl.textContent = "";
+      fmDoneBannerEl.textContent = "";
+    }
+  }
+
+  function showSurvei(data) {
+    stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
+    if (typeof stopModeScreen === "function") stopModeScreen(false);
+    if (typeof stopMap === "function") stopMap(false);
+    if (typeof stopWheel === "function") stopWheel(false);
+    if (typeof stopQuiz9 === "function") stopQuiz9(false);
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; refEl.textContent = "";
+    refSubEl.hidden = true; refSubEl.textContent = "";
+    textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+
+    surveiState_ = data.state;
+    surveiViewEl.hidden = false;
+    renderSurveiBoard_();
+    svShowActionBar_();
+  }
+
+  function stopSurvei(showIdle) {
+    surveiViewEl.hidden = true;
+    surveiActionBarEl.hidden = true;
+    surveiState_ = null;
+    stopFmTimerLoop_();
+    if (surveiHideTimer_) { clearTimeout(surveiHideTimer_); surveiHideTimer_ = null; }
+    if (showIdle) idleEl.hidden = false;
+  }
+
+  function svSendAction_(action, boxIndex) {
+    if (!surveiState_) return;
+    if (window.opener) {
+      try {
+        window.opener.postMessage({ source: "bibleAppPresenter", type: "present_survei_action", action: action, boxIndex: boxIndex }, location.origin);
+      } catch (e) {}
+    }
+  }
+  surveiWrongBtn2.addEventListener("click", () => svSendAction_("wrong"));
+  surveiUndoBtn2.addEventListener("click", () => svSendAction_("undo"));
+  document.addEventListener("mousemove", () => { if (!surveiActionBarEl.hidden) svShowActionBar_(); });
+  document.addEventListener("keydown", (e) => {
+    if ((e.key === "h" || e.key === "H") && !surveiActionBarEl.hidden) svShowActionBar_();
+  });
+
 
   // ------------------------------------------------------------
   // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4).
@@ -3571,6 +4233,8 @@
   function showLocalVideo(data) {
     stopTimer(false); stopStopwatch(false); stopTimerClock(false); hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // Video Lokal & YouTube tidak boleh berbarengan
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     if (localVideoObjectUrl_) { URL.revokeObjectURL(localVideoObjectUrl_); localVideoObjectUrl_ = null; }
     idleEl.hidden = true;
     // DIUBAH (8 Sep 2026, permintaan operator "video ada subtitle-nya")
@@ -3638,6 +4302,8 @@
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     stopModeScreen(false); // BARU (9 Sep 2026)
     stopMap(false); // BARU (9 Sep 2026)
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     stopwatchState = { baseStartAt: data.baseStartAt, label: data.label || "" };
     stopwatchLabelEl.textContent = stopwatchState.label;
@@ -3674,6 +4340,8 @@
     stopLocalVideo(false); // BARU (7 Sep 2026) -- ikut 🎬 Video Lokal juga
     stopModeScreen(false); // BARU (9 Sep 2026)
     stopMap(false); // BARU (9 Sep 2026)
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     if (stopwatchInterval) { clearInterval(stopwatchInterval); stopwatchInterval = null; }
     stopwatchState = null;
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
@@ -4379,6 +5047,8 @@
     if (typeof stopModeScreen === "function") stopModeScreen(false); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
     if (typeof stopMap === "function") stopMap(false); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
+    if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
+    if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
     setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
     idleEl.hidden = true;
@@ -4704,6 +5374,22 @@
       if (data.action === "stop") { stopWheel(true); }
       else if (data.action === "spin") { spinWheel(data); }
       else { showWheel(data); }
+      return;
+    }
+    // BARU (16 Sep 2026, permintaan operator) -- 🧩 Kuis 9 Kotak & 🎲
+    // Tak Tik Boom, lihat catatan panjang showQuiz9() di atas &
+    // js/games/kuis-9-kotak.js untuk kontrak state lengkapnya.
+    if (data.type === "quiz9") {
+      if (data.action === "reset") { stopQuiz9(true); }
+      else { showQuiz9(data); }
+      return;
+    }
+    // BARU (16 Sep 2026, permintaan operator) -- 📊 Survei Membuktikan
+    // (Family 100), lihat catatan panjang showSurvei() di atas &
+    // js/games/survei-membuktikan.js untuk kontrak state lengkapnya.
+    if (data.type === "survei") {
+      if (data.action === "reset") { stopSurvei(true); }
+      else { showSurvei(data); }
       return;
     }
     // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4),
@@ -5111,7 +5797,7 @@
   reportGeometry();
 
   // BARU (12 Sep 2026 v2, permintaan operator "jam kecil di pojok, aktif
-  // di ayat/kidung/PDF/apapun") -- interval INI SENDIRI berjalan terus 
+  // di ayat/kidung/PDF/apapun") -- interval INI SENDIRI berjalan terus
   // sejak halaman dimuat, TERLEPAS dari apa yang sedang tayang di #stage
   // (ayat/kidung/pengumuman/gambar/PDF/video/Timer/dst) & terlepas dari
   // status show/hide-nya sendiri (cukup update teksnya tiap detik --
