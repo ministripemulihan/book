@@ -32,6 +32,12 @@
 //  kemampuan apa pun (data live tetap perlu server live).
 // ============================================================
 
+// DINAIKKAN LAGI (10 Sep 2026, sesi ke-16 -- perbaikan bug efek suara
+// baru "hanya bunyi cling" di komputer [present.html sekarang pakai
+// ?v= juga], + dukungan efek dari link luar/Google Drive, + panel
+// mandiri "🔊 Efek Suara Offline" di menu ⋮).
+// DINAIKKAN LAGI (10 Sep 2026, sesi ke-15 -- opsi centang "🔊 Sertakan
+// juga efek suara" di dialog Unduh Data Alkitab, js/app.js/js/soundfx.js).
 // DINAIKKAN LAGI (10 Sep 2026, sesi ke-14 -- 14 efek suara MP3 rekaman
 // baru ditambahkan ke js/soundfx.js + folder assets/sounds/ baru).
 // DINAIKKAN LAGI (10 Sep 2026, dropdown pilihan peta online "Peta polos"
@@ -48,7 +54,13 @@
 // diperbaiki di kode tapi masih belum kelihatan di HP" -- itu 9 dari 10
 // kali karena Service Worker/cache lama, BUKAN kodenya salah; menaikkan
 // angka ini tiap deploy baru adalah cara memaksa HP ambil versi terbaru.
-const CACHE_NAME = "book-vp-shell-v6";
+// DINAIKKAN LAGI (tambahan -- tombol "💾 Unduh Efek Suara ke HP Ini" baru
+// di bagian bawah panel admin "🔊 Coba Efek Suara & Visual", index.html/
+// js/effectpreview.js).
+// DINAIKKAN LAGI (tambahan -- unduh efek suara satu-satu di
+// js/soundfx.js downloadOne()/renderDownloadList(), dipakai dari
+// index.html/js/effectpreview.js).
+const CACHE_NAME = "book-vp-shell-v14";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
