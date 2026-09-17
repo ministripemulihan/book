@@ -553,26 +553,47 @@
      q9ShowJudgeBar_() di skrip bawah) supaya tombol ✅/❌ operator TIDAK
      mengganggu pemandangan 1000 orang -- muncul lagi begitu mouse
      digerakkan atau tombol H ditekan. */
+  /* PERBAIKAN (18 Sep 2026, permintaan operator "biar lebih ke tengah
+     baik tinggi maupun lebar") -- dulu ukuran papan & teks dihitung
+     campur vh & vw (mis. min(78vh,86vw)), yang di jendela/layar yang
+     TIDAK proporsional 16:9 (mis. jendela browser dipakai belum
+     di-maximize/fullscreen, jadi pendek tapi lebar, seperti pratinjau
+     Layar 2 waktu masih di dalam window) bisa membuat tinggi TOTAL
+     seluruh isi (skor+papan+giliran+banner+padding) melebihi tinggi
+     jendela -- akibatnya sebagian bocor ke luar area yang kelihatan
+     walau CSS-nya sendiri sudah "align-items:center;justify-content:
+     center". SEKARANG semua ukuran dihitung dari vmin (= sisi TERPENDEK
+     antara lebar/tinggi jendela) supaya seluruh kartu (papan + skor +
+     teks) SELALU menyusut proporsional mengikuti sisi yang paling
+     sempit -- dijamin selalu muat & tetap di tengah, baik jendela
+     lebar-pendek maupun sempit-tinggi. #quiz9Inner (baru) + margin:auto
+     + overflow:auto di induknya adalah pola standar "flexbox centering
+     tidak boleh kepotong kalau kepaksa scroll" -- jaring pengaman kalau
+     ada layar yang sangat ekstrem sempit sampai vmin pun tidak cukup. */
   #quiz9View {
     display: none; position: fixed; inset: 0; z-index: 2;
     background: #0b0e14; flex-direction: column; align-items: center; justify-content: center;
-    padding: 3vh 2vw; box-sizing: border-box;
+    padding: 2.4vmin; box-sizing: border-box; overflow: auto;
   }
   #quiz9View:not([hidden]) { display: flex; animation: fadeInOnly .4s ease both; }
+  #quiz9Inner {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    margin: auto; max-width: 100%;
+  }
   #quiz9Scoreboard {
-    display: flex; gap: 6vw; margin-bottom: 2.6vh;
-    font: 800 clamp(20px, 3vw, 42px)/1.1 "Inter", Arial, sans-serif;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 5vmin; margin-bottom: 2.2vmin;
+    font: 800 clamp(16px, 3.2vmin, 40px)/1.1 "Inter", Arial, sans-serif;
   }
   #quiz9Scoreboard .q9-score-x { color: #3d8ee2; }
   #quiz9Scoreboard .q9-score-o { color: #e2483d; }
   #quiz9Board {
     display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-    gap: 1.4vh; width: min(78vh, 86vw); height: min(78vh, 86vw);
+    gap: 1.2vmin; width: min(68vmin, 720px); height: min(68vmin, 720px);
   }
   .q9-cell {
     position: relative; border-radius: 14px; background: rgba(255,255,255,.06);
     border: 2px solid rgba(255,255,255,.14); display: flex; align-items: center; justify-content: center;
-    text-align: center; padding: 1vh; font: 700 clamp(11px, 1.6vw, 20px)/1.25 "Inter", Arial, sans-serif;
+    text-align: center; padding: 1vmin; font: 700 clamp(11px, 2.2vmin, 20px)/1.25 "Inter", Arial, sans-serif;
     color: #f5f2e8; overflow: hidden;
   }
   .q9-cell.q9-owner-X { background: rgba(61,142,226,.28); border-color: #3d8ee2; }
@@ -580,16 +601,16 @@
   .q9-cell.q9-owner-neutral { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.08); color: rgba(245,242,232,.35); }
   .q9-cell .q9-mark {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font: 900 clamp(40px, 8vw, 110px)/1 "Inter", Arial, sans-serif;
+    font: 900 clamp(40px, 11vmin, 110px)/1 "Inter", Arial, sans-serif;
   }
   .q9-cell.q9-owner-X .q9-mark { color: #3d8ee2; }
   .q9-cell.q9-owner-O .q9-mark { color: #e2483d; }
   #quiz9Turn {
-    margin-top: 2.2vh; font: 700 clamp(14px, 1.8vw, 24px)/1.3 "Inter", Arial, sans-serif;
+    margin-top: 2vmin; font: 700 clamp(14px, 2.4vmin, 24px)/1.3 "Inter", Arial, sans-serif;
     color: var(--p-accent); text-align: center; min-height: 1.4em;
   }
   #quiz9WinnerBanner {
-    margin-top: .6vh; font: 900 clamp(24px, 4.2vw, 58px)/1.15 "Inter", Arial, sans-serif;
+    margin-top: .6vmin; font: 900 clamp(22px, 5vmin, 58px)/1.15 "Inter", Arial, sans-serif;
     color: #ffd23d; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,.6); min-height: 1em;
   }
   #quiz9QuestionView {
@@ -2079,13 +2100,15 @@
        Tik Boom, lihat catatan panjang CSS #quiz9View di atas &
        showQuiz9()/renderQuiz9Board_() di skrip bawah. -->
   <div id="quiz9View" hidden>
-    <div id="quiz9Scoreboard">
-      <span class="q9-score-x">X: <span id="quiz9ScoreX">0</span></span>
-      <span class="q9-score-o">O: <span id="quiz9ScoreO">0</span></span>
+    <div id="quiz9Inner">
+      <div id="quiz9Scoreboard">
+        <span class="q9-score-x"><span id="quiz9NameX">X</span>: <span id="quiz9ScoreX">0</span></span>
+        <span class="q9-score-o"><span id="quiz9NameO">O</span>: <span id="quiz9ScoreO">0</span></span>
+      </div>
+      <div id="quiz9Board"></div>
+      <div id="quiz9Turn"></div>
+      <div id="quiz9WinnerBanner"></div>
     </div>
-    <div id="quiz9Board"></div>
-    <div id="quiz9Turn"></div>
-    <div id="quiz9WinnerBanner"></div>
   </div>
   <div id="quiz9QuestionView" hidden>
     <div id="quiz9QTopik"></div>
@@ -3477,6 +3500,7 @@
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
     if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
     if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // PERBAIKAN (18 Sep 2026, laporan operator "kuis ketutup versi lama") -- lapisan Penciptaan (z-index 2, selalu di atas) dulu tidak pernah disuruh sembunyi kalau salah satu Mode Layar/Peta/Roda/Kuis/Survei di bawah ini dinyalakan sementara Penciptaan masih tayang.
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -3742,6 +3766,7 @@
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
     if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
     if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // PERBAIKAN (18 Sep 2026, laporan operator "kuis ketutup versi lama") -- lihat catatan di showModeScreen()
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -3945,6 +3970,7 @@
     if (typeof stopMap === "function") stopMap(false);
     if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga (celah lama, ikut dirapikan)
     if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // PERBAIKAN (18 Sep 2026, laporan operator "kuis ketutup versi lama") -- lihat catatan di showModeScreen()
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -4184,6 +4210,8 @@
   // ------------------------------------------------------------
   const quiz9ViewEl = document.getElementById("quiz9View");
   const quiz9BoardEl = document.getElementById("quiz9Board");
+  const quiz9NameXEl = document.getElementById("quiz9NameX");
+  const quiz9NameOEl = document.getElementById("quiz9NameO");
   const quiz9ScoreXEl = document.getElementById("quiz9ScoreX");
   const quiz9ScoreOEl = document.getElementById("quiz9ScoreO");
   const quiz9TurnEl = document.getElementById("quiz9Turn");
@@ -4207,8 +4235,24 @@
     return "";
   }
 
+  // BARU (18 Sep 2026, permintaan operator "biar tim ada namanya, tapi
+  // tetap kelihatan pakai tanda X atau O") -- nama tim (`teamNames.X` /
+  // `teamNames.O`) diisi operator lewat panel Studio (opsional, lihat
+  // psQuiz9TeamNameX/O di kuis-9-kotak.js). Selalu ditulis "Nama (X)"
+  // atau "Nama (O)" -- tanda X/O TETAP ditampilkan supaya penonton yang
+  // sudah hafal warna biru=X / merah=O di papan tidak bingung, sekaligus
+  // lebih ramah/menarik daripada cuma "Kelompok X" polos. Fallback ke
+  // "Kelompok X"/"Kelompok O" kalau operator tidak mengisi nama.
+  function q9TeamLabel_(group) {
+    const names = quiz9State_ && quiz9State_.teamNames;
+    const name = names && names[group] ? names[group] : "Kelompok " + group;
+    return name + " (" + group + ")";
+  }
+
   function renderQuiz9Board_() {
     if (!quiz9State_) return;
+    quiz9NameXEl.textContent = q9TeamLabel_("X");
+    quiz9NameOEl.textContent = q9TeamLabel_("O");
     quiz9ScoreXEl.textContent = quiz9State_.scores.X;
     quiz9ScoreOEl.textContent = quiz9State_.scores.O;
     quiz9BoardEl.innerHTML = "";
@@ -4226,12 +4270,12 @@
       const w = quiz9State_.winner;
       quiz9TurnEl.textContent = "";
       if (!w || w.by === "tie") quiz9WinnerBannerEl.textContent = "🤝 SERI! Skor sama.";
-      else quiz9WinnerBannerEl.textContent = "🏆 Kelompok " + w.group + " MENANG! (" + (w.by === "line" ? "3 sejajar" : "poin tertinggi") + ")";
+      else quiz9WinnerBannerEl.textContent = "🏆 " + q9TeamLabel_(w.group) + " MENANG! (" + (w.by === "line" ? "3 sejajar" : "poin tertinggi") + ")";
       if (typeof SoundFX !== "undefined") SoundFX.play("tada");
       if (typeof playConfetti_ === "function") playConfetti_();
     } else {
       quiz9WinnerBannerEl.textContent = "";
-      quiz9TurnEl.textContent = "Giliran memilih kotak: Kelompok " + quiz9State_.activeGroup;
+      quiz9TurnEl.textContent = "Giliran memilih kotak: " + q9TeamLabel_(quiz9State_.activeGroup);
     }
   }
 
@@ -4246,7 +4290,7 @@
     quiz9QSoalEl.textContent = q.soal || "";
     const box = quiz9State_.boxes[q.boxIndex];
     quiz9QSpecialBannerEl.textContent = box && box.special ? q9SpecialLabel_(box.special) : "";
-    quiz9QAnswererEl.textContent = (q.isSteal ? "🔁 Rebutan! " : "") + "Menjawab: Kelompok " + q.answeringGroup;
+    quiz9QAnswererEl.textContent = (q.isSteal ? "🔁 Rebutan! " : "") + "Menjawab: " + q9TeamLabel_(q.answeringGroup);
     quiz9QuestionViewEl.hidden = false;
     quiz9JudgeBarEl.hidden = false;
     q9ShowJudgeBar_();
@@ -4263,6 +4307,8 @@
     if (typeof stopModeScreen === "function") stopModeScreen(false);
     if (typeof stopMap === "function") stopMap(false);
     if (typeof stopWheel === "function") stopWheel(false);
+    if (typeof stopSurvei === "function") stopSurvei(false); // PERBAIKAN (18 Sep 2026) -- dulu tidak ada, padahal showSurvei() sudah lebih dulu menutup Quiz9 (celah 1 arah)
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // PERBAIKAN (18 Sep 2026, laporan operator "kuis ketutup versi lama") -- INI PENYEBAB UTAMANYA: lapisan Penciptaan (z-index 2, selalu di atas) dulu tidak pernah disuruh sembunyi begitu Kuis 9 Kotak dinyalakan sementara Penciptaan masih tayang, jadi Layar 2 kelihatan "tertimpa" pemandangan lama walau Studio sudah bilang Kuis 9 Kotak sedang tayang.
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -4524,6 +4570,7 @@
     if (typeof stopMap === "function") stopMap(false);
     if (typeof stopWheel === "function") stopWheel(false);
     if (typeof stopQuiz9 === "function") stopQuiz9(false);
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // PERBAIKAN (18 Sep 2026, laporan operator "kuis ketutup versi lama") -- lihat catatan di showModeScreen()
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -4599,6 +4646,7 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; } // Video Lokal & YouTube tidak boleh berbarengan
     if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
     if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // PERBAIKAN (18 Sep 2026, laporan operator "kuis ketutup versi lama") -- celah yang sama juga ada di sini, lihat catatan di showModeScreen()
     if (localVideoObjectUrl_) { URL.revokeObjectURL(localVideoObjectUrl_); localVideoObjectUrl_ = null; }
     idleEl.hidden = true;
     // DIUBAH (8 Sep 2026, permintaan operator "video ada subtitle-nya")
@@ -6234,7 +6282,7 @@
   // "HH:MM:SS:MSMS" yang SELALU 4 bagian, contoh "01:01:31:17") --
   // sebelumnya bagian JAM (hh) baru muncul kalau video sudah lewat 1
   // jam (video < 1 jam cuma tampil MM:SS:ms) -- sekarang SELALU
-  // ditampilkan 4 bagian (HH:MM:SS:ms) supaya formatnya konsisten sejak 
+  // ditampilkan 4 bagian (HH:MM:SS:ms) supaya formatnya konsisten sejak
   // detik pertama video, tidak berubah-ubah panjangnya di tengah jalan.
   function fmtElapsedParts_(totalSec) {
     const s = Math.max(0, totalSec);
