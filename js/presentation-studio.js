@@ -1285,10 +1285,23 @@ const PresentationStudio = (() => {
   function sendGenericItemLive(it) {
     if (!it || typeof Presentation === "undefined") return;
     if (it.type === "verse") {
-      const v = typeof verseById !== "undefined" ? verseById[it.verseId] : null;
-      if (v) Presentation.sendVerse(v, v.bookName);
-      renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? v.text : "" }] });
-      clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
+      // BARU (18 Sep 2026, permintaan operator "gabung beberapa ayat jadi
+      // 1 slide") -- it.verseIds (>1 id) = beberapa ayat digabung 1 slide,
+      // lihat combineVerseGroupForSlide() (js/app.js) & UI pemilihnya
+      // (psQuickGroupSelect, wireQuickVerse() di bawah). Ayat tunggal
+      // (verseIds kosong/1, format LAMA) tetap lewat Presentation.sendVerse()
+      // apa adanya -- tidak ada yang berubah untuk kumpulan ayat lama.
+      if (it.verseIds && it.verseIds.length > 1 && typeof combineVerseGroupForSlide === "function") {
+        const combined = combineVerseGroupForSlide(it.verseIds);
+        if (Presentation.sendVerseCombined) Presentation.sendVerseCombined(combined.ref, combined.text);
+        renderStudioPreview({ type: "verse", ref: combined.ref, texts: [{ label: "", text: combined.text }] });
+        clearMonitorVideo_();
+      } else {
+        const v = typeof verseById !== "undefined" ? verseById[it.verseId] : null;
+        if (v) Presentation.sendVerse(v, v.bookName);
+        renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? v.text : "" }] });
+        clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
+      }
     } else if (it.type === "text") {
       Presentation.sendFreeText(it.text || "");
       renderStudioPreview({ type: "text", text: it.text || "" });
@@ -3600,6 +3613,28 @@ const PresentationStudio = (() => {
       return out;
     }
 
+    // BARU (18 Sep 2026, permintaan operator) -- baca pilihan "Kalau lebih
+    // dari 1 ayat, gabung jadi" (#psQuickGroupMode). Balikan angka
+    // (ukuran tiap kelompok) atau Infinity untuk "all" (semua jadi 1).
+    // 1 (bawaan) = perilaku LAMA, tidak berubah sama sekali.
+    function getQuickGroupSize() {
+      const sel = el("psQuickGroupMode");
+      if (!sel) return 1;
+      return sel.value === "all" ? Infinity : (parseInt(sel.value, 10) || 1);
+    }
+    // Pecah daftar blok (hasil resolveRefBlocks(), 1 blok = 1 ayat/rentang)
+    // jadi kelompok-kelompok berisi `groupSize` ayat, pakai verse id dari
+    // versi PERTAMA tercentang tiap blok (konsisten dengan "➕ Daftar" yang
+    // memang sudah lebih dulu begini -- Kumpulan Ayat tersimpan 1 bahasa).
+    // Balikan: array of { verseIds: [...] } -- 1 elemen = 1 slide nanti.
+    function groupBlocksVerseIds(blocks, groupSize) {
+      const flatIds = [];
+      blocks.forEach((b) => { if (b.versions[0]) flatIds.push(...b.versions[0].verses.map((v) => v.id)); });
+      const groups = [];
+      for (let i = 0; i < flatIds.length; i += groupSize) groups.push(flatIds.slice(i, i + groupSize));
+      return groups;
+    }
+
     function updatePreview() {
       if (!preview) return;
       const blocks = resolveRefBlocks();
@@ -3618,6 +3653,29 @@ const PresentationStudio = (() => {
       el("psQuickShowBtn").addEventListener("click", () => {
         const blocks = resolveRefBlocks();
         if (!blocks.length) return;
+        const groupSize = getQuickGroupSize();
+        // BARU (18 Sep 2026) -- kalau ada LEBIH DARI 1 ayat DAN operator
+        // memilih gabung >1 ayat/slide, "Tampilkan" mengirim GABUNGAN N
+        // ayat PERTAMA (bukan cuma 1 ayat pertama seperti bawaan) --
+        // sisanya (kalau masih ada) tetap hanya lewat "➕ Daftar" (sama
+        // seperti perilaku lama, lihat catatan di bawah). Versi Alkitab:
+        // dibatasi ke versi PERTAMA tercentang saat menggabung (>1 versi
+        // sekaligus + >1 ayat sekaligus jadi terlalu padat di 1 slide).
+        if (blocks.length > 1 && groupSize > 1 && typeof combineVerseGroupForSlide === "function") {
+          const groups = groupBlocksVerseIds(blocks, groupSize);
+          const firstGroupIds = groups[0] || [];
+          const combined = combineVerseGroupForSlide(firstGroupIds);
+          const doSend = () => {
+            if (typeof Presentation !== "undefined" && Presentation.sendVerseCombined) {
+              Presentation.sendVerseCombined(combined.ref, combined.text);
+            }
+            renderStudioPreview({ type: "verse", ref: combined.ref, texts: [{ label: "", text: combined.text }] });
+            clearMonitorVideo_();
+          };
+          if (isDualLive()) stageNext(combined.ref, combined.text, doSend);
+          else doSend();
+          return;
+        }
         // Referensi pertama saja yang ditayangkan (kalau user ketik
         // beberapa referensi dipisah ";", sisanya tetap kelihatan di
         // pratinjau ketik-cepat untuk dipilih satu-satu / ditambah ke
@@ -3655,7 +3713,22 @@ const PresentationStudio = (() => {
         const username = typeof currentUser !== "undefined" ? currentUser : null;
         const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
         if (!name) return;
-        verses.forEach((v) => addVerseToCollection(username, name, v.id));
+        // BARU (18 Sep 2026, permintaan operator) -- "Kalau lebih dari 1
+        // ayat, gabung jadi": groupSize 1 (bawaan) = perilaku LAMA persis
+        // (1 ayat = 1 item/slide, addVerseToCollection() seperti sebelum
+        // ini ada). groupSize >1/"all" = tiap N ayat BERURUTAN jadi 1
+        // item gabungan (addVerseGroupToCollection(), js/collections.js) --
+        // kalau sisa ayat terakhir kurang dari N, tetap digabung apa
+        // adanya (mis. 5 ayat, gabung 2 -> 2+2+1, BUKAN dibuang).
+        const groupSize = getQuickGroupSize();
+        if (groupSize > 1 && verses.length > 1 && typeof addVerseGroupToCollection === "function") {
+          const gSize = groupSize === Infinity ? verses.length : groupSize;
+          for (let i = 0; i < verses.length; i += gSize) {
+            addVerseGroupToCollection(username, name, verses.slice(i, i + gSize).map((v) => v.id));
+          }
+        } else {
+          verses.forEach((v) => addVerseToCollection(username, name, v.id));
+        }
         renderCollectionSelect();
       });
     }
