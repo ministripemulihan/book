@@ -924,11 +924,24 @@
        muat penuh dalam layar), lalu diperbesar lewat transform scale()
        dari titik ATAS-TENGAH (transform-origin: top center) sebesar
        --ps-slide-zoom (diisi showMain()) -- sisi yang keluar layar ikut
-       terpotong body {overflow:hidden}, sama seperti fitwidth. */
+       terpotong body {overflow:hidden}, sama seperti fitwidth.
+     - .ps-slide-fill ("Lebar+Tinggi", BARU 18 Sep 2026, permintaan
+       operator "jangan kepotong, jangan mengecil, harus full, tidak
+       perlu proporsional") -- lebar DAN tinggi dipaksa PAS 100vw/100vh
+       SEKALIGUS (object-fit:fill, bukan contain) -- gambar boleh
+       melar/gepeng, TAPI konsekuensinya TIDAK ADA yang kepotong maupun
+       menyisakan ruang kosong, persis definisi "Fill Page" di aplikasi
+       cetak foto. Definisi sama dengan ".fs-fit-cover" milik viewer
+       1-layar Kumpulan Ayat (css/style.css) supaya konsisten. */
   #slideView.ps-slide-fitwidth {
     position: fixed; top: 0; left: 0; right: 0;
     width: 100vw; height: auto; max-width: none; max-height: none;
     object-fit: contain; object-position: top;
+  }
+  #slideView.ps-slide-fill {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh; max-width: none; max-height: none;
+    object-fit: fill;
   }
   #slideView.ps-slide-zoom {
     position: fixed; top: 0; left: 50%;
@@ -5499,11 +5512,13 @@
       // `displayMode` bawaan "original" kalau tidak dikirim sama sekali
       // (payload lama/tempat lain yang belum tahu field ini) -- perilaku
       // TIDAK BERUBAH untuk itu.
-      slideEl.classList.remove("ps-slide-fitwidth", "ps-slide-zoom");
+      slideEl.classList.remove("ps-slide-fitwidth", "ps-slide-fill", "ps-slide-zoom");
       slideEl.style.removeProperty("--ps-slide-zoom");
       const dispMode = data.displayMode || "original";
       if (dispMode === "fitwidth") {
         slideEl.classList.add("ps-slide-fitwidth");
+      } else if (dispMode === "fill") {
+        slideEl.classList.add("ps-slide-fill");
       } else if (dispMode === "zoom") {
         const zoomFactor = Math.max(1, (data.zoomPct || 150) / 100);
         slideEl.style.setProperty("--ps-slide-zoom", String(zoomFactor));
