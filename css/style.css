@@ -762,9 +762,80 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    .collection-fs-nav-top-btn di atas) supaya tidak tertutup.
    ============================================================ */
 .collection-fs-overlay.fs-media-mode {
-  padding: 8px 8px 4px;
+  padding: 0;
   overflow: hidden; /* video/gambar penuh 1 layar -- tidak perlu digulir */
 }
+/* PERBAIKAN (17 Sep 2026, permintaan operator: "masih ketutup yang
+   paling atas... buat model tipis seperti transparan") -- dulu
+   `.collection-fs-top-row` adalah baris BIASA (ikut alur dokumen) yang
+   MENDORONG video/gambar ke bawah, dan judul lengkap ayat/kidung/berkas
+   (`.collection-fs-ref`) ditaruh BESAR di dalam kotak, menutupi bagian
+   atas video/gambar yang memenuhi 1 layar (lihat keluhan operator +
+   tangkapan layarnya). Sekarang KHUSUS mode media (fs-media-mode),
+   topRow dilepas dari alur (position:absolute, melayang DI ATAS
+   video/gambar, bukan mendorongnya) & diberi garis gradasi gelap→
+   transparan yang TIPIS supaya tombol tetap terbaca tapi media di
+   bawahnya tetap kelihatan penuh -- semua fitur (toolbar huruf/lebar/
+   tema/layar-penuh, Sebelumnya/Selanjutnya, panel zoom gambar, Tutup)
+   TETAP ada & TETAP bisa ditekan (position:absolute tidak mematikan
+   klik), cuma dipindah jadi 1 garis melayang tipis di paling atas.
+   Mode BUKAN media (ayat/teks/kidung/pengumuman) TIDAK disentuh sama
+   sekali -- topRow-nya tetap seperti sebelumnya (baris biasa, solid). */
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  margin: 0; padding: 6px 10px calc(14px + env(safe-area-inset-top, 0px)) 10px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0) 100%);
+  gap: 6px;
+}
+/* Semua tombol/tulisan di garis tipis ini: putih, latar nyaris tembus
+   pandang (bukan solid) -- tetap kelihatan garis/kontur tombolnya (jadi
+   operator tetap tahu itu bisa ditekan), tapi tidak menutupi media di
+   bawahnya. */
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .chip-btn,
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .collection-fs-close,
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .collapsible-toolbar-toggle {
+  background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4);
+  color: #fff; backdrop-filter: blur(2px);
+}
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .chip-btn:hover,
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .collection-fs-close:hover,
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .collapsible-toolbar-toggle:hover {
+  background: rgba(255,255,255,0.22);
+}
+.collection-fs-overlay.fs-media-mode .collection-fs-top-row .collection-fs-font-select {
+  background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4); color: #fff;
+}
+/* Tombol Sebelumnya/Selanjutnya (ikon panah kecil) -- ukuran TETAP sama
+   persis seperti sebelumnya (permintaan operator: "kelihatan kecil
+   seperti sekarang"), cuma warnanya ikut jadi transparan seperti tombol
+   lain di garis ini. */
+.collection-fs-overlay.fs-media-mode .collection-fs-nav-top-btn {
+  background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4); color: #fff;
+}
+/* Tulisan ringkas "28 / 45" (posisi slide ke berapa) -- pengganti judul
+   lengkap yang dulu menutupi bagian atas media, sekarang di garis tipis
+   ini, sebelah tombol "✕ Tutup". Judul lengkapnya tetap ada, dipindah
+   jadi tooltip (atribut title=, lihat js/app.js). */
+.collection-fs-ref-compact {
+  color: #fff; font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 8px; padding: 5px 10px; flex-shrink: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+/* Panel "Asli/Lebar Penuh" + zoom (-, %, +) -- dulu SELALU melayang
+   sendiri di sudut kanan-bawah gambar (lihat `.collection-fs-media-
+   controls` polos di bawah, masih dipertahankan utk kalau dipanggil
+   tanpa controlsHost). Sekarang, di dalam topRow (dipasang lewat
+   wireMediaImageControls_(), js/app.js), jadi bagian dari GARIS yang
+   sama -- tidak lagi posisi absolute/melayang terpisah. */
+.collection-fs-media-controls.collection-fs-media-controls-inline {
+  position: static; background: transparent; padding: 0; backdrop-filter: none;
+  flex-shrink: 0;
+}
+.collection-fs-media-controls-inline .chip-btn {
+  background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.4); color: #fff;
+}
+.collection-fs-media-controls-inline .collection-fs-zoom-value { color: #fff; }
 .collection-fs-box.fs-media-box {
   /* `flex: 1` & `flex-direction: column` sudah diwarisi dari
      `.collection-fs-box` dasar di atas -- itu yang membuat kotak ini
@@ -844,6 +915,12 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .collection-fs-theme-panel {
   width: 100%; max-width: 320px; margin: -8px 0 18px; padding: 10px 12px;
   background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 10px;
+}
+/* Mode media: topRow sekarang melayang (position:absolute, lihat CSS
+   ".fs-media-mode .collection-fs-top-row"), jadi panel tema (kalau
+   dibuka) perlu jarak dari atas supaya tidak tertindih garis tipis itu. */
+.collection-fs-overlay.fs-media-mode .collection-fs-theme-panel {
+  position: relative; z-index: 4; margin: 54px 8px 10px;
 }
 /* BARU (5 Sep 2026, permintaan operator) -- kotak embed Canva/SoundCloud/
    YouTube di Mode Layar Penuh 1-layar Kumpulan Ayat (lihat
