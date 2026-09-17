@@ -12,30 +12,74 @@
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
+  <!-- BARU (17 Sep 2026) -- animasi "7 Hari Penciptaan": latar Layar
+       Masuk + game "🌱 Penciptaan". Semua kelasnya berawalan bk- dan
+       dikurung di .bk-scene, jadi tidak bisa bentrok dgn style.css. -->
+  <link rel="stylesheet" href="css/book-scene.css?v=20260917a" />
 </head>
 <body>
 
   <!-- ===================== LAYAR LOGIN ===================== -->
   <div id="loginScreen" class="login-screen" hidden>
-    <div class="login-card">
+    <!-- BARU (17 Sep 2026, permintaan operator) -- latar animasi "7 Hari
+         Penciptaan". Kotak kosong ini diisi SENDIRI oleh
+         js/book-scene.js (pasangDiLogin()) begitu halaman siap, jadi
+         js/app.js & seluruh alur login TIDAK berubah sama sekali: form,
+         id #loginForm/#loginUsername/#loginPassword, tombol Mode Tamu,
+         Daftar Akun, Info Kami -- semuanya tetap persis seperti dulu,
+         cuma sekarang ada pemandangan bergerak di belakangnya.
+         Kalau js/book-scene.js gagal dimuat (mis. file terhapus),
+         yang terjadi hanyalah latar tetap polos -- login tetap jalan. -->
+    <div id="loginBookScene" aria-hidden="true"></div>
+
+    <div class="login-card" id="loginCard">
       <div class="login-mark">☩</div>
       <h1>Masuk</h1>
       <p class="login-sub">Masukkan username dan password Anda. Anda hanya perlu melakukannya sekali di perangkat ini.</p>
-      <form id="loginForm">
-        <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required />
-        <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required />
-        <div id="loginError" class="login-error" hidden>Username atau password salah.</div>
-        <button type="submit" id="loginSubmitBtn">Masuk</button>
-      </form>
+
+      <!-- BARU (17 Sep 2026, permintaan operator) -- kartu masuk mulai
+           dalam keadaan TERTUTUP, dibuka dengan menekan batang di bawah
+           ini. Yang berubah HANYA tampilannya: #loginForm, #loginUsername,
+           #loginPassword, #loginError, #loginSubmitBtn tetap ada persis
+           seperti dulu di dalam #loginBody, jadi js/app.js tidak perlu
+           diubah sama sekali. Kalau js/book-scene.js (yang memasang
+           tombolnya) gagal dimuat, wireKartuLogin() di sana juga yang
+           membuka paksa kartunya -- lihat catatan di file itu: TIDAK
+           mungkin ada keadaan "form tidak bisa dibuka sama sekali". -->
+      <button type="button" id="loginToggleBtn" class="login-bar" aria-expanded="false" aria-controls="loginBody">
+        <span>🔐 Masuk dengan Akun</span>
+        <span class="login-chev" aria-hidden="true">▾</span>
+      </button>
+
+      <div id="loginBody" class="login-body">
+        <div class="login-body-inner">
+          <form id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required />
+            <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required />
+            <div id="loginError" class="login-error" hidden>Username atau password salah.</div>
+            <button type="submit" id="loginSubmitBtn">Masuk</button>
+          </form>
+        </div>
+      </div>
+
       <!-- Tampil hanya kalau CONFIG.GUEST_MODE_ENABLED true (lihat initAuth()
            di js/app.js) -- masuk tanpa perlu username/password, tapi dengan
-           batasan (lihat js/guest.js & README.md bagian Mode Tamu). -->
+           batasan (lihat js/guest.js & README.md bagian Mode Tamu).
+           SENGAJA di LUAR #loginBody supaya Mode Tamu & Daftar Akun tetap
+           terlihat walaupun kartunya masih tertutup. -->
       <button type="button" id="guestEnterBtn" class="login-guest-btn" hidden>👤 Coba Tanpa Daftar (Mode Tamu)</button>
       <!-- BARU -- pendaftaran akun mandiri, akun baru MENUNGGU persetujuan
            administrator sebelum bisa dipakai untuk masuk (lihat
            js/signup.js & panel "🗂️ Kelola Pengguna" khusus administrator). -->
       <button type="button" id="signupOpenBtn" class="login-info-link">📝 Daftar Akun Baru</button>
       <button type="button" id="loginInfoKamiBtn" class="login-info-link">ℹ️ Info Kami</button>
+    </div>
+
+    <!-- Tombol hari 1-7 untuk latar di atas (diisi js/book-scene.js).
+         Murni hiasan -- tidak ada hubungannya dengan proses masuk. -->
+    <div id="loginBookBar">
+      <p id="loginBookLabel">Hari 1 · Terang</p>
+      <div id="loginBookDays" class="bk-days"></div>
     </div>
   </div>
 
@@ -2246,6 +2290,11 @@
           <button type="button" class="ps-tab" data-ps-right-tab="roda">🎡 Roda Undian</button>
           <button type="button" class="ps-tab" data-ps-right-tab="kuis9">🧩 Kuis 9 Kotak</button>
           <button type="button" class="ps-tab" data-ps-right-tab="survei">📊 Survei Membuktikan</button>
+          <!-- BARU (17 Sep 2026, permintaan operator) -- 🌱 Penciptaan.
+               Modul "Game Offline" ke-4, kodenya di js/games/penciptaan.js
+               (gambarnya dipakai bersama layar Masuk lewat
+               js/book-scene.js + css/book-scene.css). -->
+          <button type="button" class="ps-tab" data-ps-right-tab="penciptaan">🌱 Penciptaan</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="teks">
@@ -3566,10 +3615,55 @@
             </div>
           </div>
         </div>
+
+        <!-- BARU (17 Sep 2026, permintaan operator) -- 🌱 Penciptaan.
+             Beda dari 3 game di atas: ini "game tayang", bukan tanya-jawab
+             -- operator menekan Hari 1..7 dan Layar 2 menggambar ulang
+             pemandangan hari itu (SVG animasi penuh, 100% offline, tidak
+             ada file gambar/video sama sekali). Gambar yang SAMA dipakai
+             sebagai latar Layar Masuk (lihat #loginBookScene di atas
+             file ini) -- sumbernya satu: js/book-scene.js.
+             Kontrak payload ada di js/games/penciptaan.js. -->
+        <div class="ps-tab-panel" data-ps-right-panel="penciptaan" hidden>
+          <div class="ps-field-label" style="margin-top:0;">🌱 Penciptaan (7 Hari)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Tekan Hari 1-7, pemandangannya langsung berganti di Layar 2 -- cocok untuk cerita Sekolah Minggu, ice breaker "tebak hari keberapa", atau latar diam saat pembicara bercerita. 100% offline (gambar digambar sendiri oleh browser, bukan file video).</p>
+
+          <div id="psPenciptaanDays" class="bk-days" style="margin-bottom:10px;"></div>
+          <div id="psPenciptaanLabel" class="ps-pointer-hint" style="font-weight:700; margin-bottom:10px;"></div>
+
+          <div class="ps-btn-row" style="margin-top:10px;">
+            <button type="button" class="chip-btn small" id="psPenciptaanPutarBtn" aria-pressed="false">▶️ Putar otomatis</button>
+            <button type="button" class="chip-btn small" id="psPenciptaanResetBtn">🗑️ Reset</button>
+          </div>
+
+          <label class="ps-pointer-hint" style="display:flex; align-items:center; gap:8px; margin-top:10px; cursor:pointer;">
+            <input type="checkbox" id="psPenciptaanTeksChk" style="width:auto;" checked />
+            Tampilkan judul hari + alamat ayat di bawah gambar (Layar 2)
+          </label>
+
+          <!-- Hanya masuk akal di Hari 7 -- hari lain gambarnya memang
+               tidak mengikuti jam sama sekali. Disembunyikan otomatis
+               oleh perbaruiJamUi_() di js/games/penciptaan.js. -->
+          <div id="psPenciptaanJamWrap" hidden style="margin-top:14px; padding:10px; border-radius:10px; background:rgba(255,255,255,.04);">
+            <div class="ps-field-label" style="margin-top:0;">🕒 Hari 7 mengikuti jam asli Layar 2</div>
+            <p class="announcement-compose-hint" style="margin-top:0;">Langit, baju kedua anak, dan munculnya ayam jago mengikuti JAM PERANGKAT Layar 2 sendiri: 05-07 kaos rumah tanpa alas kaki (ayam jago berkokok 05.00-06.00), 07-10 seragam sekolah + sepatu, 10-13 baju pergi + sepatu, 13-18 kaos rumah sore + sandal, 18-21 baju tidur, 21-05 anaknya menghilang (tidur). Penggeser di bawah hanya untuk PRATINJAU/mencoba suasana jam lain saat acara.</p>
+            <div class="ps-btn-row" style="align-items:center;">
+              <input type="range" id="psPenciptaanJam" min="0" max="1435" step="5" value="720" style="flex:1 1 180px;" />
+              <span id="psPenciptaanJamLabel" style="font-weight:700; font-variant-numeric:tabular-nums; min-width:4em; text-align:center;">12:00</span>
+              <button type="button" class="chip-btn small" id="psPenciptaanJamAutoBtn">🕒 Ikuti jam perangkat</button>
+            </div>
+          </div>
+
+          <div class="ps-pointer-hint" style="margin-top:14px;">Catatan: sama seperti 🎡 Roda Undian, versi ini dipakai LANGSUNG dari sini setiap acara (belum bisa disimpan sebagai item di "📚 Kumpulan Ayat").</div>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- BARU (17 Sep 2026) -- pemandangan "7 Hari Penciptaan". Dimuat
+       PALING AWAL karena dipakai layar Masuk (sebelum login), dan
+       dipakai lagi oleh js/games/penciptaan.js di bawah. -->
+  <script src="js/book-scene.js?v=20260917a"></script>
   <script src="js/config.js?v=20260907a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260914b"></script>
@@ -3614,6 +3708,7 @@
   <script src="js/games/roda-putar.js?v=20260916a"></script>
   <script src="js/games/kuis-9-kotak.js?v=20260916a"></script>
   <script src="js/games/survei-membuktikan.js?v=20260916a"></script>
+  <script src="js/games/penciptaan.js?v=20260917a"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
