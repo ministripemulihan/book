@@ -1,0 +1,147 @@
+/* ============================================================
+   🌱 BookScene -- animasi pemandangan "7 Hari Penciptaan".
+   Pasangan dari js/book-scene.js. Dimuat di index.html (latar Layar
+   Masuk) DAN present.html (game "🌱 Penciptaan" di Layar 2).
+
+   SEMUA kelas di sini berawalan "bk-" dan seluruh aturannya dikurung
+   di dalam .bk-scene -- jadi tidak ada satu pun aturan di file ini
+   yang bisa "bocor" ke css/style.css, kidung-anak.css, atau ke gaya
+   bawaan present.html. Begitu pula sebaliknya: karena semua kelas
+   berawalan bk-, tidak ada aturan aplikasi yang tidak sengaja
+   mengenai isi scene ini.
+   ============================================================ */
+
+.bk-scene { position: absolute; inset: 0; overflow: hidden; background: #05070c; }
+.bk-scene .bk-sky { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ---------- lapisan per hari (1..7) ---------- */
+.bk-scene .bk-lay { opacity: 0; transition: opacity .85s ease; }
+.bk-scene .bk-lay.bk-on { opacity: 1; }
+
+/* ---------- gerak ---------- */
+.bk-scene .bk-clouds { animation: bkDrift 120s linear infinite; }
+.bk-scene .bk-clouds--slow { animation-duration: 210s; }
+@keyframes bkDrift { from { transform: translateX(0) } to { transform: translateX(-1200px) } }
+
+.bk-scene .bk-mist { animation: bkSweep 70s ease-in-out infinite alternate; opacity: .5; }
+.bk-scene .bk-mist--b { animation-duration: 110s; animation-delay: -20s; opacity: .32; }
+@keyframes bkSweep { from { transform: translateX(-70px) } to { transform: translateX(70px) } }
+
+.bk-scene .bk-glow { animation: bkBreathe 9s ease-in-out infinite alternate; }
+@keyframes bkBreathe { from { opacity: .6 } to { opacity: .9 } }
+
+.bk-scene .bk-stalk { transform-box: fill-box; transform-origin: bottom center; animation: bkSway 5s ease-in-out infinite alternate; }
+@keyframes bkSway { from { transform: rotate(-2.6deg) } to { transform: rotate(2.6deg) } }
+
+.bk-scene .bk-bird { offset-rotate: auto; animation: bkFly 34s linear infinite; }
+@keyframes bkFly { from { offset-distance: 0% } to { offset-distance: 100% } }
+.bk-scene .bk-wing { animation: bkFlap 1.1s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes bkFlap { from { transform: scaleY(1) } to { transform: scaleY(.3) } }
+
+.bk-scene .bk-star { animation: bkTwinkle 4s ease-in-out infinite alternate; }
+@keyframes bkTwinkle { from { opacity: .25 } to { opacity: 1 } }
+
+.bk-scene .bk-fly-bug { animation: bkGlimmer 5s ease-in-out infinite alternate; }
+@keyframes bkGlimmer { 0% { opacity: 0; transform: translate(0, 0) } 45% { opacity: 1 } 100% { opacity: .05; transform: translate(16px, -20px) } }
+
+.bk-scene .bk-rays { transform-box: fill-box; transform-origin: center; animation: bkSpin 90s linear infinite; }
+@keyframes bkSpin { to { transform: rotate(360deg) } }
+
+.bk-scene .bk-pulse { animation: bkPulse 6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes bkPulse { from { transform: scale(.94); opacity: .8 } to { transform: scale(1.06); opacity: 1 } }
+
+.bk-scene .bk-wave { animation: bkRoll 14s linear infinite; }
+.bk-scene .bk-wave--b { animation-duration: 20s; animation-direction: reverse; }
+.bk-scene .bk-wave--c { animation-duration: 26s; }
+@keyframes bkRoll { from { transform: translateX(0) } to { transform: translateX(-240px) } }
+
+.bk-scene .bk-swim { animation: bkSwim 26s linear infinite; }
+@keyframes bkSwim { from { transform: translateX(-260px) } to { transform: translateX(1460px) } }
+.bk-scene .bk-swim-rev { animation: bkSwimRev 26s linear infinite; }
+@keyframes bkSwimRev { from { transform: translateX(1460px) } to { transform: translateX(-260px) } }
+
+.bk-scene .bk-jump { offset-rotate: auto; animation: bkJumping 7s ease-in-out infinite; }
+@keyframes bkJumping { 0%, 64% { offset-distance: 0%; opacity: 0 } 66% { opacity: 1 } 96% { offset-distance: 100%; opacity: 1 } 97%, 100% { opacity: 0 } }
+
+.bk-scene .bk-wavehand { transform-box: fill-box; transform-origin: bottom center; animation: bkHi 1.6s ease-in-out infinite alternate; }
+@keyframes bkHi { from { transform: rotate(-14deg) } to { transform: rotate(18deg) } }
+
+.bk-scene .bk-tail { transform-box: fill-box; transform-origin: left center; animation: bkWag .9s ease-in-out infinite alternate; }
+@keyframes bkWag { from { transform: rotate(-18deg) } to { transform: rotate(22deg) } }
+.bk-scene .bk-trunk { transform-box: fill-box; transform-origin: top center; animation: bkWag 3.4s ease-in-out infinite alternate; }
+.bk-scene .bk-neck { transform-box: fill-box; transform-origin: bottom center; animation: bkBob 4.6s ease-in-out infinite alternate; }
+@keyframes bkBob { from { transform: rotate(-3deg) } to { transform: rotate(4deg) } }
+.bk-scene .bk-hop { animation: bkHop 3s ease-in-out infinite alternate; }
+@keyframes bkHop { from { transform: translateY(0) } to { transform: translateY(-6px) } }
+
+/* ayam jago jam 05.00-06.00: berkokok sambil mendongak + tanda suara berkedip */
+.bk-scene .bk-kokok { transform-box: fill-box; transform-origin: bottom center; animation: bkKokok 2.4s ease-in-out infinite; }
+@keyframes bkKokok {
+  0%, 58% { transform: translateY(0) rotate(0deg) }
+  70% { transform: translateY(-5px) rotate(-17deg) scale(1.05) }
+  84% { transform: translateY(-1px) rotate(-5deg) }
+  100% { transform: translateY(0) rotate(0deg) }
+}
+.bk-scene .bk-suara { animation: bkSuara 2.4s ease-in-out infinite; }
+@keyframes bkSuara { 0%, 64% { opacity: 0 } 72% { opacity: 1 } 92% { opacity: 0 } 100% { opacity: 0 } }
+
+/* ============================================================
+   Tombol hari kecil (dipakai di Layar Masuk & boleh di mana pun)
+   ============================================================ */
+.bk-days { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 6px; border-radius: 999px; background: rgba(9, 20, 26, .5); border: 1px solid rgba(255, 255, 255, .18); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.bk-day { width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 50%; cursor: pointer; background: rgba(255, 255, 255, .1); color: #f2f6f1; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; gap: 1px; transition: background .2s ease, transform .2s ease; }
+.bk-day em { font-style: normal; font-size: 14px; }
+.bk-day span { font-size: 9px; font-weight: 700; opacity: .8; }
+.bk-day:hover { background: rgba(255, 255, 255, .2); }
+.bk-day[aria-selected="true"] { background: #f3e3be; color: #1b2a20; transform: translateY(-2px); }
+.bk-day:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* ============================================================
+   LATAR LAYAR MASUK (index.html) -- scene dipasang di belakang
+   .login-card yang sudah ada. Gaya kartu login TIDAK diubah sama
+   sekali di sini; kita hanya menaruh lapisan di belakangnya +
+   sedikit peredup supaya tulisan tetap terbaca.
+   ============================================================ */
+#loginBookScene { position: absolute; inset: 0; z-index: 0; }
+#loginBookScene::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(4, 8, 14, .28) 0%, rgba(4, 8, 14, .66) 100%); pointer-events: none; }
+.login-screen { position: relative; overflow: hidden; }
+.login-screen > .login-card { position: relative; z-index: 2; }
+
+#loginBookBar { position: absolute; left: 0; right: 0; bottom: 14px; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px; pointer-events: none; }
+#loginBookBar > * { pointer-events: auto; }
+
+/* ------------------------------------------------------------
+   Kartu Masuk yang mulai TERTUTUP (permintaan operator, 17 Sep 2026).
+   Murni tampilan -- isi #loginBody tetap form login yang sama persis,
+   jadi js/app.js tidak tahu-menahu soal buka/tutup ini.
+   ------------------------------------------------------------ */
+/* Aturan di bawah SENGAJA digantung pada kelas .login-collapsible yang
+   dipasang oleh js/book-scene.js. Artinya: kalau file JS itu gagal
+   dimuat, kelas ini tidak pernah ada, batang tombolnya tetap
+   tersembunyi, dan form login tampil UTUH seperti versi lama -- tidak
+   mungkin ada keadaan "form terkunci tertutup dan tidak bisa dibuka". */
+#loginToggleBtn { display: none; }
+.login-card.login-collapsible #loginToggleBtn { display: flex; }
+.login-bar { width: 100%; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 0; padding: 12px 14px; border: 1px solid rgba(127, 127, 127, .3); border-radius: 12px; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
+.login-bar:hover { background: rgba(127, 127, 127, .1); }
+.login-bar .login-chev { font-size: 13px; opacity: .7; transition: transform .3s ease; }
+.login-card.login-collapsible[data-open="true"] .login-chev { transform: rotate(180deg); }
+.login-card.login-collapsible .login-body { max-height: 0; opacity: 0; overflow: hidden; transition: max-height .4s cubic-bezier(.3, .8, .35, 1), opacity .28s ease; }
+.login-card.login-collapsible[data-open="true"] .login-body { max-height: 420px; opacity: 1; }
+.login-body-inner { padding-top: 12px; }
+/* Layar pendek (HP mendatar) -- kartu login lebih penting daripada
+   tombol hiasan ini, jadi barisnya disembunyikan saja. */
+@media (max-height: 560px) { #loginBookBar { display: none; } }
+#loginBookLabel { margin: 0; font-size: 13px; font-weight: 600; color: #f4f8f1; text-shadow: 0 1px 14px rgba(0, 0, 0, .7); text-align: center; }
+
+/* ============================================================
+   LAYAR 2 (present.html) -- game "🌱 Penciptaan"
+   ============================================================ */
+#penciptaanView { position: absolute; inset: 0; z-index: 2; }
+#penciptaanView[hidden] { display: none; }
+#penciptaanCaption { position: absolute; left: 0; right: 0; bottom: 5vh; z-index: 3; text-align: center; font-family: "Literata", Georgia, serif; font-size: clamp(20px, 3.6vw, 52px); font-weight: 700; color: #f7f3e6; text-shadow: 0 2px 26px rgba(0, 0, 0, .8); padding: 0 6vw; line-height: 1.25; }
+#penciptaanCaption small { display: block; margin-top: .35em; font-size: .52em; font-weight: 500; opacity: .85; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-scene *, .bk-scene *::before, .bk-scene *::after { animation: none !important; }
+}
