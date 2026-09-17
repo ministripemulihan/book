@@ -927,27 +927,27 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    expand", bukan "di shrink" seperti Asli/Lebar Penuh/Tinggi Penuh) --
    geser (drag/seret, sama seperti mode lain) tetap tersedia utk melihat
    bagian yang kepotong. */
-/* PERBAIKAN (18 Sep 2026, v4, permintaan operator: "kena potong terus,
-   tidak papa gambarnya jadi tidak gepeng [tapi jangan kepotong]") --
-   versi v3 (di atas, hari yang sama) memaksa width:100% + height:100%
-   + object-fit:cover supaya mengisi PENUH layar sesuai definisi
-   operator sebelumnya ("di expand sampai setinggi selebar layar") --
-   TERNYATA di pemakaian nyata operator lebih terganggu oleh gambar yang
-   jadi kepotong terus-menerus daripada oleh ruang kosong di
-   tepi/atas-bawah. Operator sekarang menegaskan prioritas SEBALIKNYA:
-   LEBIH PENTING gambar utuh (tidak ada bagian terpotong, rasio tidak
-   melar/gepeng) daripada mengisi penuh 100% kedua sisi -- kalau perlu,
-   gambar boleh mengecil dari "penuh 1 layar" supaya tetap utuh. Ini
-   PERSIS definisi "Asli"/contain (mengecil seperlunya di kedua sumbu,
-   tidak pernah kepotong) -- makanya sekarang dikembalikan ke pola itu.
-   CATATAN: akibatnya mode "⛶ Lebar+Tinggi" ini sekarang terlihat SAMA
-   dengan mode "▭ Asli" -- itu SENGAJA/tidak apa menurut operator (lihat
-   permintaan di atas), BUKAN bug. Kalau operator kelak berubah pikiran
-   lagi & mau mode ini sungguh mengisi penuh layar (dengan konsekuensi
-   ada yang kepotong), tinggal kembalikan ke pola v3: `width:100%;
-   height:100%; max-width:none; max-height:none; object-fit:cover;`. */
+/* PERBAIKAN (18 Sep 2026, v5, permintaan operator: "jangan kepotong,
+   jangan mengecil, HARUS full -- tidak perlu proporsional") -- v4 (di
+   atas) menyamakan "⛶ Lebar+Tinggi" dengan "▭ Asli" (contain) supaya
+   tidak ada yang kepotong, TAPI akibatnya gambar/PDF rasio beda dari
+   layar jadi mengecil & menyisakan ruang kosong -- operator melihat ini
+   di panel Studio (Layar 2) & viewer PDF "kumpulan ayat" (contoh
+   screenshot: PDF Warta Gereja halaman 6/43 di 100% tidak mengisi
+   layar). Operator sekarang menegaskan definisi FINAL untuk mode ini,
+   meniru pilihan "Fill Page"/"Expand to Fit" di aplikasi cetak foto:
+   KEDUA sisi (lebar DAN tinggi) SELALU pas 100% -- TIDAK BOLEH
+   kepotong (beda dari v3/"cover") dan TIDAK BOLEH mengecil/menyisakan
+   ruang kosong (beda dari v4/"contain"). Satu-satunya cara memenuhi
+   kedua syarat itu SEKALIGUS untuk gambar berasio beda dari layar
+   adalah gambar boleh melar/gepeng (object-fit:fill, TIDAK proporsional)
+   -- operator sudah menegaskan ini boleh/tidak masalah ("tidak perlu
+   harus proporsional"). Drag/geser (wireMediaImageControls_(),
+   js/app.js) jadi tidak relevan lagi di mode ini (gambar sudah pas
+   penuh, tidak ada sisi yang perlu digeser), tapi dibiarkan aktif --
+   tidak mengganggu apa pun. */
 .collection-fs-embed-image.fs-media-full.fs-fit-cover {
-  width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain;
+  width: 100%; height: 100%; max-width: none; max-height: none; object-fit: fill;
 }
 /* BARU (18 Sep 2026, permintaan operator: "gimana caranya bisa tidak
    kepotong DAN full layar penuh DAN tidak ada yang gepeng sekaligus" --
