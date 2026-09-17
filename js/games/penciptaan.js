@@ -70,7 +70,7 @@
     { n: 4, ikon: "🌗", nama: "Matahari, bulan & bintang", ayat: "Kejadian 1:14-19" },
     { n: 5, ikon: "🐟", nama: "Ikan & burung", ayat: "Kejadian 1:20-23" },
     { n: 6, ikon: "🦁", nama: "Binatang darat & manusia", ayat: "Kejadian 1:24-31" },
-    { n: 7, ikon: "🌾", nama: "Hari perhentian di sawah", ayat: "Kejadian 2:1-3" }
+    { n: 7, ikon: "🌾", nama: "Hari perhentian", ayat: "Kejadian 2:1-3" }
   ];
 
   let hariAktif_ = 1;
