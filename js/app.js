@@ -6019,6 +6019,76 @@ async function resolveSoundCloudSrcForCollection(trackUrl) {
   return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + paramsTail;
 }
 
+// ------------------------------------------------------------
+// BARU (17 Sep 2026, permintaan operator) -- pratinjau kotak kecil
+// (thumbnail) utk item YouTube (link portabel MAUPUN dari Media
+// Tersimpan)/gambar/PDF di panel Kumpulan Ayat BIASA (Mode 1 Layar,
+// SEBELUM masuk Mode Layar Penuh) -- meniru fitur serupa yang sudah ada
+// di daftar Kumpulan Ayat Studio Presentasi (`.ps-verse-thumb`,
+// fillCollectionThumbnails_(), js/presentation-studio.js), tapi versi
+// panel ini SENGAJA disalin sendiri (bukan dipanggil lintas file) --
+// sama alasannya dengan normalizeCanvaLinkSimple_() di atas: supaya
+// panel ini tetap bisa dipakai TANPA presentation-studio.js dimuat sama
+// sekali (dipakai dari HP, tab Studio disembunyikan di layar sempit).
+// Rasio ASLI otomatis terjaga (potret tetap potret, lanskap tetap
+// lanskap, 1:1 otomatis ikut persegi) lewat CSS
+// ".collection-item-thumb img" (height tetap, width menyesuaikan,
+// dibatasi max-width) -- TIDAK perlu deteksi orientasi manual.
+// ------------------------------------------------------------
+function extractYoutubeIdSimple_(url) {
+  if (!url) return null;
+  const s = String(url).trim();
+  const patterns = [
+    /youtu\.be\/([A-Za-z0-9_-]{6,})/,
+    /youtube\.com\/watch\?[^#]*v=([A-Za-z0-9_-]{6,})/,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{6,})/,
+    /youtube\.com\/embed\/([A-Za-z0-9_-]{6,})/,
+  ];
+  for (const re of patterns) {
+    const m = s.match(re);
+    if (m) return m[1];
+  }
+  if (/^[A-Za-z0-9_-]{10,15}$/.test(s)) return s;
+  return null;
+}
+function buildCollectionItemThumbnail_(it) {
+  if (it.type === "youtube_link" && it.embedUrl) {
+    const ytId = extractYoutubeIdSimple_(it.embedUrl);
+    if (!ytId) return null;
+    const wrap = document.createElement("div");
+    wrap.className = "collection-item-thumb";
+    const img = document.createElement("img");
+    img.src = `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`;
+    img.alt = it.title || "Pratinjau video YouTube";
+    wrap.appendChild(img);
+    return wrap;
+  }
+  if (it.type === "media" && it.mediaItemId && typeof loadMediaItems === "function") {
+    const wrap = document.createElement("div");
+    wrap.className = "collection-item-thumb collection-item-thumb-loading";
+    loadMediaItems(currentUser).then((mediaItems) => {
+      const mediaItem = (mediaItems || []).find((m) => m.id === it.mediaItemId);
+      const pageIndex = it.pageIndex || 0;
+      const raw = mediaItem && Array.isArray(mediaItem.images) ? mediaItem.images[pageIndex] : null;
+      let src = null;
+      if (raw && mediaItem.type === "youtube") {
+        const ytId = extractYoutubeIdSimple_(raw);
+        src = ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : null;
+      } else if (raw) {
+        src = raw;
+      }
+      wrap.classList.remove("collection-item-thumb-loading");
+      if (!src) { wrap.remove(); return; }
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = it.name || "Pratinjau berkas";
+      wrap.appendChild(img);
+    }).catch(() => wrap.remove());
+    return wrap;
+  }
+  return null;
+}
+
 function buildCollectionItemRow(id, col, it, i, opts) {
   const v = it.type === "verse" ? verseById[it.verseId] : null;
   const noteText = v ? getPersonalNote(currentUser, it.verseId) : "";
@@ -6071,6 +6141,7 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       <div class="result-ref">${escapeHtml(ref)}</div>
       <div class="result-text"></div>
       <div class="collection-verse-actions">
+        <button type="button" class="chip-btn small primary col-openhere-btn" title="Buka Mode Layar Penuh, mulai LANGSUNG dari item ini (tidak perlu tekan Selanjutnya berkali-kali dari awal)">▶️ Buka di Sini</button>
         ${v && ttsSupported ? '<button type="button" class="chip-btn small col-play-btn">▶️ Google Voice</button>' : ""}
         <button type="button" class="chip-btn small col-move-top-btn" title="Pindahkan ke paling awal">⏮️ Awal</button>
         <button type="button" class="chip-btn small col-move-up-btn" title="Naikkan urutan">⬆️</button>
@@ -6085,6 +6156,25 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       ${noteText ? '<div class="collection-verse-note" hidden></div>' : ""}
     </div>
   `;
+  // BARU (17 Sep 2026, permintaan operator "user baru bingung cara pindah
+  // ke bagian yang sudah disimpan, kalau mau acak") -- "▶️ Buka di Sini"
+  // di atas membuka Mode Layar Penuh (openCollectionFullscreen(), lihat
+  // di bawah) LANGSUNG mulai dari item BARIS INI (index `i`), bukan
+  // selalu dari item pertama seperti tombol "⛶ Mode Layar Penuh" di
+  // judul panel -- begitu di dalam Mode Layar Penuh, panah kiri/kanan
+  // papan ketik TETAP jalan seperti biasa dari titik ini sampai ke ujung
+  // kumpulan (tidak berubah sama sekali, lihat goPrev()/goNext()).
+  item.querySelector(".col-openhere-btn").addEventListener("click", () => openCollectionFullscreen(col, i));
+  // BARU (17 Sep 2026, permintaan operator) -- pratinjau kotak kecil
+  // (thumbnail) khusus item YouTube/gambar/PDF, ditaruh di antara
+  // referensi & isi teks -- lihat buildCollectionItemThumbnail_() di atas.
+  // Kidung/ayat/teks/pengumuman tidak punya bentuk visual, jadi fungsi
+  // ini otomatis mengembalikan null (tidak ada yang disisipkan) untuk
+  // jenis-jenis itu.
+  const thumb = buildCollectionItemThumbnail_(it);
+  if (thumb) {
+    item.querySelector(".collection-verse-body").insertBefore(thumb, item.querySelector(".result-text"));
+  }
   // Kontrol "Pindah ke urutan ke-#" (untuk kumpulan >2 item -- kalau cuma
   // 1-2 item, ⏮️/⬆️/⬇️/⏭️ saja sudah cukup) ditambahkan terpisah di sini
   // (bukan di dalam template literal di atas) supaya tidak perlu backtick
@@ -6414,6 +6504,13 @@ const COLLECTION_FS_WIDTH_KEY = "bible_app_collection_fs_width_v1";
 // huruf pembaca biasa (FONT_FAMILIES di bagian 11), supaya bisa diganti
 // bebas di sini tanpa mengubah tampilan baca pasal biasa.
 const COLLECTION_FS_FONT_FAMILY_KEY = "bible_app_collection_fs_font_family_v1";
+// BARU (17 Sep 2026, permintaan operator) -- mode lebar KHUSUS gambar/PDF
+// (Canva/media gambar) di Mode Layar Penuh: "contain" (Asli, rasio asli
+// dijaga persis seperti #slideView di present.html/Layar 2 -- potret
+// tetap potret, lanskap tetap lanskap) ATAU "wide" (Lebar Penuh, lebar
+// dipaksa penuh mengikuti pola #slideView.ps-slide-fitwidth di sana).
+// Tersimpan per perangkat (bukan per item) sama seperti COLLECTION_FS_WIDTH_KEY.
+const COLLECTION_FS_MEDIA_FIT_KEY = "bible_app_collection_fs_media_fit_v1";
 
 function openCollectionFullscreen(col, startIndex) {
   let overlay = el("collectionFsOverlay");
@@ -6450,6 +6547,56 @@ function openCollectionFullscreen(col, startIndex) {
     }
   }
   let widthBtnRef = null;
+
+  // BARU (17 Sep 2026, permintaan operator) -- status tampilan slide
+  // gambar/PDF/video (Canva/media/YouTube) di Mode Layar Penuh. SEMUANYA
+  // di-RESET tiap pindah slide (lihat awal render()) -- ini murni
+  // pengaturan "lagi dilihat sekarang", bukan preferensi permanen lintas
+  // slide seperti punya Studio Presentasi/Layar 2 (yang dipakai operator
+  // mengatur tayangan jemaat). mediaFitMode SENGAJA tetap dibaca dari
+  // localStorage (per perangkat) karena itu murni pilihan "Asli vs Lebar
+  // Penuh" yang wajar diingat, beda dari zoom/geser yang memang harus
+  // selalu mulai dari 100%/tengah tiap slide baru dibuka.
+  let mediaZoomPct = 100;
+  let mediaPanX = 0, mediaPanY = 0;
+  function currentMediaFitMode() {
+    return localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY) === "wide" ? "wide" : "contain";
+  }
+  // Video YouTube yang SEDANG tayang di slide ini (kalau ada) + status
+  // "sudah mulai diputar" -- dipakai goNext() supaya tombol/panah "next"
+  // yang PERTAMA kali ditekan di slide video memutar dulu videonya
+  // (lewat YouTube IFrame API/postMessage), baru tekan lagi utk sungguh
+  // pindah slide. Direset tiap render() (lihat di sana).
+  let currentEmbedVideoIframe = null;
+  let ytStartedForCurrentSlide = false;
+
+  // Menambahkan enablejsapi=1 + origin=<asal halaman ini> ke link embed
+  // YouTube -- KEDUANYA wajib ada supaya YouTube IFrame API mengizinkan
+  // perintah (play/pause) datang dari luar iframe lewat postMessage
+  // (lihat playCurrentEmbedVideo() & goNext() di bawah). Tidak mengubah
+  // apa pun kalau parameter itu sudah ada / link tidak valid.
+  function youTubeApiEmbedUrl_(rawEmbedUrl) {
+    if (!rawEmbedUrl) return rawEmbedUrl;
+    try {
+      const u = new URL(rawEmbedUrl, location.href);
+      if (!u.searchParams.has("enablejsapi")) u.searchParams.set("enablejsapi", "1");
+      if (!u.searchParams.has("origin")) u.searchParams.set("origin", location.origin);
+      if (!u.searchParams.has("playsinline")) u.searchParams.set("playsinline", "1");
+      return u.toString();
+    } catch (e) { return rawEmbedUrl; }
+  }
+  // Memutar video YouTube yang sedang tayang di slide ini lewat YouTube
+  // IFrame API (postMessage) -- dipanggil dari goNext() begitu tombol/
+  // panah "next" ditekan PERTAMA KALI di slide video (lihat catatan di
+  // sana), supaya operator/jemaat yang memakai panah keyboard/clicker
+  // presentasi tidak perlu menyentuh video secara langsung utk memulainya.
+  function playCurrentEmbedVideo() {
+    if (!currentEmbedVideoIframe || !currentEmbedVideoIframe.contentWindow) return false;
+    try {
+      currentEmbedVideoIframe.contentWindow.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
+      return true;
+    } catch (e) { return false; }
+  }
 
   function currentFontFamily() {
     const id = localStorage.getItem(COLLECTION_FS_FONT_FAMILY_KEY) || "default";
@@ -6539,31 +6686,131 @@ function openCollectionFullscreen(col, startIndex) {
   // keburu pindah slide lain sebelum permintaan itu selesai) tidak salah
   // menimpa DOM slide yang SEDANG tayang sekarang.
   let renderToken = 0;
+  // BARU (17 Sep 2026, permintaan operator) -- panel kecil "Asli/Lebar
+  // Penuh" + zoom (-, %, +) + geser (drag/seret), khusus utk slide
+  // gambar/PDF (BUKAN video/Canva/SoundCloud) di Mode Layar Penuh --
+  // meniru fungsi 3 mode ukuran ("Asli/Sesuai Lebar/Zoom") milik Layar 2
+  // Studio Presentasi (lihat wireSlideDisplayModeControls_(),
+  // js/presentation-studio.js), tapi versi perorangan lewat 1 layar/HP
+  // sendiri: tombol zoom + roda mouse (komputer, tidak punya cubit dua
+  // jari) DAN geser 1 jari/mouse saat sudah diperbesar (>100%) --
+  // cubit dua jari bawaan browser di HP tetap bisa dipakai apa adanya
+  // (tidak diblokir/dimatikan di sini sama sekali).
+  function wireMediaImageControls_(img, wrap) {
+    const controls = document.createElement("div");
+    controls.className = "collection-fs-media-controls";
+
+    const fitBtn = document.createElement("button");
+    fitBtn.type = "button";
+    fitBtn.className = "chip-btn small";
+    function refreshFitBtn() {
+      const wide = currentMediaFitMode() === "wide";
+      fitBtn.textContent = wide ? "▭ Asli" : "↔️ Lebar Penuh";
+      fitBtn.title = wide ? "Kembali ke ukuran asli (rasio dijaga)" : "Regangkan selebar layar (rasio tetap dijaga, tidak gepeng)";
+      img.classList.toggle("fs-fit-wide", wide);
+    }
+    refreshFitBtn();
+    fitBtn.addEventListener("click", () => {
+      localStorage.setItem(COLLECTION_FS_MEDIA_FIT_KEY, currentMediaFitMode() === "wide" ? "contain" : "wide");
+      refreshFitBtn();
+    });
+
+    const zoomOutBtn = document.createElement("button");
+    zoomOutBtn.type = "button"; zoomOutBtn.className = "chip-btn small"; zoomOutBtn.textContent = "🔍−";
+    const zoomValEl = document.createElement("span");
+    zoomValEl.className = "collection-fs-zoom-value";
+    const zoomInBtn = document.createElement("button");
+    zoomInBtn.type = "button"; zoomInBtn.className = "chip-btn small"; zoomInBtn.textContent = "🔍+";
+
+    function refreshZoomUi() {
+      zoomValEl.textContent = mediaZoomPct + "%";
+      img.style.transform = `translate(${mediaPanX}px, ${mediaPanY}px) scale(${mediaZoomPct / 100})`;
+      img.classList.toggle("zoomed", mediaZoomPct > 100);
+    }
+    function setZoom(pct) {
+      mediaZoomPct = Math.max(50, Math.min(400, Math.round(pct)));
+      if (mediaZoomPct <= 100) { mediaZoomPct = 100; mediaPanX = 0; mediaPanY = 0; }
+      refreshZoomUi();
+    }
+    zoomOutBtn.addEventListener("click", () => setZoom(mediaZoomPct - 25));
+    zoomInBtn.addEventListener("click", () => setZoom(mediaZoomPct + 25));
+    refreshZoomUi();
+
+    controls.appendChild(fitBtn);
+    controls.appendChild(zoomOutBtn);
+    controls.appendChild(zoomValEl);
+    controls.appendChild(zoomInBtn);
+    wrap.appendChild(controls);
+
+    // Roda mouse (komputer) langsung memperbesar/mengecilkan -- tanpa
+    // perlu tombol -- persis kebiasaan lihat peta/gambar pada umumnya.
+    wrap.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      setZoom(mediaZoomPct + (e.deltaY < 0 ? 15 : -15));
+    }, { passive: false });
+
+    // Seret utk menggeser (pan) saat sudah diperbesar (>100%) -- 1 jari
+    // di HP (sesudah dizoom lewat tombol/cubit) ATAU mouse di komputer.
+    // Sengaja MENANDAI overlay._collectionFsSwipeSuspended supaya
+    // attachCollectionFsSwipeNav() (navigasi geser kiri/kanan pindah
+    // slide) tidak ikut membaca gerakan geser ini sebagai "pindah slide"
+    // selama sedang diperbesar (lihat definisinya di bawah).
+    let dragging = false, dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
+    function dragStart(clientX, clientY) {
+      if (mediaZoomPct <= 100) return;
+      dragging = true;
+      dragStartX = clientX; dragStartY = clientY;
+      panStartX = mediaPanX; panStartY = mediaPanY;
+      img.classList.add("dragging");
+    }
+    function dragMove(clientX, clientY) {
+      if (!dragging) return;
+      mediaPanX = panStartX + (clientX - dragStartX);
+      mediaPanY = panStartY + (clientY - dragStartY);
+      refreshZoomUi();
+    }
+    function dragEnd() { dragging = false; img.classList.remove("dragging"); }
+    img.addEventListener("mousedown", (e) => { e.preventDefault(); dragStart(e.clientX, e.clientY); });
+    window.addEventListener("mousemove", (e) => dragMove(e.clientX, e.clientY));
+    window.addEventListener("mouseup", dragEnd);
+    img.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 1 && mediaZoomPct > 100) { overlay._collectionFsSwipeSuspended = true; dragStart(e.touches[0].clientX, e.touches[0].clientY); }
+    }, { passive: true });
+    img.addEventListener("touchmove", (e) => { if (e.touches.length === 1) dragMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    img.addEventListener("touchend", () => { dragEnd(); overlay._collectionFsSwipeSuspended = mediaZoomPct > 100; });
+  }
+
   function buildCollectionFsEmbed(it, myToken) {
     if (it.type === "youtube_link" && it.embedUrl) {
       // BARU (5 Sep 2026) -- item YouTube PORTABEL (embedUrl tersimpan
       // langsung di item, lihat addYoutubeLinkToCollection() di
       // js/collections.js), jadi TIDAK perlu menunggu loadMediaItems()
       // async seperti it.type==="media" di bawah -- langsung dibuat.
+      // BARU (17 Sep 2026) -- sekarang benar-benar penuh 1 layar (lihat
+      // "collection-fs-embed-wrap.fs-media-full" di CSS, ditambahkan
+      // lewat overlay.classList "fs-media-mode" di render()) & bisa
+      // diputar lewat tombol/panah "next" (lihat playCurrentEmbedVideo()/
+      // goNext()) berkat enablejsapi=1 dari youTubeApiEmbedUrl_().
       const wrap = document.createElement("div");
-      wrap.className = "collection-fs-embed-wrap collection-fs-embed-youtube";
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-youtube fs-media-full";
       const iframe = document.createElement("iframe");
-      iframe.src = it.embedUrl;
+      iframe.src = youTubeApiEmbedUrl_(it.embedUrl);
       iframe.setAttribute("allow", "autoplay; fullscreen; encrypted-media");
       iframe.setAttribute("allowfullscreen", "true");
-      iframe.className = "collection-fs-embed-iframe";
+      iframe.className = "collection-fs-embed-iframe fs-media-full";
       wrap.appendChild(iframe);
+      currentEmbedVideoIframe = iframe;
       return wrap;
     }
     if (it.type === "canva" && it.embedUrl) {
       const wrap = document.createElement("div");
-      wrap.className = "collection-fs-embed-wrap collection-fs-embed-canva";
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-canva fs-media-full";
       const iframe = document.createElement("iframe");
       iframe.src = it.embedUrl;
       iframe.setAttribute("allow", "fullscreen");
       iframe.setAttribute("allowfullscreen", "true");
       iframe.loading = "lazy";
-      iframe.className = "collection-fs-embed-iframe";
+      iframe.className = "collection-fs-embed-iframe fs-media-full";
       wrap.appendChild(iframe);
       return wrap;
     }
@@ -6603,22 +6850,39 @@ function openCollectionFullscreen(col, startIndex) {
           if (mediaItem && mediaItem.type === "youtube" && Array.isArray(mediaItem.images) && mediaItem.images[pageIndex]) {
             // Video YouTube -- ditayangkan langsung di sini (BARU), dulu
             // cuma tulisan "tayangkan lewat Studio Presentasi".
+            // BARU (17 Sep 2026) -- penuh 1 layar + bisa diputar lewat
+            // tombol/panah "next", sama seperti item type "youtube_link"
+            // di atas (lihat catatan panjang di sana).
+            wrap.classList.add("fs-media-full");
             const iframe = document.createElement("iframe");
-            iframe.src = mediaItem.images[pageIndex];
+            iframe.src = youTubeApiEmbedUrl_(mediaItem.images[pageIndex]);
             iframe.setAttribute("allow", "autoplay; fullscreen; encrypted-media");
             iframe.setAttribute("allowfullscreen", "true");
-            iframe.className = "collection-fs-embed-iframe";
+            iframe.className = "collection-fs-embed-iframe fs-media-full";
             wrap.appendChild(iframe);
+            currentEmbedVideoIframe = iframe;
           } else if (mediaItem && Array.isArray(mediaItem.images) && mediaItem.images[pageIndex]) {
             // Bonus (sekalian, bukan diminta): gambar/halaman PDF biasa
             // juga langsung ditampilkan di sini, bukan cuma keterangan --
             // konsisten dengan Canva/SoundCloud/YouTube yang sudah bisa
             // langsung tayang.
+            // PERBAIKAN (17 Sep 2026, laporan operator: "tampilannya
+            // hanya kotak kecil di tengah") -- dulu dibatasi
+            // `max-height:70vh` & lebar kotak induk (760px/1400px),
+            // sekarang memakai pola PERSIS #slideView di present.html
+            // (Layar 2): max-width/max-height 100% dari ruang yang
+            // tersedia, object-fit:contain -- rasio ASLI dijaga (potret
+            // tetap tinggi-sempit, lanskap tetap lebar-pendek), memenuhi
+            // layar semaksimal mungkin tanpa gepeng. Ditambah tombol
+            // Asli/Lebar Penuh + zoom/geser (wireMediaImageControls_(),
+            // lihat catatan panjang di sana).
+            wrap.classList.add("fs-media-full");
             const img = document.createElement("img");
             img.src = mediaItem.images[pageIndex];
             img.alt = it.name || "Berkas";
-            img.className = "collection-fs-embed-image";
+            img.className = "collection-fs-embed-image fs-media-full";
             wrap.appendChild(img);
+            wireMediaImageControls_(img, wrap);
           } else {
             wrap.textContent = "(berkas tidak ditemukan -- mungkin sudah dihapus dari Media Tersimpan)";
           }
@@ -6639,6 +6903,15 @@ function openCollectionFullscreen(col, startIndex) {
     const myToken = renderToken;
     overlay.innerHTML = "";
     overlay.classList.toggle("fs-wide", currentWidthMode() === "wide");
+    // BARU (17 Sep 2026) -- semua status "sedang dilihat sekarang" milik
+    // slide gambar/PDF/video (zoom/geser/video-sudah-diputar) direset tiap
+    // pindah slide -- lihat catatan panjang di deklarasinya masing-masing
+    // dekat `widthBtnRef` di atas.
+    mediaZoomPct = 100;
+    mediaPanX = 0; mediaPanY = 0;
+    currentEmbedVideoIframe = null;
+    ytStartedForCurrentSlide = false;
+    overlay._collectionFsSwipeSuspended = false;
     // PERBAIKAN (Kumpulan Ayat generik): dulu hanya col.verseIds[idx] (item
     // ayat). Sekarang col.items[idx] bisa berjenis ayat/teks/pengumuman/
     // kidung -- `v` hanya terisi untuk jenis "verse" (dipakai TTS/catatan/
@@ -6648,6 +6921,16 @@ function openCollectionFullscreen(col, startIndex) {
     const v = it && it.type === "verse" ? verseById[it.verseId] : null;
     const noteText = v ? getPersonalNote(currentUser, it.verseId) : "";
     const ref = it ? collectionItemRef(it) : "";
+    // BARU (17 Sep 2026, permintaan operator) -- slide video/gambar
+    // (YouTube/Canva/media) SEKARANG tampil BENAR-BENAR penuh 1 layar
+    // (lihat CSS ".collection-fs-overlay.fs-media-mode"), jadi baris
+    // navigasi Sebelumnya/Selanjutnya dipindah ke baris ATAS (sejajar
+    // "✕ Tutup") supaya tetap kelihatan & terjangkau -- baris BAWAH lama
+    // akan tertutup video/gambar yang memenuhi layar. Item ayat/teks/
+    // kidung/pengumuman biasa TIDAK berubah sama sekali (tetap di bawah
+    // seperti sebelumnya).
+    const isVisualEmbed = !!it && (it.type === "youtube_link" || it.type === "canva" || it.type === "media");
+    overlay.classList.toggle("fs-media-mode", isVisualEmbed);
 
     const closeBtn = document.createElement("button");
     closeBtn.className = "collection-fs-close";
@@ -6736,11 +7019,35 @@ function openCollectionFullscreen(col, startIndex) {
     // lewat `.collection-fs-top-row .collapsible-toolbar`, lihat CSS --
     // supaya tidak malah nempel ke BAWAH lagi di HP, beda dari tampilan
     // komputer).
+    // BARU (17 Sep 2026) -- tombol Sebelumnya/Selanjutnya (versi ringkas,
+    // ikon saja) dibuat DI SINI (dulu hanya ada di navRow bawah) supaya
+    // bisa dipasang ke baris ATAS untuk slide video/gambar (lihat
+    // `isVisualEmbed` & CSS ".fs-media-mode" di atas) -- goPrev()/goNext()
+    // yang dipakai SAMA PERSIS dengan tombol besar di navRow bawah punya
+    // item biasa, jadi perilaku (termasuk "next" pertama memutar video
+    // dulu, lihat goNext()) tetap konsisten di mana pun tombolnya tampil.
+    const prevBtnTop = document.createElement("button");
+    prevBtnTop.className = "chip-btn small collection-fs-nav-top-btn";
+    prevBtnTop.textContent = "⬅️";
+    prevBtnTop.title = "Sebelumnya";
+    prevBtnTop.disabled = idx <= 0;
+    prevBtnTop.addEventListener("click", goPrev);
+    const nextBtnTop = document.createElement("button");
+    nextBtnTop.className = "chip-btn small collection-fs-nav-top-btn";
+    nextBtnTop.textContent = "➡️";
+    nextBtnTop.title = "Selanjutnya";
+    nextBtnTop.disabled = idx >= total - 1;
+    nextBtnTop.addEventListener("click", goNext);
+
     const topRow = document.createElement("div");
     topRow.className = "collection-fs-top-row";
     topRow.appendChild(buildCollapsibleToolbar([fontRow], {
       title: "Sembunyikan/tampilkan pengaturan tampilan (ukuran huruf, lebar, jenis huruf, layar penuh, tema)",
     }));
+    if (isVisualEmbed) {
+      topRow.appendChild(prevBtnTop);
+      topRow.appendChild(nextBtnTop);
+    }
     topRow.appendChild(closeBtn);
     overlay.appendChild(topRow);
 
@@ -6768,7 +7075,7 @@ function openCollectionFullscreen(col, startIndex) {
     }
 
     const box = document.createElement("div");
-    box.className = "collection-fs-box";
+    box.className = "collection-fs-box" + (isVisualEmbed ? " fs-media-box" : "");
 
     const refEl = document.createElement("div");
     refEl.className = "collection-fs-ref";
@@ -6816,32 +7123,50 @@ function openCollectionFullscreen(col, startIndex) {
     }
     overlay.appendChild(box);
 
-    const navRow = document.createElement("div");
-    navRow.className = "collection-fs-nav";
-    const prevBtn = document.createElement("button");
-    prevBtn.className = "chip-btn primary";
-    prevBtn.textContent = "⬅️ Sebelumnya";
-    prevBtn.disabled = idx <= 0;
-    prevBtn.addEventListener("click", goPrev);
-    const nextBtn = document.createElement("button");
-    nextBtn.className = "chip-btn primary";
-    nextBtn.textContent = "Selanjutnya ➡️";
-    nextBtn.disabled = idx >= total - 1;
-    nextBtn.addEventListener("click", goNext);
-    navRow.appendChild(prevBtn);
-    navRow.appendChild(nextBtn);
-    overlay.appendChild(navRow);
+    // BARU (17 Sep 2026) -- baris Sebelumnya/Selanjutnya besar di BAWAH
+    // ini sekarang HANYA dibuat utk item biasa (ayat/teks/kidung/
+    // pengumuman) -- untuk video/gambar (isVisualEmbed) tombolnya sudah
+    // dipasang di baris ATAS (prevBtnTop/nextBtnTop, lihat topRow di
+    // atas) supaya tidak tertutup video/gambar yang memenuhi layar.
+    if (!isVisualEmbed) {
+      const navRow = document.createElement("div");
+      navRow.className = "collection-fs-nav";
+      const prevBtn = document.createElement("button");
+      prevBtn.className = "chip-btn primary";
+      prevBtn.textContent = "⬅️ Sebelumnya";
+      prevBtn.disabled = idx <= 0;
+      prevBtn.addEventListener("click", goPrev);
+      const nextBtn = document.createElement("button");
+      nextBtn.className = "chip-btn primary";
+      nextBtn.textContent = "Selanjutnya ➡️";
+      nextBtn.disabled = idx >= total - 1;
+      nextBtn.addEventListener("click", goNext);
+      navRow.appendChild(prevBtn);
+      navRow.appendChild(nextBtn);
+      overlay.appendChild(navRow);
 
-    const hint = document.createElement("div");
-    hint.className = "collection-fs-hint";
-    hint.textContent = "Gunakan tombol panah kiri/kanan (atau Page Up/Down, atas/bawah, spasi) di papan ketik / alat pointer presentasi untuk pindah ayat.";
-    overlay.appendChild(hint);
+      const hint = document.createElement("div");
+      hint.className = "collection-fs-hint";
+      hint.textContent = "Gunakan tombol panah kiri/kanan (atau Page Up/Down, atas/bawah, spasi) di papan ketik / alat pointer presentasi untuk pindah ayat.";
+      overlay.appendChild(hint);
+    }
   }
 
   function goPrev() {
     if (idx > 0) { stopCollectionVersePlayback(); idx -= 1; render(); }
   }
   function goNext() {
+    // BARU (17 Sep 2026, permintaan operator) -- kalau slide SEKARANG
+    // adalah video YouTube yang BELUM mulai diputar, tombol/panah "next"
+    // yang PERTAMA memutar videonya dulu (lewat playCurrentEmbedVideo(),
+    // YouTube IFrame API) -- BUKAN langsung lompat ke item Kumpulan Ayat
+    // berikutnya. Tekan "next" SEKALI LAGI (kapan saja, tidak perlu
+    // menunggu video selesai) baru sungguh pindah slide, persis seperti
+    // yang diminta. Tidak berlaku utk Canva/SoundCloud (tidak punya API
+    // kontrol resmi jarak-jauh) atau item bukan video.
+    if (currentEmbedVideoIframe && !ytStartedForCurrentSlide) {
+      if (playCurrentEmbedVideo()) { ytStartedForCurrentSlide = true; return; }
+    }
     if (idx < total - 1) { stopCollectionVersePlayback(); idx += 1; render(); }
   }
   function onKeyDown(e) {
@@ -6925,6 +7250,11 @@ function attachCollectionFsSwipeNav(overlay) {
   let startX = null, startY = null, startT = 0, swiping = false;
 
   overlay.addEventListener("touchstart", (e) => {
+    // BARU (17 Sep 2026) -- dimatikan sementara saat gambar/PDF sedang
+    // diperbesar (>100%, lihat wireMediaImageControls_()) supaya menggeser
+    // gambar utk melihat bagian yang terpotong TIDAK ikut terbaca sebagai
+    // "geser pindah slide" oleh listener ini.
+    if (overlay._collectionFsSwipeSuspended) return;
     if (e.touches.length !== 1) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
@@ -6933,6 +7263,7 @@ function attachCollectionFsSwipeNav(overlay) {
   }, { passive: true });
 
   overlay.addEventListener("touchend", (e) => {
+    if (overlay._collectionFsSwipeSuspended) return;
     if (!swiping || startX == null) return;
     swiping = false;
     const touch = e.changedTouches[0];
