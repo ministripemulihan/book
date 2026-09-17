@@ -866,11 +866,19 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    TERSEDIA (bukan lagi dari viewport langsung, karena di sini sudah ada
    ruang tersendiri lewat .fs-media-full di atas), object-fit:contain
    supaya rasio asli selalu terjaga persis seperti #slideView. */
+/* BARU (18 Sep 2026, permintaan operator: "full layar tapi jangan
+   kepotong/gepeng") -- lihat catatan panjang di
+   .collection-fs-embed-backdrop di bawah. Elemen <img> asli sekarang
+   ditaruh DI ATAS lapisan backdrop blur itu (z-index:1, wrap-nya sudah
+   position:relative lewat .fs-media-full) -- tidak mengubah ukuran/
+   posisi gambar aslinya sama sekali, cuma memastikan dia tampil di atas
+   lapisan blur, bukan ketutup olehnya. */
 .collection-fs-embed-image.fs-media-full {
   max-width: 100%; max-height: 100%; width: auto; height: auto;
   object-fit: contain; border-radius: 0;
   transform-origin: center center;
   cursor: grab; touch-action: pan-x pan-y pinch-zoom;
+  position: relative; z-index: 1;
 }
 .collection-fs-embed-image.fs-media-full.dragging { cursor: grabbing; }
 .collection-fs-embed-image.fs-media-full.zoomed { cursor: grab; }
@@ -919,8 +927,60 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    expand", bukan "di shrink" seperti Asli/Lebar Penuh/Tinggi Penuh) --
    geser (drag/seret, sama seperti mode lain) tetap tersedia utk melihat
    bagian yang kepotong. */
+/* PERBAIKAN (18 Sep 2026, v4, permintaan operator: "kena potong terus,
+   tidak papa gambarnya jadi tidak gepeng [tapi jangan kepotong]") --
+   versi v3 (di atas, hari yang sama) memaksa width:100% + height:100%
+   + object-fit:cover supaya mengisi PENUH layar sesuai definisi
+   operator sebelumnya ("di expand sampai setinggi selebar layar") --
+   TERNYATA di pemakaian nyata operator lebih terganggu oleh gambar yang
+   jadi kepotong terus-menerus daripada oleh ruang kosong di
+   tepi/atas-bawah. Operator sekarang menegaskan prioritas SEBALIKNYA:
+   LEBIH PENTING gambar utuh (tidak ada bagian terpotong, rasio tidak
+   melar/gepeng) daripada mengisi penuh 100% kedua sisi -- kalau perlu,
+   gambar boleh mengecil dari "penuh 1 layar" supaya tetap utuh. Ini
+   PERSIS definisi "Asli"/contain (mengecil seperlunya di kedua sumbu,
+   tidak pernah kepotong) -- makanya sekarang dikembalikan ke pola itu.
+   CATATAN: akibatnya mode "⛶ Lebar+Tinggi" ini sekarang terlihat SAMA
+   dengan mode "▭ Asli" -- itu SENGAJA/tidak apa menurut operator (lihat
+   permintaan di atas), BUKAN bug. Kalau operator kelak berubah pikiran
+   lagi & mau mode ini sungguh mengisi penuh layar (dengan konsekuensi
+   ada yang kepotong), tinggal kembalikan ke pola v3: `width:100%;
+   height:100%; max-width:none; max-height:none; object-fit:cover;`. */
 .collection-fs-embed-image.fs-media-full.fs-fit-cover {
-  width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover;
+  width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain;
+}
+/* BARU (18 Sep 2026, permintaan operator: "gimana caranya bisa tidak
+   kepotong DAN full layar penuh DAN tidak ada yang gepeng sekaligus" --
+   mis. gambar asli 4:3 ditayangkan di layar 16:9) -- SECARA MATEMATIKA,
+   3 hal itu TIDAK MUNGKIN dipenuhi SEKALIGUS untuk gambar aslinya
+   sendiri: memaksa 4:3 mengisi PERSIS 16:9 berarti HARUS memotong
+   sebagian gambar ATAU meregangkannya jadi gepeng -- tidak ada opsi
+   ke-3 utk gambar itu sendiri. Solusinya BUKAN mengubah gambar asli
+   (dia TETAP ditampilkan utuh, object-fit:contain, rasio asli, TIDAK
+   kepotong sama sekali -- lihat .fs-fit-cover & aturan dasar
+   .fs-media-full di atas), TAPI mengisi ruang KOSONG di kiri-kanan/
+   atas-bawahnya (yang tadinya cuma warna gelap polos) dengan SALINAN
+   gambar yang sama, diperbesar & diburamkan (blur) -- teknik yang sama
+   dipakai Instagram Stories/YouTube fullscreen utk foto/video beda
+   rasio: mata melihat layar terisi PENUH dari tepi ke tepi, TANPA ada
+   satu piksel pun dari gambar ASLI yang hilang/terpotong/melar. Dipasang
+   di js/app.js (buildCollectionItemThumbnail_ & bagian render item
+   "media") sebagai 1 <div> tambahan (.collection-fs-embed-backdrop) di
+   BELAKANG <img> asli, isinya gambar YANG SAMA lewat CSS
+   background-image (bukan elemen <img> baru) -- kalau <img> asli
+   kebetulan sudah mengisi penuh wrap (mis. rasio gambar & layar
+   kebetulan sama), backdrop ini otomatis tidak kelihatan sama sekali
+   (tertutup penuh oleh <img> asli di depannya) -- tidak pernah
+   mengganggu, HANYA mengisi celah kalau memang ada. */
+.collection-fs-embed-backdrop {
+  position: absolute; inset: 0; z-index: 0;
+  background-position: center; background-size: cover; background-repeat: no-repeat;
+  /* scale(1.15) supaya tepi hasil blur (yang jadi agak "keburaman" tidak
+     rata di pinggir elemen) tidak pernah kelihatan -- selalu ada lebih
+     dari cukup blur di luar batas wrap yang terlihat (wrap-nya sendiri
+     overflow:hidden, lihat .collection-fs-embed-wrap.fs-media-full). */
+  transform: scale(1.15);
+  filter: blur(40px) brightness(0.55) saturate(1.15);
 }
 /* Panel kecil "Asli/Lebar Penuh/dst" + zoom (-, slider, %, +) -- lihat
    wireMediaImageControls_(), js/app.js. Kalau TIDAK ada controlsHost
