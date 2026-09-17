@@ -874,57 +874,53 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 }
 .collection-fs-embed-image.fs-media-full.dragging { cursor: grabbing; }
 .collection-fs-embed-image.fs-media-full.zoomed { cursor: grab; }
-/* "↔️ Lebar Penuh" -- lebar dipaksa 100% ruang tersedia, tinggi
-   menyesuaikan (rasio TETAP terjaga, tidak gepeng) -- meniru persis
-   #slideView.ps-slide-fitwidth milik Layar 2.
-   PERBAIKAN (17 Sep 2026, permintaan operator: gambar lanskap yang
-   teksnya di bagian bawah kepotong waktu mode ini dipakai) -- dulu
-   `max-height: none` di sini artinya kalau gambar lanskapnya PROPORSINYA
-   lebih lebar dari kotak yang tersedia (mis. kotak relatif tinggi-
-   sempit), tinggi hasil hitungan (mengikuti lebar 100%) jadi LEBIH
-   TINGGI dari kotaknya sendiri -- lalu bagian bawah (sering berisi
-   keterangan/teks) kepotong oleh `overflow:hidden` milik pembungkusnya
-   (.collection-fs-embed-wrap.fs-media-full). Sekarang max-height
-   dikembalikan ke 100% (sama seperti aturan dasar .fs-media-full) --
-   lebar TETAP diprioritaskan 100% selama muat, tapi begitu tingginya mau
-   melebihi kotak, browser otomatis mengecilkan (shrink) keduanya
-   proporsional lewat object-fit:contain, BUKAN dipotong. */
+/* PERBAIKAN (18 Sep 2026, permintaan operator: "Lebar Penuh justru
+   tidak penuh, sama dengan gambar Asli") -- versi 17 Sep sebelumnya
+   memasang `max-height: 100%` di sini supaya bagian bawah gambar
+   lanskap tidak kepotong, TAPI akibatnya utk gambar potret (lebih
+   tinggi dari lebar) di kotak lanskap, tinggi hasil hitungan (lebar
+   100% ÷ rasio gambar) hampir selalu MELEBIHI tinggi kotak -- begitu
+   max-height membatasi, browser otomatis mengecilkan LEBAR juga
+   (proporsional, supaya rasio tetap terjaga) supaya tetap masuk
+   tinggi kotak -- hasilnya persis sama seperti mode "Asli" (contain),
+   lebar TIDAK PERNAH benar-benar mencapai 100%. Sekarang dikembalikan
+   ke definisi asli operator: "Lebar Penuh" = gambar di-shrink SAMPAI
+   SESUAI LEBAR layar, titik -- lebar SELALU 100%, tinggi mengikuti apa
+   adanya (rasio dijaga) walau jadi lebih tinggi dari layar. Kalau
+   sampai lebih tinggi, bagian yang lebih itu boleh "kepotong" secara
+   visual oleh `overflow:hidden` milik pembungkusnya
+   (.collection-fs-embed-wrap.fs-media-full) -- itu SENGAJA, operator
+   bisa geser (drag/seret, SELALU aktif, lihat wireMediaImageControls_()
+   di js/app.js) naik/turun utk melihat bagian yang kepotong itu. */
 .collection-fs-embed-image.fs-media-full.fs-fit-wide {
-  width: 100%; height: auto; max-height: 100%; object-fit: contain;
+  width: 100%; height: auto; max-height: none; object-fit: contain;
 }
-/* BARU (17 Sep 2026, permintaan operator: "gambar landscape kepotong
-   bawah") -- 2 mode TAMBAHAN, pelengkap Asli/Lebar Penuh di atas (lihat
-   MEDIA_FIT_MODES, js/app.js):
-   "↕️ Tinggi Penuh" -- kebalikan Lebar Penuh: TINGGI dipaksa 100% ruang
-   tersedia, lebar menyesuaikan (rasio tetap dijaga) -- kalau lebih
-   lebar dari layar, geser kiri/kanan (drag, sekarang selalu aktif,
-   lihat wireMediaImageControls_()) utk melihat sisi yang terpotong.
-   "⛶ Lebar+Tinggi" -- lihat PERBAIKAN 17 Sep 2026 (v2) di bawah aturan
-   .fs-fit-tall ini soal kenapa mode ini SEKARANG TIDAK lagi memotong
-   gambar (dulu object-fit:cover, sengaja motong). */
+/* "↕️ Tinggi Penuh" -- kebalikan Lebar Penuh: gambar di-shrink SAMPAI
+   SESUAI TINGGI layar, titik -- tinggi SELALU 100%, lebar mengikuti apa
+   adanya (rasio dijaga) walau jadi lebih lebar dari layar -- kalau
+   lebih lebar, geser kiri/kanan (drag, sama seperti di atas) utk
+   melihat sisi yang kepotong. Sudah benar sejak semula, TIDAK diubah. */
 .collection-fs-embed-image.fs-media-full.fs-fit-tall {
   height: 100%; width: auto; max-width: none; object-fit: contain;
 }
-/* PERBAIKAN (17 Sep 2026, v2, permintaan operator) -- dulu mode ini
-   memakai `width:100%; height:100%; object-fit:cover` supaya isi PENUH
-   layar tanpa sisa ruang kosong, TAPI konsekuensinya (memang disengaja
-   waktu itu) gambar lanskap yang bagian bawahnya berisi keterangan/teks
-   jadi kepotong (cover selalu mengorbankan salah satu sisi supaya kedua
-   dimensi terisi penuh). Operator sekarang minta sebaliknya: LEBIH
-   PENTING tidak ada yang kepotong daripada mengisi penuh layar -- persis
-   fitur "Fit Image"/"shrink to fit width & height" di Photoshop: tinggi
-   gambar TIDAK BOLEH melebihi tinggi ruang yang ada, lebar gambar TIDAK
-   BOLEH melebihi lebarnya, dan kalau perlu gambar boleh mengecil dari
-   ukuran "mengisi 1 layar penuh" (tidak apa jadi tidak selebar/setinggi
-   Lebar Penuh/Tinggi Penuh, alias sedikit "gepeng" dibanding tampilan
-   penuh) -- yang penting rasio ASLI tetap terjaga (TIDAK melar/distorsi)
-   & TIDAK ADA bagian yang terpotong. Makanya sekarang dipakai pola
-   PERSIS aturan dasar .fs-media-full (max-width/max-height:100%,
-   width/height:auto, object-fit:contain) -- rasio dijaga, mengecil
-   seperlunya di kedua sumbu sekaligus supaya PASTI muat, tidak ada
-   kepotong sama sekali di sisi mana pun. */
+/* PERBAIKAN (18 Sep 2026, v3, permintaan operator: definisi baru
+   "⛶ Lebar+Tinggi") -- versi v2 (17 Sep) sebelumnya memasang
+   max-width/max-height:100% + object-fit:contain di sini -- PERSIS
+   sama dengan aturan dasar .fs-media-full (mode "Asli") di atas,
+   makanya di screenshot operator, mode "Lebar+Tinggi" & "Asli"
+   kelihatan identik (bug). Operator sekarang menegaskan definisi yang
+   dia mau: "lebar+tinggi artinya SEMUA (baik tinggi MAUPUN lebar)
+   gambar di-EXPAND sampai SETINGGI dan SELEBAR layar" -- beda dari 2
+   mode di atas (yang cuma memaksa SATU sisi 100%), mode ini memaksa
+   KEDUA sisi 100% sekaligus (width:100%; height:100%). Konsekuensi
+   wajar dari mengisi 2 dimensi sekaligus dari 1 rasio gambar yang tetap
+   (tidak digepengkan/didistorsi) adalah SATU sisi pasti "kepotong" demi
+   sisi lainnya pas 100% -- itu SENGAJA (persis definisi operator: "di
+   expand", bukan "di shrink" seperti Asli/Lebar Penuh/Tinggi Penuh) --
+   geser (drag/seret, sama seperti mode lain) tetap tersedia utk melihat
+   bagian yang kepotong. */
 .collection-fs-embed-image.fs-media-full.fs-fit-cover {
-  width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain;
+  width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover;
 }
 /* Panel kecil "Asli/Lebar Penuh/dst" + zoom (-, slider, %, +) -- lihat
    wireMediaImageControls_(), js/app.js. Kalau TIDAK ada controlsHost
