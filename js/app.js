@@ -6853,7 +6853,7 @@ function openCollectionFullscreen(col, startIndex) {
     { id: "contain", label: "▭ Asli", title: "Ukuran asli, rasio dijaga -- mengecil di kedua sisi seperlunya supaya muat penuh di dalam ruang yang ada, tanpa terpotong" },
     { id: "wide", label: "↔️ Lebar Penuh", title: "Lebar SELALU dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- tinggi mengikuti apa adanya, boleh melebihi layar (geser naik/turun kalau perlu)" },
     { id: "tall", label: "↕️ Tinggi Penuh", title: "Tinggi SELALU dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- lebar mengikuti apa adanya, boleh melebihi layar (geser kiri/kanan kalau perlu)" },
-    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Lebar DAN tinggi SAMA-SAMA dipaksa 100% mengisi seluruh layar (rasio tetap dijaga, tidak gepeng) -- salah satu sisi gambar pasti terpotong, geser utk melihat bagian yang terpotong" },
+    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Mengecil seperlunya di kedua sisi (lebar DAN tinggi) supaya PASTI muat penuh tanpa ada yang kepotong -- rasio asli tetap dijaga, tidak gepeng" },
   ];
   function currentMediaFitMode() {
     const saved = localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY);
@@ -7073,6 +7073,12 @@ function openCollectionFullscreen(col, startIndex) {
             // Asli/Lebar Penuh + zoom/geser (wireMediaImageControls_(),
             // lihat catatan panjang di sana).
             wrap.classList.add("fs-media-full");
+            // BARU (18 Sep 2026) -- lapisan backdrop blur, lihat catatan
+            // panjang di .collection-fs-embed-backdrop, css/style.css.
+            const backdrop = document.createElement("div");
+            backdrop.className = "collection-fs-embed-backdrop";
+            backdrop.style.backgroundImage = "url(" + JSON.stringify(mediaItem.images[pageIndex]) + ")";
+            wrap.appendChild(backdrop);
             const img = document.createElement("img");
             img.src = mediaItem.images[pageIndex];
             img.alt = it.name || "Berkas";
