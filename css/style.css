@@ -744,6 +744,82 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    komputer. Dipilih tetap tersimpan (lihat COLLECTION_FS_WIDTH_KEY). */
 .collection-fs-overlay.fs-wide .collection-fs-box { max-width: min(1400px, 96vw); }
 .collection-fs-font-select { max-width: 220px; }
+/* BARU (17 Sep 2026) -- tombol Sebelumnya/Selanjutnya versi ringkas
+   (ikon saja) yg dipasang ke baris ATAS (.collection-fs-top-row) khusus
+   utk slide video/gambar (lihat "fs-media-mode" & `isVisualEmbed` di
+   openCollectionFullscreen(), js/app.js) -- SENGAJA tidak ikut menyusut
+   (flex-shrink:0) supaya tidak pernah terpotong toolbar font di sebelahnya. */
+.collection-fs-nav-top-btn { flex-shrink: 0; }
+/* ============================================================
+   BARU (17 Sep 2026, permintaan operator) -- MODE MEDIA PENUH 1 LAYAR:
+   slide video (YouTube), Canva, atau gambar/PDF (item type "media") di
+   Mode Layar Penuh Kumpulan Ayat sekarang memenuhi HAMPIR SELURUH layar
+   (bukan lagi kotak kecil dibatasi 760px/70vh) -- meniru persis pola
+   #slideView/#ytView milik Layar 2 (present.html): rasio ASLI gambar
+   dijaga (potret tetap tinggi-sempit, lanskap tetap lebar-pendek) lewat
+   object-fit:contain, video mengisi penuh ruang yang tersedia. Nav
+   Sebelumnya/Selanjutnya dipindah ke baris ATAS (lihat
+   .collection-fs-nav-top-btn di atas) supaya tidak tertutup.
+   ============================================================ */
+.collection-fs-overlay.fs-media-mode {
+  padding: 8px 8px 4px;
+  overflow: hidden; /* video/gambar penuh 1 layar -- tidak perlu digulir */
+}
+.collection-fs-box.fs-media-box {
+  /* `flex: 1` & `flex-direction: column` sudah diwarisi dari
+     `.collection-fs-box` dasar di atas -- itu yang membuat kotak ini
+     otomatis mengisi SISA tinggi kolom (overlay dikurangi topRow),
+     TANPA perlu height:100% literal (yang malah bisa meluber). */
+  max-width: none; width: 100%; min-height: 0;
+  align-items: stretch; justify-content: stretch;
+  gap: 6px; margin: 0;
+}
+/* PENTING: selector INI HARUS setidaknya sama spesifik dengan
+   ".collection-fs-overlay.fs-wide .collection-fs-box" (baris ~745 di
+   atas, dipakai tombol "🖥️ Lebar Komputer") supaya batas 1400px-nya
+   TIDAK menang begitu kedua mode (Lebar Komputer + slide media) aktif
+   BERSAMAAN -- tanpa baris ini, video/gambar akan tetap terpotong
+   maksimal 1400px alih-alih benar-benar penuh 1 layar. */
+.collection-fs-overlay.fs-media-mode .collection-fs-box { max-width: none; }
+.collection-fs-box.fs-media-box .collection-fs-ref { flex-shrink: 0; }
+.collection-fs-embed-wrap.fs-media-full {
+  flex: 1; min-height: 0; width: 100%; height: 100%;
+  position: relative; display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.collection-fs-embed-iframe.fs-media-full {
+  width: 100%; height: 100%; max-height: none; aspect-ratio: auto;
+  border-radius: 0;
+}
+/* Gambar/halaman PDF -- max-width/max-height 100% DARI RUANG YANG
+   TERSEDIA (bukan lagi dari viewport langsung, karena di sini sudah ada
+   ruang tersendiri lewat .fs-media-full di atas), object-fit:contain
+   supaya rasio asli selalu terjaga persis seperti #slideView. */
+.collection-fs-embed-image.fs-media-full {
+  max-width: 100%; max-height: 100%; width: auto; height: auto;
+  object-fit: contain; border-radius: 0;
+  transform-origin: center center;
+  cursor: grab; touch-action: pan-x pan-y pinch-zoom;
+}
+.collection-fs-embed-image.fs-media-full.dragging { cursor: grabbing; }
+.collection-fs-embed-image.fs-media-full.zoomed { cursor: grab; }
+/* "↔️ Lebar Penuh" -- lebar dipaksa 100% ruang tersedia, tinggi
+   menyesuaikan (rasio TETAP terjaga, tidak gepeng) -- meniru persis
+   #slideView.ps-slide-fitwidth milik Layar 2. */
+.collection-fs-embed-image.fs-media-full.fs-fit-wide {
+  width: 100%; height: auto; max-height: none; object-fit: contain;
+}
+/* Panel kecil "Asli/Lebar Penuh" + zoom (-, %, +) -- lihat
+   wireMediaImageControls_(), js/app.js. Ditaruh melayang di sudut
+   kanan-bawah kotak media supaya tidak menutupi bagian tengah gambar. */
+.collection-fs-media-controls {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(0,0,0,0.55); padding: 6px 8px; border-radius: 10px;
+  backdrop-filter: blur(2px);
+}
+.collection-fs-media-controls .chip-btn { color: #fff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); }
+.collection-fs-zoom-value { color: #fff; font-size: 12px; font-family: var(--font-ui); min-width: 40px; text-align: center; }
 #ttsRecordBtn.recording { background: var(--danger); color: #fff; border-color: var(--danger); }
 .collection-fs-ref { font-family: var(--font-ui); font-weight: 700; color: var(--brass); font-size: 16px; }
 .collection-fs-text { font-family: var(--font-body); font-weight: var(--font-body-weight, 400); line-height: 1.6; }
@@ -1897,9 +1973,38 @@ input { font-family: inherit; }
 }
 /* Memakai variabel yang sama dengan tombol A-/A+ di header (js/app.js
    applyFontSize()), supaya hasil pencarian juga ikut membesar/mengecil,
-   bukan cuma teks di layar baca pasal. */
-.result-text { font-size: var(--verse-font-size, 15px); line-height: 1.55; color: var(--ink); }
+   bukan cuma teks di layar baca pasal.
+   PERBAIKAN (17 Sep 2026, laporan operator "isi kidung di panel
+   Kumpulan Ayat -- sebelum Mode Layar Penuh -- tidak kelihatan
+   lengkap") -- AKAR MASALAH: collectionItemBodyText() (js/app.js)
+   SUDAH mengembalikan syair kidung LENGKAP dipisah "\n\n" per bait +
+   "Koor:", tapi tanpa `white-space: pre-line` di sini semua baris baru
+   itu diabaikan browser & ambruk jadi 1 paragraf panjang tanpa jeda --
+   BUKAN benar-benar terpotong, cuma tampak berantakan/tidak lengkap.
+   `pre-line` menjaga baris baru TAPI tetap merapikan spasi ganda biasa
+   (beda dari `pre` yang juga mempertahankan indentasi apa adanya) --
+   tidak mengubah tampilan ayat/teks/pengumuman biasa yang memang jarang
+   punya baris baru sendiri. */
+.result-text { font-size: var(--verse-font-size, 15px); line-height: 1.55; color: var(--ink); white-space: pre-line; }
 .result-text mark { background: var(--brass-soft); color: var(--ink); border-radius: 3px; }
+
+/* BARU (17 Sep 2026, permintaan operator) -- pratinjau kotak kecil
+   (thumbnail) utk item YouTube/gambar/PDF di panel Kumpulan Ayat biasa
+   (Mode 1 Layar, SEBELUM Mode Layar Penuh) -- lihat
+   buildCollectionItemThumbnail_(), js/app.js. `height` TETAP + `width:
+   auto` (dibatasi `max-width`) -- SENGAJA meniru persis pola
+   `.ps-verse-thumb` milik daftar Kumpulan Ayat Studio Presentasi (lihat
+   di bawah) supaya rasio ASLI selalu terjaga otomatis: gambar potret
+   otomatis tampil sempit (lebih sempit dari tingginya), lanskap
+   otomatis tampil lebar, dan 1:1 otomatis ikut persegi -- TANPA perlu
+   deteksi orientasi manual sama sekali. */
+.collection-item-thumb { margin: 4px 0 6px; }
+.collection-item-thumb img {
+  display: block; height: 96px; width: auto; max-width: 100%;
+  object-fit: contain; border-radius: 8px; border: 1px solid var(--rule);
+  background: #fff;
+}
+.collection-item-thumb-loading { min-height: 24px; }
 
 .search-results-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
@@ -3533,6 +3638,27 @@ body.pane-fullscreen-open { overflow: hidden; }
   --ps-preview-bg: #05070c;
   --ps-preview-ink: #f5f2e8;
   --ps-dropzone-border: #4a3c28;
+  /* PERBAIKAN (17 Sep 2026, laporan operator: "di mode light theme,
+     tulisan yang habis diklik warna kuning, jadi tidak terlihat karena
+     background-nya juga kekuningan") -- AKAR MASALAH: .ps-verse-ref/
+     .ps-topbar-title/.ps-timer-display dulu memakai var(--brass-soft),
+     yaitu warna aksen milik tema Layar Proyeksi (THEMES di js/app.js,
+     15 pilihan warna, bisa DIGANTI operator kapan saja) -- BUKAN warna
+     milik Studio sendiri. Kalau tema Layar Proyeksi yang sedang aktif
+     kebetulan salah satu varian gelap (brass-soft-nya sengaja dibuat
+     PUCAT supaya kontras di atas kertas GELAP), lalu Studio-nya sendiri
+     dipindah ke mode ☀️ terang (.ps-ui-light, kertas PUTIH/terang) --
+     dua sistem tema yang independen ini jadi bentrok: kuning pucat di
+     atas putih/terang = nyaris tidak kelihatan. `--ps-accent` di sini
+     GANTIKAN var(--brass-soft) KHUSUS di dalam Studio -- warnanya
+     ditentukan sendiri per mode ☀️/🌙 MENGIKUTI --ps-bg/--ps-card-bg di
+     BLOK INI, bukan ikut tema Layar Proyeksi yang mana pun sedang
+     dipilih -- supaya kontras selalu terjamin apa pun tema Layar
+     Proyeksi yang aktif. --ps-active-bg/--ps-active-border (dipakai
+     .ps-verse-row.active) mengikuti alasan yang sama. */
+  --ps-accent: #e9c977;
+  --ps-active-bg: rgba(233, 201, 119, 0.16);
+  --ps-active-border: #b8934a;
 
   position: fixed; inset: 0; z-index: 900;
   background: var(--ps-bg);
@@ -3556,6 +3682,11 @@ body.pane-fullscreen-open { overflow: hidden; }
   --ps-preview-bg: #fffdf6;
   --ps-preview-ink: #241d12;
   --ps-dropzone-border: #c9b482;
+  /* Emas GELAP (bukan pucat) -- kontras jelas di atas --ps-card-bg
+     putih/krem mode terang ini, lihat catatan panjang di atas. */
+  --ps-accent: #8a6d1f;
+  --ps-active-bg: rgba(180, 137, 42, 0.14);
+  --ps-active-border: #b4842a;
 }
 .ps-topbar {
   display: flex; align-items: center; gap: 14px;
@@ -3564,7 +3695,7 @@ body.pane-fullscreen-open { overflow: hidden; }
   border-bottom: 1px solid var(--ps-border);
   flex: 0 0 auto;
 }
-.ps-topbar-title { font-weight: 800; font-size: 15px; color: var(--brass-soft); }
+.ps-topbar-title { font-weight: 800; font-size: 15px; color: var(--ps-accent); }
 .ps-topbar-status { font-size: 12.5px; color: var(--ps-ink-soft); flex: 1; }
 .ps-topbar-actions { display: flex; align-items: center; gap: 8px; }
 
@@ -3801,7 +3932,17 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   padding: 8px 10px; color: var(--ps-ink);
 }
 .ps-verse-row:hover { border-color: var(--brass); }
-.ps-verse-ref { display: block; font-weight: 700; font-size: 12.5px; color: var(--brass-soft); }
+.ps-verse-ref { display: block; font-weight: 700; font-size: 12.5px; color: var(--ps-accent); }
+/* BARU (17 Sep 2026, permintaan operator "user baru bingung cara pindah
+   ke bagian yang sudah disimpan, kalau mau acak") -- ikon panah kecil
+   di depan referensi/judul tiap baris (lihat renderCollectionList(),
+   js/presentation-studio.js) -- SEKEDAR penanda visual "klik baris ini
+   utk langsung tayang LIVE dari sini" (perilaku klik-nya SENDIRI sudah
+   ada sejak lama, lihat .ps-verse-row-body di bawah -- ini cuma
+   membuatnya lebih KELIHATAN, tidak mengubah cara kerja apa pun,
+   termasuk navigasi panah kiri/kanan papan ketik yang tetap jalan
+   berurutan dari mana pun terakhir diklik sampai ke ujung kumpulan). */
+.ps-verse-jump-icon { margin-right: 4px; }
 .ps-verse-snippet { display: block; font-size: 12px; color: var(--ps-ink-soft); margin-top: 2px; }
 /* BARU (12 Sep 2026 v6, permintaan operator "kok tidak keluar gambar
    detil setiap halaman") -- thumbnail kecil isi halaman PDF/gambar,
@@ -3867,7 +4008,7 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
    kanan papan ketik atau clicker/stylus presentasi (lihat activePlaylist
    & wirePlaylistKeyNav() di js/presentation-studio.js) -- baik daftar
    Kumpulan Ayat MAUPUN daftar slide Kidung memakai kelas yang sama. */
-.ps-verse-row.active { border-color: var(--brass); background: rgba(216, 180, 92, .16); box-shadow: 0 0 0 1px var(--brass) inset; }
+.ps-verse-row.active { border-color: var(--ps-active-border); background: var(--ps-active-bg); box-shadow: 0 0 0 1px var(--ps-active-border) inset; }
 
 /* Detail 1 kidung di tab "🎵 Kidung / Hymn" Studio Presentasi (kolom
    tengah) -- daftar buku/nomor/pencarian di ATASnya memakai class
@@ -3975,7 +4116,7 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 }
 .ps-timer-display {
   font-size: 34px; font-weight: 800; text-align: center; margin: 4px 0 10px;
-  font-variant-numeric: tabular-nums; color: var(--brass-soft);
+  font-variant-numeric: tabular-nums; color: var(--ps-accent);
 }
 .ps-timer-display.done { color: #e35b4b; }
 /* BARU (6 Sep 2026, permintaan operator) -- gantikan .ps-timer-idle lama:
