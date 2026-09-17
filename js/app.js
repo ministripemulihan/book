@@ -6799,7 +6799,7 @@ function openCollectionFullscreen(col, startIndex) {
     { id: "contain", label: "▭ Asli", title: "Ukuran asli, rasio dijaga -- muat penuh di dalam ruang yang ada" },
     { id: "wide", label: "↔️ Lebar Penuh", title: "Lebar dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- tinggi mengikuti" },
     { id: "tall", label: "↕️ Tinggi Penuh", title: "Tinggi dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- lebar mengikuti, geser kiri/kanan kalau perlu" },
-    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Lebar DAN tinggi dipaksa 100% (isi penuh layar) -- bagian yang lebih bisa dilihat dengan menggeser" },
+    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Mengecil seperlunya di kedua sisi (lebar DAN tinggi) supaya PASTI muat penuh tanpa ada yang kepotong -- rasio asli tetap dijaga" },
   ];
   function currentMediaFitMode() {
     const saved = localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY);
@@ -9959,7 +9959,7 @@ function initScrollTopFloatButton() {
 }
 
 // ------------------------------------------------------------
-// MULAI 
+// MULAI
 // ------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
   initUIEvents();
