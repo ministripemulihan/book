@@ -501,6 +501,14 @@ const PresentationStudio = (() => {
       box.innerHTML = `<div class="present-preview-idle">📊 Survei Membuktikan — tayang di Layar 2</div>`;
       return;
     }
+    // BARU (17 Sep 2026, permintaan operator) -- 🌱 Penciptaan (7 hari),
+    // dipanggil dari js/games/penciptaan.js. Pemandangannya SVG animasi
+    // penuh layar di Layar 2 (js/book-scene.js), jadi di kotak kecil ini
+    // cukup keterangan hari keberapa yang sedang tayang.
+    if (payload.type === "penciptaan") {
+      box.innerHTML = `<div class="present-preview-idle">🌱 Penciptaan — tayang di Layar 2</div>`;
+      return;
+    }
     if (payload.type === "verse" || payload.type === "text") {
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
@@ -831,9 +839,19 @@ const PresentationStudio = (() => {
         : ytLinkId
         ? `<img class="ps-verse-thumb" alt="" src="https://i.ytimg.com/vi/${escapeHtml(ytLinkId)}/mqdefault.jpg" />`
         : "";
+      // BARU (17 Sep 2026, permintaan operator "user baru bingung cara
+      // pindah ke bagian yang sudah disimpan, kalau mau acak") -- ikon
+      // "▶️" (.ps-verse-jump-icon) ditambah di depan ref/judul + atribut
+      // title di bawah -- SEKEDAR penanda visual/tooltip supaya lebih
+      // jelas seluruh baris ini BISA diklik langsung utk tayang LIVE
+      // dari sini (perilaku klik row.querySelector(".ps-verse-row-body")
+      // di bawah SUDAH ada sejak lama, tidak berubah -- begitu juga
+      // navigasi panah kiri/kanan papan ketik lewat wirePlaylistKeyNav(),
+      // yang tetap jalan berurutan dari titik manapun terakhir diklik
+      // sampai ke ujung kumpulan, TIDAK terpengaruh perubahan ini).
       row.innerHTML =
         thumbHtml +
-        `<div class="ps-verse-row-body"><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
+        `<div class="ps-verse-row-body" title="Klik untuk langsung tayang dari item ini"><span class="ps-verse-jump-icon" aria-hidden="true">▶️</span><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
            ${showMediaGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="mediagroup" title="Hapus SEMUA ${mediaGroupN} halaman berkas ini dari kumpulan, sekali klik">🗑️ Hapus Semua ${mediaGroupN} Halaman Ini</button>` : ""}
