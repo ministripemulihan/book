@@ -6696,9 +6696,18 @@ function openCollectionFullscreen(col, startIndex) {
   // jari) DAN geser 1 jari/mouse saat sudah diperbesar (>100%) --
   // cubit dua jari bawaan browser di HP tetap bisa dipakai apa adanya
   // (tidak diblokir/dimatikan di sini sama sekali).
-  function wireMediaImageControls_(img, wrap) {
+  // PERBAIKAN (17 Sep 2026, permintaan operator: "tulisan di atas nutupin,
+  // tombol kanan-bawah dipindah ke dalam garis") -- panel ini dulu SELALU
+  // ditaruh melayang di sudut kanan-bawah `wrap` (gambar/PDF). Sekarang
+  // menerima `controlsHost` opsional (topRow tipis-transparan di atas,
+  // lihat topRow & CSS ".collection-fs-top-row" dekat render()) -- kalau
+  // ada, panel dipasang DI SITU (jadi satu garis dengan tombol Sebelumnya/
+  // Selanjutnya/Tutup) alih-alih melayang sendiri di atas gambar. Kalau
+  // tidak diberikan (dipanggil dari tempat lain kelak), tetap jatuh ke
+  // perilaku lama (nempel di `wrap`) supaya tidak ada yang rusak.
+  function wireMediaImageControls_(img, wrap, controlsHost) {
     const controls = document.createElement("div");
-    controls.className = "collection-fs-media-controls";
+    controls.className = "collection-fs-media-controls" + (controlsHost ? " collection-fs-media-controls-inline" : "");
 
     const fitBtn = document.createElement("button");
     fitBtn.type = "button";
@@ -6740,7 +6749,16 @@ function openCollectionFullscreen(col, startIndex) {
     controls.appendChild(zoomOutBtn);
     controls.appendChild(zoomValEl);
     controls.appendChild(zoomInBtn);
-    wrap.appendChild(controls);
+    // Ditaruh SEBELUM tombol "✕ Tutup" kalau controlsHost (topRow)
+    // diberikan -- supaya urutan garis tipisnya: toolbar … panel zoom …
+    // Tutup, closeBtn tetap paling ujung kanan seperti sebelumnya.
+    if (controlsHost) {
+      const closeRef = controlsHost.querySelector(".collection-fs-close");
+      if (closeRef) controlsHost.insertBefore(controls, closeRef);
+      else controlsHost.appendChild(controls);
+    } else {
+      wrap.appendChild(controls);
+    }
 
     // Roda mouse (komputer) langsung memperbesar/mengecilkan -- tanpa
     // perlu tombol -- persis kebiasaan lihat peta/gambar pada umumnya.
@@ -6780,7 +6798,7 @@ function openCollectionFullscreen(col, startIndex) {
     img.addEventListener("touchend", () => { dragEnd(); overlay._collectionFsSwipeSuspended = mediaZoomPct > 100; });
   }
 
-  function buildCollectionFsEmbed(it, myToken) {
+  function buildCollectionFsEmbed(it, myToken, controlsHost) {
     if (it.type === "youtube_link" && it.embedUrl) {
       // BARU (5 Sep 2026) -- item YouTube PORTABEL (embedUrl tersimpan
       // langsung di item, lihat addYoutubeLinkToCollection() di
@@ -6882,7 +6900,7 @@ function openCollectionFullscreen(col, startIndex) {
             img.alt = it.name || "Berkas";
             img.className = "collection-fs-embed-image fs-media-full";
             wrap.appendChild(img);
-            wireMediaImageControls_(img, wrap);
+            wireMediaImageControls_(img, wrap, controlsHost);
           } else {
             wrap.textContent = "(berkas tidak ditemukan -- mungkin sudah dihapus dari Media Tersimpan)";
           }
@@ -7047,6 +7065,18 @@ function openCollectionFullscreen(col, startIndex) {
     if (isVisualEmbed) {
       topRow.appendChild(prevBtnTop);
       topRow.appendChild(nextBtnTop);
+      // BARU (17 Sep 2026, permintaan operator) -- dulu judul lengkap
+      // ("Tenang 3 - ... (hal 19/26) · 28/45") ditaruh besar-besar di
+      // dalam kotak, menutupi bagian atas video/gambar. Sekarang, KHUSUS
+      // slide video/gambar (isVisualEmbed), diganti tulisan ringkas
+      // "28 / 45" (posisi slide ke berapa dari berapa) di garis tipis
+      // ini, sebelah tombol "✕ Tutup" -- judul lengkapnya TIDAK hilang,
+      // cuma dipindah jadi tooltip (arahkan/tekan lama tulisan ini).
+      const topRefEl = document.createElement("div");
+      topRefEl.className = "collection-fs-ref collection-fs-ref-compact";
+      topRefEl.textContent = `${idx + 1} / ${total}`;
+      topRefEl.title = ref;
+      topRow.appendChild(topRefEl);
     }
     topRow.appendChild(closeBtn);
     overlay.appendChild(topRow);
@@ -7077,10 +7107,16 @@ function openCollectionFullscreen(col, startIndex) {
     const box = document.createElement("div");
     box.className = "collection-fs-box" + (isVisualEmbed ? " fs-media-box" : "");
 
-    const refEl = document.createElement("div");
-    refEl.className = "collection-fs-ref";
-    refEl.textContent = `${ref}  ·  ${idx + 1} / ${total}`;
-    box.appendChild(refEl);
+    // Judul lengkap + posisi slide -- HANYA utk item biasa (ayat/teks/
+    // kidung/pengumuman). Utk video/gambar (isVisualEmbed) versi
+    // ringkasnya sudah dipasang di topRow (lihat catatan di sana), jadi
+    // TIDAK diulang di sini supaya tidak menutupi bagian atas media.
+    if (!isVisualEmbed) {
+      const refEl = document.createElement("div");
+      refEl.className = "collection-fs-ref";
+      refEl.textContent = `${ref}  ·  ${idx + 1} / ${total}`;
+      box.appendChild(refEl);
+    }
 
     if (v && ttsSupported) {
       const fsPlayBtn = document.createElement("button");
@@ -7097,7 +7133,7 @@ function openCollectionFullscreen(col, startIndex) {
     // teks/pengumuman/kidung/gambar-PDF-tanpa-embed) TETAP memakai
     // .collection-fs-text seperti sebelumnya, tidak berubah.
     if (isEmbeddableCollectionItem(it)) {
-      const embedBox = buildCollectionFsEmbed(it, myToken);
+      const embedBox = buildCollectionFsEmbed(it, myToken, topRow);
       if (embedBox) box.appendChild(embedBox);
     } else {
       const textEl = document.createElement("div");
