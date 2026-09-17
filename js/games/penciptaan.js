@@ -70,7 +70,7 @@
     { n: 4, ikon: "🌗", nama: "Matahari, bulan & bintang", ayat: "Kejadian 1:14-19" },
     { n: 5, ikon: "🐟", nama: "Ikan & burung", ayat: "Kejadian 1:20-23" },
     { n: 6, ikon: "🦁", nama: "Binatang darat & manusia", ayat: "Kejadian 1:24-31" },
-    { n: 7, ikon: "🌾", nama: "Hari perhentian", ayat: "Kejadian 2:1-3" }
+    { n: 7, ikon: "🌾", nama: "Hari Perhentian", ayat: "Kejadian 2:1-3" }
   ];
 
   let hariAktif_ = 1;
@@ -91,7 +91,9 @@
     const lbl = el("psPenciptaanLabel");
     if (lbl) {
       const d = HARI[hariAktif_ - 1];
-      lbl.textContent = "Hari " + d.n + " · " + d.nama + " (" + d.ayat + ")";
+      // Khusus hari 7 (permintaan operator 18 Sep 2026): pemisah "-"
+      // bukan "·", supaya tampil persis "Hari 7 - Hari Perhentian".
+      lbl.textContent = (d.n === 7 ? ("Hari " + d.n + " - " + d.nama) : ("Hari " + d.n + " · " + d.nama)) + " (" + d.ayat + ")";
     }
   }
 
