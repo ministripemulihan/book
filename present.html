@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Layar 2 — Tampilan Presentasi</title>
+<!-- BARU (17 Sep 2026) -- animasi "🌱 Penciptaan" (7 hari). Semua
+     kelasnya berawalan bk- & dikurung di .bk-scene, jadi tidak ada satu
+     pun aturan di file ini yang tersentuh olehnya. -->
+<link rel="stylesheet" href="css/book-scene.css?v=20260917a" />
 <style>
   :root {
     --p-bg: #05070c;
@@ -1999,6 +2003,15 @@
 
   <!-- BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian, lihat
        catatan panjang CSS #wheelView di atas. -->
+  <!-- BARU (17 Sep 2026, permintaan operator) -- 🌱 Penciptaan.
+       Isi #penciptaanStage diisi SENDIRI oleh js/book-scene.js saat
+       showPenciptaan() dipanggil pertama kali (lihat di skrip bawah).
+       Kontrak payload dari Studio ada di js/games/penciptaan.js. -->
+  <div id="penciptaanView" hidden>
+    <div id="penciptaanStage" style="position:absolute; inset:0;"></div>
+    <div id="penciptaanCaption" hidden></div>
+  </div>
+
   <div id="wheelView" hidden>
     <div id="wheelCanvasWrap">
       <div id="wheelPointer"></div>
@@ -2278,6 +2291,7 @@
        dekat getEffectsMasterGain_() di bawah untuk cara efek ini tetap
        ikut sakelar mute-semua "M". -->
   <script src="js/soundfx.js?v=20260911c"></script>
+  <script src="js/book-scene.js?v=20260917a"></script>
   <!-- BARU (7 Sep 2026) -- daftarkan Service Worker juga di Layar 2 itu
        sendiri (jendela terpisah dari index.html) supaya halaman ini pun
        bisa dibuka tanpa internet -- lihat catatan panjang di sw.js &
@@ -3906,6 +3920,88 @@
     if (typeof playNote_ === "function") playNote_(1600, 0, 0.03, "square", 0.06);
   }
 
+  // ------------------------------------------------------------
+  // 🌱 Penciptaan (BARU 17 Sep 2026, permintaan operator) -- game
+  // "tayang", bukan tanya-jawab: Studio mengirim hari 1..7, Layar 2
+  // menggambar ulang pemandangannya. SELURUH gambar & animasinya ada di
+  // js/book-scene.js (SVG murni, tidak ada file gambar/video sama
+  // sekali -- tetap 100% offline seperti game lain di folder games).
+  //
+  // Scene dipasang SEKALI saja (mount) lalu dipakai ulang terus --
+  // membangunnya perlu menggambar ratusan elemen SVG (padi, bintang,
+  // burung, kunang-kunang), jadi kalau dibangun ulang tiap ganti hari
+  // akan terasa tersendat di laptop lama.
+  //
+  // Payload dari Studio (lihat js/games/penciptaan.js):
+  //   { type:"penciptaan", action:"show", hari:1..7, teks:true|false }
+  //   { type:"penciptaan", action:"jam", jam:0..23.99 }  -- pratinjau jam (hari 7)
+  //   { type:"penciptaan", action:"jamauto" }            -- kembali ke jam perangkat
+  //   { type:"penciptaan", action:"reset" }
+  // ------------------------------------------------------------
+  const penciptaanViewEl = document.getElementById("penciptaanView");
+  const penciptaanStageEl = document.getElementById("penciptaanStage");
+  const penciptaanCaptionEl = document.getElementById("penciptaanCaption");
+  let penciptaanScene_ = null;
+
+  const PENCIPTAAN_HARI = [
+    { nama: "Terang", ayat: "Kejadian 1:3-5" },
+    { nama: "Cakrawala & air", ayat: "Kejadian 1:6-8" },
+    { nama: "Darat, laut & tumbuhan", ayat: "Kejadian 1:9-13" },
+    { nama: "Matahari, bulan & bintang", ayat: "Kejadian 1:14-19" },
+    { nama: "Ikan & burung", ayat: "Kejadian 1:20-23" },
+    { nama: "Binatang darat & manusia", ayat: "Kejadian 1:24-31" },
+    { nama: "Hari perhentian di sawah", ayat: "Kejadian 2:1-3" }
+  ];
+
+  function showPenciptaan(data) {
+    if (typeof BookScene === "undefined") return; // js/book-scene.js tidak termuat -- diamkan, jangan sampai error menghentikan render() lain
+    stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
+    if (typeof stopModeScreen === "function") stopModeScreen(false);
+    if (typeof stopMap === "function") stopMap(false);
+    if (typeof stopWheel === "function") stopWheel(false);
+    if (typeof stopQuiz9 === "function") stopQuiz9(false);
+    if (typeof stopSurvei === "function") stopSurvei(false);
+    hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
+    if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
+    if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
+    if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    idleEl.hidden = true;
+    refEl.hidden = true; refEl.textContent = "";
+    refSubEl.hidden = true; refSubEl.textContent = "";
+    textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+
+    penciptaanViewEl.hidden = false; // tampilkan DULU -- scene mengukur kotaknya sendiri saat dipasang
+    if (!penciptaanScene_) penciptaanScene_ = BookScene.mount(penciptaanStageEl, { hari: 1, ikutiJam: true });
+
+    const hari = Math.max(1, Math.min(7, parseInt(data.hari, 10) || 1));
+    penciptaanScene_.setHari(hari);
+
+    const info = PENCIPTAAN_HARI[hari - 1];
+    if (data.teks === false) {
+      penciptaanCaptionEl.hidden = true;
+      penciptaanCaptionEl.innerHTML = "";
+    } else {
+      penciptaanCaptionEl.hidden = false;
+      penciptaanCaptionEl.innerHTML = "Hari " + hari + " · " + info.nama + "<small>" + info.ayat + "</small>";
+    }
+  }
+
+  // jam = null -> kembali mengikuti jam asli perangkat Layar 2 ini.
+  function setJamPenciptaan_(jam) {
+    if (!penciptaanScene_) return;
+    if (jam == null) penciptaanScene_.ikutiJamPerangkat();
+    else penciptaanScene_.setJam(jam);
+  }
+
+  function stopPenciptaan(showIdle) {
+    if (penciptaanViewEl) penciptaanViewEl.hidden = true;
+    if (penciptaanCaptionEl) { penciptaanCaptionEl.hidden = true; penciptaanCaptionEl.innerHTML = ""; }
+    // Scene sengaja TIDAK di-destroy: kalau operator menekan hari lagi,
+    // gambarnya langsung muncul tanpa jeda membangun ulang. Animasinya
+    // berhenti sendiri karena elemennya tersembunyi (display:none).
+    if (showIdle && idleEl) idleEl.hidden = false;
+  }
+
   function stopWheel(showIdle) {
     clearWheelTimers_();
     wheelViewEl.hidden = true;
@@ -5166,6 +5262,7 @@
     if (typeof stopWheel === "function") stopWheel(false); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
     if (typeof stopQuiz9 === "function") stopQuiz9(false); // BARU (16 Sep 2026) -- ikut 🧩 Kuis 9 Kotak juga
     if (typeof stopSurvei === "function") stopSurvei(false); // BARU (16 Sep 2026) -- ikut 📊 Survei Membuktikan juga
+    if (typeof stopPenciptaan === "function") stopPenciptaan(false); // BARU (17 Sep 2026) -- ikut 🌱 Penciptaan juga
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock(); // BARU -- lensa menunjuk ke gambar yg SEDANG tayang, disegarkan lagi otomatis saat kursor digerakkan lagi di kotak pratinjau
     setCamVisibleForKind(kind); // BARU -- latar kamera cuma tampil di belakang verse/text/kidung, lihat catatan di atas
     idleEl.hidden = true;
@@ -5407,6 +5504,7 @@
       stopModeScreen(true); // BARU (9 Sep 2026) -- ikut Mode Layar (Welcome/Next Up) juga
       stopMap(true); // BARU (9 Sep 2026) -- ikut Peta Interaktif juga
       if (typeof stopWheel === "function") stopWheel(true); // BARU (9 Sep 2026) -- ikut 🎡 Roda Undian juga
+      if (typeof stopPenciptaan === "function") stopPenciptaan(true); // BARU (17 Sep 2026) -- ikut 🌱 Penciptaan juga
       hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
       setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
@@ -5507,6 +5605,16 @@
     if (data.type === "survei") {
       if (data.action === "reset") { stopSurvei(true); }
       else { showSurvei(data); }
+      return;
+    }
+    // BARU (17 Sep 2026, permintaan operator) -- 🌱 Penciptaan (7 hari),
+    // lihat showPenciptaan() di atas & js/games/penciptaan.js untuk
+    // kontrak payload lengkapnya.
+    if (data.type === "penciptaan") {
+      if (data.action === "reset") { stopPenciptaan(true); }
+      else if (data.action === "jam") { setJamPenciptaan_(data.jam); }
+      else if (data.action === "jamauto") { setJamPenciptaan_(null); }
+      else { showPenciptaan(data); }
       return;
     }
     // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4),
