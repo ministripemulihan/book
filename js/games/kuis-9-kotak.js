@@ -70,6 +70,9 @@
     if (!saved) return;
     if (el("psQuiz9Mode") && saved.mode) el("psQuiz9Mode").value = saved.mode;
     if (el("psQuiz9Bonus") && saved.bonusValue != null) el("psQuiz9Bonus").value = saved.bonusValue;
+    if (el("psQuiz9TeamNameX")) el("psQuiz9TeamNameX").value = saved.teamNameX || "";
+    if (el("psQuiz9TeamNameO")) el("psQuiz9TeamNameO").value = saved.teamNameO || "";
+    syncTeamNamePreview_();
     (saved.boxes || []).forEach((b, i) => {
       const n = i + 1;
       if (el("psQuiz9Topik" + n)) el("psQuiz9Topik" + n).value = b.topik || "";
@@ -82,6 +85,11 @@
   function readSetupFromInputs_() {
     const mode = el("psQuiz9Mode") ? el("psQuiz9Mode").value : "tictactoe";
     const bonusValue = parseInt(el("psQuiz9Bonus") ? el("psQuiz9Bonus").value : "500", 10) || 500;
+    // BARU (18 Sep 2026) -- nama tim OPSIONAL: dikosongkan tetap boleh
+    // mulai, jatuh ke "Kelompok X"/"Kelompok O" biasa (lihat fallback
+    // di publicState_ lewat state.teamNames & di renderPanel_ di bawah).
+    const teamNameX = el("psQuiz9TeamNameX") ? el("psQuiz9TeamNameX").value.trim() : "";
+    const teamNameO = el("psQuiz9TeamNameO") ? el("psQuiz9TeamNameO").value.trim() : "";
     const boxes = [];
     for (let i = 1; i <= 9; i++) {
       const topikEl = el("psQuiz9Topik" + i);
@@ -93,11 +101,29 @@
         poin: poinEl ? (parseInt(poinEl.value, 10) || 0) : 0,
       });
     }
-    return { mode, bonusValue, boxes };
+    return { mode, bonusValue, teamNameX, teamNameO, boxes };
   }
 
   function saveSetup_(setup) {
     try { localStorage.setItem(SETUP_KEY, JSON.stringify(setup)); } catch (e) {}
+  }
+
+  // BARU (18 Sep 2026) -- pratinjau kecil di bawah tiap kolom nama tim,
+  // supaya operator langsung lihat "nanti tampil sebagai ... (pakai
+  // tanda X/O)" SAAT mengetik, sebelum menekan "Tampilkan & Mulai".
+  function syncTeamNamePreview_() {
+    const xEl = el("psQuiz9TeamNameX");
+    const oEl = el("psQuiz9TeamNameO");
+    const xPrev = el("psQuiz9TeamNameXPreview");
+    const oPrev = el("psQuiz9TeamNameOPreview");
+    if (xPrev) {
+      const name = xEl && xEl.value.trim();
+      xPrev.textContent = name ? "→ tampil sebagai \"" + name + "\" (pakai tanda X)" : "kosong = tampil sebagai \"Kelompok X\"";
+    }
+    if (oPrev) {
+      const name = oEl && oEl.value.trim();
+      oPrev.textContent = name ? "→ tampil sebagai \"" + name + "\" (pakai tanda O)" : "kosong = tampil sebagai \"Kelompok O\"";
+    }
   }
 
   function syncBonusFieldVisibility_() {
@@ -115,6 +141,8 @@
     }
     if (el("psQuiz9Mode")) el("psQuiz9Mode").disabled = locked;
     if (el("psQuiz9Bonus")) el("psQuiz9Bonus").disabled = locked;
+    if (el("psQuiz9TeamNameX")) el("psQuiz9TeamNameX").disabled = locked;
+    if (el("psQuiz9TeamNameO")) el("psQuiz9TeamNameO").disabled = locked;
     if (el("psQuiz9StartBtn")) el("psQuiz9StartBtn").hidden = locked;
     if (el("psQuiz9ResetBtn")) el("psQuiz9ResetBtn").hidden = !locked;
     if (el("psQuiz9GameArea")) el("psQuiz9GameArea").hidden = !locked;
@@ -154,6 +182,15 @@
     state = {
       mode: setup.mode,
       boxes,
+      // BARU (18 Sep 2026) -- nama tim, dipakai present.html & panel
+      // Studio ini SELALU digandeng dengan tanda X/O-nya (mis. "Tim
+      // Garuda (X)"), tidak pernah menggantikan tanda itu -- lihat
+      // catatan di present.html/q9TeamLabel_() & renderPanel_() di
+      // bawah untuk alasannya.
+      teamNames: {
+        X: setup.teamNameX || "Kelompok X",
+        O: setup.teamNameO || "Kelompok O",
+      },
       activeGroup: "X",
       pickerGroup: "X", // kelompok yang PERTAMA KALI membuka kotak yang sedang aktif -- dipakai menentukan giliran BERIKUTNYA (lihat finishBox_())
       phase: "picking", // "picking" | "asking" | "stealing"
@@ -295,6 +332,7 @@
     return {
       mode: state.mode,
       boxes: publicBoxes_(),
+      teamNames: state.teamNames,
       activeGroup: state.activeGroup,
       scores: state.scores,
       gameOver: state.gameOver,
@@ -346,14 +384,18 @@
       boardEl.appendChild(btn);
     });
 
-    if (scoreEl) scoreEl.textContent = "Skor -- X: " + state.scores.X + "  |  O: " + state.scores.O + "  |  Giliran memilih: Kelompok " + state.activeGroup;
+    // BARU (18 Sep 2026) -- panel Studio ikut memakai nama tim (kalau
+    // diisi), tetap digandeng tanda X/O supaya operator (yang sudah
+    // hafal warna biru=X/merah=O di papan mini di atas) tidak bingung.
+    const teamLabel = (g) => state.teamNames[g] + " (" + g + ")";
+    if (scoreEl) scoreEl.textContent = "Skor -- " + teamLabel("X") + ": " + state.scores.X + "  |  " + teamLabel("O") + ": " + state.scores.O + "  |  Giliran memilih: " + teamLabel(state.activeGroup);
 
     const hasQuestion = (state.phase === "asking" || state.phase === "stealing") && state.activeBoxIndex != null;
     if (qEl) {
       if (hasQuestion) {
         const box = state.boxes[state.activeBoxIndex];
         qEl.hidden = false;
-        qEl.textContent = (state.phase === "stealing" ? "🔁 Rebutan -- " : "") + "Kelompok " + state.activeGroup + " menjawab: [" + box.topik + "] " + box.soal
+        qEl.textContent = (state.phase === "stealing" ? "🔁 Rebutan -- " : "") + teamLabel(state.activeGroup) + " menjawab: [" + box.topik + "] " + box.soal
           + (box.specialRevealed ? "  (" + box.specialRevealed.toUpperCase() + "!)" : "");
       } else {
         qEl.hidden = true;
@@ -366,7 +408,7 @@
       if (state.gameOver) {
         winnerEl.hidden = false;
         const w = state.winner;
-        winnerEl.textContent = (!w || w.by === "tie") ? "🤝 Seri! Skor sama." : "🏆 Kelompok " + w.group + " menang (" + (w.by === "line" ? "3 sejajar" : "poin tertinggi") + ")";
+        winnerEl.textContent = (!w || w.by === "tie") ? "🤝 Seri! Skor sama." : "🏆 " + teamLabel(w.group) + " menang (" + (w.by === "line" ? "3 sejajar" : "poin tertinggi") + ")";
       } else {
         winnerEl.hidden = true;
         winnerEl.textContent = "";
@@ -380,6 +422,8 @@
     const resetBtn = el("psQuiz9ResetBtn");
     const correctBtn = el("psQuiz9CorrectBtn");
     const wrongBtn = el("psQuiz9WrongBtn");
+    const teamNameXEl = el("psQuiz9TeamNameX");
+    const teamNameOEl = el("psQuiz9TeamNameO");
     if (!startBtn || !resetBtn) return; // markup belum ada di halaman ini -- diam saja
 
     loadSetup_();
@@ -387,6 +431,10 @@
     renderPanel_();
 
     if (modeEl) modeEl.addEventListener("change", syncBonusFieldVisibility_);
+    // BARU (18 Sep 2026) -- pratinjau "tampil sebagai ... (pakai tanda
+    // X/O)" hidup saat operator mengetik nama tim, lihat syncTeamNamePreview_().
+    if (teamNameXEl) teamNameXEl.addEventListener("input", syncTeamNamePreview_);
+    if (teamNameOEl) teamNameOEl.addEventListener("input", syncTeamNamePreview_);
     startBtn.addEventListener("click", startGame_);
     resetBtn.addEventListener("click", () => {
       if (state && !state.gameOver && !confirm("Reset game yang sedang berjalan?")) return;
