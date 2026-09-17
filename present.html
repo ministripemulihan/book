@@ -2395,7 +2395,7 @@
        dekat getEffectsMasterGain_() di bawah untuk cara efek ini tetap
        ikut sakelar mute-semua "M". -->
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/book-scene.js?v=20260917a"></script>
+  <script src="js/book-scene.js?v=20260918b"></script>
   <!-- BARU (7 Sep 2026) -- daftarkan Service Worker juga di Layar 2 itu
        sendiri (jendela terpisah dari index.html) supaya halaman ini pun
        bisa dibuka tanpa internet -- lihat catatan panjang di sw.js &
@@ -4087,7 +4087,7 @@
     { nama: "Matahari, bulan & bintang", ayat: "Kejadian 1:14-19" },
     { nama: "Ikan & burung", ayat: "Kejadian 1:20-23" },
     { nama: "Binatang darat & manusia", ayat: "Kejadian 1:24-31" },
-    { nama: "Hari perhentian di sawah", ayat: "Kejadian 2:1-3" }
+    { nama: "Hari Perhentian", ayat: "Kejadian 2:1-3" }
   ];
 
   function showPenciptaan(data) {
@@ -4120,7 +4120,10 @@
       penciptaanCaptionEl.innerHTML = "";
     } else {
       penciptaanCaptionEl.hidden = false;
-      penciptaanCaptionEl.innerHTML = "Hari " + hari + " · " + info.nama + "<small>" + info.ayat + "</small>";
+      // Khusus hari 7 (permintaan operator 18 Sep 2026): pemisah "-"
+      // bukan "·", supaya tampil persis "Hari 7 - Hari Perhentian".
+      var pemisahHari_ = hari === 7 ? " - " : " · ";
+      penciptaanCaptionEl.innerHTML = "Hari " + hari + pemisahHari_ + info.nama + "<small>" + info.ayat + "</small>";
     }
     updatePenciptaanClockOverlay_();
   }
