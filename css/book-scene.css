@@ -122,9 +122,15 @@
    mungkin ada keadaan "form terkunci tertutup dan tidak bisa dibuka". */
 #loginToggleBtn { display: none; }
 .login-card.login-collapsible #loginToggleBtn { display: flex; }
-.login-bar { width: 100%; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0 0; padding: 12px 14px; border: 1px solid rgba(127, 127, 127, .3); border-radius: 12px; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
-.login-bar:hover { background: rgba(127, 127, 127, .1); }
-.login-bar .login-chev { font-size: 13px; opacity: .7; transition: transform .3s ease; }
+/* DIUBAH (17 Sep 2026, permintaan operator "kolom masuk di-hide dulu,
+   tulisannya sign in / login + segitiga, dibuat tipis saja") -- gaya
+   batang ini SENGAJA dibuat ringan/tipis (font-weight normal, tanpa
+   kotak berbingkai/latar) supaya kesannya cuma sebaris teks kecil +
+   tanda segitiga, bukan tombol besar mencolok -- tetap 1:1 elemen yang
+   sama (#loginToggleBtn), cuma tampilannya diperhalus. */
+.login-bar { width: 100%; align-items: center; justify-content: center; gap: 8px; margin: 6px 0 0; padding: 8px 14px; border: none; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-weight: 400; font-size: 14px; opacity: .8; letter-spacing: .02em; cursor: pointer; transition: opacity .16s ease, background .16s ease; }
+.login-bar:hover { opacity: 1; background: rgba(127, 127, 127, .08); }
+.login-bar .login-chev { font-size: 10px; opacity: .65; transition: transform .3s ease; }
 .login-card.login-collapsible[data-open="true"] .login-chev { transform: rotate(180deg); }
 .login-card.login-collapsible .login-body { max-height: 0; opacity: 0; overflow: hidden; transition: max-height .4s cubic-bezier(.3, .8, .35, 1), opacity .28s ease; }
 .login-card.login-collapsible[data-open="true"] .login-body { max-height: 420px; opacity: 1; }
@@ -133,6 +139,37 @@
    tombol hiasan ini, jadi barisnya disembunyikan saja. */
 @media (max-height: 560px) { #loginBookBar { display: none; } }
 #loginBookLabel { margin: 0; font-size: 13px; font-weight: 600; color: #f4f8f1; text-shadow: 0 1px 14px rgba(0, 0, 0, .7); text-align: center; }
+
+/* ------------------------------------------------------------
+   Tombol "Masuk" pembuka paling luar (18 Sep 2026, permintaan
+   operator) -- defaultnya HANYA sebaris teks ini yang kelihatan di
+   atas latar, #loginCard disembunyikan total sampai ini ditekan.
+   Kelas .login-outer-collapsible dipasang lewat js/book-scene.js
+   (sama polanya dengan .login-collapsible di atas), jadi kalau
+   script gagal dimuat kelas ini tidak pernah ada dan kartu tetap
+   tampil normal.
+   ------------------------------------------------------------ */
+.login-screen > .login-card.login-outer-collapsible[data-outer-open="false"] { display: none; }
+.login-reveal {
+  position: relative;
+  z-index: 2;
+  background: rgba(9, 20, 26, .45);
+  border: 1px solid rgba(255, 255, 255, .22);
+  color: #f4f8f1;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: 10px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, .5);
+  transition: background .16s ease, transform .16s ease;
+}
+.login-reveal:hover { background: rgba(9, 20, 26, .65); transform: translateY(-1px); }
+.login-reveal:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 /* ============================================================
    LAYAR 2 (present.html) -- game "🌱 Penciptaan"
