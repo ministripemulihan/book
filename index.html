@@ -47,7 +47,7 @@
            membuka paksa kartunya -- lihat catatan di file itu: TIDAK
            mungkin ada keadaan "form tidak bisa dibuka sama sekali". -->
       <button type="button" id="loginToggleBtn" class="login-bar" aria-expanded="false" aria-controls="loginBody">
-        <span>🔐 Masuk dengan Akun</span>
+        <span>Sign in / Login</span>
         <span class="login-chev" aria-hidden="true">▾</span>
       </button>
 
@@ -2616,18 +2616,22 @@
           <div class="ps-pointer-hint">Jam kecil (format JAM:MENIT:DETIK) yang menempel di pojok Layar 2, mengikuti waktu perangkat ini -- tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, sampai disembunyikan lagi dari sini.</div>
 
           <!-- BARU (16 Sep 2026, permintaan operator "tulisan jam
-               hh:mm:ss:msms di tengah layar") -- 🕐 Jam Tengah: SAMA
-               arsitekturnya dgn Jam Pojok di atas (independen dari
-               showMain()/showTimer()/dst, selalu di ATAS konten apa
-               pun), BEDANYA posisi selalu di TENGAH layar & formatnya
-               menampilkan milidetik juga -- lihat #centerClockOverlay
-               (present.html). -->
-          <div class="ps-field-label" style="margin-top:14px;">🕐 Jam Tengah (JAM:MENIT:DETIK:MILIDETIK, di tengah layar)</div>
+               hh:mm:ss:msms di tengah layar"), DIUBAH (17 Sep 2026,
+               permintaan operator "background biru dibuat transparan,
+               tulisan putih tipis, taruh di bawah, ikuti timer
+               videonya YouTube") -- SAMA arsitekturnya dgn Jam Pojok di
+               atas (independen dari showMain()/showTimer()/dst, selalu
+               di ATAS konten apa pun), BEDANYA sekarang posisi di BAWAH
+               layar, tanpa kotak/latar (transparan, tulisan putih
+               tipis), & angkanya mengikuti POSISI PUTAR video YouTube
+               yang sedang tayang (bukan jam dinding lagi) -- lihat
+               #centerClockOverlay (present.html). -->
+          <div class="ps-field-label" style="margin-top:14px;">⏱️ Timer Video (MENIT:DETIK:MILIDETIK, di bawah layar)</div>
           <label class="more-menu-toggle" for="psCenterClockOn">
-            <span>Tampilkan jam tengah di Layar 2</span>
+            <span>Tampilkan timer video di Layar 2</span>
             <span class="toggle-switch"><input type="checkbox" id="psCenterClockOn" /><span class="toggle-slider"></span></span>
           </label>
-          <div class="ps-pointer-hint">Jam besar di tengah Layar 2, termasuk milidetik (JAM:MENIT:DETIK:MS) -- berguna untuk acuan sinkronisasi presisi tinggi (mis. dgn kamera/software lain). Tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, boleh menyala bersamaan dengan Jam Pojok di atas.</div>
+          <div class="ps-pointer-hint">Tulisan putih tipis, tanpa kotak latar, di bagian bawah Layar 2 -- mengikuti posisi putar video YouTube yang sedang tayang (bukan jam dinding), termasuk milidetik (MENIT:DETIK:MS, atau JAM:MENIT:DETIK:MS kalau videonya sudah lewat 1 jam). Berguna untuk acuan sinkronisasi presisi tinggi (mis. dgn kamera/software lain yang merekam video yang sama). Tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, boleh menyala bersamaan dengan Jam Pojok di atas.</div>
         </div>
 
         <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
@@ -3652,6 +3656,27 @@
               <span id="psPenciptaanJamLabel" style="font-weight:700; font-variant-numeric:tabular-nums; min-width:4em; text-align:center;">12:00</span>
               <button type="button" class="chip-btn small" id="psPenciptaanJamAutoBtn">🕒 Ikuti jam perangkat</button>
             </div>
+
+            <!-- BARU (17 Sep 2026, permintaan operator "hari ke-7 apa
+                 bisa dikasih tulisan bisa view jam atau tidak, kayak
+                 jam 12:40 di panel ini, tampil di kanan atas Layar 2,
+                 digital atau analog") -- sakelar TERPISAH dari
+                 penggeser pratinjau di atas: penggeser itu MENENTUKAN
+                 jam yang dipakai pemandangan (baju/langit), sakelar
+                 ini cuma MENAMPILKAN angka jam yang sama itu sbg jam
+                 kecil di pojok kanan atas Layar 2, supaya jemaat/
+                 penonton juga bisa lihat jam berapa yang sedang
+                 disimulasikan. Default MATI -- lihat kontrak payload
+                 penciptaan/jamview di js/games/penciptaan.js &
+                 penanganannya di present.html. -->
+            <label class="more-menu-toggle" for="psPenciptaanJamViewOn" style="margin-top:10px;">
+              <span>Tampilkan jam ini di Layar 2 (kanan atas)</span>
+              <span class="toggle-switch"><input type="checkbox" id="psPenciptaanJamViewOn" /><span class="toggle-slider"></span></span>
+            </label>
+            <div class="ps-btn-row" id="psPenciptaanJamViewStyleRow" style="margin-top:6px;">
+              <button type="button" class="chip-btn small active" data-jam-view-style="digital">🔢 Digital</button>
+              <button type="button" class="chip-btn small" data-jam-view-style="analog">🕑 Analog</button>
+            </div>
           </div>
 
           <div class="ps-pointer-hint" style="margin-top:14px;">Catatan: sama seperti 🎡 Roda Undian, versi ini dipakai LANGSUNG dari sini setiap acara (belum bisa disimpan sebagai item di "📚 Kumpulan Ayat").</div>
@@ -3677,7 +3702,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260913a"></script>
+  <script src="js/collections.js?v=20260913aa"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -3717,7 +3742,7 @@
   <script src="js/media-library.js?v=20260914b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20260915e2a1"></script>
+  <script src="js/app.js?v=20260915ea"></script>
   <script src="js/curhat.js?v=20260915a"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
