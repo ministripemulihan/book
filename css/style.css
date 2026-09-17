@@ -880,17 +880,48 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
 .collection-fs-embed-image.fs-media-full.fs-fit-wide {
   width: 100%; height: auto; max-height: none; object-fit: contain;
 }
-/* Panel kecil "Asli/Lebar Penuh" + zoom (-, %, +) -- lihat
-   wireMediaImageControls_(), js/app.js. Ditaruh melayang di sudut
-   kanan-bawah kotak media supaya tidak menutupi bagian tengah gambar. */
+/* BARU (17 Sep 2026, permintaan operator: "gambar landscape kepotong
+   bawah") -- 2 mode TAMBAHAN, pelengkap Asli/Lebar Penuh di atas (lihat
+   MEDIA_FIT_MODES, js/app.js):
+   "↕️ Tinggi Penuh" -- kebalikan Lebar Penuh: TINGGI dipaksa 100% ruang
+   tersedia, lebar menyesuaikan (rasio tetap dijaga) -- kalau lebih
+   lebar dari layar, geser kiri/kanan (drag, sekarang selalu aktif,
+   lihat wireMediaImageControls_()) utk melihat sisi yang terpotong.
+   "⛶ Lebar+Tinggi" -- KEDUANYA dipaksa 100% (object-fit:cover, isi
+   PENUH tanpa sisa ruang kosong di layar) -- bagian yang lebih akan
+   otomatis kepotong SALAH SATU sisi (rasio asli TIDAK dijaga penuh di
+   sini, ini memang tujuannya: memenuhi layar), geser (drag) dipakai utk
+   memilih bagian mana yang mau ditampilkan. */
+.collection-fs-embed-image.fs-media-full.fs-fit-tall {
+  height: 100%; width: auto; max-width: none; object-fit: contain;
+}
+.collection-fs-embed-image.fs-media-full.fs-fit-cover {
+  width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover;
+}
+/* Panel kecil "Asli/Lebar Penuh/dst" + zoom (-, slider, %, +) -- lihat
+   wireMediaImageControls_(), js/app.js. Kalau TIDAK ada controlsHost
+   (dipanggil dari tempat lain, lihat catatan di sana), tetap jatuh ke
+   posisi lama: melayang di sudut kanan-bawah kotak media. */
 .collection-fs-media-controls {
   position: absolute; right: 10px; bottom: 10px; z-index: 2;
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   background: rgba(0,0,0,0.55); padding: 6px 8px; border-radius: 10px;
   backdrop-filter: blur(2px);
 }
 .collection-fs-media-controls .chip-btn { color: #fff; border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.08); }
 .collection-fs-zoom-value { color: #fff; font-size: 12px; font-family: var(--font-ui); min-width: 40px; text-align: center; }
+/* Slider zoom 10%-1000% -- pelengkap tombol 🔍-/🔍+ (langkah 25%) utk
+   lompat jauh sekali seret, mis. sampai 10% (PDF potret) atau 1000%. */
+.collection-fs-zoom-slider {
+  width: 90px; accent-color: var(--brass, #b8860b); cursor: pointer;
+}
+@media (max-width: 640px) {
+  /* Garis tipis atas Mode Layar Penuh (topRow) makin padat di layar HP
+     (toolbar+panah+panel zoom+ref+Tutup) -- slider zoom dipersempit
+     supaya tetap muat, tombol -/+ & angka % tetap dipertahankan penuh
+     (paling sering dipakai lewat sentuhan, bukan seret slider). */
+  .collection-fs-zoom-slider { width: 54px; }
+}
 #ttsRecordBtn.recording { background: var(--danger); color: #fff; border-color: var(--danger); }
 .collection-fs-ref { font-family: var(--font-ui); font-weight: 700; color: var(--brass); font-size: 16px; }
 .collection-fs-text { font-family: var(--font-body); font-weight: var(--font-body-weight, 400); line-height: 1.6; }
@@ -2076,12 +2107,28 @@ input { font-family: inherit; }
    otomatis tampil lebar, dan 1:1 otomatis ikut persegi -- TANPA perlu
    deteksi orientasi manual sama sekali. */
 .collection-item-thumb { margin: 4px 0 6px; }
+/* PERBAIKAN (17 Sep 2026, permintaan operator: "thumbnailnya minta di
+   besar") -- tinggi SEKARANG lewat custom property --collection-thumb-
+   size (diatur slider, lihat renderCollectionDetailInto(), js/app.js),
+   96px tetap dipakai sebagai fallback/nilai awal. `width: auto` +
+   `object-fit: contain` dipertahankan APA ADANYA -- itu yang menjaga
+   rasio asli otomatis (potret tetap sempit, lanskap otomatis ikut
+   melebar sampai max-width:100% kalau tingginya cukup besar). */
 .collection-item-thumb img {
-  display: block; height: 96px; width: auto; max-width: 100%;
+  display: block; height: var(--collection-thumb-size, 96px); width: auto; max-width: 100%;
   object-fit: contain; border-radius: 8px; border: 1px solid var(--rule);
   background: #fff;
 }
 .collection-item-thumb-loading { min-height: 24px; }
+/* Slider ukuran pratinjau -- 1 baris, sejajar label & angka px --
+   ditaruh di atas daftar item (lihat renderCollectionDetailInto()). */
+.collection-thumb-size-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 14px; font-size: 13px; color: var(--ink-soft); font-family: var(--font-ui);
+}
+.collection-thumb-size-row label { display: flex; align-items: center; gap: 8px; }
+.collection-thumb-size-row input[type="range"] { width: 160px; accent-color: var(--brass, #b8860b); cursor: pointer; }
+.collection-thumb-size-value { font-weight: 600; color: var(--ink); min-width: 48px; }
 
 .search-results-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
