@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260915c" />
+<link rel="stylesheet" href="css/style.css?v=20260918a" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2632,6 +2632,24 @@
             <span class="toggle-switch"><input type="checkbox" id="psCenterClockOn" /><span class="toggle-slider"></span></span>
           </label>
           <div class="ps-pointer-hint">Tulisan putih tipis, tanpa kotak latar, di bagian bawah Layar 2 -- mengikuti posisi putar video YouTube yang sedang tayang (bukan jam dinding), termasuk milidetik (MENIT:DETIK:MS, atau JAM:MENIT:DETIK:MS kalau videonya sudah lewat 1 jam). Berguna untuk acuan sinkronisasi presisi tinggi (mis. dgn kamera/software lain yang merekam video yang sama). Tetap kelihatan di atas ayat/kidung/pengumuman/gambar/PDF/video apa pun yang sedang tayang, boleh menyala bersamaan dengan Jam Pojok di atas.</div>
+
+          <!-- BARU (18 Sep 2026, permintaan operator "timer ke 3, letaknya
+               di tengah, timer dari video atau youtube, mulai dari 0,
+               tulisannya transparan") -- TIMER KE-3: sama arsitektur & data
+               dgn "Timer Video" di atas (angkanya identik, sama-sama ikut
+               posisi putar video/YouTube yang sedang tayang, mulai dari 0
+               tiap video baru -- lihat #videoClockOverlay, present.html),
+               BEDANYA posisi benar-benar di TENGAH layar (horizontal &
+               vertikal), bukan di bawah -- supaya bisa dinyalakan
+               berdampingan dgn "Timer Video" di atas kalau perlu 2 posisi
+               sekaligus. Sekarang JUGA mengikuti Video Lokal (bukan cuma
+               YouTube). -->
+          <div class="ps-field-label" style="margin-top:14px;">🎬 Jam Video (Tengah Layar, timer ke-3)</div>
+          <label class="more-menu-toggle" for="psVideoClockOn">
+            <span>Tampilkan jam video di tengah Layar 2</span>
+            <span class="toggle-switch"><input type="checkbox" id="psVideoClockOn" /><span class="toggle-slider"></span></span>
+          </label>
+          <div class="ps-pointer-hint">Sama seperti "Timer Video" di atas (tulisan putih tipis transparan, tanpa kotak latar, mengikuti posisi putar video ATAU YouTube yang sedang tayang, mulai dari 0 tiap video baru) -- cuma ditaruh benar-benar di TENGAH layar (bukan di bawah). Boleh dinyalakan bersamaan dengan Jam Pojok dan/atau Timer Video di atas.</div>
         </div>
 
         <!-- BARU (28 Agu 2026) -- 🎥 Kamera Latar. Menyalakan kamera
@@ -3702,7 +3720,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260913aa"></script>
+  <script src="js/collections.js?v=20260918a"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -3725,7 +3743,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260913a"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/presentation-studio.js?v=20260915a"></script>
+  <script src="js/presentation-studio.js?v=20260918a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -3742,7 +3760,7 @@
   <script src="js/media-library.js?v=20260914b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20260915ea"></script>
+  <script src="js/app.js?v=20260918a"></script>
   <script src="js/curhat.js?v=20260915a"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
