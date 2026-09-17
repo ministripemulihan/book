@@ -5810,6 +5810,50 @@ function renderCollectionDetailInto(container, id, col) {
     return;
   }
 
+  // BARU (17 Sep 2026, permintaan operator: "thumbnailnya minta di
+  // besar... pakai tombol scroll horizontal bar, sampai selebar HP/layar
+  // full") -- slider ukuran pratinjau (thumbnail) YouTube/gambar/PDF di
+  // panel Kumpulan Ayat biasa (BUKAN Mode Layar Penuh) -- HANYA muncul
+  // kalau kumpulan ini punya minimal 1 item yang punya pratinjau (lihat
+  // buildCollectionItemThumbnail_(): youtube_link atau media). Nilainya
+  // tersimpan per perangkat (COLLECTION_THUMB_SIZE_KEY) supaya ukuran
+  // pilihan terakhir tetap dipakai lain kali panel ini dibuka -- SAMA
+  // pola dengan COLLECTION_FS_WIDTH_KEY dkk milik Mode Layar Penuh.
+  // Diterapkan lewat CSS custom property --collection-thumb-size (lihat
+  // ".collection-item-thumb img" di css/style.css) di `container` ini
+  // sendiri supaya berlaku ke SEMUA thumbnail di panel ini sekaligus,
+  // termasuk yang gambarnya baru selesai dimuat belakangan (async).
+  if (items.some((it) => it.type === "youtube_link" || it.type === "media")) {
+    const thumbSizeRow = document.createElement("div");
+    thumbSizeRow.className = "collection-thumb-size-row";
+    const thumbSizeLabel = document.createElement("label");
+    thumbSizeLabel.textContent = "🖼️ Ukuran pratinjau: ";
+    thumbSizeLabel.htmlFor = "colThumbSizeSlider";
+    const thumbSizeSlider = document.createElement("input");
+    thumbSizeSlider.type = "range";
+    thumbSizeSlider.id = "colThumbSizeSlider";
+    thumbSizeSlider.min = String(COLLECTION_THUMB_SIZE_MIN);
+    thumbSizeSlider.max = String(COLLECTION_THUMB_SIZE_MAX);
+    thumbSizeSlider.step = "10";
+    thumbSizeSlider.value = String(getCollectionThumbSizePx());
+    const thumbSizeVal = document.createElement("span");
+    thumbSizeVal.className = "collection-thumb-size-value";
+    function applyThumbSize(px) {
+      container.style.setProperty("--collection-thumb-size", px + "px");
+      thumbSizeVal.textContent = px + " px";
+    }
+    applyThumbSize(getCollectionThumbSizePx());
+    thumbSizeSlider.addEventListener("input", () => {
+      const px = Number(thumbSizeSlider.value);
+      setCollectionThumbSizePx(px);
+      applyThumbSize(px);
+    });
+    thumbSizeLabel.appendChild(thumbSizeSlider);
+    thumbSizeRow.appendChild(thumbSizeLabel);
+    thumbSizeRow.appendChild(thumbSizeVal);
+    container.appendChild(thumbSizeRow);
+  }
+
   // Render 1 baris per item, jenisnya menentukan isi & tombol aksinya --
   // lihat buildCollectionItemRow() di bawah untuk detail per jenis
   // (ayat/teks/pengumuman/kidung).
@@ -5921,12 +5965,20 @@ function collectionItemBodyText(it) {
   // sungguhan (gambarnya, bukan cuma keterangan ini), pakai Studio
   // Presentasi (js/presentation-studio.js, sendGenericItemLive() sudah
   // menangani jenis ini dengan mengambil gambarnya dari Media Tersimpan).
-  if (it.type === "media") return "(berkas PDF/gambar -- tayangkan lewat Studio Presentasi)";
-  // BARU (4 Sep 2026) -- item Canva & SoundCloud tidak punya bentuk
-  // teks yang masuk akal (isinya iframe/audio pihak ketiga) -- sama
-  // semangat seperti item "media" di atas.
-  if (it.type === "canva") return "(presentasi Canva -- tayangkan lewat Studio Presentasi)";
-  if (it.type === "soundcloud") return "(audio SoundCloud -- putar lewat Studio Presentasi)";
+  // PERBAIKAN (17 Sep 2026, permintaan operator: "tulisan itu ganggu,
+  // mendingan kosong saja") -- dulu ketiga jenis ini (media/canva/
+  // soundcloud) menampilkan tulisan keterangan "(...-- tayangkan lewat
+  // Studio Presentasi)" di baris daftar Kumpulan Ayat biasa. SEKARANG
+  // dikosongkan saja (bukan diganti tulisan lain) -- ketiganya SUDAH
+  // punya pratinjau/thumbnail sendiri di baris itu (lihat
+  // buildCollectionItemThumbnail_()) dan SUDAH bisa langsung tayang
+  // sungguhan (bukan cuma keterangan) di Mode Layar Penuh
+  // (isEmbeddableCollectionItem() -> buildCollectionFsEmbed(), bukan
+  // lewat fungsi ini) -- jadi tulisan placeholder ini sudah tidak
+  // dibutuhkan sama sekali di kedua tempat, aman dikosongkan total.
+  if (it.type === "media") return "";
+  if (it.type === "canva") return "";
+  if (it.type === "soundcloud") return "";
   // BARU (5 Sep 2026) -- lihat catatan di collectionItemRef() di atas.
   // Beda dari "media"/"canva"/"soundcloud" (yang keterangannya menyuruh
   // pindah ke Studio Presentasi), video YouTube portabel ini SUDAH bisa
@@ -6035,6 +6087,24 @@ async function resolveSoundCloudSrcForCollection(trackUrl) {
 // ".collection-item-thumb img" (height tetap, width menyesuaikan,
 // dibatasi max-width) -- TIDAK perlu deteksi orientasi manual.
 // ------------------------------------------------------------
+// BARU (17 Sep 2026, permintaan operator) -- ukuran (tinggi) pratinjau/
+// thumbnail YouTube/gambar/PDF di panel Kumpulan Ayat biasa (Mode 1
+// Layar), diatur lewat slider (lihat renderCollectionDetailInto()) --
+// tersimpan per perangkat, rentang dari sekecil tampilan lama (96px)
+// sampai cukup besar utk hampir selebar layar HP tegak (lanskap akan
+// otomatis ikut selebar itu juga, lihat CSS ".collection-item-thumb img",
+// rasio asli tetap terjaga lewat width:auto + object-fit:contain).
+const COLLECTION_THUMB_SIZE_KEY = "bible_app_collection_thumb_size_v1";
+const COLLECTION_THUMB_SIZE_DEFAULT = 96;
+const COLLECTION_THUMB_SIZE_MIN = 60;
+const COLLECTION_THUMB_SIZE_MAX = 640;
+function getCollectionThumbSizePx() {
+  const v = parseInt(localStorage.getItem(COLLECTION_THUMB_SIZE_KEY), 10);
+  return (v && v >= COLLECTION_THUMB_SIZE_MIN && v <= COLLECTION_THUMB_SIZE_MAX) ? v : COLLECTION_THUMB_SIZE_DEFAULT;
+}
+function setCollectionThumbSizePx(px) {
+  localStorage.setItem(COLLECTION_THUMB_SIZE_KEY, String(Math.max(COLLECTION_THUMB_SIZE_MIN, Math.min(COLLECTION_THUMB_SIZE_MAX, Math.round(px)))));
+}
 function extractYoutubeIdSimple_(url) {
   if (!url) return null;
   const s = String(url).trim();
@@ -6187,7 +6257,12 @@ function buildCollectionItemRow(id, col, it, i, opts) {
       `<button type="button" class="chip-btn small col-move-to-btn">Pindah</button>`;
     item.querySelector(".collection-verse-body").appendChild(moveToWrap);
   }
-  item.querySelector(".result-text").textContent = bodyText;
+  // BARU (17 Sep 2026) -- kalau bodyText kosong (item media/canva/
+  // soundcloud, lihat collectionItemBodyText()), baris tulisan ini
+  // disembunyikan total (bukan cuma dikosongkan) supaya tidak
+  // menyisakan celah/garis kosong di baris daftar.
+  const resultTextEl = item.querySelector(".result-text");
+  if (bodyText) { resultTextEl.textContent = bodyText; } else { resultTextEl.hidden = true; }
   if (noteText) item.querySelector(".collection-verse-note").textContent = noteText;
 
   const toggleBtn = item.querySelector(".col-note-toggle");
@@ -6559,9 +6634,9 @@ function openCollectionFullscreen(col, startIndex) {
   // selalu mulai dari 100%/tengah tiap slide baru dibuka.
   let mediaZoomPct = 100;
   let mediaPanX = 0, mediaPanY = 0;
-  function currentMediaFitMode() {
-    return localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY) === "wide" ? "wide" : "contain";
-  }
+  // (currentMediaFitMode() sekarang didefinisikan dekat MEDIA_FIT_MODES/
+  // wireMediaImageControls_() di bawah -- lihat catatan panjang di sana,
+  // 17 Sep 2026, sudah mendukung 4 mode, bukan cuma "wide"/"contain".)
   // Video YouTube yang SEDANG tayang di slide ini (kalau ada) + status
   // "sudah mulai diputar" -- dipakai goNext() supaya tombol/panah "next"
   // yang PERTAMA kali ditekan di slide video memutar dulu videonya
@@ -6705,6 +6780,31 @@ function openCollectionFullscreen(col, startIndex) {
   // Selanjutnya/Tutup) alih-alih melayang sendiri di atas gambar. Kalau
   // tidak diberikan (dipanggil dari tempat lain kelak), tetap jatuh ke
   // perilaku lama (nempel di `wrap`) supaya tidak ada yang rusak.
+  // PERBAIKAN (17 Sep 2026, permintaan operator: "gambar landscape
+  // kepotong bawah waktu full screen", "PDF potret minta bisa sampai
+  // 10%", "bisa digeser turun") -- 3 perubahan dari versi sebelumnya:
+  // (1) mode "Asli/Lebar Penuh" (2 pilihan) diperluas jadi 4 pilihan
+  // (Asli/Lebar Penuh/Tinggi Penuh/Lebar+Tinggi Penuh, lihat
+  // MEDIA_FIT_MODES di bawah) supaya gambar lanskap yang kepotong bisa
+  // dipilih mode "Tinggi Penuh" (utuh secara tinggi, lebar boleh
+  // melebihi layar -- makanya geser jadi penting, lihat poin 3);
+  // (2) rentang zoom diperlebar dari 50–400% jadi 10–1000% + slider
+  // (bukan cuma tombol -/+ langkah 25%) supaya PDF potret bisa
+  // diperkecil jauh sampai 10%; (3) geser (drag/seret) SEKARANG selalu
+  // aktif di SEMUA zoom/mode (dulu hanya aktif kalau zoom > 100%) --
+  // supaya bagian gambar yang "kepotong" (baik karena mode Tinggi
+  // Penuh/Lebar+Tinggi Penuh, maupun sekadar digeser turun/naik) bisa
+  // selalu dijangkau, di HP maupun komputer.
+  const MEDIA_FIT_MODES = [
+    { id: "contain", label: "▭ Asli", title: "Ukuran asli, rasio dijaga -- muat penuh di dalam ruang yang ada" },
+    { id: "wide", label: "↔️ Lebar Penuh", title: "Lebar dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- tinggi mengikuti" },
+    { id: "tall", label: "↕️ Tinggi Penuh", title: "Tinggi dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- lebar mengikuti, geser kiri/kanan kalau perlu" },
+    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Lebar DAN tinggi dipaksa 100% (isi penuh layar) -- bagian yang lebih bisa dilihat dengan menggeser" },
+  ];
+  function currentMediaFitMode() {
+    const saved = localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY);
+    return MEDIA_FIT_MODES.some((m) => m.id === saved) ? saved : "contain";
+  }
   function wireMediaImageControls_(img, wrap, controlsHost) {
     const controls = document.createElement("div");
     controls.className = "collection-fs-media-controls" + (controlsHost ? " collection-fs-media-controls-inline" : "");
@@ -6713,40 +6813,63 @@ function openCollectionFullscreen(col, startIndex) {
     fitBtn.type = "button";
     fitBtn.className = "chip-btn small";
     function refreshFitBtn() {
-      const wide = currentMediaFitMode() === "wide";
-      fitBtn.textContent = wide ? "▭ Asli" : "↔️ Lebar Penuh";
-      fitBtn.title = wide ? "Kembali ke ukuran asli (rasio dijaga)" : "Regangkan selebar layar (rasio tetap dijaga, tidak gepeng)";
-      img.classList.toggle("fs-fit-wide", wide);
+      const mode = currentMediaFitMode();
+      const def = MEDIA_FIT_MODES.find((m) => m.id === mode) || MEDIA_FIT_MODES[0];
+      fitBtn.textContent = def.label;
+      fitBtn.title = def.title + " (tekan utk ganti ke mode berikutnya)";
+      img.classList.toggle("fs-fit-wide", mode === "wide");
+      img.classList.toggle("fs-fit-tall", mode === "tall");
+      img.classList.toggle("fs-fit-cover", mode === "cover");
     }
     refreshFitBtn();
     fitBtn.addEventListener("click", () => {
-      localStorage.setItem(COLLECTION_FS_MEDIA_FIT_KEY, currentMediaFitMode() === "wide" ? "contain" : "wide");
+      const idx = MEDIA_FIT_MODES.findIndex((m) => m.id === currentMediaFitMode());
+      const next = MEDIA_FIT_MODES[(idx + 1) % MEDIA_FIT_MODES.length];
+      localStorage.setItem(COLLECTION_FS_MEDIA_FIT_KEY, next.id);
       refreshFitBtn();
+      // Ganti mode = titik awal baru -- geseran (pan) lama direset
+      // supaya tidak salah posisi mengikuti mode sebelumnya. Sekaligus
+      // jadi cara cepat "reset posisi" kalau operator sudah menggeser
+      // terlalu jauh (tekan tombol ini 4x -- balik ke mode Asli lagi).
+      mediaPanX = 0; mediaPanY = 0;
+      refreshZoomUi();
     });
 
     const zoomOutBtn = document.createElement("button");
     zoomOutBtn.type = "button"; zoomOutBtn.className = "chip-btn small"; zoomOutBtn.textContent = "🔍−";
     const zoomValEl = document.createElement("span");
     zoomValEl.className = "collection-fs-zoom-value";
+    // Slider (10%-1000%) -- pelengkap tombol -/+ untuk lompat jauh
+    // sekali seret (mis. dari 100% langsung ke 10% utk PDF potret, atau
+    // ke 1000% utk memeriksa detail kecil), tanpa perlu menekan tombol
+    // -/+ berkali-kali.
+    const zoomSlider = document.createElement("input");
+    zoomSlider.type = "range";
+    zoomSlider.className = "collection-fs-zoom-slider";
+    zoomSlider.min = "10"; zoomSlider.max = "1000"; zoomSlider.step = "5";
     const zoomInBtn = document.createElement("button");
     zoomInBtn.type = "button"; zoomInBtn.className = "chip-btn small"; zoomInBtn.textContent = "🔍+";
 
     function refreshZoomUi() {
       zoomValEl.textContent = mediaZoomPct + "%";
+      zoomSlider.value = String(mediaZoomPct);
       img.style.transform = `translate(${mediaPanX}px, ${mediaPanY}px) scale(${mediaZoomPct / 100})`;
-      img.classList.toggle("zoomed", mediaZoomPct > 100);
+      img.classList.toggle("zoomed", mediaZoomPct !== 100);
     }
     function setZoom(pct) {
-      mediaZoomPct = Math.max(50, Math.min(400, Math.round(pct)));
-      if (mediaZoomPct <= 100) { mediaZoomPct = 100; mediaPanX = 0; mediaPanY = 0; }
+      const prev = mediaZoomPct;
+      mediaZoomPct = Math.max(10, Math.min(1000, Math.round(pct)));
+      if (mediaZoomPct === 100 && prev !== 100) { mediaPanX = 0; mediaPanY = 0; } // kembali tepat 100% -- geseran direset biar rapi lagi
       refreshZoomUi();
     }
     zoomOutBtn.addEventListener("click", () => setZoom(mediaZoomPct - 25));
     zoomInBtn.addEventListener("click", () => setZoom(mediaZoomPct + 25));
+    zoomSlider.addEventListener("input", () => setZoom(Number(zoomSlider.value)));
     refreshZoomUi();
 
     controls.appendChild(fitBtn);
     controls.appendChild(zoomOutBtn);
+    controls.appendChild(zoomSlider);
     controls.appendChild(zoomValEl);
     controls.appendChild(zoomInBtn);
     // Ditaruh SEBELUM tombol "✕ Tutup" kalau controlsHost (topRow)
@@ -6767,15 +6890,16 @@ function openCollectionFullscreen(col, startIndex) {
       setZoom(mediaZoomPct + (e.deltaY < 0 ? 15 : -15));
     }, { passive: false });
 
-    // Seret utk menggeser (pan) saat sudah diperbesar (>100%) -- 1 jari
-    // di HP (sesudah dizoom lewat tombol/cubit) ATAU mouse di komputer.
-    // Sengaja MENANDAI overlay._collectionFsSwipeSuspended supaya
-    // attachCollectionFsSwipeNav() (navigasi geser kiri/kanan pindah
-    // slide) tidak ikut membaca gerakan geser ini sebagai "pindah slide"
-    // selama sedang diperbesar (lihat definisinya di bawah).
+    // Seret utk menggeser (pan) -- SEKARANG selalu aktif (dulu hanya
+    // kalau zoom > 100%, lihat catatan panjang di atas dekat
+    // MEDIA_FIT_MODES) -- 1 jari di HP ATAU mouse di komputer, di zoom
+    // DAN mode fit apa pun. Sengaja MENANDAI
+    // overlay._collectionFsSwipeSuspended supaya attachCollectionFsSwipeNav()
+    // (navigasi geser kiri/kanan pindah slide) tidak ikut membaca
+    // gerakan geser ini sebagai "pindah slide" selama sedang menggeser
+    // gambar.
     let dragging = false, dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
     function dragStart(clientX, clientY) {
-      if (mediaZoomPct <= 100) return;
       dragging = true;
       dragStartX = clientX; dragStartY = clientY;
       panStartX = mediaPanX; panStartY = mediaPanY;
@@ -6792,10 +6916,10 @@ function openCollectionFullscreen(col, startIndex) {
     window.addEventListener("mousemove", (e) => dragMove(e.clientX, e.clientY));
     window.addEventListener("mouseup", dragEnd);
     img.addEventListener("touchstart", (e) => {
-      if (e.touches.length === 1 && mediaZoomPct > 100) { overlay._collectionFsSwipeSuspended = true; dragStart(e.touches[0].clientX, e.touches[0].clientY); }
+      if (e.touches.length === 1) { overlay._collectionFsSwipeSuspended = true; dragStart(e.touches[0].clientX, e.touches[0].clientY); }
     }, { passive: true });
     img.addEventListener("touchmove", (e) => { if (e.touches.length === 1) dragMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
-    img.addEventListener("touchend", () => { dragEnd(); overlay._collectionFsSwipeSuspended = mediaZoomPct > 100; });
+    img.addEventListener("touchend", () => { dragEnd(); overlay._collectionFsSwipeSuspended = false; });
   }
 
   function buildCollectionFsEmbed(it, myToken, controlsHost) {
