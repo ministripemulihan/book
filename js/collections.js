@@ -131,8 +131,84 @@ function _findCollectionIdByName(collections, name) {
 
 // Kirim ke Google Sheet di latar belakang (best-effort, tidak memblokir
 // UI) -- HANYA verseIds yang ikut dikirim (lihat catatan sinkron di atas).
-function _pushCollectionRemote(username, id, col) {
-  if (typeof Sync !== "undefined") Sync.pushCollection(username, id, col);
+// PERBAIKAN (18 Sep 2026, permintaan operator: "komputer sudah 45 slide,
+// HP masih 35, tidak bisa sinkron") -- dulu fungsi ini "tembak lalu lupa"
+// (fire-and-forget): kalau Sync.pushCollection() gagal (offline / jaringan
+// putus di tengah jalan / server sedang sibuk), TIDAK ADA jejaknya sama
+// sekali & TIDAK PERNAH dicoba lagi -- perubahan itu SELAMANYA cuma ada
+// di perangkat yang mengedit (tersimpan lokal, aplikasi tetap normal di
+// situ), tapi tidak pernah sampai ke Sheet, jadi tidak pernah sampai ke
+// perangkat lain juga. Sekarang: kalau gagal, id kumpulan itu dicatat ke
+// antrean lokal (localStorage, per perangkat) & dicoba lagi otomatis
+// lewat processCollectionPushQueue() -- pola SAMA persis dengan antrean
+// unggah media (queueMediaUpload()/processMediaUploadQueue() di atas).
+function _collectionPushQueueKey(username) { return "bible_app_collection_push_queue_v1_" + (username || "guest"); }
+function _queueCollectionPush(username, id) {
+  try {
+    const key = _collectionPushQueueKey(username);
+    const ids = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!ids.includes(id)) ids.push(id);
+    localStorage.setItem(key, JSON.stringify(ids));
+  } catch (e) { /* diamkan -- antrean gagal ditulis, coba lagi lain kali diedit */ }
+}
+function _unqueueCollectionPush(username, id) {
+  try {
+    const key = _collectionPushQueueKey(username);
+    const ids = JSON.parse(localStorage.getItem(key) || "[]").filter((x) => x !== id);
+    localStorage.setItem(key, JSON.stringify(ids));
+  } catch (e) { /* diamkan */ }
+}
+async function _pushCollectionRemote(username, id, col) {
+  if (typeof Sync === "undefined") return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    // Sedang offline -- jangan buang waktu mencoba, langsung antre saja
+    // (sama pola dengan queueMediaUpload() di bawah).
+    _queueCollectionPush(username, id);
+    return;
+  }
+  const ok = await Sync.pushCollection(username, id, col);
+  if (ok) _unqueueCollectionPush(username, id);
+  else _queueCollectionPush(username, id); // gagal (server/jaringan) -- antre, dicoba lagi otomatis
+}
+
+// Dipanggil saat online lagi / aplikasi dibuka/login & saat panel
+// Kumpulan Ayat dibuka -- mencoba ulang SEMUA kumpulan yang gagal
+// terkirim sebelumnya (lihat catatan panjang di _pushCollectionRemote()
+// di atas). Mengembalikan jumlah yang berhasil disinkronkan.
+async function processCollectionPushQueue(username) {
+  try {
+    if (typeof Sync === "undefined" || !Sync.enabled()) return 0;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return 0;
+    const key = _collectionPushQueueKey(username);
+    const ids = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!ids.length) return 0;
+    const collections = loadCollections(username);
+    let successCount = 0;
+    for (const id of ids) {
+      const col = collections[id];
+      if (!col) { _unqueueCollectionPush(username, id); continue; } // sudah dihapus lokal -- buang dari antrean, tidak perlu dikirim lagi
+      try {
+        const ok = await Sync.pushCollection(username, id, col);
+        if (ok) { _unqueueCollectionPush(username, id); successCount++; }
+      } catch (e) { /* masih gagal -- biarkan di antrean, lanjut ke id berikutnya */ }
+    }
+    return successCount;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Dipasang sekali dari startApp() (js/app.js), sama pola dengan
+// wireMediaUploadQueueAutoRetry() di atas.
+let _collectionPushQueueAutoRetryWired = false;
+function wireCollectionPushQueueAutoRetry(username) {
+  if (typeof window === "undefined") return;
+  const tryNow = () => { processCollectionPushQueue(username); };
+  if (!_collectionPushQueueAutoRetryWired) {
+    _collectionPushQueueAutoRetryWired = true;
+    window.addEventListener("online", tryNow);
+  }
+  tryNow();
 }
 
 // Cari-atau-buat kumpulan berdasarkan NAMA (bukan id) -- sesuai pola
