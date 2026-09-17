@@ -1841,6 +1841,25 @@
             <label><input type="checkbox" value="jawa" /> JAWA</label>
           </div>
           <div id="psQuickPreview" class="ps-quick-preview"></div>
+          <!-- BARU (18 Sep 2026, permintaan operator "matius 1:1,2,3;
+               yohanes 3:16 jadi 4 slide, mau bisa dipilih gabung berapa
+               ayat per slide") -- HANYA berlaku kalau ayat yang diketik
+               di atas LEBIH DARI 1 (referensi dipisah ";"/","), berlaku
+               untuk tombol "▶️ Tampilkan" MAUPUN "➕ Daftar" (lihat
+               wireQuickVerse(), js/presentation-studio.js &
+               combineVerseGroupForSlide(), js/app.js). Kalau cuma 1
+               ayat yang diketik, pengaturan ini tidak berpengaruh apa
+               pun (tetap 1 ayat = 1 slide seperti biasa). -->
+          <div class="ps-field-label">Kalau lebih dari 1 ayat, gabung jadi</div>
+          <div class="ps-btn-row">
+            <select id="psQuickGroupMode" class="columns-lang-select">
+              <option value="1" selected>1 ayat / slide (biasa, terpisah)</option>
+              <option value="2">2 ayat / slide</option>
+              <option value="3">3 ayat / slide</option>
+              <option value="4">4 ayat / slide</option>
+              <option value="all">Semua jadi 1 slide</option>
+            </select>
+          </div>
           <div class="ps-btn-row">
             <button type="button" id="psQuickShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
             <button type="button" id="psQuickAddBtn" class="chip-btn small">➕ Daftar</button>
@@ -2550,13 +2569,23 @@
           <div class="ps-btn-row" id="psSlideDisplayModeRow">
             <button type="button" class="chip-btn small" data-slide-mode="original">▭ Asli</button>
             <button type="button" class="chip-btn small" data-slide-mode="fitwidth">📐 Sesuai Lebar</button>
+            <!-- BARU (18 Sep 2026, permintaan operator "PDF/gambar kepotong,
+                 jangan mengecil, harus full, tidak perlu proporsional") --
+                 mode ke-4, meniru pilihan "Fill Page" di aplikasi cetak foto:
+                 lebar DAN tinggi dipaksa PAS 100% layar sekaligus, gambar
+                 boleh melar/gepeng (rasio TIDAK dijaga) supaya TIDAK ADA yang
+                 kepotong maupun menyisakan ruang kosong. Sama definisinya
+                 dengan "⛶ Lebar+Tinggi" milik viewer 1-layar Kumpulan Ayat
+                 (lihat MEDIA_FIT_MODES id "cover", js/app.js) supaya
+                 konsisten di kedua mode (2 layar & 1 layar). -->
+            <button type="button" class="chip-btn small" data-slide-mode="fill">⛶ Lebar+Tinggi</button>
             <button type="button" class="chip-btn small" data-slide-mode="zoom">🔍 Zoom</button>
           </div>
           <div class="ps-btn-row" id="psSlideZoomRow" hidden>
             <input type="range" id="psSlideZoomPct" min="100" max="400" value="150" style="flex:1;" />
             <input type="number" id="psSlideZoomPctValue" class="ps-pen-size-value ps-pen-size-value-input" min="100" max="400" step="5" value="150" title="Ketik angka Zoom manual (100-400), lalu tekan Enter" />%
           </div>
-          <div class="ps-pointer-hint">"Asli" = muat penuh dalam layar apa adanya (bawaan). "Sesuai Lebar" = lebar dipaksa penuh layar, nempel di atas. "Zoom" = diperbesar dari titik ATAS, sisi kelebihannya terpotong -- ketiganya berlaku untuk gambar/PDF berikutnya juga (◀ ▶), tidak perlu diatur ulang tiap halaman.</div>
+          <div class="ps-pointer-hint">"Asli" = muat penuh dalam layar apa adanya (bawaan). "Sesuai Lebar" = lebar dipaksa penuh layar, nempel di atas. "Lebar+Tinggi" = mengisi PENUH layar (lebar DAN tinggi pas 100%), gambar boleh melar/gepeng supaya tidak ada yang kepotong atau menyisakan ruang kosong. "Zoom" = diperbesar dari titik ATAS, sisi kelebihannya terpotong -- keempatnya berlaku untuk gambar/PDF berikutnya juga (◀ ▶), tidak perlu diatur ulang tiap halaman.</div>
           <!-- BARU (6 Sep 2026, permintaan operator) -- "Ukuran Timer/
                Stopwatch (Layar 2)": SENGAJA dipisah dari "Ukuran Teks" di
                atas (yang untuk ayat/teks/pengumuman/kidung) -- angka
