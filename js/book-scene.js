@@ -781,9 +781,49 @@
     }
   }
 
+  // ---- Tombol "Masuk" pembuka paling luar (18 Sep 2026) --------------
+  // #loginCard defaultnya disembunyikan TOTAL, yang kelihatan cuma
+  // #loginRevealBtn ini. Ditekan sekali -> kartu utuh muncul (judul
+  // "Masuk", batang Sign in/Login, Mode Tamu, Daftar Akun, Info Kami),
+  // persis seperti tampilan sebelum perubahan ini -- form username/
+  // password di dalamnya masih tertutup seperti biasa, itu urusan
+  // wireKartuLogin() di atas, tidak disentuh di sini sama sekali.
+  function wireLuarMasuk() {
+    var card = document.getElementById("loginCard");
+    var reveal = document.getElementById("loginRevealBtn");
+    if (!card || !reveal) return;
+
+    card.classList.add("login-outer-collapsible");
+    card.dataset.outerOpen = "false";
+    reveal.hidden = false;
+
+    reveal.addEventListener("click", function () {
+      card.dataset.outerOpen = "true";
+      reveal.hidden = true;
+      var toggleBtn = document.getElementById("loginToggleBtn");
+      if (toggleBtn) setTimeout(function () { try { toggleBtn.focus(); } catch (e) {} }, 200);
+    });
+
+    // Sama seperti wireKartuLogin(): kalau js/app.js sampai menampilkan
+    // pesan "Username atau password salah", itu artinya kartu sudah
+    // pasti sedang terbuka (usernam/password tidak mungkin terkirim
+    // kalau kartunya masih tertutup) -- tapi jaga-jaga saja supaya
+    // pesan itu tidak pernah tersembunyi di balik tombol "Masuk".
+    var err = document.getElementById("loginError");
+    if (err && typeof MutationObserver !== "undefined") {
+      new MutationObserver(function () {
+        if (!err.hidden && card.dataset.outerOpen !== "true") {
+          card.dataset.outerOpen = "true";
+          reveal.hidden = true;
+        }
+      }).observe(err, { attributes: true, attributeFilter: ["hidden"] });
+    }
+  }
+
   function siap() {
     pasangDiLogin();
     wireKartuLogin();
+    wireLuarMasuk();
   }
 
   if (document.readyState === "loading") {
