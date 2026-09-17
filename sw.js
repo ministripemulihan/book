@@ -64,7 +64,18 @@
 // Layar Masuk: file BARU js/book-scene.js, css/book-scene.css,
 // js/games/penciptaan.js, plus perubahan index.html/present.html/
 // js/presentation-studio.js).
-const CACHE_NAME = "book-vp-shell-v15";
+// DINAIKKAN LAGI (18 Sep 2026 -- v8 "fix-mediafit-sync": (1) perbaikan
+// mode "⛶ Lebar+Tinggi" slide gambar/PDF Mode Layar Penuh Kumpulan Ayat
+// (css/style.css, js/app.js) -- SEBELUM baris ini dinaikkan, versi lama
+// css/js masih "nyangkut" di banyak HP walau kodenya sudah benar (lihat
+// laporan operator "sudah dicoba masih belum sesuai") -- baris ini WAJIB
+// dinaikkan supaya perbaikan itu sungguh terpakai; (2) tombol "🔄 Sinkron
+// Sekarang" baru di panel Kumpulan Ayat (js/app.js); (3) timer ke-3 "🎬
+// Jam Video (Tengah Layar)" + Timer Video sekarang ikut Video Lokal juga,
+// bukan cuma YouTube (present.html, js/presentation-studio.js,
+// index.html). Lihat juga ?v=... yang ikut dinaikkan di index.html utk
+// css/style.css, js/app.js, js/presentation-studio.js, js/collections.js.
+const CACHE_NAME = "book-vp-shell-v16";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
