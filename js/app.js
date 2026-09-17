@@ -5932,8 +5932,62 @@ function renderCollectionDetailInto(container, id, col) {
 // Penuh ayat SEBELUMNYA cukup diperluas render-nya di sini, tidak perlu
 // diubah strukturnya.
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// BARU (18 Sep 2026, permintaan operator "matius 1:1,2,3;yohanes 3:16
+// sekarang 4 slide, apa bisa jadi 1 slide isi 4 ayat, atau 2 slide isi
+// 2 ayat, terserah operator pilih") -- item Kumpulan Ayat bertipe
+// "verse" SEKARANG boleh punya `verseIds` (array, lebih dari 1 id) di
+// samping `verseId` lama (dipertahankan = verseIds[0], supaya kode
+// LAMA yang cuma baca it.verseId -- dedup addItemToCollection(),
+// removeVerseFromCollection(), dst -- tetap jalan tanpa berubah sama
+// sekali). Fungsi INI SATU-SATUNYA tempat menggabungkan beberapa ayat
+// jadi 1 blok ref+teks siap tayang/tampil -- dipakai baik oleh
+// collectionItemRef()/collectionItemBodyText() di bawah (baris daftar,
+// Mode Layar Penuh 1-layar) MAUPUN sendGenericItemLive()/
+// genericItemRefText() (js/presentation-studio.js, Layar 2) supaya
+// format gabungannya SELALU sama persis di mana pun ditampilkan.
+// - Kalau semua ayat 1 kitab+1 pasal & berurutan (mis. Matius 1:1,2,3)
+//   -> ref dipendekkan jadi rentang "Matius 1:1-3".
+// - Kalau ayat lompat pasal/kitab (mis. Matius 1:1,2,3;Yohanes 3:16)
+//   -> ref jadi daftar dipisah "; " per kitab (mis.
+//   "Matius 1:1-3; Yohanes 3:16"), teks tiap kitab dipisah 1 baris
+//   kosong supaya jelas batasnya (bukan 1 paragraf nyambung).
+// - Tiap ayat SELALU diberi nomor di depan teksnya (mis. "1 Pada mulanya
+//   ...") supaya jelas itu gabungan beberapa ayat, bukan 1 ayat panjang
+//   -- konsisten dengan cara resolveRefBlocks() (js/presentation-
+//   studio.js, tab Alkitab ketik cepat) menandai rentang ayat.
+function combineVerseGroupForSlide(verseIds) {
+  const verses = (verseIds || []).map((id) => verseById[id]).filter(Boolean);
+  if (!verses.length) return { ref: "", text: "(ayat tidak ditemukan di bahasa saat ini)" };
+  if (verses.length === 1) {
+    const v = verses[0];
+    return { ref: `${v.bookName} ${v.chapter}:${v.verse}`, text: v.text };
+  }
+  // Kelompokkan berurutan per kitab+pasal (TANPA mengurutkan ulang --
+  // urutan yang operator ketik/susun sendiri di Kumpulan Ayat tetap
+  // dihormati) supaya rentang "1-3" hanya dipakai kalau memang
+  // berdekatan di kitab+pasal yang sama.
+  const groups = [];
+  verses.forEach((v) => {
+    const last = groups[groups.length - 1];
+    if (last && last.bookName === v.bookName && last.chapter === v.chapter) last.verses.push(v);
+    else groups.push({ bookName: v.bookName, chapter: v.chapter, verses: [v] });
+  });
+  const refParts = groups.map((g) => {
+    const nums = g.verses.map((v) => v.verse);
+    const lo = nums[0], hi = nums[nums.length - 1];
+    const range = lo === hi ? `${lo}` : `${lo}-${hi}`;
+    return `${g.bookName} ${g.chapter}:${range}`;
+  });
+  const textParts = groups.map((g) => g.verses.map((v) => `${v.verse} ${v.text}`).join(" "));
+  return { ref: refParts.join("; "), text: textParts.join("\n\n") };
+}
+
 function collectionItemRef(it) {
   if (it.type === "verse") {
+    // BARU (18 Sep 2026) -- it.verseIds (>1 ayat digabung 1 slide),
+    // lihat combineVerseGroupForSlide() di atas.
+    if (it.verseIds && it.verseIds.length > 1) return combineVerseGroupForSlide(it.verseIds).ref;
     const v = verseById[it.verseId];
     return v ? `${v.bookName} ${v.chapter}:${v.verse}` : it.verseId;
   }
@@ -5998,6 +6052,8 @@ function collectionItemRef(it) {
 // lihat js/presentation-studio.js untuk versi Studio 2 Layarnya).
 function collectionItemBodyText(it) {
   if (it.type === "verse") {
+    // BARU (18 Sep 2026) -- lihat catatan combineVerseGroupForSlide() di atas.
+    if (it.verseIds && it.verseIds.length > 1) return combineVerseGroupForSlide(it.verseIds).text;
     const v = verseById[it.verseId];
     return v ? v.text : "(ayat tidak ditemukan di bahasa saat ini)";
   }
@@ -6853,7 +6909,7 @@ function openCollectionFullscreen(col, startIndex) {
     { id: "contain", label: "▭ Asli", title: "Ukuran asli, rasio dijaga -- mengecil di kedua sisi seperlunya supaya muat penuh di dalam ruang yang ada, tanpa terpotong" },
     { id: "wide", label: "↔️ Lebar Penuh", title: "Lebar SELALU dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- tinggi mengikuti apa adanya, boleh melebihi layar (geser naik/turun kalau perlu)" },
     { id: "tall", label: "↕️ Tinggi Penuh", title: "Tinggi SELALU dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- lebar mengikuti apa adanya, boleh melebihi layar (geser kiri/kanan kalau perlu)" },
-    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Mengecil seperlunya di kedua sisi (lebar DAN tinggi) supaya PASTI muat penuh tanpa ada yang kepotong -- rasio asli tetap dijaga, tidak gepeng" },
+    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Mengisi PENUH layar di kedua sisi (lebar DAN tinggi) sekaligus -- tidak kepotong, tidak mengecil, tapi gambar boleh melar/gepeng (rasio TIDAK dijaga) supaya keduanya pas 100%" },
   ];
   function currentMediaFitMode() {
     const saved = localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY);
