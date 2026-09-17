@@ -60,7 +60,11 @@
 // DINAIKKAN LAGI (tambahan -- unduh efek suara satu-satu di
 // js/soundfx.js downloadOne()/renderDownloadList(), dipakai dari
 // index.html/js/effectpreview.js).
-const CACHE_NAME = "book-vp-shell-v14";
+// DINAIKKAN LAGI (17 Sep 2026 -- game "🌱 Penciptaan" + latar animasi
+// Layar Masuk: file BARU js/book-scene.js, css/book-scene.css,
+// js/games/penciptaan.js, plus perubahan index.html/present.html/
+// js/presentation-studio.js).
+const CACHE_NAME = "book-vp-shell-v15";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
