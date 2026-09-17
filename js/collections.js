@@ -103,8 +103,15 @@ function _migrateCollection(col) {
     col.items = (Array.isArray(col.verseIds) ? col.verseIds : []).map((verseId) => ({ type: "verse", verseId }));
   }
   // verseIds selalu dihitung ulang dari items supaya 2 sumber ini TIDAK
-  // pernah beda isi (single source of truth = items).
-  col.verseIds = col.items.filter((it) => it && it.type === "verse").map((it) => it.verseId);
+  // pernah beda isi (single source of truth = items). DIRATAKAN (18 Sep
+  // 2026) -- item gabungan (verseIds>1, lihat addVerseGroupToCollection())
+  // ikut disumbangkan SEMUA id-nya (bukan cuma verseId pertama) supaya
+  // kode LAMA yang masih baca col.verseIds langsung (mis. hitung jumlah
+  // ayat) tetap dapat angka yang benar -- konsekuensinya kode lama itu
+  // TIDAK tahu ayat mana yang sengaja digabung 1 slide (lihat "items"
+  // untuk info itu), tapi tidak pernah salah hitung/hilang datanya.
+  col.verseIds = col.items.filter((it) => it && it.type === "verse")
+    .reduce((acc, it) => acc.concat(it.verseIds && it.verseIds.length ? it.verseIds : [it.verseId]), []);
   return col;
 }
 
@@ -237,7 +244,15 @@ function addItemToCollection(username, name, item) {
   const id = _getOrCreateCollectionByName(collections, name);
   if (!id) return null;
   const col = collections[id];
-  const isDupVerse = item.type === "verse" && col.items.some((it) => it.type === "verse" && it.verseId === item.verseId);
+  // BARU (18 Sep 2026) -- item "verse" boleh punya `verseIds` (>1 id,
+  // beberapa ayat digabung 1 slide, lihat addVerseGroupToCollection() di
+  // bawah). Dedup HANYA berlaku untuk item ayat TUNGGAL lama (tanpa
+  // verseIds) -- item gabungan TIDAK pernah dianggap duplikat walau
+  // ayat pertamanya (verseId) kebetulan sama dengan item lain, supaya
+  // operator tetap bisa menyusun ulang gabungan yang berbeda tanpa
+  // ada yang diam-diam gagal ditambahkan.
+  const isDupVerse = item.type === "verse" && !item.verseIds
+    && col.items.some((it) => it.type === "verse" && !it.verseIds && it.verseId === item.verseId);
   if (!isDupVerse) col.items.push(item);
   _migrateCollection(col); // hitung ulang verseIds turunan
   col.updatedAt = new Date().toISOString();
@@ -280,6 +295,24 @@ function createEmptyCollection(username, name) {
 function addVerseToCollection(username, name, verseId) {
   if (!verseId) return null;
   return addItemToCollection(username, name, { type: "verse", verseId });
+}
+
+// BARU (18 Sep 2026, permintaan operator "matius 1:1,2,3;yohanes 3:16
+// jadi 1 slide isi 4 ayat, atau 2 slide isi 2 ayat, terserah operator") --
+// gabungkan beberapa ayat (array verseId, URUTAN sesuai yang diketik/
+// disusun operator) jadi 1 ITEM (= 1 slide) di Kumpulan Ayat, alih-alih
+// 1 item per ayat seperti addVerseToCollection() di atas. `verseId`
+// (tunggal) TETAP diisi (= verseIds[0]) supaya kode LAMA yang masih baca
+// it.verseId langsung (dedup, remove/move by verseId, dst) tetap jalan
+// tanpa berubah -- rendering gabungannya sendiri lihat
+// combineVerseGroupForSlide() (js/app.js). Array 1 elemen otomatis sama
+// persis dengan addVerseToCollection() biasa (verseIds tidak disertakan
+// sama sekali kalau cuma 1, supaya item tetap format LAMA).
+function addVerseGroupToCollection(username, name, verseIds) {
+  const ids = (verseIds || []).filter(Boolean);
+  if (!ids.length) return null;
+  if (ids.length === 1) return addVerseToCollection(username, name, ids[0]);
+  return addItemToCollection(username, name, { type: "verse", verseId: ids[0], verseIds: ids.slice() });
 }
 
 function addTextToCollection(username, name, text) {
