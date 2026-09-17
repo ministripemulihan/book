@@ -369,6 +369,21 @@ const Presentation = (() => {
     flashSendFeedback();
   }
 
+  // BARU (18 Sep 2026, permintaan operator "gabung beberapa ayat jadi 1
+  // slide, bukan 1 ayat 1 slide terus") -- sama seperti sendVerse(),
+  // TAPI `ref` & `text` sudah bentuk AKHIR siap tayang (bisa gabungan
+  // beberapa ayat/pasal/kitab berbeda sekaligus dalam 1 slide) --
+  // dipakai combineVerseGroupForSlide() (js/presentation-studio.js &
+  // js/app.js) untuk item Kumpulan Ayat bertipe "verse" yang punya
+  // `verseIds` (lebih dari 1 ayat digabung), TIDAK dibangun ulang dari
+  // 1 objek v.bookName/chapter/verse tunggal seperti sendVerse().
+  function sendVerseCombined(ref, text) {
+    if (!isTwoScreenMode()) return;
+    if (!winRef || winRef.closed) openWindow();
+    post({ type: "verse", ref, text });
+    flashSendFeedback();
+  }
+
   function sendFreeText(text, align) {
     if (!text || !text.trim()) return;
     if (!isTwoScreenMode()) return;
@@ -891,7 +906,7 @@ const Presentation = (() => {
     initUi();
     refreshGuestGate();
     // Terapkan proporsi huruf pratinjau dari ukuran Layar 2 TERAKHIR
-    // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak 
+    // yang diketahui (localStorage) SEJAK AWAL -- supaya kotak
     // "Berikutnya"/"Tayang" langsung memakai proporsi yang benar sedari
     // pertama kali Studio dibuka, tanpa menunggu Layar 2 benar-benar
     // dibuka ulang & melaporkan ukurannya lagi lewat "present_geometry".
@@ -905,5 +920,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendVerseCombined, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
 })();
