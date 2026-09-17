@@ -704,7 +704,7 @@
     { n: 4, ikon: "🌗", nama: "Matahari, bulan & bintang" },
     { n: 5, ikon: "🐟", nama: "Ikan & burung" },
     { n: 6, ikon: "🦁", nama: "Binatang darat & manusia" },
-    { n: 7, ikon: "🌾", nama: "Hari perhentian di sawah" }
+    { n: 7, ikon: "🌾", nama: "Hari Perhentian" }
   ];
 
   window.BookScene = { mount: mount, HARI: HARI_INFO };
@@ -737,7 +737,9 @@
           x.setAttribute("aria-selected", String(i + 1 === d.n));
         });
         var lbl = document.getElementById("loginBookLabel");
-        if (lbl) lbl.textContent = "Hari " + d.n + " · " + d.nama;
+        // Khusus hari 7 (permintaan operator 18 Sep 2026): pemisah "-"
+        // bukan "·", supaya tampil persis "Hari 7 - Hari Perhentian".
+        if (lbl) lbl.textContent = d.n === 7 ? ("Hari " + d.n + " - " + d.nama) : ("Hari " + d.n + " · " + d.nama);
       });
       bar.appendChild(b);
     });
