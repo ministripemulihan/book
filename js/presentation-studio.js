@@ -9281,6 +9281,20 @@ const PresentationStudio = (() => {
         saveAndSendTheme({ centerClockOn: el("psCenterClockOn").checked });
       });
     }
+    // BARU (18 Sep 2026, permintaan operator "timer ke 3, di tengah,
+    // timer dari video atau youtube, mulai dari 0, transparan") -- 🎬
+    // Jam Video (Tengah Layar): timer ke-3, pola SAMA persis dgn 2
+    // toggle jam di atas, lihat #videoClockOverlay & applyTheme()
+    // (present.html). Angkanya IDENTIK dengan Jam Tengah (sama-sama
+    // ikut posisi putar video/YouTube yang sedang tayang, mulai dari 0
+    // tiap video baru) -- bedanya cuma posisi di layar (benar-benar di
+    // TENGAH, bukan di bawah), jadi operator bisa nyalakan salah satu
+    // atau keduanya sekaligus.
+    if (el("psVideoClockOn")) {
+      el("psVideoClockOn").addEventListener("change", () => {
+        saveAndSendTheme({ videoClockOn: el("psVideoClockOn").checked });
+      });
+    }
     // BARU (9 Sep 2026) -- "🔁 Balik sisi" khusus mode "Kamera Kiri,
     // Konten Kanan", lihat body.cam-split-lr-reverse (present.html).
     if (el("psCamSplitReverse")) {
@@ -9818,7 +9832,7 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false, videoClockOn: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -9969,6 +9983,7 @@ const PresentationStudio = (() => {
     }
     // BARU (16 Sep 2026) -- pulihkan sakelar 🕐 Jam Tengah.
     if (el("psCenterClockOn")) el("psCenterClockOn").checked = !!theme.centerClockOn;
+    if (el("psVideoClockOn")) el("psVideoClockOn").checked = !!theme.videoClockOn;
     applyThemeToStudioPreview(theme);
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- `camSplitReverse` ("🔁 Balik
     // Sisi" mode split kiri-kanan) SEBELUMNYA tidak pernah ikut daftar
@@ -9979,7 +9994,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, videoClockOn: theme.videoClockOn } });
   }
 
   function saveAndSendTheme(partial) {
@@ -10003,7 +10018,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, videoClockOn: theme.videoClockOn } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
