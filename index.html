@@ -3466,6 +3466,34 @@
             </label>
           </div>
 
+          <!-- BARU (18 Sep 2026, permintaan operator "biar bisa masukin
+               nama tim, tapi tetap kelihatan pakai tanda X/O-nya") --
+               nama tim OPSIONAL (kosong = tetap jalan, jatuh ke
+               "Kelompok X"/"Kelompok O" biasa, lihat fallback di
+               kuis-9-kotak.js & present.html). Kotak "X"/"O" kecil di
+               depan tiap input SENGAJA statis (bukan pilihan) karena
+               mesinnya memang selalu Tim 1 = X, Tim 2 = O -- label ini
+               cuma supaya operator TIDAK bingung pas mengisi mana yang
+               mana. Pratinjau di bawah tiap input ikut menampilkan
+               "(pakai tanda X/O)" hidup saat diketik (lihat wireTab()). -->
+          <div class="ps-field-label" style="margin-top:0;">Nama Tim (opsional, biar lebih seru)</div>
+          <div style="display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; margin-bottom:12px;">
+            <div>
+              <label style="display:flex; align-items:center; gap:6px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:6px; background:rgba(61,142,226,.18); border:1.5px solid #3d8ee2; color:#3d8ee2; font-weight:800; font-size:13px; flex:none;">X</span>
+                <input type="text" id="psQuiz9TeamNameX" placeholder="Nama Tim X (mis. Tim Garuda)" style="width:190px; box-sizing:border-box;" />
+              </label>
+              <div id="psQuiz9TeamNameXPreview" class="ps-pointer-hint" style="font-size:11px; margin-top:3px; margin-left:30px; color:#3d8ee2;"></div>
+            </div>
+            <div>
+              <label style="display:flex; align-items:center; gap:6px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:6px; background:rgba(226,72,61,.18); border:1.5px solid #e2483d; color:#e2483d; font-weight:800; font-size:13px; flex:none;">O</span>
+                <input type="text" id="psQuiz9TeamNameO" placeholder="Nama Tim O (mis. Tim Rajawali)" style="width:190px; box-sizing:border-box;" />
+              </label>
+              <div id="psQuiz9TeamNameOPreview" class="ps-pointer-hint" style="font-size:11px; margin-top:3px; margin-left:30px; color:#e2483d;"></div>
+            </div>
+          </div>
+
           <div class="ps-field-label" style="margin-top:0;">Isi 9 Kotak (Topik + Pertanyaan + Poin)</div>
           <p class="announcement-compose-hint" style="margin-top:0;">Poin boleh negatif (mis. -10) -- kotak bernilai negatif otomatis jadi kotak instan TANPA pertanyaan (langsung final ke kelompok yang membukanya, tidak dilempar ke lawan). Untuk mode Tak Tik Boom, isi semua 9 seperti biasa -- JANGAN coba menebak/mengatur sendiri kotak mana yang nanti jadi TAK/TIK/BOOM, itu diacak mesin sendiri saat "Acak &amp; Mulai" ditekan.</p>
             <div class="ps-quiz9-row" style="display:grid; grid-template-columns:1fr 2fr 70px; gap:6px; margin-bottom:6px; align-items:center;">
@@ -3515,7 +3543,7 @@
             </div>
 
           <div class="ps-btn-row" style="margin-top:10px;">
-            <button type="button" class="chip-btn small" id="psQuiz9StartBtn">🎲 Acak &amp; Mulai</button>
+            <button type="button" class="chip-btn small" id="psQuiz9StartBtn">▶️ Tampilkan &amp; Mulai</button>
             <button type="button" class="chip-btn small" id="psQuiz9ResetBtn" hidden>🔁 Reset Game</button>
           </div>
 
@@ -3775,7 +3803,7 @@
   <script src="js/games/roda-putar.js?v=20260916a"></script>
   <script src="js/games/kuis-9-kotak.js?v=20260916a"></script>
   <script src="js/games/survei-membuktikan.js?v=20260916a"></script>
-  <script src="js/games/penciptaan.js?v=20260917a1"></script>
+  <script src="js/games/penciptaan.js?v=20260917a"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
