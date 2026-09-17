@@ -1494,29 +1494,71 @@
   #cornerClockOverlay.cc-pos-bottom-right { bottom: 3vh; right: 3vw; }
 
   /* BARU (16 Sep 2026, permintaan operator "tulisan jam hh:mm:ss:msms di
-     tengah layar") -- 🕐 Jam Tengah: sama arsitekturnya persis dengan
-     #cornerClockOverlay di atas (lapisan TERPISAH dari #stage, fixed ke
-     jendela, pointer-events:none, independen dari showMain()/dst,
-     digerakkan interval sendiri, lihat tickCenterClock() di skrip
-     bawah) -- BEDANYA cuma di posisi (selalu tengah layar, bukan salah 1
-     pojok) & formatnya menyertakan milidetik (HH:MM:SS:ms, lihat
-     fmtWallClockMs_()) supaya berguna sebagai acuan sinkronisasi presisi
-     tinggi (mis. sinkron dgn software lain/kamera), bukan cuma jam
-     biasa. z-index SAMA dgn jam pojok (keduanya boleh menyala bersamaan,
-     tidak saling tumpang tindih posisi). */
+     tengah layar"), DIUBAH (17 Sep 2026, permintaan operator "background
+     biru dibuat transparan, tulisan putih tipis saja, taruh di bawah,
+     dan angkanya ikuti timer videonya YouTube, bukan jam dinding") --
+     🕐 Jam Tengah / Timer Video: masih 1 lapisan TERPISAH dari #stage,
+     fixed ke jendela, pointer-events:none, independen dari showMain()/dst
+     (lihat tickCenterClock() di skrip bawah) -- SEKARANG dipindah ke
+     BAWAH layar (bukan tengah), tanpa kotak/latar (transparan total),
+     tulisan PUTIH tipis (bukan tebal spt sebelumnya), dan angkanya
+     mengikuti POSISI PUTAR video YouTube yang sedang tayang (dari
+     infoDelivery.currentTime, lihat reportYtProgress() di skrip bawah)
+     -- BUKAN jam dinding lagi. Formatnya HH:MM:SS:ms selama videonya
+     sudah lewat 1 jam, MM:SS:ms selama masih di bawah 1 jam (lihat
+     fmtElapsedParts_() & tickCenterClock() di skrip bawah). Berguna
+     sbg acuan sinkronisasi presisi tinggi dgn software/kamera lain yg
+     merekam video yang sama. z-index SAMA dgn jam pojok (boleh menyala
+     bersamaan). */
   #centerClockOverlay {
     display: none; position: fixed; z-index: 45; pointer-events: none;
-    top: 50%; left: 50%; transform: translate(-50%, -50%);
-    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
-    font-size: clamp(20px, 5vw, 72px);
-    color: var(--p-ink); background: var(--p-bg);
-    padding: 0.25em 0.6em; border-radius: 14px;
+    bottom: 4vh; left: 50%; transform: translateX(-50%);
+    font-family: "Inter", Arial, sans-serif; font-weight: 300; letter-spacing: 0.03em;
+    font-size: clamp(16px, 3vw, 40px);
+    color: #fff; background: transparent;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.4);
+    padding: 0; border-radius: 0;
     font-variant-numeric: tabular-nums;
-    box-shadow: 0 2px 14px rgba(0,0,0,0.35);
-    border: 1px solid color-mix(in srgb, var(--p-ink) 18%, transparent);
+    box-shadow: none; border: none;
   }
   #centerClockOverlay.cc-on { display: block; }
-  #centerClockOverlay .cc-ms { font-size: 0.55em; opacity: 0.75; }
+  #centerClockOverlay .cc-ms { font-size: 0.6em; opacity: 0.8; font-weight: 300; }
+
+  /* BARU (17 Sep 2026, permintaan operator "hari ke-7 apa bisa dikasih
+     tulisan bisa view jam atau tidak, tampil di kanan atas Layar 2,
+     digital atau analog") -- 🕐 Jam Hari 7 (Penciptaan): SAMA arsitektur
+     dgn #cornerClockOverlay (kotak solid warna tema, kontras terjamin
+     apa pun latar di baliknya), diposisikan tetap di kanan atas
+     (BEDA dari posisi Jam Pojok yg bisa dipindah operator -- jam ini
+     memang khusus utk Hari 7, jadi posisinya sengaja ditetapkan saja).
+     display:none selama updatePenciptaanClockOverlay_() (skrip bawah)
+     belum mengaktifkannya (JS toggle, BUKAN class "cc-on" spt 2 jam di
+     atas -- supaya gampang disatukan dgn logika show/hide Hari 7 &
+     tayang_/hariAktif_ yang sudah ada). */
+  #penciptaanClockOverlay {
+    display: none; position: fixed; z-index: 45; pointer-events: none;
+    top: 3vh; right: 3vw;
+    font-family: "Inter", Arial, sans-serif; font-weight: 800; letter-spacing: 0.02em;
+    color: var(--p-ink); background: var(--p-bg);
+    padding: 0.35em 0.7em; border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    border: 1px solid color-mix(in srgb, var(--p-ink) 18%, transparent);
+  }
+  #penciptaanClockOverlay.pc-on { display: block; }
+  #penciptaanClockDigital { font-size: clamp(14px, 2.2vw, 30px); }
+  /* Digital/analog TIDAK PERNAH tampil berbarengan -- kelas
+     "pc-style-digital"/"pc-style-analog" pada wrapper ini menentukan
+     mana yang ditampilkan (lihat updatePenciptaanClockOverlay_()). */
+  #penciptaanClockOverlay.pc-style-digital #penciptaanClockAnalogSvg { display: none; }
+  #penciptaanClockOverlay.pc-style-analog #penciptaanClockDigital { display: none; }
+  #penciptaanClockAnalogSvg { display: block; width: clamp(46px, 6vw, 72px); height: clamp(46px, 6vw, 72px); }
+  #penciptaanClockAnalogSvg .pc-ac-face { fill: none; stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 2; opacity: .85; }
+  #penciptaanClockAnalogSvg .pc-ac-tick { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 2.4; opacity: .9; }
+  #penciptaanClockAnalogSvg .pc-ac-hand { stroke-linecap: round; transform-box: view-box; transform-origin: 50px 50px; }
+  #penciptaanClockAnalogSvg .pc-ac-hour { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 6; }
+  #penciptaanClockAnalogSvg .pc-ac-minute { stroke: var(--p-timerclock-color, var(--p-ink)); stroke-width: 4; }
+  #penciptaanClockAnalogSvg .pc-ac-hub { fill: var(--p-timerclock-color, var(--p-ink)); }
 
   /* BARU (16 Sep 2026, permintaan operator "30 detik terakhir sebelum
      video B, apa bisa info, ada semacam card reminder... lalu ada count
@@ -2255,6 +2297,32 @@
   <div id="cornerClockOverlay"><span id="cornerClockTimeEl">00:00:00</span></div>
   <!-- BARU (16 Sep 2026) -- lihat catatan CSS #centerClockOverlay di atas. -->
   <div id="centerClockOverlay"><span id="centerClockTimeEl">00:00:00</span><span class="cc-ms" id="centerClockMsEl">:000</span></div>
+  <!-- BARU (17 Sep 2026, permintaan operator "hari ke-7 apa bisa dikasih
+       tulisan bisa view jam atau tidak, tampil di kanan atas Layar 2,
+       digital atau analog") -- 🕐 Jam Hari 7 (Penciptaan): lapisan
+       TERPISAH lagi, sama filosofinya dgn Jam Pojok/Jam Tengah di atas
+       (fixed ke jendela, pointer-events:none, z-index sama) -- BEDANYA
+       jam ini HANYA relevan selagi 🌱 Penciptaan Hari 7 sedang tayang
+       (disembunyikan otomatis di luar itu, lihat updatePenciptaanClockOverlay_()
+       di skrip bawah) & angkanya BUKAN jam dinding tapi jam yang SEDANG
+       DISIMULASIKAN di pemandangan sawah (bisa jam asli perangkat, bisa
+       hasil geser pratinjau operator -- lihat penciptaanScene_.jamSekarang(),
+       js/book-scene.js). Dua variasi tampilan (digital teks / analog
+       jarum) disiapkan sekaligus di markup, hanya satu yang ditampilkan
+       lewat kelas "pc-style-digital"/"pc-style-analog" pada wrapper ini. -->
+  <div id="penciptaanClockOverlay" class="pc-style-digital">
+    <div id="penciptaanClockDigital">12:00</div>
+    <svg id="penciptaanClockAnalogSvg" viewBox="0 0 100 100">
+      <circle class="pc-ac-face" cx="50" cy="50" r="46"></circle>
+      <line class="pc-ac-tick pc-ac-tick-major" x1="50" y1="6" x2="50" y2="14"></line>
+      <line class="pc-ac-tick pc-ac-tick-major" x1="94" y1="50" x2="86" y2="50"></line>
+      <line class="pc-ac-tick pc-ac-tick-major" x1="50" y1="94" x2="50" y2="86"></line>
+      <line class="pc-ac-tick pc-ac-tick-major" x1="6" y1="50" x2="14" y2="50"></line>
+      <line id="pcAcHourHand" class="pc-ac-hand pc-ac-hour" x1="50" y1="50" x2="50" y2="28"></line>
+      <line id="pcAcMinuteHand" class="pc-ac-hand pc-ac-minute" x1="50" y1="50" x2="50" y2="16"></line>
+      <circle class="pc-ac-hub" cx="50" cy="50" r="3"></circle>
+    </svg>
+  </div>
   <!-- BARU (16 Sep 2026) -- lihat catatan CSS #ytNextUpCard di atas. -->
   <div id="ytNextUpCard"><div class="nu-label">▶️ Berikutnya</div><div class="nu-title" id="ytNextUpTitle"></div><div class="nu-count" id="ytNextUpCount"></div></div>
 
@@ -2347,6 +2415,19 @@
   let ytQueue = [];
   let ytQueueIndex = 0;
   let ytLastState = null; // state terakhir yang dilaporkan player (lihat infoDelivery di bawah)
+  // BARU (17 Sep 2026, permintaan operator "Jam Tengah ikut timer
+  // videonya YouTube") -- posisi putar (detik) TERAKHIR yang dilaporkan
+  // player lewat infoDelivery, + kapan (Date.now()) laporan itu tiba &
+  // apakah videonya sedang benar-benar main (playerState 1). Dipakai
+  // tickCenterClock() di bawah utk menghitung posisi SEKARANG dgn
+  // interpolasi ringan di antara 2 laporan infoDelivery (yg cuma
+  // datang beberapa kali/detik, bukan tiap 30ms), supaya milidetiknya
+  // tetap kelihatan berjalan mulus. Direset ke null tiap ganti video
+  // (lihat setYtSrc_() & ytEl "load" di bawah) supaya tidak "kebawa"
+  // detik video lama.
+  let ytElapsedBase_ = null; // detik currentTime terakhir dari infoDelivery
+  let ytElapsedBaseAt_ = 0; // Date.now() saat ytElapsedBase_ dicatat
+  let ytElapsedPlaying_ = false; // true kalau playerState terakhir = 1 (main)
   // PERBAIKAN (16 Sep 2026, laporan operator "pindah dari video A ke B lalu
   // balik ke A, detiknya malah kebawa detik terakhir video B") -- akar
   // masalah: saat `ytEl.src` diganti ke video BARU, iframe LAMA belum tentu
@@ -2369,6 +2450,7 @@
   function setYtSrc_(url) {
     ytIgnoreInfoUntil_ = Date.now() + 400;
     if (ytNextUpCardEl) ytNextUpCardEl.classList.remove("show"); // video baru mulai -- sembunyikan kartu "Berikutnya" sisa video lama
+    ytElapsedBase_ = null; ytElapsedPlaying_ = false; // BARU (17 Sep 2026) -- Jam Tengah jangan kebawa detik video lama
     ytEl.src = url;
   }
   // BARU (16 Sep 2026, permintaan operator "30 detik terakhir apa bisa
@@ -3936,12 +4018,28 @@
   //   { type:"penciptaan", action:"show", hari:1..7, teks:true|false }
   //   { type:"penciptaan", action:"jam", jam:0..23.99 }  -- pratinjau jam (hari 7)
   //   { type:"penciptaan", action:"jamauto" }            -- kembali ke jam perangkat
+  //   { type:"penciptaan", action:"jamview", on:true|false, style:"digital"|"analog" }
+  //                                                       -- BARU (17 Sep 2026), lihat catatan
+  //                                                          panjang CSS #penciptaanClockOverlay di atas
   //   { type:"penciptaan", action:"reset" }
   // ------------------------------------------------------------
   const penciptaanViewEl = document.getElementById("penciptaanView");
   const penciptaanStageEl = document.getElementById("penciptaanStage");
   const penciptaanCaptionEl = document.getElementById("penciptaanCaption");
+  const penciptaanClockOverlayEl = document.getElementById("penciptaanClockOverlay");
+  const penciptaanClockDigitalEl = document.getElementById("penciptaanClockDigital");
+  const pcAcHourHandEl = document.getElementById("pcAcHourHand");
+  const pcAcMinuteHandEl = document.getElementById("pcAcMinuteHand");
   let penciptaanScene_ = null;
+  // BARU (17 Sep 2026) -- state jam kanan atas Hari 7: hariAktif_
+  // dicatat DI SINI JUGA (terpisah dari hariAktif_ milik Studio) supaya
+  // present.html tahu apakah hari yg sedang tayang SEKARANG persis 7
+  // (jam ini tidak masuk akal di hari lain), jamViewOn_/jamViewStyle_
+  // datang dari action "jamview" (lihat dispatcher di bawah), default
+  // MATI & gaya digital sampai Studio bilang lain.
+  let penciptaanHariAktif_ = 1;
+  let penciptaanJamViewOn_ = false;
+  let penciptaanJamViewStyle_ = "digital";
 
   const PENCIPTAAN_HARI = [
     { nama: "Terang", ayat: "Kejadian 1:3-5" },
@@ -3975,6 +4073,7 @@
 
     const hari = Math.max(1, Math.min(7, parseInt(data.hari, 10) || 1));
     penciptaanScene_.setHari(hari);
+    penciptaanHariAktif_ = hari; // BARU (17 Sep 2026) -- dipakai updatePenciptaanClockOverlay_()
 
     const info = PENCIPTAAN_HARI[hari - 1];
     if (data.teks === false) {
@@ -3984,6 +4083,7 @@
       penciptaanCaptionEl.hidden = false;
       penciptaanCaptionEl.innerHTML = "Hari " + hari + " · " + info.nama + "<small>" + info.ayat + "</small>";
     }
+    updatePenciptaanClockOverlay_();
   }
 
   // jam = null -> kembali mengikuti jam asli perangkat Layar 2 ini.
@@ -3991,11 +4091,56 @@
     if (!penciptaanScene_) return;
     if (jam == null) penciptaanScene_.ikutiJamPerangkat();
     else penciptaanScene_.setJam(jam);
+    updatePenciptaanClockOverlay_();
   }
+
+  // BARU (17 Sep 2026, permintaan operator "hari ke-7 apa bisa dikasih
+  // tulisan bisa view jam atau tidak, tampil di kanan atas") -- action
+  // "jamview" dari Studio (lihat js/games/penciptaan.js): cuma
+  // mengatur MATI/NYALA + gaya jam kanan atas ini, TIDAK mengubah jam
+  // yang dipakai pemandangan sama sekali (itu tugas "jam"/"jamauto" di
+  // atas, lewat setJamPenciptaan_()).
+  function setJamViewPenciptaan_(data) {
+    penciptaanJamViewOn_ = !!(data && data.on);
+    penciptaanJamViewStyle_ = data && data.style === "analog" ? "analog" : "digital";
+    updatePenciptaanClockOverlay_();
+  }
+
+  // Menampilkan/menyembunyikan & menggambar ulang jam kanan atas Hari 7
+  // -- dipanggil tiap kali salah satu dari 3 hal berubah: hari yang
+  // aktif (showPenciptaan), jam yang disimulasikan (setJamPenciptaan_),
+  // atau sakelar tampil/gaya-nya sendiri (setJamViewPenciptaan_) -- plus
+  // 1 interval ringan di bawah supaya tetap mengikuti detak jam
+  // perangkat selagi mode "ikuti jam perangkat" aktif (BUKAN pratinjau
+  // manual), sama filosofinya dgn tickCornerClock()/tickCenterClock().
+  function updatePenciptaanClockOverlay_() {
+    if (!penciptaanClockOverlayEl) return;
+    const tayang = penciptaanViewEl && !penciptaanViewEl.hidden;
+    const tampil = tayang && penciptaanJamViewOn_ && penciptaanHariAktif_ === 7 && penciptaanScene_;
+    penciptaanClockOverlayEl.classList.toggle("pc-on", !!tampil);
+    if (!tampil) return;
+    penciptaanClockOverlayEl.classList.remove("pc-style-digital", "pc-style-analog");
+    penciptaanClockOverlayEl.classList.add(penciptaanJamViewStyle_ === "analog" ? "pc-style-analog" : "pc-style-digital");
+    const jam = penciptaanScene_.jamSekarang(); // 0..23.999
+    const h = Math.floor(jam);
+    let m = Math.round((jam - h) * 60);
+    let hh = h;
+    if (m >= 60) { m -= 60; hh = (hh + 1) % 24; } // pembulatan detik/menit terakhir bisa "meluap" ke jam berikut
+    const pad2 = (n) => String(n).padStart(2, "0");
+    if (penciptaanClockDigitalEl) penciptaanClockDigitalEl.textContent = pad2(hh) + ":" + pad2(m);
+    if (pcAcHourHandEl) pcAcHourHandEl.style.transform = "rotate(" + ((hh % 12) + m / 60) * 30 + "deg)";
+    if (pcAcMinuteHandEl) pcAcMinuteHandEl.style.transform = "rotate(" + (m * 6) + "deg)";
+  }
+  // Jalan terus sejak halaman dimuat (murah -- updatePenciptaanClockOverlay_()
+  // langsung pulang di baris ke-2 selama tidak relevan), supaya jam ikut
+  // maju selagi mode "ikuti jam perangkat" (bukan pratinjau manual) aktif
+  // & Hari 7 sedang tayang lama (mis. dibiarkan menyala semalaman).
+  setInterval(updatePenciptaanClockOverlay_, 15000);
 
   function stopPenciptaan(showIdle) {
     if (penciptaanViewEl) penciptaanViewEl.hidden = true;
     if (penciptaanCaptionEl) { penciptaanCaptionEl.hidden = true; penciptaanCaptionEl.innerHTML = ""; }
+    if (penciptaanClockOverlayEl) penciptaanClockOverlayEl.classList.remove("pc-on"); // BARU (17 Sep 2026)
     // Scene sengaja TIDAK di-destroy: kalau operator menekan hari lagi,
     // gambarnya langsung muncul tanpa jeda membangun ulang. Animasinya
     // berhenti sendiri karena elemennya tersembunyi (display:none).
@@ -5614,6 +5759,7 @@
       if (data.action === "reset") { stopPenciptaan(true); }
       else if (data.action === "jam") { setJamPenciptaan_(data.jam); }
       else if (data.action === "jamauto") { setJamPenciptaan_(null); }
+      else if (data.action === "jamview") { setJamViewPenciptaan_(data); } // BARU (17 Sep 2026)
       else { showPenciptaan(data); }
       return;
     }
@@ -5967,6 +6113,16 @@
     if (Date.now() < ytIgnoreInfoUntil_) return; // buang sisa pesan video LAMA (lihat setYtSrc_())
     reportYtProgress(data.info);
     updateYtNextUpCard_(data.info.currentTime, typeof data.info.duration === "number" ? data.info.duration : 0);
+    // BARU (17 Sep 2026) -- catat posisi putar TERAKHIR + kapan, dipakai
+    // tickCenterClock() (Jam Tengah) utk menghitung "waktu timer YouTube"
+    // -- lihat deklarasi ytElapsedBase_ di atas.
+    if (typeof data.info.currentTime === "number") {
+      ytElapsedBase_ = data.info.currentTime;
+      ytElapsedBaseAt_ = Date.now();
+    }
+    if (typeof data.info.playerState === "number") {
+      ytElapsedPlaying_ = data.info.playerState === 1;
+    }
     if (typeof data.info.playerState !== "number") return;
     const state = data.info.playerState;
     if (state === ytLastState) return;
@@ -6040,17 +6196,50 @@
     setInterval(tickCornerClock, 1000);
   }
   // BARU (16 Sep 2026, permintaan operator "jam hh:mm:ss:msms di tengah
-  // layar") -- 🕐 Jam Tengah: interval TERPISAH dari jam pojok di atas,
-  // sengaja di-tick tiap 30ms (bukan tiap detik) supaya angka milidetiknya
-  // sungguh terlihat berjalan -- murah (cuma ganti textContent 2 elemen
-  // kecil), sama filosofinya dgn jam pojok: jalan terus sejak halaman
-  // dimuat, terlepas dari status nyala/mati (disembunyikan CSS lewat
-  // "cc-on" selama theme.centerClockOn belum aktif -- lihat applyTheme()).
+  // layar"), DIUBAH (17 Sep 2026, permintaan operator "ikutin timer
+  // videonya YouTube, bukan jam dinding") -- 🕐 Jam Tengah / Timer Video:
+  // interval TERPISAH dari jam pojok di atas, sengaja di-tick tiap 30ms
+  // (bukan tiap detik) supaya angka milidetiknya sungguh terlihat
+  // berjalan -- murah (cuma ganti textContent 2 elemen kecil), sama
+  // filosofinya dgn jam pojok: jalan terus sejak halaman dimuat, terlepas
+  // dari status nyala/mati (disembunyikan CSS lewat "cc-on" selama
+  // theme.centerClockOn belum aktif -- lihat applyTheme()).
+  //
+  // Angkanya SEKARANG mengikuti posisi putar video YouTube yang sedang
+  // tayang (ytElapsedBase_/ytElapsedBaseAt_/ytElapsedPlaying_, dicatat
+  // dari infoDelivery -- lihat deklarasi & listener di atas), BUKAN jam
+  // dinding lagi: selagi video main, posisi ditambah selisih waktu sejak
+  // laporan infoDelivery TERAKHIR (supaya milidetiknya tetap kelihatan
+  // berjalan mulus di antara 2 laporan yang cuma datang beberapa
+  // kali/detik); selagi dijeda/belum ada video, angka berhenti di posisi
+  // terakhir (atau 00:00:000 kalau belum pernah ada video sama sekali).
+  // Format JAM disembunyikan selama masih di bawah 1 jam (MM:SS:ms saja)
+  // -- lihat fmtElapsedParts_().
+  // BARU (18 Sep 2026, permintaan operator: referensi tampilan
+  // "HH:MM:SS:MSMS" yang SELALU 4 bagian, contoh "01:01:31:17") --
+  // sebelumnya bagian JAM (hh) baru muncul kalau video sudah lewat 1
+  // jam (video < 1 jam cuma tampil MM:SS:ms) -- sekarang SELALU
+  // ditampilkan 4 bagian (HH:MM:SS:ms) supaya formatnya konsisten sejak
+  // detik pertama video, tidak berubah-ubah panjangnya di tengah jalan.
+  function fmtElapsedParts_(totalSec) {
+    const s = Math.max(0, totalSec);
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = Math.floor(s % 60);
+    const ms = Math.floor((s - Math.floor(s)) * 1000);
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const main = pad2(hh) + ":" + pad2(mm) + ":" + pad2(ss);
+    return { main, ms: String(ms).padStart(3, "0") };
+  }
   if (centerClockTimeEl && centerClockMsEl) {
     const tickCenterClock = () => {
-      const d = new Date();
-      centerClockTimeEl.textContent = fmtWallClock_(d);
-      centerClockMsEl.textContent = ":" + String(d.getMilliseconds()).padStart(3, "0");
+      let elapsed = 0;
+      if (ytElapsedBase_ != null) {
+        elapsed = ytElapsedBase_ + (ytElapsedPlaying_ ? (Date.now() - ytElapsedBaseAt_) / 1000 : 0);
+      }
+      const parts = fmtElapsedParts_(elapsed);
+      centerClockTimeEl.textContent = parts.main;
+      centerClockMsEl.textContent = ":" + parts.ms;
     };
     tickCenterClock();
     setInterval(tickCenterClock, 30);
