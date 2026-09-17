@@ -43,8 +43,6 @@
          "hidden" di bawah ini TETAP ada, jadi tombol ini tidak pernah
          muncul dan #loginCard tampil normal seperti sebelum perubahan
          ini -- tidak mungkin ada keadaan "tidak bisa masuk sama sekali". -->
-    <button type="button" id="loginRevealBtn" class="login-reveal" hidden>Masuk</button>
-
     <div class="login-card" id="loginCard">
       <div class="login-mark">☩</div>
       <h1>Masuk</h1>
@@ -91,6 +89,14 @@
     <!-- Tombol hari 1-7 untuk latar di atas (diisi js/book-scene.js).
          Murni hiasan -- tidak ada hubungannya dengan proses masuk. -->
     <div id="loginBookBar">
+      <!-- DIPINDAH ke sini (18 Sep 2026, permintaan operator "icon masuk
+           pindah ke arah bawah, di atas persis tulisan hari 7") -- dulu
+           tombol ini berdiri sendiri di tengah layar (sibling sebelum
+           #loginCard), sekarang jadi baris PALING ATAS di batang bawah
+           ini, tepat di atas #loginBookLabel ("Hari 7 · ..."). Elemen &
+           id-nya TIDAK berubah sama sekali, jadi js/book-scene.js
+           (wireLuarMasuk()) tetap jalan persis seperti sebelumnya. -->
+      <button type="button" id="loginRevealBtn" class="login-reveal" hidden>Masuk</button>
       <p id="loginBookLabel">Hari 1 · Terang</p>
       <div id="loginBookDays" class="bk-days"></div>
     </div>
@@ -3758,7 +3764,7 @@
   <!-- BARU (17 Sep 2026) -- pemandangan "7 Hari Penciptaan". Dimuat
        PALING AWAL karena dipakai layar Masuk (sebelum login), dan
        dipakai lagi oleh js/games/penciptaan.js di bawah. -->
-  <script src="js/book-scene.js?v=20260918a"></script>
+  <script src="js/book-scene.js?v=20260918b"></script>
   <script src="js/config.js?v=20260907a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260914b"></script>
@@ -3803,7 +3809,7 @@
   <script src="js/games/roda-putar.js?v=20260916a"></script>
   <script src="js/games/kuis-9-kotak.js?v=20260916a"></script>
   <script src="js/games/survei-membuktikan.js?v=20260916a"></script>
-  <script src="js/games/penciptaan.js?v=20260917a"></script>
+  <script src="js/games/penciptaan.js?v=20260918a"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
