@@ -34,16 +34,29 @@
 //   { type:"penciptaan", action:"show",  hari:1..7, teks:true|false }
 //   { type:"penciptaan", action:"jam",   jam:0..23.99 }   // pratinjau jam (hari 7)
 //   { type:"penciptaan", action:"jamauto" }               // kembali ke jam perangkat
+//   { type:"penciptaan", action:"jamview", on:true|false, style:"digital"|"analog" }
+//                                                          // BARU (17 Sep 2026) -- lihat catatan di bawah
 //   { type:"penciptaan", action:"reset" }                 // sembunyikan, kembali idle
 // Modul ini TIDAK menunggu balasan apa pun dari Layar 2 (beda dari 🎡
 // Roda Undian yang perlu tahu pemenangnya), jadi handleMessage() cukup
 // dipakai untuk menyelaraskan tombol kalau Layar 2 baru dibuka.
+//
+// BARU (17 Sep 2026, permintaan operator "hari ke-7 apa bisa dikasih
+// tulisan bisa view jam atau tidak, kayak jam 12:40 di panel ini,
+// tampil di kanan atas Layar 2, digital atau analog") -- action
+// "jamview" TERPISAH dari "jam"/"jamauto" di atas: dua-duanya itu
+// MENENTUKAN jam yang dipakai pemandangan (baju/langit) hari 7,
+// "jamview" ini cuma MENAMPILKAN/MENYEMBUNYIKAN jam kecil (angka yang
+// SAMA) di pojok kanan atas Layar 2, sbg jam digital atau analog --
+// lihat penanganannya di present.html (penciptaanClockOverlay dkk).
 // ============================================================
 (function () {
   const { el, rawPost, renderStudioPreview } = window.PSCore;
 
   const HARI_KEY = "bible_app_penciptaan_hari_v1";
   const TEKS_KEY = "bible_app_penciptaan_teks_v1";
+  const JAMVIEW_ON_KEY = "bible_app_penciptaan_jamview_on_v1";
+  const JAMVIEW_STYLE_KEY = "bible_app_penciptaan_jamview_style_v1";
   const PUTAR_MS = 4500; // jeda "putar otomatis" antar hari
 
   // Judul & rujukan tiap hari. Sengaja hanya JUDUL + ALAMAT AYAT (bukan
@@ -82,11 +95,26 @@
     }
   }
 
+  function jamViewOn_() {
+    const chk = el("psPenciptaanJamViewOn");
+    return chk ? !!chk.checked : false;
+  }
+  function jamViewStyle_() {
+    const row = el("psPenciptaanJamViewStyleRow");
+    if (!row) return "digital";
+    const active = row.querySelector("[data-jam-view-style].active");
+    return active && active.dataset.jamViewStyle === "analog" ? "analog" : "digital";
+  }
+  function kirimJamView_() {
+    rawPost({ type: "penciptaan", action: "jamview", on: jamViewOn_(), style: jamViewStyle_() });
+  }
+
   function kirim_(hari) {
     hariAktif_ = Math.max(1, Math.min(7, hari));
     tayang_ = true;
     try { localStorage.setItem(HARI_KEY, String(hariAktif_)); } catch (e) {}
     rawPost({ type: "penciptaan", action: "show", hari: hariAktif_, teks: pakaiTeks_() });
+    kirimJamView_(); // BARU (17 Sep 2026) -- selaraskan jam kanan atas tiap ganti hari
     renderStudioPreview({ type: "penciptaan" });
     tandaiTombol_();
     perbaruiJamUi_();
@@ -128,6 +156,22 @@
       const t = localStorage.getItem(TEKS_KEY);
       const chk = el("psPenciptaanTeksChk");
       if (chk && t != null) chk.checked = t === "1";
+    } catch (e) {}
+    // BARU (17 Sep 2026) -- pulihkan pilihan "tampilkan jam kanan atas" +
+    // gaya digital/analog dari perangkat ini (default: mati, digital).
+    try {
+      const jvOn = localStorage.getItem(JAMVIEW_ON_KEY);
+      const jvChk = el("psPenciptaanJamViewOn");
+      if (jvChk && jvOn != null) jvChk.checked = jvOn === "1";
+    } catch (e) {}
+    try {
+      const jvStyle = localStorage.getItem(JAMVIEW_STYLE_KEY);
+      const jvRow = el("psPenciptaanJamViewStyleRow");
+      if (jvRow && jvStyle) {
+        jvRow.querySelectorAll("[data-jam-view-style]").forEach((b) => {
+          b.classList.toggle("active", b.dataset.jamViewStyle === jvStyle);
+        });
+      }
     } catch (e) {}
 
     HARI.forEach((d) => {
@@ -192,6 +236,29 @@
         rawPost({ type: "penciptaan", action: "jamauto" });
       });
     }
+
+    // BARU (17 Sep 2026, permintaan operator "hari ke-7 apa bisa dikasih
+    // tulisan bisa view jam atau tidak, tampil di kanan atas Layar 2,
+    // digital atau analog") -- lihat kirimJamView_() & catatan payload
+    // "jamview" di atas berkas ini.
+    const jamViewChk = el("psPenciptaanJamViewOn");
+    if (jamViewChk) {
+      jamViewChk.addEventListener("change", () => {
+        try { localStorage.setItem(JAMVIEW_ON_KEY, jamViewChk.checked ? "1" : "0"); } catch (e) {}
+        kirimJamView_();
+      });
+    }
+    const jamViewStyleRow = el("psPenciptaanJamViewStyleRow");
+    if (jamViewStyleRow) {
+      const jvBtns = Array.from(jamViewStyleRow.querySelectorAll("[data-jam-view-style]"));
+      jvBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          jvBtns.forEach((b) => b.classList.toggle("active", b === btn));
+          try { localStorage.setItem(JAMVIEW_STYLE_KEY, btn.dataset.jamViewStyle); } catch (e) {}
+          kirimJamView_();
+        });
+      });
+    }
   }
 
   // Layar 2 baru dibuka/dimuat ulang saat game ini sedang dipakai ->
@@ -200,6 +267,7 @@
     if (!data || data.type !== "present_ready") return;
     if (!tayang_) return;
     rawPost({ type: "penciptaan", action: "show", hari: hariAktif_, teks: pakaiTeks_() });
+    kirimJamView_(); // BARU (17 Sep 2026) -- selaraskan jam kanan atas juga
   }
 
   window.GameOffline.register({ id: "penciptaan", label: "🌱 Penciptaan", wireTab, handleMessage });
