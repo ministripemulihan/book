@@ -515,6 +515,12 @@ async function startApp() {
     // js/collections.js) -- best-effort, tidak menghalangi apa pun di
     // atas kalau gagal/fungsinya belum dimuat.
     if (typeof wireMediaUploadQueueAutoRetry === "function") wireMediaUploadQueueAutoRetry(currentUser);
+    // BARU (18 Sep 2026) -- lihat catatan panjang di _pushCollectionRemote()/
+    // processCollectionPushQueue(), js/collections.js: coba lagi otomatis
+    // SEMUA perubahan Kumpulan Ayat yang dulu gagal terkirim ke server
+    // (offline / jaringan putus saat mengedit) setiap kali aplikasi ini
+    // dibuka/login -- best-effort, tidak menghalangi apa pun kalau gagal.
+    if (typeof wireCollectionPushQueueAutoRetry === "function") wireCollectionPushQueueAutoRetry(currentUser);
   }
 }
 
@@ -5530,9 +5536,57 @@ function renderCollectionsPanel(openId) {
     return;
   }
 
+  const titleRow0 = document.createElement("div");
+  titleRow0.className = "collection-title-row";
   const title = document.createElement("h2");
   title.textContent = "📚 Kumpulan Ayat Saya";
-  container.appendChild(title);
+  titleRow0.appendChild(title);
+  // BARU (18 Sep 2026, permintaan operator: "gimana caranya supaya bisa
+  // sinkron ke yang paling baru?") -- sebelumnya kumpulan HANYA ditarik
+  // dari server (refreshCollectionsFromRemote(), js/collections.js)
+  // SEKALI diam-diam saat aplikasi pertama dibuka/login (lihat
+  // startApp(), di atas berkas ini) -- kalau HP dibuka lebih dulu lalu
+  // dibiarkan terbuka/tidak ditutup-buka lagi (mis. PWA/"Add to Home
+  // Screen" yang tetap berjalan di latar), sedangkan komputer baru
+  // menambah slide BELAKANGAN, HP itu tidak akan pernah tahu ada
+  // perubahan sampai dibuka ulang/login ulang. Tombol ini memberi cara
+  // MANUAL, kapan saja, menarik ulang versi TERBARU dari server tanpa
+  // perlu keluar aplikasi -- dipasang di panel ini (bukan cuma di
+  // startApp()) supaya operator bisa memicunya persis saat sedang
+  // melihat/curiga datanya ketinggalan.
+  if (currentUser) {
+    const syncBtn = document.createElement("button");
+    syncBtn.className = "chip-btn small";
+    syncBtn.type = "button";
+    syncBtn.textContent = "🔄 Sinkron Sekarang";
+    syncBtn.title = "Tarik ulang Kumpulan Ayat versi TERBARU dari server (berguna kalau perangkat ini belum melihat perubahan yang dibuat di perangkat lain)";
+    syncBtn.addEventListener("click", async () => {
+      if (typeof Sync === "undefined" || !Sync.enabled()) {
+        alert("Sinkron belum aktif di aplikasi ini (CONFIG.APPS_SCRIPT_URL kosong).");
+        return;
+      }
+      syncBtn.disabled = true;
+      const originalLabel = syncBtn.textContent;
+      syncBtn.textContent = "🔄 Menyinkron…";
+      try {
+        const changed = await refreshCollectionsFromRemote(currentUser);
+        renderCollectionsPanel(); // gambar ulang panel ini (baik ada perubahan atau tidak, supaya tombol kembali normal)
+        if (!changed) {
+          // Panel sudah digambar ulang di atas (kehilangan tombol lama
+          // ini) -- beri tahu lewat alert singkat karena tidak ada
+          // indikator lain yang terlihat kalau memang tidak ada yang
+          // berubah (sudah paling baru).
+          setTimeout(() => alert("Sudah versi paling baru -- tidak ada perubahan dari server."), 50);
+        }
+      } catch (e) {
+        syncBtn.disabled = false;
+        syncBtn.textContent = originalLabel;
+        alert("Gagal menyinkron: periksa sambungan internet, lalu coba lagi.");
+      }
+    });
+    titleRow0.appendChild(syncBtn);
+  }
+  container.appendChild(titleRow0);
 
   // BARU -- 🔔 kartu "Kiriman Menunggu Persetujuan" (kalau ada), lihat
   // checkPendingCollectionShares()/respondToCollectionShare() di
@@ -6796,10 +6850,10 @@ function openCollectionFullscreen(col, startIndex) {
   // Penuh/Lebar+Tinggi Penuh, maupun sekadar digeser turun/naik) bisa
   // selalu dijangkau, di HP maupun komputer.
   const MEDIA_FIT_MODES = [
-    { id: "contain", label: "▭ Asli", title: "Ukuran asli, rasio dijaga -- muat penuh di dalam ruang yang ada" },
-    { id: "wide", label: "↔️ Lebar Penuh", title: "Lebar dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- tinggi mengikuti" },
-    { id: "tall", label: "↕️ Tinggi Penuh", title: "Tinggi dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- lebar mengikuti, geser kiri/kanan kalau perlu" },
-    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Mengecil seperlunya di kedua sisi (lebar DAN tinggi) supaya PASTI muat penuh tanpa ada yang kepotong -- rasio asli tetap dijaga" },
+    { id: "contain", label: "▭ Asli", title: "Ukuran asli, rasio dijaga -- mengecil di kedua sisi seperlunya supaya muat penuh di dalam ruang yang ada, tanpa terpotong" },
+    { id: "wide", label: "↔️ Lebar Penuh", title: "Lebar SELALU dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- tinggi mengikuti apa adanya, boleh melebihi layar (geser naik/turun kalau perlu)" },
+    { id: "tall", label: "↕️ Tinggi Penuh", title: "Tinggi SELALU dipaksa 100% (rasio tetap dijaga, tidak gepeng) -- lebar mengikuti apa adanya, boleh melebihi layar (geser kiri/kanan kalau perlu)" },
+    { id: "cover", label: "⛶ Lebar+Tinggi", title: "Lebar DAN tinggi SAMA-SAMA dipaksa 100% mengisi seluruh layar (rasio tetap dijaga, tidak gepeng) -- salah satu sisi gambar pasti terpotong, geser utk melihat bagian yang terpotong" },
   ];
   function currentMediaFitMode() {
     const saved = localStorage.getItem(COLLECTION_FS_MEDIA_FIT_KEY);
