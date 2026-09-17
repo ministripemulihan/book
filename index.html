@@ -15,7 +15,7 @@
   <!-- BARU (17 Sep 2026) -- animasi "7 Hari Penciptaan": latar Layar
        Masuk + game "🌱 Penciptaan". Semua kelasnya berawalan bk- dan
        dikurung di .bk-scene, jadi tidak bisa bentrok dgn style.css. -->
-  <link rel="stylesheet" href="css/book-scene.css?v=20260917a" />
+  <link rel="stylesheet" href="css/book-scene.css?v=20260918a" />
 </head>
 <body>
 
@@ -31,6 +31,19 @@
          Kalau js/book-scene.js gagal dimuat (mis. file terhapus),
          yang terjadi hanyalah latar tetap polos -- login tetap jalan. -->
     <div id="loginBookScene" aria-hidden="true"></div>
+
+    <!-- BARU (18 Sep 2026, permintaan operator) -- lapisan paling luar:
+         defaultnya kartu #loginCard di bawah ini disembunyikan TOTAL dan
+         yang kelihatan cuma tombol kecil ini ("Masuk"). Begitu ditekan,
+         baru kartu utuhnya muncul (persis tampilan lama: judul "Masuk",
+         batang "Sign in / Login", Mode Tamu, Daftar Akun, Info Kami --
+         form usernam/password-nya sendiri masih tertutup seperti biasa,
+         dibuka lagi lewat #loginToggleBtn). Dipasang lewat js/book-scene.js
+         (wireLuarMasuk()) -- kalau file itu gagal dimuat, atribut
+         "hidden" di bawah ini TETAP ada, jadi tombol ini tidak pernah
+         muncul dan #loginCard tampil normal seperti sebelum perubahan
+         ini -- tidak mungkin ada keadaan "tidak bisa masuk sama sekali". -->
+    <button type="button" id="loginRevealBtn" class="login-reveal" hidden>Masuk</button>
 
     <div class="login-card" id="loginCard">
       <div class="login-mark">☩</div>
@@ -3717,7 +3730,7 @@
   <!-- BARU (17 Sep 2026) -- pemandangan "7 Hari Penciptaan". Dimuat
        PALING AWAL karena dipakai layar Masuk (sebelum login), dan
        dipakai lagi oleh js/games/penciptaan.js di bawah. -->
-  <script src="js/book-scene.js?v=20260917a"></script>
+  <script src="js/book-scene.js?v=20260918a"></script>
   <script src="js/config.js?v=20260907a"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260914b"></script>
