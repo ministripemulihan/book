@@ -36,6 +36,7 @@
 //   { type:"penciptaan", action:"jamauto" }               // kembali ke jam perangkat
 //   { type:"penciptaan", action:"jamview", on:true|false, style:"digital"|"analog" }
 //                                                          // BARU (17 Sep 2026) -- lihat catatan di bawah
+//   { type:"penciptaan", action:"awal" }                  // BARU (19 Sep 2026) kartu Tampilan Awal (7 hari), sebelum pilih hari
 //   { type:"penciptaan", action:"reset" }                 // sembunyikan, kembali idle
 // Modul ini TIDAK menunggu balasan apa pun dari Layar 2 (beda dari 🎡
 // Roda Undian yang perlu tahu pemenangnya), jadi handleMessage() cukup
@@ -76,6 +77,7 @@
   let hariAktif_ = 1;
   let putarTimer_ = null;
   let tayang_ = false;
+  let awal_ = false; // BARU (19 Sep 2026) -- true selagi kartu Tampilan Awal yang tayang (bukan pemandangan hari)
 
   function pakaiTeks_() {
     const chk = el("psPenciptaanTeksChk");
@@ -111,9 +113,24 @@
     rawPost({ type: "penciptaan", action: "jamview", on: jamViewOn_(), style: jamViewStyle_() });
   }
 
+  // BARU (19 Sep 2026) -- TAMPILAN AWAL: kartu pembuka 7 hari di Layar 2.
+  function kirimAwal_() {
+    setPutar_(false);
+    tayang_ = true;
+    awal_ = true;
+    rawPost({ type: "penciptaan", action: "awal" });
+    renderStudioPreview({ type: "penciptaan", action: "awal" });
+    const lbl = el("psPenciptaanLabel");
+    if (lbl) lbl.textContent = "Tayang: Tampilan Awal — tekan Hari 1-7 untuk mulai";
+    const bar = el("psPenciptaanDays");
+    if (bar) bar.querySelectorAll("button[data-hari]").forEach((b) => b.setAttribute("aria-selected", "false"));
+    perbaruiJamUi_();
+  }
+
   function kirim_(hari) {
     hariAktif_ = Math.max(1, Math.min(7, hari));
     tayang_ = true;
+    awal_ = false;
     try { localStorage.setItem(HARI_KEY, String(hariAktif_)); } catch (e) {}
     rawPost({ type: "penciptaan", action: "show", hari: hariAktif_, teks: pakaiTeks_() });
     kirimJamView_(); // BARU (17 Sep 2026) -- selaraskan jam kanan atas tiap ganti hari
@@ -126,7 +143,7 @@
   // pemandangannya memang tidak mengikuti jam sama sekali.
   function perbaruiJamUi_() {
     const wrap = el("psPenciptaanJamWrap");
-    if (wrap) wrap.hidden = hariAktif_ !== 7;
+    if (wrap) wrap.hidden = hariAktif_ !== 7 || awal_;
   }
 
   function setPutar_(on) {
@@ -194,14 +211,19 @@
     if (putarBtn) {
       putarBtn.addEventListener("click", () => {
         if (putarTimer_) { setPutar_(false); return; }
-        if (!tayang_) kirim_(hariAktif_); // hidupkan dulu kalau Layar 2 masih idle
+        if (!tayang_ || awal_) kirim_(hariAktif_); // hidupkan dulu kalau Layar 2 masih idle / masih di Tampilan Awal
         setPutar_(true);
       });
     }
 
+    const awalBtn = el("psPenciptaanAwalBtn");
+    if (awalBtn) awalBtn.addEventListener("click", kirimAwal_);
+
     resetBtn.addEventListener("click", () => {
       setPutar_(false);
       tayang_ = false;
+      awal_ = false;
+      tandaiTombol_();
       rawPost({ type: "penciptaan", action: "reset" });
     });
 
@@ -209,7 +231,7 @@
     if (teksChk) {
       teksChk.addEventListener("change", () => {
         try { localStorage.setItem(TEKS_KEY, teksChk.checked ? "1" : "0"); } catch (e) {}
-        if (tayang_) kirim_(hariAktif_); // langsung terlihat, tanpa perlu klik hari lagi
+        if (tayang_ && !awal_) kirim_(hariAktif_); // langsung terlihat, tanpa perlu klik hari lagi
       });
     }
 
@@ -268,6 +290,7 @@
   function handleMessage(data) {
     if (!data || data.type !== "present_ready") return;
     if (!tayang_) return;
+    if (awal_) { rawPost({ type: "penciptaan", action: "awal" }); return; }
     rawPost({ type: "penciptaan", action: "show", hari: hariAktif_, teks: pakaiTeks_() });
     kirimJamView_(); // BARU (17 Sep 2026) -- selaraskan jam kanan atas juga
   }
