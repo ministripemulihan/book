@@ -2095,19 +2095,98 @@
   <div id="penciptaanView" hidden>
     <div id="penciptaanStage" style="position:absolute; inset:0;"></div>
     <div id="penciptaanCaption" hidden></div>
+    <!-- BARU (19 Sep 2026) -- TAMPILAN AWAL Penciptaan (kartu pembuka 7 hari),
+         dipicu tombol "🏠 Tampilan Awal" di Studio (payload action:"awal").
+         Menutupi pemandangan sampai operator menekan Hari 1-7. -->
+    <div id="penciptaanIntro" hidden>
+      <div id="pcIntroTitle">Penciptaan</div>
+      <div id="pcIntroSub">TUJUH HARI · KEJADIAN 1:1 – 2:3</div>
+      <div id="pcIntroDays"></div>
+    </div>
   </div>
 
-  <!-- BARU -- 🔤 Slogan Karakter, dikontrol dari js/games/slogankarakter.js.
-       #skBlocksWrap KOSONG di sini, diisi JS dengan 1 blok per kolom
-       yang dicentang operator (short/long/arti/contoh/ayat, bisa
-       berapa saja sekaligus lewat checklist) -- lihat
-       showSloganKarakter() di bawah. Supaya bisa nambah kolom baru di
-       masa depan (js/games/slogankarakter-data.js) tanpa ubah markup
-       di sini lagi. -->
-  <div id="sloganKarakterView" hidden style="position:absolute; inset:0; z-index:2; display:flex; align-items:center; justify-content:center; background:#182B4D; color:#F6F1E6; font-family:Georgia,'Times New Roman',serif; text-align:center; padding:40px; box-sizing:border-box; overflow:auto;">
-    <div style="max-width:1400px; margin:auto;">
-      <div id="skName" style="font-family:'Inter',Arial,sans-serif; font-weight:700; letter-spacing:.14em; font-size:22px; color:#E4C67C; margin-bottom:28px;"></div>
-      <div id="skBlocksWrap"></div>
+  <!-- 🔤 Slogan Karakter, dikontrol dari js/games/slogankarakter.js.
+       PERBAIKAN (19 Sep 2026) -- AKAR MASALAH #2: dulu semua gaya ada di
+       atribut style="" termasuk `display:flex`. Gaya inline MENANG atas
+       aturan bawaan browser [hidden]{display:none}, jadi kotak ini SELALU
+       terlihat: latar biru navy #182B4D, z-index 2, MENUTUPI semua game
+       lain (termasuk 🌱 Penciptaan yang z-index-nya sama tapi lebih dulu di
+       DOM) dan tetap kosong. Sekarang gayanya di CSS memakai pola yang
+       sama dengan game lain: display:none, lalu :not([hidden]) -> flex.
+
+       Isi: 2 tampilan bergantian --
+         #skGrid   = TAMPILAN AWAL (judul + 10 kotak kelompok, opsional 1
+                     kotak disorot) -> payload action:"grid"
+         #skDetail = slogan 1 karakter (blok per kolom yang dicentang)
+                     -> payload action:"show"
+       #skBlocksWrap KOSONG di sini, diisi JS -- lihat showSloganKarakter(). -->
+  <style>
+    #sloganKarakterView {
+      display: none; position: fixed; inset: 0; z-index: 2;
+      flex-direction: column; box-sizing: border-box; overflow: auto;
+      background: #182B4D; color: #F6F1E6; text-align: center;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+    #sloganKarakterView:not([hidden]) { display: flex; animation: fadeInOnly .4s ease both; }
+    #skDetail, #skGrid { flex: 1 1 auto; min-height: 0; box-sizing: border-box; }
+    #skDetail:not([hidden]) { display: flex; padding: 40px; }
+    #skDetail[hidden], #skGrid[hidden] { display: none; }
+    .sk-detail-inner { max-width: 1400px; margin: auto; }
+
+    /* Tampilan Awal: judul + 10 kotak (5x2 di layar lebar, 2 kolom di layar tegak) */
+    #skGrid:not([hidden]) { display: flex; flex-direction: column; gap: 2.4vh; padding: 4.5vh 4vw 4vh; }
+    #skGridTitle { font-weight: 700; font-size: clamp(22px, 3.8vw, 68px); letter-spacing: .05em; line-height: 1.15; }
+    #skGridSub { font-family: 'Inter', Arial, sans-serif; font-weight: 600; letter-spacing: .14em; font-size: clamp(11px, 1.15vw, 21px); color: #E4C67C; margin-top: -1vh; }
+    #skGridCards { flex: 1 1 auto; min-height: 0; display: grid; gap: 1.5vw; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    .sk-card {
+      display: flex; flex-direction: column; justify-content: space-between; text-align: left; overflow: hidden;
+      padding: 1.3vw 1.5vw; border-radius: 1.1vw; border: 1.5px solid rgba(228,198,124,.30); background: rgba(255,255,255,.05);
+      transition: opacity .35s ease, transform .35s ease, background .35s ease, border-color .35s ease;
+    }
+    .sk-card-top { display: flex; align-items: center; justify-content: space-between; }
+    .sk-card-num {
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      width: clamp(26px, 2.6vw, 52px); height: clamp(26px, 2.6vw, 52px); border-radius: 50%;
+      border: 2px solid #E4C67C; color: #E4C67C; font-weight: 700; font-size: clamp(13px, 1.5vw, 28px);
+    }
+    .sk-card-ico { width: clamp(20px, 2.4vw, 46px); height: clamp(20px, 2.4vw, 46px); color: #AEB4C4; }
+    .sk-card-ico svg { display: block; width: 100%; height: 100%; }
+    .sk-card-names { font-weight: 700; font-size: clamp(16px, 2.05vw, 40px); line-height: 1.25; }
+    #skGridCards.sk-has-focus .sk-card { opacity: .26; }
+    #skGridCards.sk-has-focus .sk-card.sk-on { opacity: 1; transform: scale(1.03); background: rgba(228,198,124,.16); border-color: #E4C67C; }
+    @media (orientation: portrait) {
+      #skGrid:not([hidden]) { overflow: auto; }
+      #skGridCards { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; grid-auto-rows: minmax(120px, 1fr); }
+    }
+
+    /* 🌱 Penciptaan -- TAMPILAN AWAL (kartu pembuka 7 hari), payload action:"awal" */
+    #penciptaanIntro {
+      display: none; position: absolute; inset: 0; z-index: 5; box-sizing: border-box;
+      flex-direction: column; align-items: center; justify-content: center; gap: 3vh; text-align: center; padding: 5vh 5vw;
+      background: radial-gradient(ellipse at 50% 30%, #23406f 0%, #182B4D 55%, #0F1B2D 100%); color: #F6F1E6;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+    #penciptaanIntro:not([hidden]) { display: flex; }
+    #pcIntroTitle { font-weight: 700; font-size: clamp(30px, 6vw, 110px); letter-spacing: .08em; line-height: 1.05; }
+    #pcIntroSub { font-family: 'Inter', Arial, sans-serif; font-weight: 600; letter-spacing: .14em; font-size: clamp(12px, 1.4vw, 26px); color: #E4C67C; }
+    #pcIntroDays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1.4vw; width: 100%; max-width: 1500px; margin-top: 2vh; }
+    .pc-intro-day { display: flex; flex-direction: column; align-items: center; gap: .8vh; padding: 1.6vw .8vw; border-radius: 1.1vw; border: 1.5px solid rgba(228,198,124,.30); background: rgba(255,255,255,.05); }
+    .pc-intro-day em { font-style: normal; font-size: clamp(28px, 4vw, 76px); line-height: 1; }
+    .pc-intro-day b { font-size: clamp(14px, 1.7vw, 32px); color: #E4C67C; }
+    .pc-intro-day span { font-size: clamp(11px, 1.25vw, 24px); line-height: 1.25; opacity: .92; }
+    @media (orientation: portrait) { #pcIntroDays { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+  <div id="sloganKarakterView" hidden>
+    <div id="skDetail" hidden>
+      <div class="sk-detail-inner">
+        <div id="skName" style="font-family:'Inter',Arial,sans-serif; font-weight:700; letter-spacing:.14em; font-size:22px; color:#E4C67C; margin-bottom:28px;"></div>
+        <div id="skBlocksWrap"></div>
+      </div>
+    </div>
+    <div id="skGrid" hidden>
+      <div id="skGridTitle">30 Karakter untuk Generasi Muda</div>
+      <div id="skGridSub">10 KELOMPOK · 3 KARAKTER TIAP KELOMPOK</div>
+      <div id="skGridCards"></div>
     </div>
   </div>
 
@@ -2436,6 +2515,13 @@
        ikut sakelar mute-semua "M". -->
   <script src="js/soundfx.js?v=20260911c"></script>
   <script src="js/book-scene.js?v=20260918b"></script>
+  <!-- PERBAIKAN (19 Sep 2026, laporan operator "Slogan Karakter & Penciptaan
+       tidak tampil di Layar 2") -- AKAR MASALAH #1: showSloganKarakter() &
+       skLabelFor_() di bawah membaca window.SLOGAN_KARAKTER_DATA, tapi file
+       datanya cuma dimuat di index.html, TIDAK di sini (Layar 2 = jendela
+       terpisah). Akibatnya `typeof window.SLOGAN_KARAKTER_DATA ===
+       "undefined"` -> fungsi pulang diam-diam tanpa menampilkan apa pun. -->
+  <script src="js/games/slogankarakter-data.js?v=20260919a"></script>
   <!-- BARU (7 Sep 2026) -- daftarkan Service Worker juga di Layar 2 itu
        sendiri (jendela terpisah dari index.html) supaya halaman ini pun
        bisa dibuka tanpa internet -- lihat catatan panjang di sw.js &
@@ -4191,11 +4277,13 @@
   //   { type:"penciptaan", action:"jamview", on:true|false, style:"digital"|"analog" }
   //                                                       -- BARU (17 Sep 2026), lihat catatan
   //                                                          panjang CSS #penciptaanClockOverlay di atas
+  //   { type:"penciptaan", action:"awal" }              -- BARU (19 Sep 2026) kartu Tampilan Awal (7 hari)
   //   { type:"penciptaan", action:"reset" }
   // ------------------------------------------------------------
   const penciptaanViewEl = document.getElementById("penciptaanView");
   const penciptaanStageEl = document.getElementById("penciptaanStage");
   const penciptaanCaptionEl = document.getElementById("penciptaanCaption");
+  const penciptaanIntroEl = document.getElementById("penciptaanIntro"); // BARU (19 Sep 2026) -- Tampilan Awal
   const penciptaanClockOverlayEl = document.getElementById("penciptaanClockOverlay");
   const penciptaanClockDigitalEl = document.getElementById("penciptaanClockDigital");
   const pcAcHourHandEl = document.getElementById("pcAcHourHand");
@@ -4212,23 +4300,41 @@
   let penciptaanJamViewStyle_ = "digital";
 
   const PENCIPTAAN_HARI = [
-    { nama: "Terang", ayat: "Kejadian 1:3-5" },
-    { nama: "Cakrawala & air", ayat: "Kejadian 1:6-8" },
-    { nama: "Darat, laut & tumbuhan", ayat: "Kejadian 1:9-13" },
-    { nama: "Matahari, bulan & bintang", ayat: "Kejadian 1:14-19" },
-    { nama: "Ikan & burung", ayat: "Kejadian 1:20-23" },
-    { nama: "Binatang darat & manusia", ayat: "Kejadian 1:24-31" },
-    { nama: "Hari Perhentian", ayat: "Kejadian 2:1-3" }
+    { ikon: "✨", nama: "Terang", ayat: "Kejadian 1:3-5" },
+    { ikon: "🌊", nama: "Cakrawala & air", ayat: "Kejadian 1:6-8" },
+    { ikon: "🌿", nama: "Darat, laut & tumbuhan", ayat: "Kejadian 1:9-13" },
+    { ikon: "🌗", nama: "Matahari, bulan & bintang", ayat: "Kejadian 1:14-19" },
+    { ikon: "🐟", nama: "Ikan & burung", ayat: "Kejadian 1:20-23" },
+    { ikon: "🦁", nama: "Binatang darat & manusia", ayat: "Kejadian 1:24-31" },
+    { ikon: "🌾", nama: "Hari Perhentian", ayat: "Kejadian 2:1-3" }
   ];
 
-  function showPenciptaan(data) {
-    if (typeof BookScene === "undefined") return; // js/book-scene.js tidak termuat -- diamkan, jangan sampai error menghentikan render() lain
+  // BARU (19 Sep 2026) -- isi kartu Tampilan Awal (7 kotak hari), dibangun sekali.
+  (function buildPenciptaanIntro_() {
+    const wrap = document.getElementById("pcIntroDays");
+    if (!wrap) return;
+    PENCIPTAAN_HARI.forEach((h, i) => {
+      const d = document.createElement("div");
+      d.className = "pc-intro-day";
+      d.innerHTML = "<em></em><b></b><span></span>";
+      d.querySelector("em").textContent = h.ikon;
+      d.querySelector("b").textContent = "Hari " + (i + 1);
+      d.querySelector("span").textContent = h.nama;
+      wrap.appendChild(d);
+    });
+  })();
+
+  // Matikan/sembunyikan semua tayangan lain sebelum Penciptaan (Tampilan Awal
+  // ATAU pemandangan hari) tampil. PERBAIKAN (19 Sep 2026): sekarang ikut
+  // menyembunyikan 🔤 Slogan Karakter (dulu lupa -- lihat AKAR MASALAH #2).
+  function penciptaanPrepare_() {
     stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
     if (typeof stopModeScreen === "function") stopModeScreen(false);
     if (typeof stopMap === "function") stopMap(false);
     if (typeof stopWheel === "function") stopWheel(false);
     if (typeof stopQuiz9 === "function") stopQuiz9(false);
     if (typeof stopSurvei === "function") stopSurvei(false);
+    if (typeof stopSloganKarakter === "function") stopSloganKarakter(false);
     hideMagnify(); hideBoxZoomHover(); hideBoxZoomLock();
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
@@ -4239,7 +4345,23 @@
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
     textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+  }
 
+  // BARU (19 Sep 2026) -- Tampilan Awal Penciptaan: kartu pembuka 7 hari,
+  // payload { type:"penciptaan", action:"awal" } dari tombol "🏠 Tampilan Awal".
+  function showPenciptaanAwal() {
+    penciptaanPrepare_();
+    penciptaanViewEl.hidden = false;
+    if (penciptaanIntroEl) penciptaanIntroEl.hidden = false;
+    penciptaanCaptionEl.hidden = true; penciptaanCaptionEl.innerHTML = "";
+    penciptaanHariAktif_ = 0; // jam kanan atas (khusus Hari 7) otomatis tersembunyi
+    updatePenciptaanClockOverlay_();
+  }
+
+  function showPenciptaan(data) {
+    if (typeof BookScene === "undefined") return; // js/book-scene.js tidak termuat -- diamkan, jangan sampai error menghentikan render() lain
+    penciptaanPrepare_();
+    if (penciptaanIntroEl) penciptaanIntroEl.hidden = true; // BARU (19 Sep 2026) -- tutup kartu Tampilan Awal begitu hari dipilih
     penciptaanViewEl.hidden = false; // tampilkan DULU -- scene mengukur kotaknya sendiri saat dipasang
     if (!penciptaanScene_) penciptaanScene_ = BookScene.mount(penciptaanStageEl, { hari: 1, ikutiJam: true });
 
@@ -4315,6 +4437,7 @@
   function stopPenciptaan(showIdle) {
     if (penciptaanViewEl) penciptaanViewEl.hidden = true;
     if (penciptaanCaptionEl) { penciptaanCaptionEl.hidden = true; penciptaanCaptionEl.innerHTML = ""; }
+    if (penciptaanIntroEl) penciptaanIntroEl.hidden = true; // BARU (19 Sep 2026)
     if (penciptaanClockOverlayEl) penciptaanClockOverlayEl.classList.remove("pc-on"); // BARU (17 Sep 2026)
     // Scene sengaja TIDAK di-destroy: kalau operator menekan hari lagi,
     // gambarnya langsung muncul tanpa jeda membangun ulang. Animasinya
@@ -4340,11 +4463,16 @@
   //   - fields: array key kolom yg mau tayang & urutannya, mis.
   //     ["short","long"] atau ["arti"] saja (tergantung yang
   //     tercentang di Studio/Pustaka Media saat itu).
+  //   { type:"slogankarakter", action:"grid", kelompok }   -- BARU (19 Sep 2026) Tampilan Awal 10 kotak
+  //     (kelompok 1..10 opsional = kotak yang disorot)
   //   { type:"slogankarakter", action:"reset" }
   // ------------------------------------------------------------
   const sloganKarakterViewEl = document.getElementById("sloganKarakterView");
   const skNameEl = document.getElementById("skName");
   const skBlocksWrapEl = document.getElementById("skBlocksWrap");
+  const skDetailEl = document.getElementById("skDetail");
+  const skGridEl = document.getElementById("skGrid");
+  const skGridCardsEl = document.getElementById("skGridCards");
 
   function skFitText_(node, maxSize, minSize, heightRatio) {
     const maxWidth = Math.min(sloganKarakterViewEl.clientWidth, 1400) - 80;
@@ -4378,12 +4506,9 @@
     nodes.forEach((node) => skFitText_(node, maxSize, minSize, heightRatio));
   }
 
-  function showSloganKarakter(data) {
-    if (!sloganKarakterViewEl || typeof window.SLOGAN_KARAKTER_DATA === "undefined") return;
-    const info = window.SLOGAN_KARAKTER_DATA.CHARS[data.karakter];
-    if (!info) return;
-    const fields = Array.isArray(data.fields) && data.fields.length ? data.fields : ["short"];
-
+  // Matikan/sembunyikan semua tayangan lain sebelum Slogan Karakter tampil
+  // (dipakai bersama oleh Tampilan Awal 10 kotak & slogan 1 karakter).
+  function skPrepareStage_() {
     stopTimer(false); stopStopwatch(false); stopTimerClock(false); stopLocalVideo(false);
     if (typeof stopModeScreen === "function") stopModeScreen(false);
     if (typeof stopMap === "function") stopMap(false);
@@ -4401,6 +4526,43 @@
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
     textEl.textContent = ""; logoEl.hidden = true; slideEl.hidden = true;
+  }
+
+  // BARU (19 Sep 2026) -- TAMPILAN AWAL: judul + 10 kotak kelompok.
+  // Payload { type:"slogankarakter", action:"grid", kelompok:<1..10|null> }
+  // -- kelompok (opsional) = kotak yang disorot, sisanya diredupkan.
+  function showSloganKarakterGrid(data) {
+    const D = window.SLOGAN_KARAKTER_DATA;
+    if (!sloganKarakterViewEl || !D) { console.warn("[Slogan Karakter] slogankarakter-data.js belum termuat di Layar 2"); return; }
+    skPrepareStage_();
+    const fokus = data && parseInt(data.kelompok, 10) ? parseInt(data.kelompok, 10) : null;
+    skGridCardsEl.innerHTML = "";
+    D.GROUPS.forEach((g) => {
+      const card = document.createElement("div");
+      card.className = "sk-card" + (fokus === g.num ? " sk-on" : "");
+      card.innerHTML =
+        '<div class="sk-card-top"><span class="sk-card-num"></span><span class="sk-card-ico"></span></div>' +
+        '<div class="sk-card-names"></div>';
+      card.querySelector(".sk-card-num").textContent = g.num;
+      card.querySelector(".sk-card-ico").innerHTML = D.ICONS[g.icon] || ""; // SVG statis dari slogankarakter-data.js
+      card.querySelector(".sk-card-names").textContent = g.chars.join(", ");
+      skGridCardsEl.appendChild(card);
+    });
+    skGridCardsEl.classList.toggle("sk-has-focus", !!fokus);
+    skDetailEl.hidden = true;
+    skGridEl.hidden = false;
+    sloganKarakterViewEl.hidden = false;
+  }
+
+  function showSloganKarakter(data) {
+    if (!sloganKarakterViewEl || typeof window.SLOGAN_KARAKTER_DATA === "undefined") return;
+    const info = window.SLOGAN_KARAKTER_DATA.CHARS[data.karakter];
+    if (!info) return;
+    const fields = Array.isArray(data.fields) && data.fields.length ? data.fields : ["short"];
+
+    skPrepareStage_();
+    skGridEl.hidden = true;
+    skDetailEl.hidden = false;
 
     skNameEl.textContent = "KARAKTER " + String(data.karakter).toUpperCase();
     skBlocksWrapEl.innerHTML = "";
@@ -4430,7 +4592,7 @@
     if (showIdle && idleEl) idleEl.hidden = false;
   }
   window.addEventListener("resize", () => {
-    if (!sloganKarakterViewEl || sloganKarakterViewEl.hidden) return;
+    if (!sloganKarakterViewEl || sloganKarakterViewEl.hidden || skDetailEl.hidden) return;
     skRefitActive_();
   });
 
@@ -6113,6 +6275,7 @@
       else if (data.action === "jam") { setJamPenciptaan_(data.jam); }
       else if (data.action === "jamauto") { setJamPenciptaan_(null); }
       else if (data.action === "jamview") { setJamViewPenciptaan_(data); } // BARU (17 Sep 2026)
+      else if (data.action === "awal") { showPenciptaanAwal(); } // BARU (19 Sep 2026) -- Tampilan Awal
       else { showPenciptaan(data); }
       return;
     }
@@ -6122,6 +6285,7 @@
     // (versi checklist: data.fields = array key kolom, bukan "mode" lagi).
     if (data.type === "slogankarakter") {
       if (data.action === "reset") { stopSloganKarakter(true); }
+      else if (data.action === "grid") { showSloganKarakterGrid(data); } // BARU (19 Sep 2026) -- Tampilan Awal 10 kotak
       else { showSloganKarakter(data); }
       return;
     }
