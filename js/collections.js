@@ -359,6 +359,21 @@ function addSoundCloudToCollection(username, name, scItem) {
   });
 }
 
+// BARU (18 Sep 2026) -- item MP3/Audio (tab "🔗 Link" -> "🎵 MP3 / Audio",
+// js/presentation-studio.js wireLinkTab()). `audioUrl` disimpan APA
+// ADANYA (link MP3 langsung ATAU link Google Drive biasa) -- deteksi
+// Drive vs link biasa dilakukan LAGI saat ditayangkan (present.html,
+// kind==="mp3" / buildCollectionFsEmbed() js/app.js), pola sama seperti
+// addSoundCloudToCollection() di atas.
+function addMp3ToCollection(username, name, mp3Item) {
+  if (!mp3Item || !mp3Item.audioUrl) return null;
+  return addItemToCollection(username, name, {
+    type: "mp3",
+    audioUrl: mp3Item.audioUrl,
+    title: mp3Item.title || "",
+  });
+}
+
 // BARU (5 Sep 2026) -- item YouTube PORTABEL, dipakai tombol "🔗 Tambah
 // Link" di panel Kumpulan Ayat BIASA (js/app.js, renderCollectionDetailInto())
 // supaya bisa ditambahkan LANGSUNG dari HP tanpa perlu Studio Presentasi
@@ -445,6 +460,29 @@ function addMapToCollection(username, name, mapRef) {
   });
 }
 
+// BARU (18 Sep 2026 v3, permintaan operator "link mp3/youtube/mp4 kidung
+// ikut kesimpan di Kumpulan Ayat, nempel di 1 syair tertentu") --
+// `kidungItem.bgAudio` (opsional): { kind: "mp3"|"mp4"|"yt", url, label,
+// autoplay }. SENGAJA nempel per-ITEM (= per-slide/syair, lihat catatan
+// "1 panggilan = 1 SLIDE" di atas), BUKAN per-lagu -- jadi operator bisa
+// pilih syair mana yang mau dikasih audio (mis. cuma bait 1 sebagai
+// musik pembuka), sisanya (bila ada) tidak usah dibawa apa-apa sama
+// sekali, sama persis pola "tidak perlu dilakukan apa-apa" utk kidung
+// yang murni teks. Cara pakainya di Studio Presentasi: lihat
+// `renderCollectionList()` (blok "🎧 Audio Latar" per baris, SEKARANG
+// berlaku utk item APA SAJA, tidak cuma kidung -- lihat
+// updateItemBgAudioInCollection() di bawah) & panel Audio Latar tab
+// "🎵 Kidung" (js/presentation-studio.js) -- keduanya menulis field yang
+// SAMA ini. Item lama (disimpan sebelum kolom ini ada) otomatis
+// `bgAudio: null`, tidak ada error/baris aneh apa pun.
+// BARU (18 Sep 2026, lanjutan) -- `autoplay: true` (dicentang lewat
+// checkbox "▶️ Otomatis mainkan saat masuk slide") membuat
+// sendGenericItemLive()/playlistGoTo() (js/presentation-studio.js)
+// memutar audio ini SENDIRI begitu item ini jadi slide aktif (klik baris
+// PERTAMA kali ATAU lewat panah/PageUp-Down/stylus presentasi) --
+// operator tidak perlu menekan ▶ Play manual lagi. Default MATI (perilaku
+// LAMA -- operator tetap tekan ▶ Play sendiri) kalau tidak diisi/item
+// lama sebelum kolom ini ada.
 function addKidungToCollection(username, name, kidungItem) {
   if (!kidungItem || !kidungItem.kidungNo) return null;
   return addItemToCollection(username, name, {
@@ -455,6 +493,9 @@ function addKidungToCollection(username, name, kidungItem) {
     ikon: kidungItem.ikon || "",
     bait: Array.isArray(kidungItem.bait) ? kidungItem.bait.map((b) => ({ noBait: b.noBait, teks: b.teks })) : [],
     koorTeks: kidungItem.koorTeks || null,
+    bgAudio: (kidungItem.bgAudio && kidungItem.bgAudio.url)
+      ? { kind: kidungItem.bgAudio.kind === "yt" ? "yt" : (kidungItem.bgAudio.kind === "mp4" ? "mp4" : "mp3"), url: String(kidungItem.bgAudio.url), label: kidungItem.bgAudio.label || "", autoplay: !!kidungItem.bgAudio.autoplay }
+      : null,
     // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah" (lihat
     // catatan panjang di splitKidungIntoSlides()/js/kidung.js) ikut
     // disimpan supaya kidung yang ditambahkan ke Kumpulan Ayat tetap
@@ -520,6 +561,65 @@ function addMediaToCollection(username, name, mediaItem, pageIndex) {
 // Hapus/pindah item berdasarkan INDEX di array items (bukan verseId --
 // item teks/pengumuman/kidung tidak punya id unik alami). Dipakai oleh
 // panel Kumpulan Ayat generik di js/app.js.
+// BARU (18 Sep 2026, permintaan operator "kidung typo/kedobelan, mau
+// dibenerin langsung dari app tanpa balik ke Sheet") -- ubah TEKS
+// bait/koor 1 item kidung yang SUDAH tersimpan di Kumpulan Ayat (index
+// sama seperti removeItemFromCollection/moveItemInCollection di bawah).
+// SENGAJA cuma menyentuh SALINAN di kumpulan ini saja -- data ASLI di
+// Sheet Kidung (js/kidung.js) TIDAK ikut berubah (app masih read-only
+// terhadap Sheet itu, lihat catatan panjang di kidung.js), jadi kidung
+// yang SAMA di kumpulan lain atau di menu 🎵 Kidung biasa TIDAK ikut
+// berubah -- cocok untuk perbaikan cepat 1 acara ini saja; kalau
+// typo-nya memang salah di sumbernya, tetap perlu dibenarkan juga di
+// Sheet supaya tidak muncul lagi lain kali.
+function updateKidungItemTextInCollection(username, id, index, updates) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !col.items[index] || col.items[index].type !== "kidung") return false;
+  const it = col.items[index];
+  if (Array.isArray(updates && updates.bait)) it.bait = updates.bait.map((b) => ({ noBait: b.noBait, teks: b.teks }));
+  if (updates && typeof updates.koorTeks !== "undefined") it.koorTeks = updates.koorTeks;
+  _migrateCollection(col);
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+
+// BARU (18 Sep 2026, permintaan operator "kidung yang sudah punya mp3,
+// ATAUPUN file PDF/gambar, minta bisa dilampiri lagu latar (mp3
+// unggahan/link Drive, mp4 Drive, atau YouTube) + checklist otomatis
+// mainkan begitu slide ini masuk lewat panah/stylus") -- SEBELUM ini,
+// `bgAudio` cuma bisa dilampirkan ke item "kidung" lewat
+// addKidungToCollection() (lihat di atas). Fungsi ini menggeneralkan
+// hal itu supaya berlaku untuk ITEM APA SAJA di Kumpulan Ayat (verse/
+// text/media/dst -- termasuk halaman PDF/gambar hasil unggahan File),
+// dipakai tombol baru "🎧 Audio Latar" per baris di
+// js/presentation-studio.js renderCollectionList(). `bgAudio` yang
+// dikirim: null (hapus lampiran) ATAU { kind:"mp3"|"mp4"|"yt", url,
+// label, autoplay }. `autoplay: true` itulah "checklist"-nya -- kalau
+// dicentang, playlistGoTo()/sendGenericItemLive() (js/
+// presentation-studio.js) otomatis memutar audio ini SETIAP kali item
+// ini masuk jadi slide aktif (panah kiri/kanan, PageUp/PageDown, atau
+// stylus/clicker presentasi yang meniru tombol itu) -- TIDAK perlu
+// operator menekan ▶ Play manual lagi. Kind "mp4" numpang jalur audio
+// SAMA PERSIS dengan "mp3" (elemen <audio> tersembunyi di present.html,
+// lihat controlSharedBgAudio_() js/presentation-studio.js) -- video-nya
+// sendiri TIDAK ditampilkan, cuma suaranya yang jalan sebagai latar,
+// sama seperti mp3.
+function updateItemBgAudioInCollection(username, id, index, bgAudio) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !col.items[index]) return false;
+  col.items[index].bgAudio = (bgAudio && bgAudio.url)
+    ? { kind: bgAudio.kind === "yt" ? "yt" : (bgAudio.kind === "mp4" ? "mp4" : "mp3"), url: String(bgAudio.url), label: bgAudio.label || "", autoplay: !!bgAudio.autoplay }
+    : null;
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+
 function removeItemFromCollection(username, id, index) {
   const collections = loadCollections(username);
   const col = collections[id];
