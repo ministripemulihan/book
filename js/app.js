@@ -6859,6 +6859,29 @@ function openCollectionFullscreen(col, startIndex) {
   let fsBgAudioEl = null;
   let fsBgYtEl = null;
   let fsBgAudioActiveUrl_ = null; // url yang SEDANG dimuat -- supaya tidak dimuat ulang (yg bikin lagu balik ke awal) kalau operator kebetulan lompat ke slide yg link audionya SAMA
+  // BARU (18 Sep 2026, port dari Studio Presentasi/js/presentation-studio.js
+  // -- permintaan operator "fitur YouTube latar per-slide yang sudah ada
+  // di Mode 2 Layar dipakai juga di Mode 1 Layar/HP") -- 3 tambahan:
+  //   1) armStart -- slide dgn audio YouTube latar yg dicentang "perlu 1x
+  //      klik panah lagi" TIDAK langsung main begitu slide masuk, harus
+  //      ditandai dulu (fsYtArmed_) lalu menunggu 1x tekan "Selanjutnya"/
+  //      panah maju LAGI (lihat goNext() di bawah) -- SAMA PERSIS pola
+  //      pendingYtArrowStart_ di Studio.
+  //   2) continuePrev ("↩️ Lanjutkan") -- slide ini SAMA SEKALI tidak
+  //      menyentuh audio latar yg sedang main (tidak mulai/hentikan apa
+  //      pun), itulah cara 1 lagu YouTube menembus beberapa slide
+  //      berturut-turut tanpa direstart.
+  //   3) loopFile/loopAll+extraUrls -- 1 video diulang terus, ATAU 1
+  //      PAKET beberapa video YouTube BERBEDA (lewat parameter resmi
+  //      YouTube playlist=id1,id2,... sama seperti Studio).
+  // `fsBgHandledForItem_` menyimpan REFERENSI objek item (bukan url) yg
+  // TERAKHIR sudah "diputuskan" oleh handleFsBgAudioForItem_() di bawah --
+  // dipakai supaya render() ulang utk SLIDE YANG SAMA (mis. operator ganti
+  // tema/ukuran huruf, bukan pindah slide) TIDAK ikut merestart/mem-fade
+  // lagu yang sedang main. col.items[idx] selalu objek yg SAMA selama idx
+  // tidak berubah, jadi perbandingan `===` ini aman & murah.
+  let fsBgHandledForItem_ = null;
+  let fsYtArmed_ = null; // null ATAU objek item -- item aktif SEKARANG yang audio YouTube latarnya sudah "diarm" tapi BELUM dimulai, menunggu 1x klik Selanjutnya/panah maju lagi
   function ensureFsBgAudioEls_() {
     if (!fsBgAudioEl) {
       fsBgAudioEl = document.createElement("audio");
@@ -6875,35 +6898,97 @@ function openCollectionFullscreen(col, startIndex) {
       document.body.appendChild(fsBgYtEl);
     }
   }
-  function stopFsBgAudio_() {
-    if (fsBgAudioEl) { try { fsBgAudioEl.pause(); } catch (e) {} fsBgAudioEl.removeAttribute("src"); try { fsBgAudioEl.load(); } catch (e) {} }
+  // Turunkan volume sedikit demi sedikit selama `durationMs` (bukan
+  // berhenti mendadak) -- SAMA PERSIS pola fadeOutYtBg_()/fadeOutMp3Bg_()
+  // di present.html (Layar 2 Studio). Iframe YouTube perlu enablejsapi=1
+  // (lihat buildFsYtBgEmbedUrl_() di bawah) supaya perintah "setVolume"
+  // ini didengarkan.
+  function fadeOutFsYtBg_(durationMs) {
+    if (!fsBgYtEl || !fsBgYtEl.src) return;
+    const steps = 10;
+    const stepMs = Math.max(30, Math.floor(durationMs / steps));
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      const vol = Math.max(0, Math.round(100 * (1 - i / steps)));
+      try { if (fsBgYtEl.contentWindow) fsBgYtEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [vol] }), "*"); } catch (e) {}
+      if (i >= steps) clearInterval(timer);
+    }, stepMs);
+  }
+  function fadeOutFsMp3Bg_(durationMs) {
+    if (!fsBgAudioEl || !fsBgAudioEl.src) return;
+    const steps = 10;
+    const stepMs = Math.max(30, Math.floor(durationMs / steps));
+    const startVol = typeof fsBgAudioEl.volume === "number" ? fsBgAudioEl.volume : 1;
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      try { fsBgAudioEl.volume = Math.max(0, startVol * (1 - i / steps)); } catch (e) {}
+      if (i >= steps) clearInterval(timer);
+    }, stepMs);
+  }
+  function stopFsBgAudioNow_() {
+    if (fsBgAudioEl) { try { fsBgAudioEl.pause(); } catch (e) {} fsBgAudioEl.removeAttribute("src"); try { fsBgAudioEl.load(); } catch (e) {} fsBgAudioEl.volume = 1; fsBgAudioEl.loop = false; }
     if (fsBgYtEl) fsBgYtEl.src = "";
     fsBgAudioActiveUrl_ = null;
   }
+  // `opts.fade` (opsional, ~1 detik) -- dipakai saat berpindah slide yang
+  // TIDAK mencentang "↩️ Lanjutkan" (lihat handleFsBgAudioForItem_()
+  // di bawah); pemanggilan LAMA tanpa argumen (tombol "⏹ Berhenti" manual,
+  // atau menutup Mode Layar Penuh) tetap berhenti seketika seperti semula.
+  function stopFsBgAudio_(opts) {
+    const fade = !!(opts && opts.fade) && !!fsBgAudioActiveUrl_;
+    if (fade) {
+      fadeOutFsYtBg_(1000);
+      fadeOutFsMp3Bg_(1000);
+      setTimeout(stopFsBgAudioNow_, 1000);
+    } else {
+      stopFsBgAudioNow_();
+    }
+  }
   function removeFsBgAudioEls_() {
-    stopFsBgAudio_();
+    stopFsBgAudioNow_();
     if (fsBgAudioEl && fsBgAudioEl.parentNode) fsBgAudioEl.parentNode.removeChild(fsBgAudioEl);
     if (fsBgYtEl && fsBgYtEl.parentNode) fsBgYtEl.parentNode.removeChild(fsBgYtEl);
     fsBgAudioEl = null; fsBgYtEl = null;
+    fsBgHandledForItem_ = null; fsYtArmed_ = null;
   }
-  // Dipanggil tiap render() (tiap kali slide berganti, termasuk PERTAMA
-  // kali dibuka) -- "checklist, pilih 1 saja yang aktif" jalan otomatis
-  // di sini: kalau item ini TIDAK punya bgAudio ATAU kotak "Otomatis"-nya
-  // tidak dicentang, audio yang mungkin masih menyala dari slide
-  // SEBELUMNYA langsung dihentikan (silakan diam) -- tidak seperti Studio
-  // (yang sengaja MEMPERTAHANKAN audio latar kidung lintas bait sampai
-  // ditekan Berhenti manual), di sini per-SLIDE PDF/gambar/ayat biasanya
-  // mau 1 lagu 1 slide, jadi lebih aman default-nya berhenti saat pindah.
-  function applyFsBgAudioForItem_(it) {
+  // enablejsapi=1+origin -- supaya fadeOutFsYtBg_() di atas bisa mengirim
+  // perintah "setVolume" ke iframe ini. loop/playlist -- SAMA PERSIS
+  // parameter resmi YouTube yg dipakai Studio (loadSharedBgAudio_(),
+  // js/presentation-studio.js): 1 id (loopFile) atau beberapa id berbeda
+  // digabung (loopAll, `extraIds` = daftar id video LAIN dari bg.extraUrls).
+  function buildFsYtBgEmbedUrl_(url, loop, extraIds) {
+    const base = typeof youTubeEmbedUrl === "function" ? youTubeEmbedUrl(url) : null;
+    if (!base) return null;
+    let embed = base + "?autoplay=1&mute=0&playsinline=1&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
+    if (loop) {
+      const id = extractYoutubeIdSimple_(url);
+      const queueIds = [id].concat(Array.isArray(extraIds) ? extraIds : []).filter(Boolean);
+      if (queueIds.length) embed += "&loop=1&playlist=" + queueIds.join(",");
+    }
+    return embed;
+  }
+  // Sungguh memuat + memutar audio latar milik `it` SEKARANG JUGA -- dipanggil
+  // baik oleh handleFsBgAudioForItem_() (kalau autoplay tercentang) MAUPUN
+  // goNext() (kalau operator menekan panah konfirmasi ke-2 utk item yang
+  // armStart-nya tercentang).
+  function startFsBgAudioForItem_(it) {
     ensureFsBgAudioEls_();
     const bg = it && it.bgAudio;
-    if (!bg || !bg.url || !bg.autoplay) { stopFsBgAudio_(); return; }
-    if (fsBgAudioActiveUrl_ === bg.url) return; // sudah jalan persis link yg sama -- jangan dimuat ulang (lagu tidak balik ke awal)
-    stopFsBgAudio_();
+    if (!bg || !bg.url) return;
+    if (fsBgAudioActiveUrl_ === bg.url) { fsYtArmed_ = null; return; } // sudah jalan persis link yg sama -- jangan dimuat ulang (lagu tidak balik ke awal)
+    stopFsBgAudioNow_();
     fsBgAudioActiveUrl_ = bg.url;
+    fsYtArmed_ = null;
     if (bg.kind === "yt") {
-      const embed = typeof youTubeEmbedUrl === "function" ? youTubeEmbedUrl(bg.url) : null;
-      if (embed) fsBgYtEl.src = embed + (embed.indexOf("?") >= 0 ? "&" : "?") + "autoplay=1&mute=0&playsinline=1";
+      let extraIds = [];
+      if (bg.loopAll && Array.isArray(bg.extraUrls) && bg.extraUrls.length) {
+        extraIds = bg.extraUrls.map((u) => extractYoutubeIdSimple_(u)).filter(Boolean);
+      }
+      const loop = !!bg.loopFile || !!bg.loopAll;
+      const embed = buildFsYtBgEmbedUrl_(bg.url, loop, extraIds);
+      if (embed) fsBgYtEl.src = embed;
     } else {
       // mp3/mp4 -- link Drive dinormalisasi ke "uc?export=download" dulu
       // (driveDownloadUrl(), sudah ada di app.js) supaya bisa dipasang
@@ -6911,10 +6996,31 @@ function openCollectionFullscreen(col, startIndex) {
       // di present.html/Layar 2.
       const src = (typeof isDriveUrl === "function" && isDriveUrl(bg.url) && typeof driveDownloadUrl === "function")
         ? driveDownloadUrl(bg.url) : bg.url;
+      fsBgAudioEl.volume = 1;
+      fsBgAudioEl.loop = !!bg.loopFile; // "Ulang Semua" (loopAll) khusus paket YouTube berbeda-beda -- mp3/mp4 tunggal cukup ulang bawaan <audio>
       fsBgAudioEl.src = src;
       const p = fsBgAudioEl.play();
       if (p && p.catch) p.catch(() => {}); // browser kadang menolak autoplay -- operator sudah "berinteraksi" (buka Mode Layar Penuh), jadi biasanya lolos; kalau tetap ditolak, operator bisa buka dialog "🎧 Audio Latar" item ini & tekan Simpan lagi, atau tambahkan kontrol manual bila perlu.
     }
+  }
+  // Dipanggil tiap render() (tiap kali slide berganti, termasuk PERTAMA
+  // kali dibuka) -- checklist "Otomatis"/armStart/continuePrev/loop dibaca
+  // & diputuskan di sini. Defaultnya semua YouTube MATI -- kalau item ini
+  // TIDAK punya bgAudio, TIDAK dicentang apa pun, atau bukan "↩️ Lanjutkan",
+  // audio yang mungkin masih menyala dari slide SEBELUMNYA dihentikan
+  // (fade halus ~1 detik, SAMA seperti Studio) sebelum (mungkin) memuat
+  // yang baru.
+  function handleFsBgAudioForItem_(it) {
+    ensureFsBgAudioEls_();
+    if (fsBgHandledForItem_ === it) return; // slide yg SAMA (re-render biasa, mis. ganti tema/ukuran huruf) -- JANGAN diulang/direstart, lihat catatan panjang di deklarasi fsBgHandledForItem_ di atas
+    fsBgHandledForItem_ = it;
+    fsYtArmed_ = null; // slide (benar-benar) baru -- lupakan status "menunggu klik" milik slide SEBELUMNYA, batal begitu saja, TIDAK otomatis mulai
+    const bg = it && it.bgAudio;
+    if (bg && bg.kind === "yt" && bg.continuePrev) return; // "↩️ Lanjutkan" -- JANGAN sentuh apa pun, biarkan audio yang sedang main (kalau ada) tetap jalan apa adanya
+    if (fsBgAudioActiveUrl_) stopFsBgAudio_({ fade: true }); // default: hentikan (fade halus) audio yang sedang main sebelum (mungkin) memuat yang baru di bawah
+    if (!bg || !bg.url) return; // slide ini sendiri tidak punya audio latar -> selesai, tetap diam
+    if (bg.kind === "yt" && bg.armStart) { fsYtArmed_ = it; return; } // perlu 1x klik Selanjutnya/panah lagi -- lihat goNext()
+    if (bg.autoplay) startFsBgAudioForItem_(it); // otomatis, tanpa perlu konfirmasi klik tambahan
   }
 
   // Menambahkan enablejsapi=1 + origin=<asal halaman ini> ke link embed
@@ -7375,9 +7481,10 @@ function openCollectionFullscreen(col, startIndex) {
     // tombol "Buka di Pembaca" di bawah, semuanya sudah menjaga v ? ... : ...
     // seperti sebelumnya, jadi jenis lain otomatis melewati bagian itu).
     const it = col.items[idx];
-    // BARU (18 Sep 2026) -- checklist audio latar otomatis, lihat catatan
-    // panjang di applyFsBgAudioForItem_() dekat awal fungsi ini.
-    applyFsBgAudioForItem_(it);
+    // BARU (18 Sep 2026) -- checklist audio latar otomatis (+ armStart/
+    // continuePrev/loopFile/loopAll, port dari Studio), lihat catatan
+    // panjang di handleFsBgAudioForItem_() dekat awal fungsi ini.
+    handleFsBgAudioForItem_(it);
     const v = it && it.type === "verse" ? verseById[it.verseId] : null;
     const noteText = v ? getPersonalNote(currentUser, it.verseId) : "";
     const ref = it ? collectionItemRef(it) : "";
@@ -7522,7 +7629,7 @@ function openCollectionFullscreen(col, startIndex) {
     }
     // BARU (18 Sep 2026) -- indikator kecil + tombol berhenti manual,
     // tampil HANYA kalau audio latar item ini sedang menyala (checklist
-    // "Otomatis" tercentang & sedang diputar, lihat applyFsBgAudioForItem_()
+    // "Otomatis" tercentang & sedang diputar, lihat handleFsBgAudioForItem_()
     // di atas) -- supaya operator tetap bisa membungkam lagu sewaktu-waktu
     // tanpa harus keluar dari Mode Layar Penuh dulu.
     if (fsBgAudioActiveUrl_) {
@@ -7532,6 +7639,18 @@ function openCollectionFullscreen(col, startIndex) {
       bgStopBtn.title = (it && it.bgAudio && it.bgAudio.label) ? `Hentikan audio latar: ${it.bgAudio.label}` : "Hentikan audio latar";
       bgStopBtn.addEventListener("click", () => { stopFsBgAudio_(); bgStopBtn.remove(); });
       topRow.appendChild(bgStopBtn);
+    }
+    // BARU (18 Sep 2026, port dari Studio) -- slide ini punya audio YouTube
+    // latar yg armStart-nya tercentang & sedang menunggu 1x klik konfirmasi
+    // (fsYtArmed_, lihat handleFsBgAudioForItem_()/goNext()) -- tampilkan
+    // penanda supaya operator tahu harus tekan Selanjutnya/panah maju SEKALI
+    // LAGI (TANPA pindah slide) baru musiknya sungguh mulai.
+    if (fsYtArmed_ && fsYtArmed_ === it) {
+      const armBadge = document.createElement("div");
+      armBadge.className = "chip-btn small";
+      armBadge.style.cssText = "background:#fef3c7; color:#92400e; font-weight:600;";
+      armBadge.textContent = "🎵 Tekan Selanjutnya/panah maju sekali lagi untuk mulai musik latar";
+      topRow.appendChild(armBadge);
     }
     topRow.appendChild(closeBtn);
     overlay.appendChild(topRow);
@@ -7657,6 +7776,17 @@ function openCollectionFullscreen(col, startIndex) {
     // kontrol resmi jarak-jauh) atau item bukan video.
     if (currentEmbedVideoIframe && !ytStartedForCurrentSlide) {
       if (playCurrentEmbedVideo()) { ytStartedForCurrentSlide = true; return; }
+    }
+    // BARU (18 Sep 2026, port dari Studio "playlistNext()") -- audio latar
+    // YouTube slide ini "diarm" (armStart tercentang, lihat
+    // handleFsBgAudioForItem_()) & belum dimulai -- klik/panah maju
+    // PERTAMA di sini memulai musiknya dulu, BUKAN langsung pindah slide
+    // (SAMA pola dengan video isVisualEmbed di atas). Klik/panah lagi
+    // (kapan saja) baru sungguh pindah slide.
+    if (fsYtArmed_ && fsYtArmed_ === col.items[idx]) {
+      startFsBgAudioForItem_(fsYtArmed_);
+      render();
+      return;
     }
     if (idx < total - 1) { stopCollectionVersePlayback(); idx += 1; render(); }
   }
