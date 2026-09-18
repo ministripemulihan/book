@@ -1838,6 +1838,7 @@ const PresentationStudio = (() => {
     let currentMeta = null; // { buku, noKidung, judul, ... } dari getKidungList()
     let currentBaits = [];  // getKidungBaitsWithKoor()
     let currentSlides = []; // splitKidungIntoSlides()
+    let currentGenericItems = []; // BARU (18 Sep 2026 v4) -- referensi HIDUP ke array yang sama dipakai renderSlides()/"▶️ Tayangkan"/"➕ Daftar", supaya applyPendingBgAudioToGenericItems_() bisa menempelkan/melepas bgAudio ke item yang SUDAH ada tanpa perlu menggambar ulang daftar bait
 
     async function renderBookToggle() {
       const books = await getKidungBooksOrdered();
@@ -1904,7 +1905,18 @@ const PresentationStudio = (() => {
     // "➕ Daftar"/"➕ Semua Slide" (lihat addSlideToCollection() &
     // addAllBtn di bawah) -- kidungItem.bgAudio yang tersimpan ke
     // Kumpulan Ayat lewat addKidungToCollection() (js/collections.js).
-    let pendingAttachLink_ = null; // null ATAU { kind, url, label } -- link TERAKHIR dimuat dari panel ini, siap dilampirkan ke item berikutnya yang di-➕
+    let pendingAttachLink_ = null; // null ATAU { kind, url, label, autoplay } -- link TERAKHIR dimuat dari panel ini, siap dilampirkan ke item berikutnya yang di-➕
+    // BARU (18 Sep 2026 v4) -- menempelkan/melepas bgAudio ke SEMUA item
+    // di currentGenericItems (dipakai bareng oleh "▶️ Tayangkan"/"👁️
+    // Pratinjau"/"➕ Daftar", lihat renderSlides() di bawah) sesuai status
+    // checkbox #psKidungBgAutoToggle SEKARANG -- dipanggil tiap kali link
+    // baru dimuat (chip/manual) ATAU checkbox itu sendiri diganti,
+    // sehingga baris "▶️ Tayangkan"/navigasi panah langsung ikut status
+    // TERBARU tanpa perlu menggambar ulang daftar bait.
+    function applyPendingBgAudioToGenericItems_() {
+      const bg = (pendingAttachLink_ && pendingAttachLink_.autoplay) ? pendingAttachLink_ : null;
+      currentGenericItems.forEach((it) => { it.bgAudio = bg; });
+    }
     function bgStatus_(text) {
       const s = el("psKidungBgStatus");
       if (s) s.textContent = text || "";
@@ -1923,6 +1935,7 @@ const PresentationStudio = (() => {
     function renderKidungBgLinks() {
       const wrap = el("psKidungBgWrap");
       const linksBox = el("psKidungBgLinks");
+      const autoToggle = el("psKidungBgAutoToggle");
       if (!wrap || !linksBox) return;
       const links = [];
       if (currentMeta && currentMeta.linkMp3_1) links.push({ kind: "mp3", url: currentMeta.linkMp3_1, label: "🎵 Latar: MP3" });
@@ -1933,6 +1946,12 @@ const PresentationStudio = (() => {
       // === 0 cuma mengosongkan baris tombol otomatis di atasnya.
       wrap.hidden = false;
       pendingAttachLink_ = null;
+      // BARU (18 Sep 2026 v4) -- checkbox "Otomatis" SELALU mulai dari
+      // KOSONG tiap kali kidung/bait BARU dibuka (openKidung()) -- supaya
+      // operator harus SENGAJA mencentang untuk kidung yang sedang
+      // dibuka ini, tidak "ke-bawa" tercentang dari kidung sebelumnya.
+      if (autoToggle) autoToggle.checked = false;
+      applyPendingBgAudioToGenericItems_();
       refreshBgControlsUi_();
       bgStatus_(links.length ? "Pilih salah satu di atas untuk dimuat, lalu tekan ▶ Play (atau tempel link Anda sendiri di bawah)." : "Kidung ini belum punya link MP3/YouTube di Sheet -- tempel link Anda sendiri di bawah kalau perlu audio latar.");
       linksBox.innerHTML = "";
@@ -1942,11 +1961,38 @@ const PresentationStudio = (() => {
         btn.className = "chip-btn small";
         btn.textContent = lk.label;
         btn.addEventListener("click", () => {
-          loadSharedBgAudio_(lk.kind, lk.url, lk.label.replace(/^\S+\s/, ""));
-          pendingAttachLink_ = { kind: lk.kind, url: lk.url, label: lk.label.replace(/^\S+\s/, "") };
-          bgStatus_(`🎧 Dimuat: ${pendingAttachLink_.label} -- tekan ▶ Play untuk mulai (teks kidung TETAP tayang seperti biasa). Link ini akan ikut tersimpan kalau Anda tekan "➕ Daftar"/"➕ Semua Slide" di bawah.`);
+          loadLinkAsBg_(lk.kind, lk.url, lk.label.replace(/^\S+\s/, ""));
         });
         linksBox.appendChild(btn);
+      });
+    }
+    // BARU (18 Sep 2026 v4) -- disatukan dari 2 tempat yang tadinya
+    // hampir sama persis (klik chip Sheet & tombol "Muat sebagai Latar"
+    // manual) supaya keduanya SAMA-SAMA menghormati checkbox "Otomatis"
+    // (autoToggle) dan menempelkan bgAudio-nya ke currentGenericItems.
+    function loadLinkAsBg_(kind, url, label) {
+      const autoToggle = el("psKidungBgAutoToggle");
+      const autoplay = !!(autoToggle && autoToggle.checked);
+      loadSharedBgAudio_(kind, url, label);
+      if (autoplay) controlSharedBgAudio_("play"); // BARU (18 Sep 2026 v4) -- checkbox sudah tercentang saat link ini dimuat -> langsung terdengar SEKARANG JUGA, bukan cuma "siap" menunggu pindah slide
+      pendingAttachLink_ = { kind, url, label, autoplay };
+      applyPendingBgAudioToGenericItems_();
+      const startNote = autoplay ? "sudah langsung main" : "tekan ▶ Play untuk mulai";
+      const autoNote = autoplay ? " Otomatis akan ikut nyala sendiri tiap bait kidung ini masuk slide." : " (Centang \"Otomatis\" di atas kalau mau ini ikut nyala sendiri tiap bait kidung ini masuk slide.)";
+      bgStatus_(`🎧 Dimuat: ${label} -- ${startNote} (teks kidung TETAP tayang seperti biasa).${autoNote} Link ini akan ikut tersimpan kalau Anda tekan "➕ Daftar"/"➕ Semua Slide" di bawah.`);
+    }
+    if (el("psKidungBgAutoToggle")) {
+      el("psKidungBgAutoToggle").addEventListener("change", (e) => {
+        if (!pendingAttachLink_) return; // belum ada link yg dimuat sama sekali -- checkbox-nya baru "siap", tidak ada apa pun utk ditempelkan/dihentikan
+        pendingAttachLink_.autoplay = e.target.checked;
+        applyPendingBgAudioToGenericItems_();
+        if (e.target.checked && sharedBgAudio_ && sharedBgAudio_.url === pendingAttachLink_.url) {
+          controlSharedBgAudio_("play"); // dicentang belakangan, link-nya sudah dimuat duluan -> langsung mainkan sekarang
+        } else if (!e.target.checked && sharedBgAudio_ && sharedBgAudio_.url === pendingAttachLink_.url) {
+          // Dicentang lalu langsung DILEPAS lagi -- hentikan juga audio
+          // yang sudah kadung menyala supaya konsisten dengan checkbox-nya.
+          controlSharedBgAudio_("stop");
+        }
       });
     }
     if (el("psKidungBgPlayBtn")) el("psKidungBgPlayBtn").addEventListener("click", () => controlSharedBgAudio_("play"));
@@ -1981,9 +2027,7 @@ const PresentationStudio = (() => {
         if (!url) return;
         const looksLikeYoutube = /youtube\.com|youtu\.be/i.test(url);
         const kind = looksLikeYoutube ? "yt" : "mp3";
-        loadSharedBgAudio_(kind, url, "Link manual");
-        pendingAttachLink_ = { kind, url, label: "Link manual" };
-        bgStatus_('🎧 Dimuat dari link manual -- tekan ▶ Play untuk mulai (teks kidung TETAP tayang seperti biasa). Link ini akan ikut tersimpan kalau Anda tekan "➕ Daftar"/"➕ Semua Slide" di bawah.');
+        loadLinkAsBg_(kind, url, "Link manual");
       });
     }
 
@@ -2027,6 +2071,8 @@ const PresentationStudio = (() => {
         birama: currentMeta.birama || "",
         jumlahBait: currentMeta.jumlahBait || 0,
       }));
+      currentGenericItems = genericItems; // BARU (18 Sep 2026 v4) -- lihat catatan panjang di deklarasinya (dekat currentSlides)
+      applyPendingBgAudioToGenericItems_(); // BARU (18 Sep 2026 v4) -- mode tampilan slide diganti = genericItems baru dibuat ulang; kalau checkbox "Otomatis" sudah tercentang duluan, tempelkan lagi ke item-item barunya supaya tidak "hilang" begitu operator ganti mode
       slideListWrap.innerHTML = "";
       currentSlides.forEach((slide, i) => {
         const label = slide.onlyKoor ? "Koor" : slide.baits.map((b) => b.noBait || "?").join(",");
