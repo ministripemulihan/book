@@ -3796,8 +3796,11 @@
              Kontrak payload ada di js/games/penciptaan.js. -->
         <div class="ps-tab-panel" data-ps-right-panel="penciptaan" hidden>
           <div class="ps-field-label" style="margin-top:0;">🌱 Penciptaan (7 Hari)</div>
-          <p class="announcement-compose-hint" style="margin-top:0;">Tekan Hari 1-7, pemandangannya langsung berganti di Layar 2 -- cocok untuk cerita Sekolah Minggu, ice breaker "tebak hari keberapa", atau latar diam saat pembicara bercerita. 100% offline (gambar digambar sendiri oleh browser, bukan file video).</p>
+          <p class="announcement-compose-hint" style="margin-top:0;">Tekan 🏠 Tampilan Awal dulu untuk kartu pembuka di Layar 2, lalu tekan Hari 1-7 -- pemandangannya langsung berganti di Layar 2 -- cocok untuk cerita Sekolah Minggu, ice breaker "tebak hari keberapa", atau latar diam saat pembicara bercerita. 100% offline (gambar digambar sendiri oleh browser, bukan file video).</p>
 
+          <div class="ps-btn-row" style="margin-bottom:10px;">
+            <button type="button" class="chip-btn small primary" id="psPenciptaanAwalBtn" title="Tampilkan kartu pembuka 7 hari di Layar 2, sebelum memilih hari">🏠 Tampilan Awal</button>
+          </div>
           <div id="psPenciptaanDays" class="bk-days" style="margin-bottom:10px;"></div>
           <div id="psPenciptaanLabel" class="ps-pointer-hint" style="font-weight:700; margin-bottom:10px;"></div>
 
@@ -3859,7 +3862,11 @@
              slogankarakter-data.js) -- default SEMUA TERCENTANG. -->
         <div class="ps-tab-panel" data-ps-right-panel="slogankarakter">
           <div class="ps-field-label" style="margin-top:0; font-family:Georgia,'Times New Roman',serif; font-size:16px;">30 Karakter untuk Generasi Muda</div>
-          <div class="ps-pointer-hint" style="margin-bottom:10px;">Pilih salah satu dari 10 kotak kelompok, lalu pilih karakternya. Kolom yang dicentang di bawah langsung tayang ke Layar 2 (default semua tercentang).</div>
+          <div class="ps-pointer-hint" style="margin-bottom:10px;">Tekan 🏠 Tampilan Awal untuk memunculkan 10 kotak di Layar 2, lalu klik salah satu kotak kelompok (disorot di Layar 2) dan pilih karakternya. Kolom yang dicentang di bawah langsung tayang ke Layar 2 (default semua tercentang).</div>
+
+          <div class="ps-btn-row" style="margin-bottom:10px;">
+            <button type="button" class="chip-btn small primary" id="skAwalBtn" title="Tampilkan judul + 10 kotak kelompok di Layar 2 (bisa ditekan kapan saja untuk kembali ke sini)">🏠 Tampilan Awal (10 Kotak)</button>
+          </div>
 
           <div id="skGroupArea" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px;"></div>
 
@@ -3919,7 +3926,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <script src="js/presentation.js?v=20260913a"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/presentation-studio.js?v=20260915a"></script>
+  <script src="js/presentation-studio.js?v=20260919a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -3927,13 +3934,13 @@
   <script src="js/games/roda-putar.js?v=20260916a"></script>
   <script src="js/games/kuis-9-kotak.js?v=20260916a"></script>
   <script src="js/games/survei-membuktikan.js?v=20260916a"></script>
-  <script src="js/games/penciptaan.js?v=20260918a"></script>
+  <script src="js/games/penciptaan.js?v=20260919b"></script>
   <!-- BARU (18 Sep 2026) -- 🔤 Slogan Karakter. slogankarakter-data.js
        WAJIB dimuat SEBELUM slogankarakter.js DAN SEBELUM
        media-library.js (keduanya baca window.SLOGAN_KARAKTER_DATA /
        window.SLOGAN_KARAKTER_MODES_FOR dari file data itu). -->
   <script src="js/games/slogankarakter-data.js?v=20260919a"></script>
-  <script src="js/games/slogankarakter.js?v=20260919a"></script>
+  <script src="js/games/slogankarakter.js?v=20260919b"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
