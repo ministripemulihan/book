@@ -4225,6 +4225,12 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 .ps-kidung-detail { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ps-col-border); }
 .ps-kidung-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .ps-kidung-detail-title { font-weight: 700; font-size: 14px; color: var(--ps-ink); }
+/* BARU (18 Sep 2026) -- blok "🎵 Audio Latar" per kidung (mp3/YouTube),
+   lihat renderKidungBgLinks() js/presentation-studio.js. Bingkai tipis
+   supaya kelihatan sebagai grup terpisah dari mode tampilan slide di
+   bawahnya, warna ikut var(--ps-col-border) yang sudah dipakai .ps-kidung-detail. */
+.ps-kidung-bg-wrap { margin: 4px 0 14px; padding: 8px 10px; border: 1px solid var(--ps-col-border); border-radius: 8px; }
+.ps-kidung-bg-wrap .ps-field-label { margin-top: 0; }
 .ps-kidung-slide-actions { margin-top: 6px; }
 /* Tab Kidung Studio memakai class .kidung-book-toggle-btn/.kidung-list-item
    dkk. YANG SAMA dengan panel Kidung biasa (js/kidung-ui.js) supaya tidak
