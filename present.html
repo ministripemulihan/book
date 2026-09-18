@@ -2197,6 +2197,14 @@
          tampilan utama) -- lihat data.type "mp3_bg"/"mp3_bg_control"/
          "mp3_bg_clear" di window.addEventListener("message") bawah. -->
     <audio id="kidungBgAudio" preload="auto" hidden></audio>
+    <!-- BARU (18 Sep 2026 v6, permintaan operator "perlu ada info di
+         Layar 2, supaya operator tahu audio belum jalan") -- badge kecil,
+         SENGAJA subtle (pojok bawah kanan) -- muncul HANYA selagi ada
+         slide YouTube latar yang "diarm" tapi belum mulai (menunggu klik
+         panah konfirmasi ke-2), lihat data.type "yt_bg_armed" di
+         window.addEventListener("message") bawah &
+         setYtArmedIndicator_() (js/presentation-studio.js). -->
+    <div id="ytBgArmedBadge" hidden style="position:fixed; right:22px; bottom:22px; z-index:45; background:rgba(20,20,20,.82); color:#ffd84a; font-size:15px; font-weight:600; padding:9px 16px; border-radius:999px; border:1px solid rgba(255,216,74,.55); box-shadow:0 4px 14px rgba(0,0,0,.35); pointer-events:none; letter-spacing:.2px;">🎵 Tekan panah lagi untuk mulai musik</div>
     <!-- BARU (4 Sep 2026) -- lihat catatan CSS #canvaView & #scView di
          atas, dan showMain() kind "canva"/"soundcloud" di skrip bawah. -->
     <iframe id="canvaView" hidden allow="fullscreen" allowfullscreen frameborder="0"></iframe>
@@ -2476,6 +2484,45 @@
   let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
   const ytBgEl = document.getElementById("ytBg");
   const kidungBgAudioEl = document.getElementById("kidungBgAudio"); // BARU (18 Sep 2026) -- Audio Latar MP3 kidung, lihat catatan di atas
+  const ytBgArmedBadgeEl = document.getElementById("ytBgArmedBadge"); // BARU (18 Sep 2026 v6) -- lihat catatan di markup-nya di atas
+  // BARU (18 Sep 2026 v6, permintaan operator "next lagi defaultnya mati
+  // suaranya, fade-out halus ~1 detik") -- turunkan volume iframe YouTube
+  // latar SEDIKIT DEMI SEDIKIT lewat perintah resmi "setVolume" (butuh
+  // enablejsapi=1, sudah ada di buildYoutubeEmbedUrl() js/presentation-
+  // studio.js) selama `durationMs`, BUKAN berhenti mendadak -- dipanggil
+  // dari data.type "yt_bg_clear" (data.fade) di bawah. Kalau iframe-nya
+  // ternyata belum "siap" menerima perintah (postMessage gagal/diabaikan),
+  // src tetap dikosongkan sesudah durasi ini oleh pemanggil -- jadi paling
+  // lambat berhenti PERSIS di titik itu, tidak pernah nyangkut lebih lama.
+  function fadeOutYtBg_(durationMs) {
+    if (!ytBgEl.src) return;
+    const steps = 10;
+    const stepMs = Math.max(30, Math.floor(durationMs / steps));
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      const vol = Math.max(0, Math.round(100 * (1 - i / steps)));
+      try {
+        if (ytBgEl.contentWindow) ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [vol] }), "*");
+      } catch (e) {}
+      if (i >= steps) clearInterval(timer);
+    }, stepMs);
+  }
+  // Sama seperti fadeOutYtBg_() di atas, tapi utk elemen <audio> asli
+  // (#kidungBgAudio) -- lewat `.volume` (0-1) bawaan, jauh lebih andal
+  // daripada postMessage ke iframe YouTube (tidak butuh player "siap").
+  function fadeOutMp3Bg_(durationMs) {
+    if (!kidungBgAudioEl.src) return;
+    const steps = 10;
+    const stepMs = Math.max(30, Math.floor(durationMs / steps));
+    const startVol = typeof kidungBgAudioEl.volume === "number" ? kidungBgAudioEl.volume : 1;
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      try { kidungBgAudioEl.volume = Math.max(0, startVol * (1 - i / steps)); } catch (e) {}
+      if (i >= steps) clearInterval(timer);
+    }, stepMs);
+  }
   // BARU (18 Sep 2026 v5, permintaan operator "audio mp3 tidak bisa nyala,
   // apa ada yang keliru?") -- lapor balik ke jendela Studio (window.opener,
   // pola SAMA seperti "present_camera_status"/"present_ready" dkk di bawah
@@ -6116,7 +6163,23 @@
       return;
     }
     if (data.type === "yt_bg_clear") {
-      ytBgEl.src = "";
+      // BARU (18 Sep 2026 v6) -- `data.fade` (dikirim controlSharedBgAudio_()
+      // js/presentation-studio.js begitu operator pindah slide TANPA
+      // mencentang "↩️ Lanjutkan") -- redupkan dulu ~1 detik, BUKAN
+      // berhenti mendadak. Tanpa `data.fade` (mis. tombol "⏹ Berhenti"
+      // manual) tetap berhenti SEKETIKA seperti sebelumnya.
+      if (data.fade && ytBgEl.src) {
+        fadeOutYtBg_(1000);
+        setTimeout(() => { ytBgEl.src = ""; }, 1050);
+      } else {
+        ytBgEl.src = "";
+      }
+      return;
+    }
+    if (data.type === "yt_bg_armed") {
+      // BARU (18 Sep 2026 v6) -- lihat catatan panjang di badge-nya
+      // sendiri (markup) & setYtArmedIndicator_() js/presentation-studio.js.
+      if (ytBgArmedBadgeEl) ytBgArmedBadgeEl.hidden = !data.armed;
       return;
     }
     // BARU (18 Sep 2026, permintaan operator) -- Audio Latar MP3, pola
@@ -6151,9 +6214,21 @@
       return;
     }
     if (data.type === "mp3_bg_clear") {
-      try { kidungBgAudioEl.pause(); } catch (e) {}
-      kidungBgAudioEl.currentTime = 0;
-      kidungBgAudioEl.src = "";
+      // BARU (18 Sep 2026 v6) -- `data.fade`, sama persis alasannya
+      // dengan "yt_bg_clear" di atas (lihat catatan di sana).
+      if (data.fade && kidungBgAudioEl.src) {
+        fadeOutMp3Bg_(1000);
+        setTimeout(() => {
+          try { kidungBgAudioEl.pause(); } catch (e) {}
+          kidungBgAudioEl.currentTime = 0;
+          kidungBgAudioEl.src = "";
+          kidungBgAudioEl.volume = 1; // reset utk pemutaran berikutnya
+        }, 1050);
+      } else {
+        try { kidungBgAudioEl.pause(); } catch (e) {}
+        kidungBgAudioEl.currentTime = 0;
+        kidungBgAudioEl.src = "";
+      }
       return;
     }
     if (data.type === "pen") {
