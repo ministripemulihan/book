@@ -1898,7 +1898,50 @@
           <div id="psKidungDetail" class="ps-kidung-detail" hidden>
             <div class="ps-kidung-detail-head">
               <div id="psKidungDetailTitle" class="ps-kidung-detail-title"></div>
+              <button type="button" id="psKidungEditBtn" class="chip-btn small" title="Perbaiki typo/teks kidung ini di kumpulan/sesi Studio ini (tidak mengubah Sheet Kidung asli)">✏️ Edit Syair</button>
               <button type="button" id="psKidungBackBtn" class="chip-btn small">✖️ Tutup</button>
+            </div>
+            <!-- BARU (18 Sep 2026, permintaan operator "kidung butuh mp3/
+                 audio youtube latar, teks tetap tayang") -- kalau kidung
+                 ini punya link mp3/YouTube di Sheet (kolom linkMp3_1/
+                 linkMp3_2/linkYoutube), tombol "Latar" muncul di sini,
+                 diisi ulang oleh renderKidungBgLinks() (js/presentation-
+                 studio.js) tiap kali kidung ini dibuka. Diputar
+                 TERSEMBUNYI (sama pola dengan #ytBg Audio Latar YouTube
+                 di tab ▶️ YouTube) -- slide teks bait/koor yang sedang
+                 dipilih di bawah TETAP tayang seperti biasa, tidak
+                 tergantikan. -->
+            <div id="psKidungBgWrap" class="ps-kidung-bg-wrap" hidden>
+              <div class="ps-field-label">🎵 Audio Latar (opsional -- suara diputar di belakang layar, teks kidung tetap tayang)</div>
+              <div class="ps-btn-row" id="psKidungBgLinks"></div>
+              <!-- BARU (18 Sep 2026, lanjutan permintaan operator "kadang
+                   kidungnya belum ada di Sheet, tapi tetap butuh mp3/
+                   Drive/YouTube latar sekali pakai") -- link manual,
+                   TIDAK bergantung pada linkMp3_1/linkMp3_2/linkYoutube
+                   Sheet sama sekali. Kirim lewat channel SAMA PERSIS
+                   (mp3_bg / yt_bg) seperti tombol "Latar" otomatis di
+                   atas -- lihat wireKidungManualBg_() di
+                   js/presentation-studio.js. -->
+              <div class="ps-yt-row">
+                <input type="text" id="psKidungBgManualInput" class="columns-lang-select" placeholder="Tempel link MP3/Google Drive atau YouTube di sini (manual)" />
+              </div>
+              <div class="ps-btn-row">
+                <button type="button" id="psKidungBgManualLoadBtn" class="chip-btn small">🎧 Muat sebagai Latar</button>
+              </div>
+              <div class="ps-btn-row" id="psKidungBgControls" hidden>
+                <button type="button" id="psKidungBgPlayBtn" class="chip-btn small">▶ Play</button>
+                <button type="button" id="psKidungBgPauseBtn" class="chip-btn small">⏸ Jeda</button>
+                <!-- BARU (18 Sep 2026 v3, permintaan operator "1x habis
+                     minta diulangi lagi sampai bosen, atau bisa jadi
+                     cuma 1x saja") -- toggle: tekan sekali nyala (lagu
+                     berulang terus tanpa putus lewat `.loop` bawaan
+                     <audio>, atau reload embed loop=1 utk YouTube),
+                     tekan lagi mati. Bawaan MATI (main 1x, perilaku
+                     lama) tiap kali audio BARU dimuat. -->
+                <button type="button" id="psKidungBgLoopBtn" class="chip-btn small" title="Putar berulang terus sampai dihentikan manual (tekan lagi utk matikan)">🔁 Ulang</button>
+                <button type="button" id="psKidungBgStopBtn" class="chip-btn small danger">⏹ Berhenti</button>
+              </div>
+              <p id="psKidungBgStatus" class="announcement-compose-hint"></p>
             </div>
             <div class="ps-field-label">Mode tampilan slide</div>
             <select id="psKidungModeSelect" class="columns-lang-select">
@@ -2157,6 +2200,32 @@
             <button type="button" id="psScPauseBtn" class="chip-btn small">⏸ Pause</button>
           </div>
           <div class="ps-yt-hint" id="psScStatus">Belum ada audio SoundCloud yang diputar.</div>
+
+          <!-- BARU (18 Sep 2026, permintaan operator "kadang cuma butuh
+               MP3/Drive, bukan SoundCloud") -- link MP3 langsung (mis.
+               "https://.../lagu.mp3") ATAU link Google Drive (dikenali
+               otomatis lewat isDriveUrl(), js/media.js -- polanya sama
+               seperti yang sudah dipakai linkMp3_1/linkMp3_2 kidung, lihat
+               kidungMp3Square() di js/kidung-ui.js). Link Drive dimuat
+               lewat iframe ".../preview" (satu-satunya cara Drive bisa
+               diputar tertanam -- link "/view" biasa TIDAK bisa dipasang
+               langsung ke <audio src>, lihat catatan panjang di
+               kidungMp3Square()). Ayat/kidung/pengumuman yang SEDANG
+               tayang di Layar 2 TIDAK ikut hilang saat ini ditayangkan --
+               sama seperti SoundCloud di atas (audio jalan di bilah bawah,
+               teks tetap kelihatan) -- lihat wireLinkTab() &
+               kind==="mp3" di present.html. -->
+          <hr class="ps-yt-sep" />
+          <div class="ps-field-label">🎵 MP3 / Audio (link langsung atau Google Drive)</div>
+          <p class="announcement-compose-hint">Tempel link MP3 langsung (mis. "https://.../lagu.mp3"), ATAU link Google Drive (mis. "https://drive.google.com/file/d/xxxx/view") -- keduanya otomatis dikenali. Ayat/kidung/pengumuman yang sedang tayang TIDAK ikut hilang, audio jalan di bilah bawah Layar 2 (mirip SoundCloud di atas). Cocok untuk kidung yang butuh musik pengiring tanpa video.</p>
+          <div class="ps-yt-row">
+            <input type="text" id="psMp3Input" class="columns-lang-select" placeholder="https://.../lagu.mp3 atau link Google Drive" />
+          </div>
+          <div class="ps-btn-row">
+            <button type="button" id="psMp3ShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
+            <button type="button" id="psMp3SaveBtn" class="chip-btn small">➕ Simpan ke Kumpulan Ayat</button>
+          </div>
+          <div class="ps-yt-hint" id="psMp3Status">Belum ada MP3/Audio yang diputar.</div>
         </div>
 
         <!-- BARU (4 Sep 2026 v3) -- tab "🤖 AI Presentation": ketik
@@ -2831,7 +2900,7 @@
                "⭕ Kamera Penuh, Teks Bulat" ditambahkan sebagai tombol
                ke-6 di dalam #psCamLayoutRow di atas (bukan di sini) --
                supaya ikut logika exclusive-active 1 tombol yang sudah
-               ada untuk semua Tata Letak Kamera/Gambar Latar.
+               ada untuk semua Tata Letak Kamera/Gambar Latar. -->
           <div class="ps-pointer-hint">Kebalikan dari "Teks Penuh, Kamera Bulat" -- di sini kamera/gambar memenuhi layar penuh, ayat/kidung/pengumuman yang jadi jendela bulat kecil mengambang.</div>
 
           <!-- BARU (9 Sep 2026, sesi ke-9, permintaan operator "5 sisi,
