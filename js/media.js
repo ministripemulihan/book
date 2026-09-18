@@ -1177,7 +1177,7 @@ async function buildMediaPlan(sheet) {
 }
 
 // Menarik ulang data TERBARU dari Google Sheet untuk rencana yang sedang
-// aktif (kalau rencana itu berbasis Bacaan Bersuara), lalu memasang 
+// aktif (kalau rencana itu berbasis Bacaan Bersuara), lalu memasang
 // kembali link/labelnya -- progres centang yang sudah ada TETAP dijaga
 // (dicocokkan berdasar urutan/index hari, bukan dihapus dan mulai dari 0).
 async function resyncMediaPlan(plan) {
