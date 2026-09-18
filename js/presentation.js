@@ -456,13 +456,22 @@ const Presentation = (() => {
   // yang show:false dari hideAllMessageBars_()), bukan ayat/kidung/dst
   // yang sesungguhnya sedang tayang. "warta" & "footnote" (Atas & Bawah)
   // sudah benar terdaftar dari awal -- "msgmid" (Tengah) yang terlewat.
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control"];
+  // PERBAIKAN (18 Sep 2026, ikut ditemukan saat menambah Audio Latar MP3
+  // kidung) -- "yt_bg"/"yt_bg_control"/"yt_bg_clear" (Audio Latar YouTube,
+  // sudah ada sebelumnya) TERNYATA belum pernah didaftarkan di sini, sama
+  // seperti "msgmid" dulu (lihat catatan PERBAIKAN di atas) -- akibatnya
+  // tiap kali operator menekan Play/Pause/dst audio latar, `lastPayload`
+  // ikut tertimpa payload kontrol itu, jadi "kirim ulang konten terakhir"
+  // saat Layar 2 dibuka ulang salah (bukan ayat/kidung yg sesungguhnya
+  // sedang tayang). "mp3_bg"/"mp3_bg_control"/"mp3_bg_clear" (BARU, Audio
+  // Latar MP3) ikut didaftarkan sekalian di sini dari awal.
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "mp3_bg", "mp3_bg_control", "mp3_bg_clear"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) {
       // Overlay (pointer/pen/tick timer) tidak perlu memaksa buka jendela
       // baru berkali-kali; hanya buka untuk aksi yang jelas disengaja.
-      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote" || payload.type === "msgmid") {
+      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote" || payload.type === "msgmid" || payload.type === "yt_bg" || payload.type === "mp3_bg") {
         openWindow();
       } else {
         return;
