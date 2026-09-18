@@ -31,9 +31,20 @@
 //   - fields: array key kolom yang dicentang & mau tayang, urut
 //     sesuai urutan tampil, mis. ["short","long"] atau ["arti"] saja.
 //   { type:"slogankarakter", action:"reset" }
+//   { type:"slogankarakter", action:"grid", kelompok }   -- BARU (19 Sep 2026)
+//     TAMPILAN AWAL: judul "30 Karakter untuk Generasi Muda" + 10 kotak
+//     kelompok di Layar 2 (kelompok 1..10 opsional = kotak yang disorot).
 // Modul ini murni SATU ARAH (Studio -> Layar 2), tidak ada balasan
 // dari Layar 2 -- handleMessage() sengaja kosong (dibiarkan ada,
-// mengikuti kontrak window.GameOffline).
+// mengikuti kontrak window.GameOffline). Kalau Layar 2 baru dibuka/
+// dimuat ulang, Presentation.postRaw() (js/presentation.js) sudah
+// otomatis mengirim ulang payload terakhir, jadi tidak perlu ditangani.
+//
+// ALUR "ENAK" (19 Sep 2026): 🏠 Tampilan Awal (10 kotak) -> klik kotak
+// kelompok (kotaknya disorot di Layar 2) -> klik karakter (slogan
+// tayang). Klik kotak kelompok TIDAK menimpa slogan yang sedang tayang
+// (supaya operator bebas menyiapkan kelompok berikutnya) -- pakai
+// tombol 🏠 Tampilan Awal untuk kembali ke 10 kotak kapan saja.
 // ============================================================
 (function () {
   const { el, rawPost, renderStudioPreview } = window.PSCore;
@@ -45,6 +56,7 @@
   let currentKelompok_ = null; // objek { num, icon, chars }
   let currentKarakter_ = null; // string, key di CHARS
   let checkedFields_ = null;   // Set<string> -- null = belum diatur (dianggap "semua")
+  let tayangMode_ = null;      // "grid" (Tampilan Awal) | "detail" (slogan 1 karakter) | null (belum ada dari modul ini)
 
   function data_() { return window.SLOGAN_KARAKTER_DATA; }
 
@@ -79,6 +91,19 @@
     });
   }
 
+  // BARU (19 Sep 2026) -- TAMPILAN AWAL: 10 kotak di Layar 2. nomorKelompok
+  // (opsional) = kotak yang disorot.
+  function tampilkanAwal_(nomorKelompok) {
+    const payload = { type: "slogankarakter", action: "grid", kelompok: nomorKelompok || null };
+    tayangMode_ = "grid";
+    rawPost(payload);
+    renderStudioPreview(payload);
+    const status = el("skStatus");
+    if (status) status.textContent = nomorKelompok
+      ? "Tayang: Tampilan Awal — kotak " + nomorKelompok + " disorot. Pilih karakternya di bawah."
+      : "Tayang: Tampilan Awal (10 kotak kelompok)";
+  }
+
   function selectKelompok_(g) {
     if (!currentKelompok_ || currentKelompok_.num !== g.num) currentKarakter_ = null;
     currentKelompok_ = g;
@@ -86,6 +111,13 @@
     buildGroupGrid_(el("skGroupArea"));
     renderCharsArea_();
     renderFieldsArea_();
+    // Sorot kotak ini di Layar 2 -- KECUALI sedang ada slogan karakter yang
+    // tayang (jangan ditimpa; operator mungkin cuma menyiapkan berikutnya).
+    if (tayangMode_ !== "detail") tampilkanAwal_(g.num);
+    else {
+      const status = el("skStatus");
+      if (status) status.textContent = "Slogan sedang tayang. Pilih karakter untuk menggantinya, atau tekan 🏠 Tampilan Awal untuk kembali ke 10 kotak.";
+    }
   }
 
   function renderCharsArea_() {
@@ -171,8 +203,9 @@
       if (status) status.textContent = "Pilih minimal 1 kolom untuk ditayangkan.";
       return;
     }
+    tayangMode_ = "detail";
     rawPost({ type: "slogankarakter", action: "show", karakter: currentKarakter_, fields });
-    renderStudioPreview({ type: "slogankarakter" });
+    renderStudioPreview({ type: "slogankarakter", action: "show", karakter: currentKarakter_, fields });
     if (status) status.textContent = "Tayang: " + currentKarakter_ + " (" + fields.length + " kolom)";
   }
 
@@ -202,7 +235,11 @@
     renderCharsArea_();
     renderFieldsArea_();
 
+    const awalBtn = el("skAwalBtn");
+    if (awalBtn) awalBtn.addEventListener("click", () => tampilkanAwal_(currentKelompok_ ? currentKelompok_.num : null));
+
     resetBtn.addEventListener("click", () => {
+      tayangMode_ = null;
       rawPost({ type: "slogankarakter", action: "reset" });
       const status = el("skStatus");
       if (status) status.textContent = "";
