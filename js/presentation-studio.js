@@ -363,6 +363,101 @@ const PresentationStudio = (() => {
     if (typeof Presentation !== "undefined" && Presentation.postMonitorVideo) Presentation.postMonitorVideo({ kind: "none" });
   }
 
+  // ------------------------------------------------------------
+  // BARU (18 Sep 2026 v3, permintaan operator "link mp3/youtube/mp4
+  // kidung nempel di 1 syair, ada tombol ulang") -- status Audio Latar
+  // BERSAMA, dipakai baik oleh panel tab "🎵 Kidung" (browsing kidung
+  // langsung, sudah ada sejak 18 Sep 2026 v2) MAUPUN baris "📋 Kumpulan
+  // Ayat" (kidung yang SUDAH tersimpan, bgAudio-nya lihat
+  // addKidungToCollection() js/collections.js) -- SATU status supaya
+  // tidak ada 2 audio latar nyala bertabrakan kalau operator berpindah
+  // panel. Channel pengiriman ke Layar 2 (mp3_bg/yt_bg/dst) SAMA PERSIS
+  // seperti sebelumnya, TIDAK menyentuh navigasi panah kiri/kanan
+  // (wirePlaylistKeyNav()) sama sekali -- audio ini murni "nempel di
+  // belakang layar", slide teks kidung/ayat/dll tetap dikendalikan
+  // terpisah oleh sendGenericItemLive()/playlistGoTo() seperti biasa.
+  // ------------------------------------------------------------
+  let sharedBgAudio_ = null; // null ATAU { kind:"mp3"|"yt", url, label, loop }
+  const sharedBgAudioListeners_ = []; // dipanggil ulang tiap status berubah -- HANYA utk listener yang HIDUP SELAMA Studio terbuka (mis. panel tab "🎵 Kidung", didaftarkan SEKALI saat wireKidungTab() jalan), BUKAN utk elemen yang dibuat ulang tiap render (lihat previewBgAudioRefresh_ di bawah -- kalau dipakai array ini malah bocor memori, nambah terus tiap ganti slide)
+  function onSharedBgAudioChange_(fn) { sharedBgAudioListeners_.push(fn); }
+  // Slot TUNGGAL (bukan array) khusus mini-kontrol Audio Latar di kotak
+  // "Tayang" (#psPreviewBox) -- ditimpa ulang tiap kali renderStudioPreview()
+  // menggambar slide kidung baru (lihat sana), supaya tidak menumpuk
+  // referensi ke elemen lama yang sudah dibuang dari DOM.
+  let previewBgAudioRefresh_ = null;
+  function notifySharedBgAudioChange_() {
+    sharedBgAudioListeners_.forEach((fn) => { try { fn(); } catch (e) {} });
+    if (previewBgAudioRefresh_) { try { previewBgAudioRefresh_(); } catch (e) {} }
+  }
+  function loadSharedBgAudio_(kind, url, label) {
+    if (!url) return;
+    if (kind === "yt") {
+      const id = typeof extractYoutubeId === "function" ? extractYoutubeId(url) : null;
+      if (!id) { alert("Link YouTube ini tidak dikenali -- periksa lagi linknya."); return; }
+      rawPost({ type: "yt_bg", embedUrl: buildYoutubeEmbedUrl(id, 0) });
+    } else {
+      rawPost({ type: "mp3_bg", url });
+    }
+    sharedBgAudio_ = { kind: kind === "yt" ? "yt" : "mp3", url, label: label || "", loop: false };
+    notifySharedBgAudioChange_();
+  }
+  // action: "play" | "pause" | "stop" | "toggleloop"
+  function controlSharedBgAudio_(action) {
+    if (!sharedBgAudio_) return;
+    if (action === "play" || action === "pause") {
+      rawPost({ type: sharedBgAudio_.kind === "yt" ? "yt_bg_control" : "mp3_bg_control", action });
+    } else if (action === "stop") {
+      rawPost({ type: sharedBgAudio_.kind === "yt" ? "yt_bg_clear" : "mp3_bg_clear" });
+      sharedBgAudio_ = null;
+    } else if (action === "toggleloop") {
+      sharedBgAudio_.loop = !sharedBgAudio_.loop;
+      if (sharedBgAudio_.kind !== "yt") {
+        // MP3/MP4/Drive lewat elemen <audio> asli (#kidungBgAudio) --
+        // BARU (18 Sep 2026) -- kind "mp4" numpang jalur audio yang SAMA
+        // (cek "bukan yt" alih-alih "persis mp3") supaya video Drive
+        // yang dipakai sekedar suara latar juga dapat 🔁 Ulang mulus.
+        // `.loop = true/false` bawaan browser, berulang MULUS tanpa
+        // putus sama sekali.
+        rawPost({ type: "mp3_bg_control", action: sharedBgAudio_.loop ? "loop_on" : "loop_off" });
+      } else {
+        // YouTube lewat iframe (#ytBg) -- TIDAK ada API resmi utk
+        // menyalakan loop di tengah jalan tanpa memuat ulang embed-nya
+        // (parameter resmi YouTube "loop=1&playlist=<id video yang
+        // sama>"), jadi videonya akan mulai dari awal lagi SETIAP kali
+        // 🔁 ditekan (nyala ATAU mati) -- operator perlu tahu ini,
+        // beda dari MP3 yang mulus.
+        const id = typeof extractYoutubeId === "function" ? extractYoutubeId(sharedBgAudio_.url) : null;
+        if (id) {
+          let url2 = buildYoutubeEmbedUrl(id, 0);
+          if (sharedBgAudio_.loop) url2 += `&loop=1&playlist=${id}`;
+          rawPost({ type: "yt_bg", embedUrl: url2 });
+        }
+      }
+    }
+    notifySharedBgAudioChange_();
+  }
+
+  // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
+  // otomatis, pilih 1 saja yang aktif (mp3 unggahan/mp4/YouTube)") --
+  // dipanggil oleh sendGenericItemLive() (lihat catatan panjang di sana)
+  // setiap kali item APA SAJA (ayat/teks/kidung/media halaman PDF-gambar/
+  // dst) menjadi slide aktif. `it.bgAudio` sekarang bisa dilampirkan ke
+  // item APA SAJA lewat updateItemBgAudioInCollection() (js/collections.js)
+  // -- BUKAN cuma kidung lagi. Karena sharedBgAudio_ itu SATU status
+  // BERSAMA (lihat catatan panjang dekat deklarasinya), otomatis "cuma 1
+  // yang aktif": memuat audio baru di sini menggantikan/menghentikan
+  // audio latar sebelumnya dengan sendirinya (loadSharedBgAudio_ menimpa
+  // sharedBgAudio_ & src elemen <audio>/iframe -- yang lama otomatis
+  // berhenti begitu src-nya diganti) -- itulah "checklist, pilih 1 saja
+  // yang aktif" yang diminta: operator cukup mencentang ▶️ Otomatis di
+  // SATU item yang audionya mau jalan, item lain (kalau ada bgAudio-nya
+  // tapi tidak dicentang) tetap diam sampai ditekan manual.
+  function autoplayBgAudioIfEnabled_(it) {
+    if (!it || !it.bgAudio || !it.bgAudio.url || !it.bgAudio.autoplay) return;
+    loadSharedBgAudio_(it.bgAudio.kind || "mp3", it.bgAudio.url, it.bgAudio.label || "Audio Latar");
+    controlSharedBgAudio_("play");
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
@@ -405,6 +500,13 @@ const PresentationStudio = (() => {
     const box = el("psPreviewBox");
     if (!box) return;
     syncYtLiveBarVisibility(payload);
+    // BARU (18 Sep 2026 v3) -- reset di sini, BUKAN cuma di cabang
+    // "kidung" di bawah (lihat wireBgAudioControlsInBox_()) -- supaya
+    // begitu pindah dari slide kidung yang PUNYA mini-kontrol Audio
+    // Latar ke jenis tayangan lain (ayat/YouTube/dst, semuanya `return`
+    // lebih awal dari cabang kidung), slot ini tidak nyangkut menunjuk
+    // ke tombol lama yang sudah tidak ada lagi di kotak ini.
+    previewBgAudioRefresh_ = null;
     if (!payload || payload.type === "clear") {
       box.innerHTML = '<div class="present-preview-idle">Belum ada tayangan</div>';
       return;
@@ -457,6 +559,10 @@ const PresentationStudio = (() => {
     }
     if (payload.type === "soundcloud") {
       box.innerHTML = `<div class="present-preview-idle">🎧 SoundCloud${payload.title ? ": " + escapeHtml(payload.title) : ""} — putar di Layar 2</div>`;
+      return;
+    }
+    if (payload.type === "mp3") {
+      box.innerHTML = `<div class="present-preview-idle">🎵 MP3/Audio${payload.title ? ": " + escapeHtml(payload.title) : ""} — putar di Layar 2</div>`;
       return;
     }
     // BARU (7 Sep 2026, permintaan operator) -- 🎬 Video Lokal (MP4).
@@ -548,8 +654,61 @@ const PresentationStudio = (() => {
       } else {
         bodyHtml = baits.map(baitLine).join("") + koorBlock;
       }
-      box.innerHTML = `${refHtml}${subHtml}${bodyHtml}`;
+      // BARU (18 Sep 2026 v3, permintaan operator "link mp3/youtube/mp4
+      // kidung nempel di 1 syair, ada tombol ulang") -- kalau slide
+      // kidung INI (baik dari tab "🎵 Kidung" langsung MAUPUN dari
+      // "📋 Kumpulan Ayat" -- keduanya lewat sendKidungSlide()) punya
+      // `payload.bgAudio`, tampilkan mini kontrol di bawah pratinjau.
+      // Memakai channel BERSAMA (sharedBgAudio_ dkk, lihat catatan
+      // panjang dekat clearMonitorVideo_() atas file ini) -- jadi kalau
+      // link ini KEBETULAN sudah dimuat/sedang main (mis. dari panel
+      // tab Kidung), kontrolnya langsung sinkron, bukan mulai dari nol.
+      box.innerHTML = `${refHtml}${subHtml}${bodyHtml}${bgAudioControlsHtml_(payload.bgAudio)}`;
+      wireBgAudioControlsInBox_(box, payload.bgAudio);
     }
+  }
+
+  function bgAudioControlsHtml_(bgAudio) {
+    if (!bgAudio || !bgAudio.url) return "";
+    return `<div class="ps-btn-row ps-preview-bg-audio" style="margin-top:8px; flex-wrap:wrap;">
+      <button type="button" class="chip-btn small" data-bgpv="load">🎧 ${escapeHtml(bgAudio.label || "Audio Latar")}</button>
+      <button type="button" class="chip-btn small" data-bgpv="pause" hidden>⏸ Jeda</button>
+      <button type="button" class="chip-btn small" data-bgpv="loop" hidden>🔁 Ulang</button>
+      <button type="button" class="chip-btn small danger" data-bgpv="stop" hidden>⏹ Berhenti</button>
+    </div>`;
+  }
+  // `box`: elemen #psPreviewBox (innerHTML SUDAH berisi bgAudioControlsHtml_()
+  // di atas). Dipanggil ULANG tiap kali renderStudioPreview() menggambar
+  // slide kidung -- previewBgAudioRefresh_ (slot tunggal) sengaja
+  // ditimpa di sini, bukan ditambah ke array, lihat catatan di atas.
+  function wireBgAudioControlsInBox_(box, bgAudio) {
+    previewBgAudioRefresh_ = null;
+    if (!bgAudio || !bgAudio.url) return;
+    const row = box.querySelector(".ps-preview-bg-audio");
+    if (!row) return;
+    const loadBtn = row.querySelector('[data-bgpv="load"]');
+    const pauseBtn = row.querySelector('[data-bgpv="pause"]');
+    const loopBtn = row.querySelector('[data-bgpv="loop"]');
+    const stopBtn = row.querySelector('[data-bgpv="stop"]');
+    function isThisOneLoaded_() {
+      return !!(sharedBgAudio_ && sharedBgAudio_.url === bgAudio.url && sharedBgAudio_.kind === (bgAudio.kind || "mp3"));
+    }
+    function refresh() {
+      const on = isThisOneLoaded_();
+      if (loadBtn) loadBtn.textContent = on ? "▶ Play" : `🎧 ${bgAudio.label || "Audio Latar"}`;
+      if (pauseBtn) pauseBtn.hidden = !on;
+      if (loopBtn) { loopBtn.hidden = !on; loopBtn.classList.toggle("active", !!(on && sharedBgAudio_.loop)); }
+      if (stopBtn) stopBtn.hidden = !on;
+    }
+    if (loadBtn) loadBtn.addEventListener("click", () => {
+      if (isThisOneLoaded_()) controlSharedBgAudio_("play");
+      else loadSharedBgAudio_(bgAudio.kind || "mp3", bgAudio.url, bgAudio.label || "Audio Latar");
+    });
+    if (pauseBtn) pauseBtn.addEventListener("click", () => controlSharedBgAudio_("pause"));
+    if (loopBtn) loopBtn.addEventListener("click", () => controlSharedBgAudio_("toggleloop"));
+    if (stopBtn) stopBtn.addEventListener("click", () => controlSharedBgAudio_("stop"));
+    previewBgAudioRefresh_ = refresh;
+    refresh();
   }
 
   // ------------------------------------------------------------
@@ -851,7 +1010,31 @@ const PresentationStudio = (() => {
       // sampai ke ujung kumpulan, TIDAK terpengaruh perubahan ini).
       row.innerHTML =
         thumbHtml +
-        `<div class="ps-verse-row-body" title="Klik untuk langsung tayang dari item ini"><span class="ps-verse-jump-icon" aria-hidden="true">▶️</span><span class="ps-verse-ref">${escapeHtml(ref)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
+        // DIUBAH (18 Sep 2026) -- ikon kecil "🎧" dulu HANYA muncul utk
+        // item kidung (satu-satunya tipe yang bisa punya bgAudio saat
+        // itu). Sekarang bgAudio bisa dilampirkan ke item APA SAJA
+        // (lihat updateItemBgAudioInCollection(), js/collections.js) --
+        // jadi syaratnya digeneralkan ke "punya it.bgAudio.url", TIDAK
+        // lagi disyaratkan type==="kidung". Kalau autoplay-nya TERCENTANG,
+        // ikonnya diganti "🎧▶️" (SEKEDAR penanda visual mana yang akan
+        // otomatis bunyi begitu dilangkahi panah/stylus -- lihat blok
+        // ".ps-verse-row-bgaudio" di bawah utk checkbox sungguhannya).
+        `<div class="ps-verse-row-body" title="Klik untuk langsung tayang dari item ini"><span class="ps-verse-jump-icon" aria-hidden="true">▶️</span><span class="ps-verse-ref">${escapeHtml(ref)}${(it && it.bgAudio && it.bgAudio.url) ? ' <span title="Punya Audio Latar (' + escapeHtml(it.bgAudio.label || "") + (it.bgAudio.autoplay ? ") -- OTOMATIS diputar begitu item ini masuk slide" : ") -- tayangkan item ini untuk kontrol ▶/⏸/🔁/⏹") + '">' + (it.bgAudio.autoplay ? "🎧▶️" : "🎧") + '</span>' : ""}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
+        // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
+        // mp3 unggahan/mp4/YouTube otomatis saat masuk slide, dengan 2
+        // tombol mudah panah atas/bawah") -- baris kecil per item: tombol
+        // "🎧 Audio Latar" (buka dialog pasang/ganti/lepas link mp3/mp4/
+        // YouTube, lihat openBgAudioDialog_() di bawah) + kalau item ini
+        // SUDAH punya bgAudio, ikut ditampilkan checkbox "▶️ Otomatis"
+        // (data-bgauto) -- itulah "checklist"-nya: dicentang = audio ini
+        // otomatis main begitu item masuk slide aktif lewat panah kiri/
+        // kanan, PageUp/PageDown, ATAU stylus/clicker presentasi yang
+        // meniru tombol itu (lihat wirePlaylistKeyNav() & catatan
+        // autoplayBgAudioIfEnabled_() dekat sendGenericItemLive()).
+        `<div class="ps-verse-row-bgaudio" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+           <button type="button" class="chip-btn small" data-bgaudio-edit title="Lampirkan/ganti/lepas link audio latar (MP3 unggahan/Drive, MP4 Drive, atau YouTube) untuk item ini">🎧 ${(it && it.bgAudio && it.bgAudio.url) ? "Ganti" : "Audio Latar"}</button>
+           ${(it && it.bgAudio && it.bgAudio.url) ? `<label class="ps-pointer-hint" style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Kalau dicentang, audio ini OTOMATIS diputar begitu item ini masuk slide (panah/PageUp-Down/stylus) -- tidak perlu tekan ▶ Play manual lagi."><input type="checkbox" data-bgauto ${it.bgAudio.autoplay ? "checked" : ""} /> ▶️ Otomatis saat masuk slide</label>` : ""}
+         </div>` +
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
            ${showMediaGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="mediagroup" title="Hapus SEMUA ${mediaGroupN} halaman berkas ini dari kumpulan, sekali klik">🗑️ Hapus Semua ${mediaGroupN} Halaman Ini</button>` : ""}
@@ -869,6 +1052,26 @@ const PresentationStudio = (() => {
         setActivePlaylist(items, i, col.name);
         sendGenericItemLive(items[i]);
       });
+      // "🎧 Audio Latar"/"🎧 Ganti" -- buka dialog pasang/ganti/lepas link.
+      row.querySelector("[data-bgaudio-edit]").addEventListener("click", (e) => {
+        e.stopPropagation();
+        openBgAudioDialog_(username, sel.value, i, it);
+      });
+      // Checkbox "▶️ Otomatis saat masuk slide" -- langsung tersimpan
+      // begitu diklik (tidak perlu tombol Simpan terpisah), pola sama
+      // seperti checkbox lain di app ini (mis. "Koor di tengah").
+      const bgAutoCb = row.querySelector("[data-bgauto]");
+      if (bgAutoCb) {
+        bgAutoCb.addEventListener("click", (e) => e.stopPropagation());
+        bgAutoCb.addEventListener("change", () => {
+          if (!it.bgAudio || !it.bgAudio.url) return;
+          const updated = Object.assign({}, it.bgAudio, { autoplay: bgAutoCb.checked });
+          if (updateItemBgAudioInCollection(username, sel.value, i, updated)) {
+            it.bgAudio = updated; // supaya autoplayBgAudioIfEnabled_() lihat status terbaru tanpa perlu render ulang
+            renderCollectionList(); // segarkan ikon 🎧/🎧▶️ di baris ini
+          }
+        });
+      }
       // "🗑️ Hapus Item Ini" -- hapus 1 item (1 bait, kalau kidung) saja.
       row.querySelector('[data-del="one"]').addEventListener("click", (e) => {
         e.stopPropagation();
@@ -932,6 +1135,123 @@ const PresentationStudio = (() => {
     });
     highlightActivePlaylistRow();
     fillCollectionThumbnails_(wrap, username); // isi <img> thumbnail halaman PDF/gambar (lihat catatan di atas)
+  }
+
+  // BARU (18 Sep 2026, permintaan operator "PDF 26 halaman diupload +
+  // link mp3/mp4/YouTube, checklist pilih 1 aktif, otomatis mainkan pas
+  // masuk slide") -- dialog kecil (numpang showSimpleDialog(), js/app.js,
+  // pola sama dgn dialog Edit Syair Kidung) untuk pasang/ganti/lepas
+  // `bgAudio` di ITEM APA SAJA di Kumpulan Ayat -- termasuk halaman PDF/
+  // gambar (type "media") yang sebelumnya SAMA SEKALI tidak bisa dikasih
+  // audio latar (fitur 18 Sep v1-v3 sebelumnya cuma menjangkau item
+  // "kidung"). `it` di sini REFERENSI LANGSUNG ke item di array
+  // `items`/`col.items` yang sedang dipakai renderCollectionList() --
+  // begitu tersimpan, `it.bgAudio` ditimpa juga di memori supaya kalau
+  // item ini KEBETULAN sedang jadi playlist aktif, tidak perlu menunggu
+  // render ulang dulu baru autoplay-nya "sadar" ada lampiran baru.
+  function openBgAudioDialog_(username, colId, index, it) {
+    if (!colId || typeof showSimpleDialog !== "function") return;
+    const existing = (it && it.bgAudio) || null;
+    showSimpleDialog(`🎧 Audio Latar — ${genericItemRefText(it)}`, (box) => {
+      const hint = document.createElement("p");
+      hint.className = "simple-dialog-hint";
+      hint.textContent = "Tempel SATU link saja: MP3 (unggahan/link langsung/Google Drive), MP4 (video Google Drive -- gambarnya TIDAK ditampilkan, cuma suaranya jadi latar), atau YouTube. Kosongkan lalu Simpan untuk melepas audio latar dari item ini.";
+      box.appendChild(hint);
+
+      const urlField = document.createElement("div");
+      urlField.className = "simple-dialog-field";
+      const urlLabel = document.createElement("label");
+      urlLabel.textContent = "Link audio (MP3/MP4/YouTube):";
+      urlField.appendChild(urlLabel);
+      const urlInput = document.createElement("input");
+      urlInput.type = "text";
+      urlInput.style.width = "100%";
+      urlInput.placeholder = "https://... atau link Google Drive";
+      urlInput.value = (existing && existing.url) || "";
+      urlField.appendChild(urlInput);
+      box.appendChild(urlField);
+
+      const labelField = document.createElement("div");
+      labelField.className = "simple-dialog-field";
+      const labelLabel = document.createElement("label");
+      labelLabel.textContent = "Nama singkat (opsional, tampil di kontrol Play):";
+      labelField.appendChild(labelLabel);
+      const labelInput = document.createElement("input");
+      labelInput.type = "text";
+      labelInput.style.width = "100%";
+      labelInput.placeholder = "mis. Instrumen pembuka";
+      labelInput.value = (existing && existing.label) || "";
+      labelField.appendChild(labelInput);
+      box.appendChild(labelField);
+
+      // "Checklist" jenis berkas -- SENGAJA cuma 1 yang bisa dipilih
+      // (radio, bukan checkbox biasa) karena SATU item cuma menyimpan
+      // SATU bgAudio (lihat catatan panjang di updateItemBgAudioInCollection(),
+      // js/collections.js) -- ini yang menentukan `kind` mana yang
+      // disimpan (mp3/mp4 sama-sama lewat elemen <audio>, cuma beda
+      // label; yt lewat iframe YouTube tersembunyi).
+      const kindField = document.createElement("div");
+      kindField.className = "simple-dialog-field";
+      const kindLabel = document.createElement("label");
+      kindLabel.textContent = "Jenis link:";
+      kindField.appendChild(kindLabel);
+      const kindRow = document.createElement("div");
+      kindRow.className = "ps-btn-row";
+      const kindOpts = [["mp3", "🎵 MP3"], ["mp4", "🎬 MP4 (Drive)"], ["yt", "📺 YouTube"]];
+      const kindInputs = [];
+      kindOpts.forEach(([val, label]) => {
+        const wrapLbl = document.createElement("label");
+        wrapLbl.style.cssText = "display:inline-flex; align-items:center; gap:4px; margin-right:10px;";
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "psBgAudioKind_" + index;
+        radio.value = val;
+        if ((existing ? existing.kind : "mp3") === val) radio.checked = true;
+        wrapLbl.appendChild(radio);
+        wrapLbl.appendChild(document.createTextNode(" " + label));
+        kindRow.appendChild(wrapLbl);
+        kindInputs.push(radio);
+      });
+      kindField.appendChild(kindRow);
+      box.appendChild(kindField);
+
+      // Kalau URL yang ditempel jelas link YouTube, jenisnya diikutkan
+      // otomatis (operator sering lupa ganti radio-nya secara manual) --
+      // TIDAK mengunci pilihan, operator tetap bisa ganti manual kapan
+      // saja (mis. link Drive yang isinya video tapi mau dipakai audio
+      // MP3-style, walau jarang perlu).
+      urlInput.addEventListener("input", () => {
+        if (/youtube\.com|youtu\.be/i.test(urlInput.value)) {
+          const ytRadio = kindInputs.find((r) => r.value === "yt");
+          if (ytRadio) ytRadio.checked = true;
+        }
+      });
+
+      const autoField = document.createElement("div");
+      autoField.className = "simple-dialog-field";
+      const autoLabel = document.createElement("label");
+      autoLabel.style.cssText = "display:flex; align-items:center; gap:6px; cursor:pointer;";
+      const autoCb = document.createElement("input");
+      autoCb.type = "checkbox";
+      autoCb.checked = !!(existing && existing.autoplay);
+      autoLabel.appendChild(autoCb);
+      autoLabel.appendChild(document.createTextNode("▶️ Otomatis mainkan begitu item ini masuk slide (panah kiri/kanan, PageUp/PageDown, atau stylus/clicker presentasi)"));
+      autoField.appendChild(autoLabel);
+      box.appendChild(autoField);
+
+      return () => {
+        const url = urlInput.value.trim();
+        if (!url) return { url: "", label: "", kind: "mp3", autoplay: false }; // kosong -> lepas lampiran
+        const kindRadio = kindInputs.find((r) => r.checked);
+        return { url, label: labelInput.value.trim(), kind: kindRadio ? kindRadio.value : "mp3", autoplay: autoCb.checked };
+      };
+    }, (val) => {
+      const newBgAudio = val && val.url ? val : null;
+      if (updateItemBgAudioInCollection(username, colId, index, newBgAudio)) {
+        if (it) it.bgAudio = newBgAudio; // lihat catatan di atas fungsi ini
+        renderCollectionList();
+      }
+    }, "Simpan");
   }
 
   // BARU (12 Sep 2026 v6) -- lihat catatan panjang di renderCollectionList()
@@ -1284,6 +1604,18 @@ const PresentationStudio = (() => {
   // sesudahnya selalu terasa 1 alur yang sama, bukan 2 perilaku beda.
   function sendGenericItemLive(it) {
     if (!it || typeof Presentation === "undefined") return;
+    // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
+    // otomatis begitu masuk slide, entah mp3 unggahan/mp4/YouTube")
+    // -- dipanggil di sini (BUKAN dobel di playlistGoTo() + tiap klik
+    // baris terpisah) karena sendGenericItemLive() ADALAH satu-satunya
+    // funnel yang dilewati SEMUA jalur "item ini baru jadi slide aktif"
+    // (klik baris pertama kali, playlistGoTo() lewat panah/PageUp-Down/
+    // stylus presentasi, tombol "▶️ Tayangkan" kidung, dst -- lihat
+    // catatan "1 mesin kirim ... cukup untuk keduanya" di atas). Kalau
+    // item ini TIDAK punya bgAudio.autoplay tercentang, fungsi di bawah
+    // langsung berhenti tanpa efek apa pun -- perilaku LAMA (audio latar
+    // manual lewat tombol 🎧/▶ Play) sama sekali tidak berubah.
+    autoplayBgAudioIfEnabled_(it);
     if (it.type === "verse") {
       // BARU (18 Sep 2026, permintaan operator "gabung beberapa ayat jadi
       // 1 slide") -- it.verseIds (>1 id) = beberapa ayat digabung 1 slide,
@@ -1319,6 +1651,8 @@ const PresentationStudio = (() => {
       sendCanvaSlide(it);
     } else if (it.type === "soundcloud") {
       sendSoundCloudSlide(it);
+    } else if (it.type === "mp3") {
+      sendMp3Slide(it);
     } else if (it.type === "youtube_link") {
       // BARU (5 Sep 2026) -- item YouTube portabel yang ditambahkan dari
       // panel Kumpulan Ayat biasa/HP (addYoutubeLinkToCollection(),
@@ -1371,6 +1705,15 @@ const PresentationStudio = (() => {
     rawPost({ type: "soundcloud", trackUrl: it.trackUrl });
     renderStudioPreview({ type: "soundcloud", trackUrl: it.trackUrl, title: it.title });
   }
+  // BARU (18 Sep 2026) -- kirim item MP3/Audio (link langsung atau Google
+  // Drive, lihat catatan panjang di wireLinkTab() -> bagian MP3) dari
+  // Kumpulan Ayat ke Layar 2, pola sama persis dengan sendSoundCloudSlide()
+  // di atas.
+  function sendMp3Slide(it) {
+    if (!it || !it.audioUrl) return;
+    rawPost({ type: "mp3", audioUrl: it.audioUrl });
+    renderStudioPreview({ type: "mp3", audioUrl: it.audioUrl, title: it.title });
+  }
 
   // BARU (27 Agu 2026) -- lihat addMediaToCollection() (js/collections.js)
   // untuk alasan kenapa item "media" cuma simpan REFERENSI (mediaItemId +
@@ -1419,7 +1762,12 @@ const PresentationStudio = (() => {
       koorMid: !!it.koorMid, // BARU (13 Sep 2026) -- lihat catatan "Koor di tengah" di atas
     };
     Presentation.sendKidung(payload);
-    renderStudioPreview(Object.assign({ type: "kidung" }, payload));
+    // BARU (18 Sep 2026 v3) -- `it.bgAudio` (lihat addKidungToCollection(),
+    // js/collections.js) diteruskan ke renderStudioPreview() SEKEDAR
+    // supaya kotak "Tayang" tahu perlu menampilkan tombol "🎧 Audio
+    // Latar" atau tidak -- TIDAK otomatis diputar (operator yang tekan
+    // sendiri kalau memang perlu, lihat renderStudioPreview()).
+    renderStudioPreview(Object.assign({ type: "kidung", bgAudio: it.bgAudio || null }, payload));
     clearMonitorVideo_(); // kidung bukan video -- sembunyikan area video Monitor 3
   }
 
@@ -1441,6 +1789,16 @@ const PresentationStudio = (() => {
   // selagi Studio terbuka & sudah ada playlist aktif, dan TIDAK dipakai
   // saat fokus sedang di kotak isian (select/input/textarea) supaya
   // tidak mengganggu pemakaian normal kotak itu.
+  // DIUBAH (18 Sep 2026, permintaan operator "2 tombol mudah, seperti
+  // stylus pen, panah atas, panah bawah") -- ArrowUp/ArrowDown ditambah
+  // sebagai ALIAS panah kanan/kiri (bukan pengganti) -- beberapa stylus
+  // pen/clicker presentasi meniru panah ATAS/BAWAH alih-alih KIRI/KANAN
+  // untuk maju/mundur slide, jadi keduanya sekarang bekerja sama persis:
+  // ArrowDown/ArrowRight/PageDown = maju 1 slide, ArrowUp/ArrowLeft/
+  // PageUp = mundur 1 slide. Kalau item yang DITUJU (maju) punya
+  // bgAudio.autoplay tercentang, audionya otomatis ikut main -- lihat
+  // autoplayBgAudioIfEnabled_() (dipanggil dari dalam sendGenericItemLive(),
+  // yang dipanggil playlistGoTo() di bawah).
   function wirePlaylistKeyNav() {
     document.addEventListener("keydown", (e) => {
       if (!activePlaylist) return;
@@ -1448,8 +1806,8 @@ const PresentationStudio = (() => {
       if (!studio || studio.hidden) return;
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); playlistNext(); }
-      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); playlistPrev(); }
+      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); playlistNext(); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") { e.preventDefault(); playlistPrev(); }
     });
   }
 
@@ -1516,7 +1874,117 @@ const PresentationStudio = (() => {
       currentBaits = result.baits || [];
       if (detailWrap) detailWrap.hidden = false;
       if (detailTitle) detailTitle.textContent = `${typeof formatKidungNo === "function" ? formatKidungNo(currentMeta.buku, currentMeta.noKidung) : currentMeta.noKidung} — ${currentMeta.judul || ""}`;
+      renderKidungBgLinks(); // BARU (18 Sep 2026) -- lihat catatan panjang di atas fungsi ini
       renderSlides();
+    }
+
+    // ------------------------------------------------------------
+    // BARU (18 Sep 2026, permintaan operator "pas syair kidung jalan,
+    // audio mp3 bisa nyala") -- Audio Latar per kidung. `linkMp3_1`/
+    // `linkMp3_2`/`linkYoutube` (kolom Sheet Kidung, lihat js/kidung.js)
+    // ada di `currentMeta` kalau diisi. TIDAK semua kidung butuh ini --
+    // kidung yang cuma butuh teks (linkMp3_1/2/linkYoutube kosong) tidak
+    // menampilkan blok ini sama sekali (wrap.hidden = true). Dipisah
+    // SENGAJA dari sendKidungSlide()/genericItems (yang mengirim TEKS
+    // bait) -- audio latar diputar 1x lewat tombol di sini lalu TERUS
+    // jalan walau operator pindah ◀ ▶ antar bait/slide teks (kirim ulang
+    // {type:"kidung"} lewat post() TIDAK menyentuh #ytBg/#kidungBgAudio
+    // di present.html sama sekali), sampai operator sendiri menekan
+    // "⏹ Berhenti" atau membuka kidung lain (renderKidungBgLinks()
+    // dipanggil ulang, TAPI TIDAK otomatis mengirim yt_bg_clear/
+    // mp3_bg_clear -- audio yang sedang jalan tetap jalan sampai
+    // dihentikan manual, supaya lagu tidak putus paksa kalau operator
+    // cuma mau intip kidung lain sebentar).
+    // BARU (18 Sep 2026 v3) -- panel ini SEKARANG numpang status Audio
+    // Latar BERSAMA (sharedBgAudio_/loadSharedBgAudio_/controlSharedBgAudio_,
+    // lihat catatan panjang di dekat clearMonitorVideo_() atas file ini)
+    // -- yang sebelumnya lokal ke panel ini sendiri. `pendingAttachLabel_`
+    // di bawah HANYA dipakai fungsi ini: menandai link MANA yang terakhir
+    // dimuat lewat panel ini, supaya bisa "nempel otomatis" ke tombol
+    // "➕ Daftar"/"➕ Semua Slide" (lihat addSlideToCollection() &
+    // addAllBtn di bawah) -- kidungItem.bgAudio yang tersimpan ke
+    // Kumpulan Ayat lewat addKidungToCollection() (js/collections.js).
+    let pendingAttachLink_ = null; // null ATAU { kind, url, label } -- link TERAKHIR dimuat dari panel ini, siap dilampirkan ke item berikutnya yang di-➕
+    function bgStatus_(text) {
+      const s = el("psKidungBgStatus");
+      if (s) s.textContent = text || "";
+    }
+    function refreshBgControlsUi_() {
+      const controlsBox = el("psKidungBgControls");
+      const loopBtn = el("psKidungBgLoopBtn");
+      if (!controlsBox) return;
+      controlsBox.hidden = !sharedBgAudio_;
+      if (loopBtn) loopBtn.classList.toggle("active", !!(sharedBgAudio_ && sharedBgAudio_.loop));
+      if (!sharedBgAudio_) { bgStatus_(pendingAttachLink_ ? "Audio latar dihentikan." : ""); return; }
+      const loopNote = sharedBgAudio_.loop ? " -- 🔁 akan diulang terus sampai ⏹ Berhenti ditekan" : " -- main 1x (tekan 🔁 Ulang kalau mau diputar terus)";
+      bgStatus_(`🎧 ${sharedBgAudio_.label || "Audio latar"}${loopNote}.`);
+    }
+    onSharedBgAudioChange_(refreshBgControlsUi_);
+    function renderKidungBgLinks() {
+      const wrap = el("psKidungBgWrap");
+      const linksBox = el("psKidungBgLinks");
+      if (!wrap || !linksBox) return;
+      const links = [];
+      if (currentMeta && currentMeta.linkMp3_1) links.push({ kind: "mp3", url: currentMeta.linkMp3_1, label: "🎵 Latar: MP3" });
+      if (currentMeta && currentMeta.linkMp3_2) links.push({ kind: "mp3", url: currentMeta.linkMp3_2, label: "🎧 Latar: MP3 (versi 2)" });
+      if (currentMeta && currentMeta.linkYoutube) links.push({ kind: "yt", url: currentMeta.linkYoutube, label: "📺 Latar: Audio YouTube" });
+      // wrap tetap ditampilkan walau kidung ini belum punya link di Sheet
+      // sama sekali (kotak link manual di bawah selalu ada) -- links.length
+      // === 0 cuma mengosongkan baris tombol otomatis di atasnya.
+      wrap.hidden = false;
+      pendingAttachLink_ = null;
+      refreshBgControlsUi_();
+      bgStatus_(links.length ? "Pilih salah satu di atas untuk dimuat, lalu tekan ▶ Play (atau tempel link Anda sendiri di bawah)." : "Kidung ini belum punya link MP3/YouTube di Sheet -- tempel link Anda sendiri di bawah kalau perlu audio latar.");
+      linksBox.innerHTML = "";
+      links.forEach((lk) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip-btn small";
+        btn.textContent = lk.label;
+        btn.addEventListener("click", () => {
+          loadSharedBgAudio_(lk.kind, lk.url, lk.label.replace(/^\S+\s/, ""));
+          pendingAttachLink_ = { kind: lk.kind, url: lk.url, label: lk.label.replace(/^\S+\s/, "") };
+          bgStatus_(`🎧 Dimuat: ${pendingAttachLink_.label} -- tekan ▶ Play untuk mulai (teks kidung TETAP tayang seperti biasa). Link ini akan ikut tersimpan kalau Anda tekan "➕ Daftar"/"➕ Semua Slide" di bawah.`);
+        });
+        linksBox.appendChild(btn);
+      });
+    }
+    if (el("psKidungBgPlayBtn")) el("psKidungBgPlayBtn").addEventListener("click", () => controlSharedBgAudio_("play"));
+    if (el("psKidungBgPauseBtn")) el("psKidungBgPauseBtn").addEventListener("click", () => controlSharedBgAudio_("pause"));
+    // BARU (18 Sep 2026 v3, permintaan operator "1x habis dan minta
+    // diulangi lagi sampai bosen yang dengar, tapi bisa jadi hanya 1x
+    // saja") -- toggle, BUKAN tombol sekali-pakai: tekan lagi utk
+    // matikan. Default MATI (main 1x, perilaku lama) tiap kali audio
+    // BARU dimuat -- lihat loadSharedBgAudio_().
+    if (el("psKidungBgLoopBtn")) el("psKidungBgLoopBtn").addEventListener("click", () => controlSharedBgAudio_("toggleloop"));
+    if (el("psKidungBgStopBtn")) {
+      el("psKidungBgStopBtn").addEventListener("click", () => controlSharedBgAudio_("stop"));
+    }
+
+    // BARU (18 Sep 2026 v2) -- link manual (#psKidungBgManualInput),
+    // dipakai kalau kidung ini BELUM punya linkMp3_1/2/linkYoutube di
+    // Sheet (mis. kidung baru, atau operator cuma butuh 1x pakai). Kirim
+    // lewat channel SAMA PERSIS ("mp3_bg"/"yt_bg") seperti tombol
+    // otomatis di atas -- lihat loadSharedBgAudio_()/present.html
+    // window.addEventListener("message") untuk kind "mp3_bg"/"yt_bg" --
+    // jadi Play/Jeda/🔁 Ulang/Berhenti di atas ikut bekerja sama persis,
+    // tanpa perlu jalur/kode terpisah di present.html. Berlaku juga utk
+    // link Google Drive mp4 (video) -- diputar sebagai SUARA latar saja
+    // lewat elemen <audio> (#kidungBgAudio di present.html), gambarnya
+    // tidak ditampilkan -- kalau memang perlu videonya tampil penuh
+    // layar, itu fitur terpisah yang belum ada.
+    const kidungBgManualInput = el("psKidungBgManualInput");
+    const kidungBgManualLoadBtn = el("psKidungBgManualLoadBtn");
+    if (kidungBgManualLoadBtn) {
+      kidungBgManualLoadBtn.addEventListener("click", () => {
+        const url = (kidungBgManualInput && kidungBgManualInput.value || "").trim();
+        if (!url) return;
+        const looksLikeYoutube = /youtube\.com|youtu\.be/i.test(url);
+        const kind = looksLikeYoutube ? "yt" : "mp3";
+        loadSharedBgAudio_(kind, url, "Link manual");
+        pendingAttachLink_ = { kind, url, label: "Link manual" };
+        bgStatus_('🎧 Dimuat dari link manual -- tekan ▶ Play untuk mulai (teks kidung TETAP tayang seperti biasa). Link ini akan ikut tersimpan kalau Anda tekan "➕ Daftar"/"➕ Semua Slide" di bawah.');
+      });
     }
 
     function renderSlides() {
@@ -1605,11 +2073,91 @@ const PresentationStudio = (() => {
       const username = typeof currentUser !== "undefined" ? currentUser : null;
       const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
       if (!name) return;
-      addKidungToCollection(username, name, genericItem);
+      // BARU (18 Sep 2026 v3) -- kalau operator baru saja memuat link
+      // Audio Latar dari panel "🎧 Audio Latar" di atas (pendingAttachLink_),
+      // link itu ikut nempel ke SLIDE INI SAJA (1 syair yang sedang
+      // ditekan ➕-nya) -- bukan ke semua bait kidung ini. Tidak memuat
+      // apa pun -> bgAudio kosong, item tersimpan seperti biasa tanpa
+      // audio (tidak perlu dilakukan apa-apa).
+      addKidungToCollection(username, name, Object.assign({}, genericItem, { bgAudio: pendingAttachLink_ }));
       renderCollectionSelect();
     }
 
     if (backBtn) backBtn.addEventListener("click", () => { if (detailWrap) detailWrap.hidden = true; });
+    // BARU (18 Sep 2026, permintaan operator "kumpulan ayat/kidung ada
+    // typo/kedobelan, mau dibenerin langsung dari app") -- edit `teks`
+    // per bait + koor kidung yang SEDANG dibuka di panel ini (currentBaits,
+    // SUMBER dari getKidungBaitsWithKoor() -- lihat js/kidung.js), lalu
+    // renderSlides() dipanggil ulang supaya currentSlides & daftar bait
+    // di bawah langsung ikut perbaikannya. SENGAJA cuma mengubah salinan
+    // di memori sesi Studio ini (SAMA seperti catatan panjang di
+    // updateKidungItemTextInCollection(), js/collections.js) -- Sheet
+    // Kidung asli TIDAK ikut berubah, jadi kalau Studio ditutup/dimuat
+    // ulang, perbaikan ini hilang -- benarkan juga di Sheet kalau memang
+    // salah di sumbernya. Kalau kidung ini KEBETULAN sedang jadi playlist
+    // aktif (activePlaylist, artinya slide-nya SEDANG tayang di Layar 2),
+    // slide yang sedang tayang otomatis dikirim ulang supaya perbaikan
+    // langsung kelihatan SAAT ITU JUGA (termasuk kalau audio latarnya
+    // sedang menyala -- audio TIDAK ikut terputus, lihat renderKidungBgLinks()
+    // di atas, jalurnya memang terpisah dari pengiriman teks bait).
+    const editBtn = el("psKidungEditBtn");
+    if (editBtn) {
+      editBtn.addEventListener("click", () => {
+        if (!currentBaits.length || typeof showSimpleDialog !== "function") return;
+        const uniqueKoorTexts = Array.from(new Set(currentBaits.map((b) => b.koorTeks).filter(Boolean)));
+        showSimpleDialog(`✏️ Edit Syair — ${detailTitle ? detailTitle.textContent : ""}`, (box) => {
+          const baitInputs = [];
+          currentBaits.forEach((b, idx) => {
+            const field = document.createElement("div");
+            field.className = "simple-dialog-field";
+            const label = document.createElement("label");
+            label.textContent = b.noBait != null ? `Bait ${b.noBait}:` : `Baris ${idx + 1}:`;
+            field.appendChild(label);
+            const ta = document.createElement("textarea");
+            ta.rows = 3;
+            ta.style.width = "100%";
+            ta.value = b.teks || "";
+            field.appendChild(ta);
+            box.appendChild(field);
+            baitInputs.push(ta);
+          });
+          const koorInputs = [];
+          uniqueKoorTexts.forEach((kt, idx) => {
+            const field = document.createElement("div");
+            field.className = "simple-dialog-field";
+            const label = document.createElement("label");
+            label.textContent = uniqueKoorTexts.length > 1 ? `Koor (versi ${idx + 1}):` : "Koor:";
+            field.appendChild(label);
+            const ta = document.createElement("textarea");
+            ta.rows = 3;
+            ta.style.width = "100%";
+            ta.value = kt;
+            field.appendChild(ta);
+            box.appendChild(field);
+            koorInputs.push(ta);
+          });
+          const hint = document.createElement("p");
+          hint.className = "simple-dialog-hint";
+          hint.textContent = "Perbaikan ini HANYA berlaku di perangkat & sesi Studio ini sekarang (tidak mengubah Sheet Kidung aslinya) -- kalau memang salah di sumbernya, benarkan juga di Sheet Kidung supaya tidak muncul lagi lain kali.";
+          box.appendChild(hint);
+          return () => ({ baitTexts: baitInputs.map((t) => t.value), koorTexts: koorInputs.map((t) => t.value) });
+        }, (val) => {
+          const koorMap = {};
+          uniqueKoorTexts.forEach((kt, idx) => { koorMap[kt] = val.koorTexts[idx]; });
+          currentBaits = currentBaits.map((b, idx) => Object.assign({}, b, {
+            teks: val.baitTexts[idx],
+            koorTeks: b.koorTeks ? koorMap[b.koorTeks] : b.koorTeks,
+          }));
+          renderSlides();
+          const isThisKidungLive = activePlaylist && activePlaylist.items.length && activePlaylist.items[0].type === "kidung" &&
+            activePlaylist.items[0].buku === currentMeta.buku && String(activePlaylist.items[0].kidungNo) === String(currentMeta.noKidung);
+          if (isThisKidungLive) {
+            const idx = Math.min(activePlaylist.index, currentSlides.length - 1);
+            playlistGoTo(idx);
+          }
+        }, "Simpan");
+      });
+    }
     if (goBtn) goBtn.addEventListener("click", () => { if (noInput && noInput.value.trim()) openKidung(currentBuku, noInput.value.trim()); });
     if (noInput) noInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); goBtn.click(); } });
     if (searchInput) searchInput.addEventListener("input", () => renderSearchResults(searchInput.value));
@@ -1624,11 +2172,18 @@ const PresentationStudio = (() => {
         const username = typeof currentUser !== "undefined" ? currentUser : null;
         const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
         if (!name) return;
-        currentSlides.forEach((slide) => {
+        // BARU (18 Sep 2026 v3) -- kalau ada link Audio Latar yang lagi
+        // dimuat (pendingAttachLink_), ditempelkan HANYA ke slide
+        // PERTAMA (mis. musik pembuka sebelum bait 1) -- bukan ke semua
+        // bait -- supaya tidak dobel/aneh (audio latar sifatnya sekali
+        // nyala, terus jalan sendiri di belakang layar walau operator
+        // pindah bait, lihat catatan panjang di sharedBgAudio_ atas).
+        currentSlides.forEach((slide, idx) => {
           addKidungToCollection(username, name, {
             buku: currentMeta.buku, kidungNo: currentMeta.noKidung, title: currentMeta.judul,
             ikon: currentMeta.ikon || "", bait: slide.baits, koorTeks: slide.koorTeks,
             koorMid: !!slide.koorMid, // BARU (13 Sep 2026) -- lihat catatan "Koor di tengah" di atas
+            bgAudio: idx === 0 ? pendingAttachLink_ : null,
           });
         });
         renderCollectionSelect();
@@ -4812,6 +5367,59 @@ const PresentationStudio = (() => {
       if (!scStatus) return;
       scStatus.textContent = e.detail && e.detail.isPlaying ? "▶️ Sedang diputar di Layar 2." : "⏸️ Dijeda.";
     });
+
+    // ---------- MP3 / Audio (link langsung atau Google Drive) ----------
+    // BARU (18 Sep 2026, permintaan operator) -- lihat catatan panjang di
+    // index.html dekat #psMp3Input & kidungMp3Square() (js/kidung-ui.js)
+    // untuk alasan Drive butuh isDriveUrl()/driveEmbedPreviewUrl()
+    // (js/media.js) alih-alih langsung dipasang ke <audio src>. Payload
+    // yang dikirim ke Layar 2 SELALU {type:"mp3", audioUrl: <link ASLI
+    // apa adanya>} -- deteksi Drive vs link biasa dilakukan LAGI di sisi
+    // Layar 2 (present.html, kind==="mp3"), bukan di sini, supaya kalau
+    // item ini tersimpan ke Kumpulan Ayat & dibuka ulang lewat
+    // sendMp3Slide()/mode 1 layar, tidak perlu menormalisasi ulang.
+    const mp3Input = el("psMp3Input");
+    const mp3ShowBtn = el("psMp3ShowBtn");
+    const mp3SaveBtn = el("psMp3SaveBtn");
+    const mp3Status = el("psMp3Status");
+
+    function mp3StatusHint(url) {
+      if (!url) return "";
+      return typeof isDriveUrl === "function" && isDriveUrl(url)
+        ? "☁️ Terdeteksi link Google Drive."
+        : "🎵 Link MP3 langsung.";
+    }
+    if (mp3Input) {
+      mp3Input.addEventListener("input", () => {
+        if (mp3Status) mp3Status.textContent = mp3StatusHint(mp3Input.value.trim());
+      });
+    }
+    if (mp3ShowBtn) {
+      mp3ShowBtn.addEventListener("click", () => {
+        const url = (mp3Input && mp3Input.value || "").trim();
+        if (!url) return;
+        rawPost({ type: "mp3", audioUrl: url });
+        renderStudioPreview({ type: "mp3", audioUrl: url });
+        if (mp3Status) mp3Status.textContent = "▶️ Diputar di Layar 2. " + mp3StatusHint(url);
+      });
+    }
+    if (mp3SaveBtn) {
+      mp3SaveBtn.addEventListener("click", async () => {
+        const url = (mp3Input && mp3Input.value || "").trim();
+        if (!url) return;
+        if (typeof promptCollectionName !== "function" || typeof addMp3ToCollection !== "function") return;
+        const name = await promptCollectionName();
+        if (!name) return; // operator batal / tutup dialog tanpa nama
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const id = addMp3ToCollection(username, name, { audioUrl: url, title: "" });
+        renderCollectionSelect();
+        if (mp3Status) {
+          mp3Status.textContent = id
+            ? `✅ Tersimpan ke kumpulan "${name}".`
+            : "⚠️ Gagal menyimpan (coba lagi).";
+        }
+      });
+    }
   }
 
   // ============================================================
