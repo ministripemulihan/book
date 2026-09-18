@@ -2418,6 +2418,11 @@
                (gambarnya dipakai bersama layar Masuk lewat
                js/book-scene.js + css/book-scene.css). -->
           <button type="button" class="ps-tab" data-ps-right-tab="penciptaan">🌱 Penciptaan</button>
+          <!-- BARU (18 Sep 2026, permintaan operator) -- 🔤 Slogan
+               Karakter. Modul "Game Offline" ke-5, kodenya di
+               js/games/slogankarakter.js + data di
+               js/games/slogankarakter-data.js. -->
+          <button type="button" class="ps-tab" data-ps-right-tab="slogankarakter">🔤 Slogan Karakter</button>
         </div>
 
         <div class="ps-tab-panel" data-ps-right-panel="teks">
@@ -3842,6 +3847,34 @@
 
           <div class="ps-pointer-hint" style="margin-top:14px;">Catatan: sama seperti 🎡 Roda Undian, versi ini dipakai LANGSUNG dari sini setiap acara (belum bisa disimpan sebagai item di "📚 Kumpulan Ayat").</div>
         </div>
+
+        <!-- BARU (19 Sep 2026, versi checklist) -- 🔤 Slogan Karakter,
+             kodenya di js/games/slogankarakter.js (+ data di
+             js/games/slogankarakter-data.js). #skGroupArea diisi
+             DINAMIS oleh JS jadi GRID 10 KOTAK (persis app aslinya:
+             nomor + ikon + 3 nama karakter per kotak) -- markup di
+             sini cuma wadah kosong. #skFieldsArea juga KOSONG di
+             sini, isinya checkbox per kolom yang dibangun DINAMIS
+             (lihat window.SLOGAN_KARAKTER_FIELDS_FOR di
+             slogankarakter-data.js) -- default SEMUA TERCENTANG. -->
+        <div class="ps-tab-panel" data-ps-right-panel="slogankarakter">
+          <div class="ps-field-label" style="margin-top:0; font-family:Georgia,'Times New Roman',serif; font-size:16px;">30 Karakter untuk Generasi Muda</div>
+          <div class="ps-pointer-hint" style="margin-bottom:10px;">Pilih salah satu dari 10 kotak kelompok, lalu pilih karakternya. Kolom yang dicentang di bawah langsung tayang ke Layar 2 (default semua tercentang).</div>
+
+          <div id="skGroupArea" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px;"></div>
+
+          <div style="font-weight:700; font-size:13px; margin:16px 0 6px;">Karakter</div>
+          <div id="skCharsArea" class="ps-btn-row" style="flex-wrap:wrap;"></div>
+
+          <div style="font-weight:700; font-size:13px; margin:14px 0 2px;">Tampilkan kolom (centang/uncek langsung tayang)</div>
+          <div id="skFieldsArea" hidden></div>
+
+          <div class="ps-btn-row" style="margin-top:16px;">
+            <button type="button" class="chip-btn small" id="skResetBtn">🗑️ Sembunyikan</button>
+          </div>
+          <div id="skStatus" class="ps-pointer-hint" style="margin-top:10px; font-weight:700;"></div>
+          <div class="ps-pointer-hint" style="margin-top:14px;">Catatan: "Apa Artinya", "Contoh Karakter", dan "Ayat Firman Tuhan" adalah RENCANA KE DEPAN -- checkbox-nya baru muncul otomatis di sini begitu isinya diisi di js/games/slogankarakter-data.js.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -3895,6 +3928,12 @@
   <script src="js/games/kuis-9-kotak.js?v=20260916a"></script>
   <script src="js/games/survei-membuktikan.js?v=20260916a"></script>
   <script src="js/games/penciptaan.js?v=20260918a"></script>
+  <!-- BARU (18 Sep 2026) -- 🔤 Slogan Karakter. slogankarakter-data.js
+       WAJIB dimuat SEBELUM slogankarakter.js DAN SEBELUM
+       media-library.js (keduanya baca window.SLOGAN_KARAKTER_DATA /
+       window.SLOGAN_KARAKTER_MODES_FOR dari file data itu). -->
+  <script src="js/games/slogankarakter-data.js?v=20260919a"></script>
+  <script src="js/games/slogankarakter.js?v=20260919a"></script>
   <!-- BARU (11 Sep 2026) -- lihat STATUS-PUSTAKA-MEDIA.md langkah 1-2.
        favorites.js HARUS dimuat SEBELUM media-library.js (dipakai
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
