@@ -64,7 +64,12 @@
 // Layar Masuk: file BARU js/book-scene.js, css/book-scene.css,
 // js/games/penciptaan.js, plus perubahan index.html/present.html/
 // js/presentation-studio.js).
-const CACHE_NAME = "book-vp-shell-v15";
+// DINAIKKAN LAGI (19 Sep 2026 -- perbaikan Slogan Karakter & Penciptaan tidak
+// tampil di Layar 2 [present.html kurang memuat slogankarakter-data.js + kotak
+// Slogan Karakter tidak pernah bisa disembunyikan], + tombol "Tampilan Awal"
+// di kedua game: present.html, index.html, js/presentation-studio.js,
+// js/games/penciptaan.js, js/games/slogankarakter.js).
+const CACHE_NAME = "book-vp-shell-v16";
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",
