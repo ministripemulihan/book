@@ -2476,6 +2476,31 @@
   let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
   const ytBgEl = document.getElementById("ytBg");
   const kidungBgAudioEl = document.getElementById("kidungBgAudio"); // BARU (18 Sep 2026) -- Audio Latar MP3 kidung, lihat catatan di atas
+  // BARU (18 Sep 2026 v5, permintaan operator "audio mp3 tidak bisa nyala,
+  // apa ada yang keliru?") -- lapor balik ke jendela Studio (window.opener,
+  // pola SAMA seperti "present_camera_status"/"present_ready" dkk di bawah
+  // file ini) kalau elemen <audio> Audio Latar ini GAGAL memutar sama
+  // sekali. Penyebab TERSERING: link Google Drive yang linknya kena
+  // halaman "Google tidak bisa memindai file ini untuk virus" (biasa
+  // muncul utk file berukuran cukup besar) -- <audio src> lalu menerima
+  // HALAMAN HTML itu, bukan berkas MP3-nya, jadi diam total TANPA pesan
+  // error apa pun yang kelihatan operator (persis keluhan "tidak bisa
+  // nyala, tidak tahu kenapa"). Event "error" native <audio> menangkap
+  // ini (src gagal di-decode sebagai audio); event "playing" dipakai
+  // sebagai tanda SEBALIKNYA (berhasil, supaya presentation-studio.js
+  // bisa menghapus pesan gagal SEBELUMNYA kalau operator ganti ke link
+  // yang benar).
+  function reportBgAudioStatus_(ok, url, message) {
+    if (!window.opener) return;
+    try {
+      window.opener.postMessage({ source: "bibleAppPresenter", type: "present_bgaudio_status", ok: !!ok, url: url || "", message: message || "" }, location.origin);
+    } catch (e) {}
+  }
+  kidungBgAudioEl.addEventListener("error", () => {
+    if (!kidungBgAudioEl.src) return;
+    reportBgAudioStatus_(false, kidungBgAudioEl.src, "Gagal memuat/memutar -- kemungkinan besar link Google Drive ini kena halaman \"tidak bisa dipindai virus\" (biasa terjadi untuk file cukup besar), atau file belum dibagikan \"Siapa saja yang memiliki link\". Coba buka link aslinya langsung di tab baru untuk memastikan, atau pakai hosting MP3 lain (link yang berakhiran .mp3 langsung biasanya paling aman).");
+  });
+  kidungBgAudioEl.addEventListener("playing", () => reportBgAudioStatus_(true, kidungBgAudioEl.src, ""));
   // BARU (28 Agu 2026) -- Repeat One/Repeat All + daftar putar (playlist)
   // untuk video YouTube utama (#ytView), lihat wireYtControls() &
   // wireYtPlaylistTab() di js/presentation-studio.js, dan handler
@@ -6402,7 +6427,7 @@
   // "HH:MM:SS:MSMS" yang SELALU 4 bagian, contoh "01:01:31:17") --
   // sebelumnya bagian JAM (hh) baru muncul kalau video sudah lewat 1
   // jam (video < 1 jam cuma tampil MM:SS:ms) -- sekarang SELALU
-  // ditampilkan 4 bagian (HH:MM:SS:ms) supaya formatnya konsisten sejak 
+  // ditampilkan 4 bagian (HH:MM:SS:ms) supaya formatnya konsisten sejak
   // detik pertama video, tidak berubah-ubah panjangnya di tengah jalan.
   function fmtElapsedParts_(totalSec) {
     const s = Math.max(0, totalSec);
