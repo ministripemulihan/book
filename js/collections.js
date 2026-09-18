@@ -493,8 +493,13 @@ function addKidungToCollection(username, name, kidungItem) {
     ikon: kidungItem.ikon || "",
     bait: Array.isArray(kidungItem.bait) ? kidungItem.bait.map((b) => ({ noBait: b.noBait, teks: b.teks })) : [],
     koorTeks: kidungItem.koorTeks || null,
-    bgAudio: (kidungItem.bgAudio && kidungItem.bgAudio.url)
-      ? { kind: kidungItem.bgAudio.kind === "yt" ? "yt" : (kidungItem.bgAudio.kind === "mp4" ? "mp4" : "mp3"), url: String(kidungItem.bgAudio.url), label: kidungItem.bgAudio.label || "", autoplay: !!kidungItem.bgAudio.autoplay }
+    bgAudio: (kidungItem.bgAudio && (kidungItem.bgAudio.url || kidungItem.bgAudio.continuePrev))
+      ? {
+          kind: kidungItem.bgAudio.kind === "yt" ? "yt" : (kidungItem.bgAudio.kind === "mp4" ? "mp4" : "mp3"),
+          url: String(kidungItem.bgAudio.url || ""), label: kidungItem.bgAudio.label || "", autoplay: !!kidungItem.bgAudio.autoplay,
+          // BARU (18 Sep 2026 v6) -- lihat catatan panjang di updateItemBgAudioInCollection() di atas
+          armStart: !!kidungItem.bgAudio.armStart, continuePrev: !!kidungItem.bgAudio.continuePrev, loopFile: !!kidungItem.bgAudio.loopFile,
+        }
       : null,
     // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah" (lihat
     // catatan panjang di splitKidungIntoSlides()/js/kidung.js) ikut
@@ -607,12 +612,28 @@ function updateKidungItemTextInCollection(username, id, index, updates) {
 // lihat controlSharedBgAudio_() js/presentation-studio.js) -- video-nya
 // sendiri TIDAK ditampilkan, cuma suaranya yang jalan sebagai latar,
 // sama seperti mp3.
+// DIUBAH (18 Sep 2026 v6, permintaan operator "YouTube latar per-slide,
+// klik panah ke 2 baru mulai, lanjutkan ke slide berikut") -- 3 field
+// baru (SEMUA opsional, cuma dipakai kalau kind==="yt", lihat
+// openBgAudioDialog_() js/presentation-studio.js): `armStart` (perlu 1x
+// klik panah lagi baru mulai, TIDAK otomatis), `continuePrev` (jangan
+// mulai/hentikan apa pun -- biarkan audio dari slide sebelumnya terus
+// main), `loopFile` (loop video ini terus-menerus alih-alih berhenti
+// sesudah 1x). Item LAMA (disimpan sebelum field ini ada) otomatis jatuh
+// ke false utk semuanya -- perilaku LAMA sama persis, tidak ada yang
+// berubah. `continuePrev` SATU-SATUNYA alasan item ini boleh disimpan
+// TANPA `url` sendiri (marker "lanjutkan" murni) -- makanya syaratnya
+// `bgAudio.url || bgAudio.continuePrev`, bukan cuma `.url` seperti dulu.
 function updateItemBgAudioInCollection(username, id, index, bgAudio) {
   const collections = loadCollections(username);
   const col = collections[id];
   if (!col || !col.items[index]) return false;
-  col.items[index].bgAudio = (bgAudio && bgAudio.url)
-    ? { kind: bgAudio.kind === "yt" ? "yt" : (bgAudio.kind === "mp4" ? "mp4" : "mp3"), url: String(bgAudio.url), label: bgAudio.label || "", autoplay: !!bgAudio.autoplay }
+  col.items[index].bgAudio = (bgAudio && (bgAudio.url || bgAudio.continuePrev))
+    ? {
+        kind: bgAudio.kind === "yt" ? "yt" : (bgAudio.kind === "mp4" ? "mp4" : "mp3"),
+        url: String(bgAudio.url || ""), label: bgAudio.label || "", autoplay: !!bgAudio.autoplay,
+        armStart: !!bgAudio.armStart, continuePrev: !!bgAudio.continuePrev, loopFile: !!bgAudio.loopFile,
+      }
     : null;
   col.updatedAt = new Date().toISOString();
   saveCollections(username, collections);
