@@ -1914,6 +1914,22 @@
             <div id="psKidungBgWrap" class="ps-kidung-bg-wrap" hidden>
               <div class="ps-field-label">🎵 Audio Latar (opsional -- suara diputar di belakang layar, teks kidung tetap tayang)</div>
               <div class="ps-btn-row" id="psKidungBgLinks"></div>
+              <!-- BARU (18 Sep 2026 v4, permintaan operator "tombolnya bisa
+                   dibuat bisa dicentang/tidak, jadi bisa pakai audio atau
+                   tidak") -- checklist TUNGGAL untuk kidung yang sedang
+                   dibuka: dicentang = link yang dimuat (chip di atas ATAU
+                   link manual di bawah) otomatis ikut nyala sendiri begitu
+                   BAIT MANA PUN dari kidung ini masuk slide (▶️ Tayangkan,
+                   atau panah/PageUp-Down/stylus) -- tidak perlu tekan
+                   ▶ Play manual lagi. TIDAK dicentang = tetap tersedia
+                   untuk dimuat & diputar manual seperti biasa (▶ Play di
+                   bawah), tapi TIDAK ikut otomatis nyala sendiri. Lihat
+                   wireKidungTab() -> renderKidungBgLinks() (js/presentation-
+                   studio.js) untuk cara kerjanya. -->
+              <label class="ps-pointer-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin:4px 0;">
+                <input type="checkbox" id="psKidungBgAutoToggle" />
+                ▶️ Otomatis nyala sendiri saat baitnya masuk slide (tidak usah tekan ▶ Play)
+              </label>
               <!-- BARU (18 Sep 2026, lanjutan permintaan operator "kadang
                    kidungnya belum ada di Sheet, tapi tetap butuh mp3/
                    Drive/YouTube latar sekali pakai") -- link manual,
