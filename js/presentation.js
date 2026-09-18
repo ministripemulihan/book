@@ -465,7 +465,12 @@ const Presentation = (() => {
   // saat Layar 2 dibuka ulang salah (bukan ayat/kidung yg sesungguhnya
   // sedang tayang). "mp3_bg"/"mp3_bg_control"/"mp3_bg_clear" (BARU, Audio
   // Latar MP3) ikut didaftarkan sekalian di sini dari awal.
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "mp3_bg", "mp3_bg_control", "mp3_bg_clear"];
+  // BARU (18 Sep 2026 v6) -- "yt_bg_armed" (badge kecil "🎵 Tekan panah
+  // lagi" di Layar 2, lihat setYtArmedIndicator_() js/presentation-studio.js
+  // & present.html) ikut didaftarkan di sini dari awal, SAMA seperti
+  // yt_bg/yt_bg_control dkk di atas -- supaya TIDAK menimpa `lastPayload`
+  // (lihat catatan PERBAIKAN panjang di atas persis utk alasan yang sama).
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) {
