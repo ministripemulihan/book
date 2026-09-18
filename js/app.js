@@ -6031,6 +6031,9 @@ function collectionItemRef(it) {
   // daftar tetap masuk akal.
   if (it.type === "canva") return `🖼️ Canva${it.title ? ": " + it.title : ""}`;
   if (it.type === "soundcloud") return `🎧 SoundCloud${it.title ? ": " + it.title : ""}`;
+  // BARU (18 Sep 2026) -- item MP3/Audio (link langsung atau Google
+  // Drive), lihat addMp3ToCollection() (js/collections.js).
+  if (it.type === "mp3") return `🎵 MP3/Audio${it.title ? ": " + it.title : ""}`;
   // BARU (5 Sep 2026) -- item YouTube portabel (addYoutubeLinkToCollection(),
   // js/collections.js), ditambahkan lewat tombol "🔗 Tambah Link" di panel
   // ini sendiri (bisa dari HP) -- beda dari it.type==="media" yang jadi
@@ -6089,6 +6092,7 @@ function collectionItemBodyText(it) {
   if (it.type === "media") return "";
   if (it.type === "canva") return "";
   if (it.type === "soundcloud") return "";
+  if (it.type === "mp3") return "";
   // BARU (5 Sep 2026) -- lihat catatan di collectionItemRef() di atas.
   // Beda dari "media"/"canva"/"soundcloud" (yang keterangannya menyuruh
   // pindah ke Studio Presentasi), video YouTube portabel ini SUDAH bisa
@@ -6145,7 +6149,7 @@ function collectionItemBodyHtml(it) {
 // Layar Penuh -- dipakai openCollectionFullscreen() untuk memutuskan
 // apakah menampilkan .collection-fs-text (teks biasa) ATAU kotak embed.
 function isEmbeddableCollectionItem(it) {
-  return !!it && (it.type === "canva" || it.type === "soundcloud" || it.type === "media" || it.type === "youtube_link");
+  return !!it && (it.type === "canva" || it.type === "soundcloud" || it.type === "mp3" || it.type === "media" || it.type === "youtube_link");
 }
 
 // Sama PERSIS logikanya dengan resolveSoundCloudSrc() di present.html
@@ -6313,6 +6317,13 @@ function buildCollectionItemRow(id, col, it, i, opts) {
     }
   }
 
+  // BARU (18 Sep 2026, permintaan operator "kidung typo/kedobelan, mau
+  // dibenerin langsung dari app") -- tombol edit HANYA untuk item kidung
+  // (bukan ayat/teks/media/dst -- yang lain punya sumber berbeda-beda,
+  // lihat catatan updateKidungItemTextInCollection() di js/collections.js
+  // untuk kenapa fitur ini dibatasi ke kidung dulu).
+  const editKidungBtnHtml = it.type === "kidung" ? '<button type="button" class="chip-btn small col-edit-kidung-btn">✏️ Edit Teks</button>' : "";
+
   const item = document.createElement("div");
   item.className = "collection-verse-item";
   item.innerHTML = `
@@ -6329,6 +6340,7 @@ function buildCollectionItemRow(id, col, it, i, opts) {
         <button type="button" class="chip-btn small col-move-bottom-btn" title="Pindahkan ke paling akhir">⏭️ Akhir</button>
         ${noteText ? '<button type="button" class="chip-btn small col-note-toggle">📝 Lihat Catatan</button>' : ""}
         ${v ? '<button type="button" class="chip-btn small col-open-btn">📖 Buka di Pembaca</button>' : ""}
+        ${editKidungBtnHtml}
         ${groupRemoveBtnHtml}
         ${mediaGroupRemoveBtnHtml}
         <button type="button" class="chip-btn small danger col-remove-btn">Hapus</button>
@@ -6401,6 +6413,72 @@ function buildCollectionItemRow(id, col, it, i, opts) {
     groupRemoveBtn.addEventListener("click", () => {
       if (!confirm(`Hapus SEMUA ${groupCount} bait kidung "${it.title || ("No. " + it.kidungNo)}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
       if (removeKidungGroupFromCollection(currentUser, id, it.buku, it.kidungNo) > 0) opts.onChanged();
+    });
+  }
+  // BARU (18 Sep 2026, permintaan operator "kidung typo/kedobelan, mau
+  // dibenerin langsung dari app") -- lihat catatan panjang di
+  // updateKidungItemTextInCollection() (js/collections.js). Dialog
+  // sederhana: 1 kotak teks per bait (+ 1 kotak Koor kalau ada), simpan
+  // lewat showSimpleDialog() yang sudah ada. Setelah disimpan, operator
+  // ditanya mau langsung dikirim ulang ke Layar 2 SEKARANG atau tidak
+  // (Presentation.sendKidung() sama persis dipakai sendKidungSlide() di
+  // js/presentation-studio.js) -- supaya kalau kidung ini KEBETULAN
+  // sedang tayang saat itu, perbaikannya langsung kelihatan tanpa perlu
+  // operator mencari-cari cara menayangkan ulang.
+  const editKidungBtn = item.querySelector(".col-edit-kidung-btn");
+  if (editKidungBtn) {
+    editKidungBtn.addEventListener("click", () => {
+      const baitList = Array.isArray(it.bait) ? it.bait : [];
+      showSimpleDialog(`✏️ Edit Teks Kidung — ${it.title || ("No. " + it.kidungNo)}`, (box) => {
+        const baitInputs = [];
+        baitList.forEach((b) => {
+          const field = document.createElement("div");
+          field.className = "simple-dialog-field";
+          const label = document.createElement("label");
+          label.textContent = b.noBait != null ? `Bait ${b.noBait}:` : "Baris:";
+          field.appendChild(label);
+          const ta = document.createElement("textarea");
+          ta.rows = 3;
+          ta.style.width = "100%";
+          ta.value = b.teks || "";
+          field.appendChild(ta);
+          box.appendChild(field);
+          baitInputs.push(ta);
+        });
+        let koorInput = null;
+        if (it.koorTeks) {
+          const field = document.createElement("div");
+          field.className = "simple-dialog-field";
+          const label = document.createElement("label");
+          label.textContent = "Koor:";
+          field.appendChild(label);
+          koorInput = document.createElement("textarea");
+          koorInput.rows = 3;
+          koorInput.style.width = "100%";
+          koorInput.value = it.koorTeks;
+          field.appendChild(koorInput);
+          box.appendChild(field);
+        }
+        const hint = document.createElement("p");
+        hint.className = "simple-dialog-hint";
+        hint.textContent = "Perbaikan ini HANYA berlaku di kumpulan ini (tidak mengubah Sheet Kidung aslinya) -- kalau memang salah di sumbernya, benarkan juga di Sheet Kidung supaya tidak muncul lagi lain kali.";
+        box.appendChild(hint);
+        return () => ({
+          bait: baitList.map((b, idx) => ({ noBait: b.noBait, teks: baitInputs[idx].value })),
+          koorTeks: koorInput ? koorInput.value : (it.koorTeks || null),
+        });
+      }, (val) => {
+        if (!updateKidungItemTextInCollection(currentUser, id, i, val)) { alert("Gagal menyimpan perubahan."); return; }
+        opts.onChanged();
+        if (typeof Presentation !== "undefined" && Presentation.sendKidung &&
+            confirm("Teks sudah disimpan. Kirim ulang ke Layar 2 SEKARANG (supaya perbaikan langsung terlihat kalau kidung ini sedang tayang)?")) {
+          Presentation.sendKidung({
+            ref: ref, bait: val.bait, koorTeks: val.koorTeks,
+            pengarang: it.pengarang || "", birama: it.birama || "", jumlahBait: it.jumlahBait || 0,
+            koorMid: !!it.koorMid,
+          });
+        }
+      }, "Simpan");
     });
   }
   const mediaGroupRemoveBtn = item.querySelector(".col-remove-mediagroup-btn");
@@ -6755,6 +6833,90 @@ function openCollectionFullscreen(col, startIndex) {
   let currentEmbedVideoIframe = null;
   let ytStartedForCurrentSlide = false;
 
+  // ------------------------------------------------------------
+  // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
+  // otomatis (mp3/mp4/YouTube), 1 saja yang aktif, otomatis nyala pas
+  // masuk slide, panah atas/bawah pindah slide") -- versi Mode Layar
+  // Penuh (1 layar/HP, openCollectionFullscreen ini) dari fitur `bgAudio`
+  // yang SUDAH ada di Studio Presentasi 2 layar (lihat autoplayBgAudioIfEnabled_()
+  // & catatan panjang di sekitarnya, js/presentation-studio.js). DATA-nya
+  // (it.bgAudio = {url, kind:"mp3"|"mp4"|"yt", label, autoplay}) SAMA
+  // PERSIS -- disimpan lewat tombol "🎧 Audio Latar" di panel Kumpulan
+  // Ayat biasa (openBgAudioDialog_(), sudah jalan utk item APA SAJA
+  // termasuk halaman PDF/gambar "media"), jadi TIDAK perlu dialog baru
+  // di sini, tinggal DIBACA & diputar sendiri karena Mode Layar Penuh ini
+  // TIDAK punya jendela Layar 2 terpisah (postMessage) -- audio harus
+  // diputar LANGSUNG di halaman yang sama.
+  //
+  // 2 elemen tersembunyi ini SENGAJA ditaruh di document.body (BUKAN di
+  // dalam `overlay`) karena render() di bawah melakukan
+  // `overlay.innerHTML = ""` tiap ganti slide -- kalau elemen audio ada
+  // di dalam overlay, ia ikut terhapus & audio terputus paksa tiap
+  // pindah slide walau lagunya belum selesai. kind "mp3"/"mp4" sama-sama
+  // lewat <audio> (mp4 Drive dipakai suaranya saja, videonya tidak
+  // ditampilkan -- sama seperti perilaku Studio), kind "yt" lewat
+  // <iframe> YouTube tersembunyi 1x1px dengan ?autoplay=1.
+  let fsBgAudioEl = null;
+  let fsBgYtEl = null;
+  let fsBgAudioActiveUrl_ = null; // url yang SEDANG dimuat -- supaya tidak dimuat ulang (yg bikin lagu balik ke awal) kalau operator kebetulan lompat ke slide yg link audionya SAMA
+  function ensureFsBgAudioEls_() {
+    if (!fsBgAudioEl) {
+      fsBgAudioEl = document.createElement("audio");
+      fsBgAudioEl.id = "collectionFsBgAudio";
+      fsBgAudioEl.preload = "auto";
+      fsBgAudioEl.hidden = true;
+      document.body.appendChild(fsBgAudioEl);
+    }
+    if (!fsBgYtEl) {
+      fsBgYtEl = document.createElement("iframe");
+      fsBgYtEl.id = "collectionFsBgYt";
+      fsBgYtEl.style.cssText = "position:fixed; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0; pointer-events:none; border:0;";
+      fsBgYtEl.setAttribute("allow", "autoplay");
+      document.body.appendChild(fsBgYtEl);
+    }
+  }
+  function stopFsBgAudio_() {
+    if (fsBgAudioEl) { try { fsBgAudioEl.pause(); } catch (e) {} fsBgAudioEl.removeAttribute("src"); try { fsBgAudioEl.load(); } catch (e) {} }
+    if (fsBgYtEl) fsBgYtEl.src = "";
+    fsBgAudioActiveUrl_ = null;
+  }
+  function removeFsBgAudioEls_() {
+    stopFsBgAudio_();
+    if (fsBgAudioEl && fsBgAudioEl.parentNode) fsBgAudioEl.parentNode.removeChild(fsBgAudioEl);
+    if (fsBgYtEl && fsBgYtEl.parentNode) fsBgYtEl.parentNode.removeChild(fsBgYtEl);
+    fsBgAudioEl = null; fsBgYtEl = null;
+  }
+  // Dipanggil tiap render() (tiap kali slide berganti, termasuk PERTAMA
+  // kali dibuka) -- "checklist, pilih 1 saja yang aktif" jalan otomatis
+  // di sini: kalau item ini TIDAK punya bgAudio ATAU kotak "Otomatis"-nya
+  // tidak dicentang, audio yang mungkin masih menyala dari slide
+  // SEBELUMNYA langsung dihentikan (silakan diam) -- tidak seperti Studio
+  // (yang sengaja MEMPERTAHANKAN audio latar kidung lintas bait sampai
+  // ditekan Berhenti manual), di sini per-SLIDE PDF/gambar/ayat biasanya
+  // mau 1 lagu 1 slide, jadi lebih aman default-nya berhenti saat pindah.
+  function applyFsBgAudioForItem_(it) {
+    ensureFsBgAudioEls_();
+    const bg = it && it.bgAudio;
+    if (!bg || !bg.url || !bg.autoplay) { stopFsBgAudio_(); return; }
+    if (fsBgAudioActiveUrl_ === bg.url) return; // sudah jalan persis link yg sama -- jangan dimuat ulang (lagu tidak balik ke awal)
+    stopFsBgAudio_();
+    fsBgAudioActiveUrl_ = bg.url;
+    if (bg.kind === "yt") {
+      const embed = typeof youTubeEmbedUrl === "function" ? youTubeEmbedUrl(bg.url) : null;
+      if (embed) fsBgYtEl.src = embed + (embed.indexOf("?") >= 0 ? "&" : "?") + "autoplay=1&mute=0&playsinline=1";
+    } else {
+      // mp3/mp4 -- link Drive dinormalisasi ke "uc?export=download" dulu
+      // (driveDownloadUrl(), sudah ada di app.js) supaya bisa dipasang
+      // langsung sebagai src <audio>, sama seperti resolveBellAudioUrl_()
+      // di present.html/Layar 2.
+      const src = (typeof isDriveUrl === "function" && isDriveUrl(bg.url) && typeof driveDownloadUrl === "function")
+        ? driveDownloadUrl(bg.url) : bg.url;
+      fsBgAudioEl.src = src;
+      const p = fsBgAudioEl.play();
+      if (p && p.catch) p.catch(() => {}); // browser kadang menolak autoplay -- operator sudah "berinteraksi" (buka Mode Layar Penuh), jadi biasanya lolos; kalau tetap ditolak, operator bisa buka dialog "🎧 Audio Latar" item ini & tekan Simpan lagi, atau tambahkan kontrol manual bila perlu.
+    }
+  }
+
   // Menambahkan enablejsapi=1 + origin=<asal halaman ini> ke link embed
   // YouTube -- KEDUANYA wajib ada supaya YouTube IFrame API mengizinkan
   // perintah (play/pause) datang dari luar iframe lewat postMessage
@@ -7086,6 +7248,43 @@ function openCollectionFullscreen(col, startIndex) {
       });
       return wrap;
     }
+    if (it.type === "mp3" && it.audioUrl) {
+      // BARU (18 Sep 2026) -- item MP3/Audio (link langsung ATAU Google
+      // Drive, lihat addMp3ToCollection()/js/collections.js). Link Drive
+      // TIDAK bisa dipasang langsung ke <audio src> (itu halaman HTML,
+      // bukan berkas mentah) -- pakai iframe ".../preview" seperti pola
+      // kidungMp3Square() (js/kidung-ui.js). Link biasa pakai <audio
+      // controls autoplay> bawaan browser (pola sama seperti kotak embed
+      // SoundCloud di atas: audio-nya diputar di sini, BUKAN mengganti
+      // seluruh layar).
+      const wrap = document.createElement("div");
+      wrap.className = "collection-fs-embed-wrap collection-fs-embed-soundcloud";
+      const isDrive = typeof isDriveUrl === "function" && isDriveUrl(it.audioUrl);
+      if (isDrive && typeof driveEmbedPreviewUrl === "function") {
+        const src = driveEmbedPreviewUrl(it.audioUrl);
+        const iframe = document.createElement("iframe");
+        iframe.setAttribute("allow", "autoplay");
+        iframe.className = "collection-fs-embed-iframe collection-fs-embed-iframe-audio";
+        iframe.src = src || it.audioUrl;
+        wrap.appendChild(iframe);
+      } else {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.autoplay = true;
+        audio.src = it.audioUrl;
+        audio.className = "collection-fs-embed-iframe-audio";
+        audio.style.width = "100%";
+        wrap.appendChild(audio);
+      }
+      const openLink = document.createElement("a");
+      openLink.href = it.audioUrl;
+      openLink.target = "_blank";
+      openLink.rel = "noopener noreferrer";
+      openLink.className = "collection-fs-embed-openlink";
+      openLink.textContent = isDrive ? "🔗 Buka di Google Drive" : "🔗 Buka link MP3";
+      wrap.appendChild(openLink);
+      return wrap;
+    }
     if (it.type === "media" && it.mediaItemId) {
       const wrap = document.createElement("div");
       wrap.className = "collection-fs-embed-wrap collection-fs-embed-media";
@@ -7176,6 +7375,9 @@ function openCollectionFullscreen(col, startIndex) {
     // tombol "Buka di Pembaca" di bawah, semuanya sudah menjaga v ? ... : ...
     // seperti sebelumnya, jadi jenis lain otomatis melewati bagian itu).
     const it = col.items[idx];
+    // BARU (18 Sep 2026) -- checklist audio latar otomatis, lihat catatan
+    // panjang di applyFsBgAudioForItem_() dekat awal fungsi ini.
+    applyFsBgAudioForItem_(it);
     const v = it && it.type === "verse" ? verseById[it.verseId] : null;
     const noteText = v ? getPersonalNote(currentUser, it.verseId) : "";
     const ref = it ? collectionItemRef(it) : "";
@@ -7317,6 +7519,19 @@ function openCollectionFullscreen(col, startIndex) {
       topRefEl.textContent = `${idx + 1} / ${total}`;
       topRefEl.title = ref;
       topRow.appendChild(topRefEl);
+    }
+    // BARU (18 Sep 2026) -- indikator kecil + tombol berhenti manual,
+    // tampil HANYA kalau audio latar item ini sedang menyala (checklist
+    // "Otomatis" tercentang & sedang diputar, lihat applyFsBgAudioForItem_()
+    // di atas) -- supaya operator tetap bisa membungkam lagu sewaktu-waktu
+    // tanpa harus keluar dari Mode Layar Penuh dulu.
+    if (fsBgAudioActiveUrl_) {
+      const bgStopBtn = document.createElement("button");
+      bgStopBtn.className = "chip-btn small";
+      bgStopBtn.textContent = "🎧 ⏹ Berhenti";
+      bgStopBtn.title = (it && it.bgAudio && it.bgAudio.label) ? `Hentikan audio latar: ${it.bgAudio.label}` : "Hentikan audio latar";
+      bgStopBtn.addEventListener("click", () => { stopFsBgAudio_(); bgStopBtn.remove(); });
+      topRow.appendChild(bgStopBtn);
     }
     topRow.appendChild(closeBtn);
     overlay.appendChild(topRow);
@@ -7465,6 +7680,7 @@ function openCollectionFullscreen(col, startIndex) {
   }
   function closeOverlay() {
     stopCollectionVersePlayback();
+    removeFsBgAudioEls_(); // BARU (18 Sep 2026) -- hentikan & buang elemen audio latar tersembunyi, jangan biarkan nyangkut/nyala setelah Mode Layar Penuh ditutup
     exitRealFullscreenIfOurs();
     overlay.hidden = true;
     overlay.innerHTML = "";
