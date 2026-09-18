@@ -1023,6 +1023,15 @@
      pakai salah satu (tombol Studio ATAU klik langsung di bilah ini,
      keduanya sinkron karena sama-sama lewat 1 objek SC.Widget). */
   #scView { width: 100vw; height: 166px; position: fixed; left: 0; right: 0; bottom: 0; border: none; }
+  /* BARU (18 Sep 2026, permintaan operator "kadang cuma butuh MP3/Drive
+     link, bukan SoundCloud") -- kind "mp3" (lihat showMain() bawah).
+     #mp3DriveView dipakai utk link Google Drive (iframe ".../preview",
+     satu-satunya cara Drive bisa diputar tertanam), #mp3AudioView dipakai
+     utk link MP3 langsung (<audio controls> bawaan browser). Sama seperti
+     #scView di atas: bilah bawah, TIDAK menutupi ayat/kidung/pengumuman
+     yang sedang tayang di #text/#ref di belakangnya. */
+  #mp3DriveView { width: 100vw; height: 166px; position: fixed; left: 0; right: 0; bottom: 0; border: none; }
+  #mp3AudioView { width: 100vw; position: fixed; left: 0; right: 0; bottom: 0; }
   /* Audio Latar YouTube ("Latar suara saja" di Studio) -- video ASLI
      tetap dimuat & diputar (supaya suaranya jalan), tapi disembunyikan
      SECARA VISUAL (opacity:0, bukan display:none/hidden -- display:none
@@ -2182,10 +2191,18 @@
          Layar 2 ini, jadi TIDAK ada batas ukuran buatan & 100% offline. -->
     <video id="localVideoEl" hidden playsinline></video>
     <iframe id="ytBg" allow="autoplay; encrypted-media" frameborder="0" tabindex="-1"></iframe>
+    <!-- BARU (18 Sep 2026, permintaan operator "kidung butuh mp3 latar,
+         teks tetap tayang") -- Audio Latar MP3, pola SAMA PERSIS dengan
+         #ytBg di atas (tersembunyi, cuma suaranya, tidak menggantikan
+         tampilan utama) -- lihat data.type "mp3_bg"/"mp3_bg_control"/
+         "mp3_bg_clear" di window.addEventListener("message") bawah. -->
+    <audio id="kidungBgAudio" preload="auto" hidden></audio>
     <!-- BARU (4 Sep 2026) -- lihat catatan CSS #canvaView & #scView di
          atas, dan showMain() kind "canva"/"soundcloud" di skrip bawah. -->
     <iframe id="canvaView" hidden allow="fullscreen" allowfullscreen frameborder="0"></iframe>
     <iframe id="scView" hidden allow="autoplay" frameborder="0"></iframe>
+    <iframe id="mp3DriveView" hidden allow="autoplay" frameborder="0"></iframe>
+    <audio id="mp3AudioView" hidden controls></audio>
     <div id="timerWrap" hidden>
       <svg id="timerRing" viewBox="0 0 100 100">
         <circle id="timerRingBg" cx="50" cy="50" r="44"></circle>
@@ -2439,8 +2456,26 @@
   });
   const canvaEl = document.getElementById("canvaView"); // BARU (4 Sep 2026)
   const scEl = document.getElementById("scView"); // BARU (4 Sep 2026)
+  const mp3DriveEl = document.getElementById("mp3DriveView"); // BARU (18 Sep 2026)
+  const mp3AudioEl = document.getElementById("mp3AudioView"); // BARU (18 Sep 2026)
+  // Link Google Drive dikenali dari pola "/file/d/FILE_ID" atau
+  // "?id=FILE_ID" -- versi ringkas isDriveUrl()/driveFileIdFromUrl()/
+  // driveEmbedPreviewUrl() (js/media.js), diduplikasi di sini karena
+  // media.js TIDAK dimuat di present.html (lihat catatan berkas ini
+  // sengaja mandiri/self-contained).
+  function mp3DriveFileId_(url) {
+    const s = String(url || "");
+    let m = s.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+    if (m) return m[1];
+    m = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+    return m ? m[1] : null;
+  }
+  function mp3IsDriveUrl_(url) {
+    return /drive\.google\.com/.test(String(url || ""));
+  }
   let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
   const ytBgEl = document.getElementById("ytBg");
+  const kidungBgAudioEl = document.getElementById("kidungBgAudio"); // BARU (18 Sep 2026) -- Audio Latar MP3 kidung, lihat catatan di atas
   // BARU (28 Agu 2026) -- Repeat One/Repeat All + daftar putar (playlist)
   // untuk video YouTube utama (#ytView), lihat wireYtControls() &
   // wireYtPlaylistTab() di js/presentation-studio.js, dan handler
@@ -3505,6 +3540,8 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     idleEl.hidden = true;
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
@@ -3771,6 +3808,8 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     idleEl.hidden = true;
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
@@ -3975,6 +4014,8 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     idleEl.hidden = true;
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
@@ -4102,6 +4143,8 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     idleEl.hidden = true;
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
@@ -4316,6 +4359,8 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     idleEl.hidden = true;
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
@@ -4578,6 +4623,8 @@
     if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
     if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     idleEl.hidden = true;
     refEl.hidden = true; refEl.textContent = "";
     refSubEl.hidden = true; refSubEl.textContent = "";
@@ -5483,6 +5530,14 @@
     // #ytView di atas.
     if (kind !== "canva" && !canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; }
     if (kind !== "soundcloud" && !scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; }
+    // BARU (18 Sep 2026) -- MP3/Audio (link langsung atau Google Drive),
+    // sama pola dengan Canva/SoundCloud di atas: dihentikan/disembunyikan
+    // saat berpindah ke jenis tayangan LAIN, TAPI dibiarkan jalan kalau
+    // kind ini sendiri yang dipanggil lagi (mis. hanya berganti kidung/
+    // ayat berikutnya sementara audio tetap diputar -- lihat kind==="mp3"
+    // di bawah, yang SENGAJA tidak mengosongkan #text/#ref).
+    if (kind !== "mp3" && !mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; }
+    if (kind !== "mp3" && !mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     stageEl.classList.remove("fade-in");
     void stageEl.offsetWidth;
     // BARU (4 Sep 2026) -- #refSub HANYA dipakai untuk kind "kidung" (lihat
@@ -5640,6 +5695,29 @@
           scEl.src = src;
         });
       }
+    } else if (kind === "mp3") {
+      // BARU (18 Sep 2026, permintaan operator) -- MP3/Audio (link
+      // langsung ATAU Google Drive), lihat catatan panjang di
+      // wireLinkTab() -> bagian MP3 (js/presentation-studio.js). Pola
+      // SAMA PERSIS seperti "soundcloud" di atas: #ref disembunyikan,
+      // TAPI #text SENGAJA TIDAK dikosongkan -- kidung/ayat/pengumuman
+      // yang sedang tayang tetap terlihat penuh, audio jalan di bilah
+      // bawah (drive -> iframe ".../preview", link langsung -> <audio
+      // controls>, lihat CSS #mp3DriveView/#mp3AudioView).
+      refEl.hidden = true; refEl.textContent = "";
+      if (data.audioUrl) {
+        const fid = mp3DriveFileId_(data.audioUrl);
+        if (mp3IsDriveUrl_(data.audioUrl) && fid) {
+          mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = "";
+          mp3DriveEl.src = "https://drive.google.com/file/d/" + fid + "/preview";
+          mp3DriveEl.hidden = false;
+        } else {
+          mp3DriveEl.hidden = true; mp3DriveEl.src = "";
+          mp3AudioEl.src = data.audioUrl;
+          mp3AudioEl.hidden = false;
+          mp3AudioEl.play().catch(() => {}); // diamkan -- browser kadang menolak autoplay tanpa interaksi, operator masih bisa tekan ▶ bawaan di bilah audio-nya
+        }
+      }
     } else if (kind === "kidung") {
       // Slide Kidung (bait + koor snapshot, lihat Presentation.sendKidung()
       // di js/presentation.js & tab "🎵 Kidung / Hymn" di js/presentation-
@@ -5708,6 +5786,8 @@
       if (!ytEl.hidden) { ytEl.hidden = true; ytEl.src = ""; }
       if (!canvaEl.hidden) { canvaEl.hidden = true; canvaEl.src = ""; } // BARU (4 Sep 2026)
       if (!scEl.hidden) { scEl.hidden = true; scEl.src = ""; scWidget = null; } // BARU (4 Sep 2026)
+      if (!mp3DriveEl.hidden) { mp3DriveEl.hidden = true; mp3DriveEl.src = ""; } // BARU (18 Sep 2026)
+      if (!mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; } // BARU (18 Sep 2026)
       stopTimer(true);
       stopStopwatch(true);
       stopTimerClock(true); // BARU (7 Sep 2026)
@@ -5720,7 +5800,7 @@
       setCamVisibleForKind(null); // BARU -- sembunyikan latar kamera juga saat layar dikosongkan (stream tetap jalan)
       return;
     }
-    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung" || data.type === "canva" || data.type === "soundcloud") {
+    if (data.type === "verse" || data.type === "text" || data.type === "black" || data.type === "logo" || data.type === "slide" || data.type === "youtube" || data.type === "kidung" || data.type === "canva" || data.type === "soundcloud" || data.type === "mp3") {
       showMain(data.type, data);
       return;
     }
@@ -6012,6 +6092,43 @@
     }
     if (data.type === "yt_bg_clear") {
       ytBgEl.src = "";
+      return;
+    }
+    // BARU (18 Sep 2026, permintaan operator) -- Audio Latar MP3, pola
+    // SAMA PERSIS dengan yt_bg/yt_bg_control/yt_bg_clear di atas, hanya
+    // sumbernya file mp3 (lewat elemen <audio> tersembunyi #kidungBgAudio,
+    // bukan iframe YouTube) -- dipakai supaya lagu kidung (mp3 dari kolom
+    // linkMp3_1/linkMp3_2 di Sheet Kidung) bisa diputar SAMBIL teks
+    // kidung/ayat/pengumuman apa pun yang sedang tayang tetap kelihatan.
+    // Link Google Drive diterjemahkan dulu lewat resolveBellAudioUrl_()
+    // (sudah generik, dipakai juga untuk bel custom timer) supaya link
+    // "drive.google.com/file/d/ID/view" biasa tetap bisa dipasang
+    // langsung sebagai src <audio>.
+    if (data.type === "mp3_bg") {
+      if (data.url) {
+        kidungBgAudioEl.src = resolveBellAudioUrl_(data.url);
+        kidungBgAudioEl.currentTime = 0;
+      }
+      return;
+    }
+    if (data.type === "mp3_bg_control") {
+      if (!kidungBgAudioEl.src) return;
+      if (data.action === "play") { const p = kidungBgAudioEl.play(); if (p && p.catch) p.catch(() => {}); }
+      else if (data.action === "pause") kidungBgAudioEl.pause();
+      // BARU (18 Sep 2026 v3, permintaan operator "diulang-ulang sampai
+      // bosan yang dengar, atau bisa jadi cuma 1x saja") -- `.loop`
+      // bawaan elemen <audio>, berulang MULUS begitu lagu habis, tanpa
+      // celah senyap sama sekali. Default MATI (main 1x, seperti
+      // sebelum fitur ini ada) -- operator nyalakan sendiri lewat
+      // tombol "🔁 Ulang" kalau memang perlu diulang terus.
+      else if (data.action === "loop_on") kidungBgAudioEl.loop = true;
+      else if (data.action === "loop_off") kidungBgAudioEl.loop = false;
+      return;
+    }
+    if (data.type === "mp3_bg_clear") {
+      try { kidungBgAudioEl.pause(); } catch (e) {}
+      kidungBgAudioEl.currentTime = 0;
+      kidungBgAudioEl.src = "";
       return;
     }
     if (data.type === "pen") {
