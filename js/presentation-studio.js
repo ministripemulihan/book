@@ -378,6 +378,12 @@ const PresentationStudio = (() => {
   // terpisah oleh sendGenericItemLive()/playlistGoTo() seperti biasa.
   // ------------------------------------------------------------
   let sharedBgAudio_ = null; // null ATAU { kind:"mp3"|"yt", url, label, loop }
+  // BARU (18 Sep 2026 v5) -- lihat catatan panjang di reportBgAudioStatus_()/
+  // kidungBgAudioEl "error" listener, present.html. null = belum ada
+  // laporan gagal (atau sudah berhasil lagi), ATAU { url, message }
+  // kalau link yg SEDANG dimuat (sharedBgAudio_.url) ternyata gagal
+  // diputar di Layar 2.
+  let sharedBgAudioError_ = null;
   const sharedBgAudioListeners_ = []; // dipanggil ulang tiap status berubah -- HANYA utk listener yang HIDUP SELAMA Studio terbuka (mis. panel tab "🎵 Kidung", didaftarkan SEKALI saat wireKidungTab() jalan), BUKAN utk elemen yang dibuat ulang tiap render (lihat previewBgAudioRefresh_ di bawah -- kalau dipakai array ini malah bocor memori, nambah terus tiap ganti slide)
   function onSharedBgAudioChange_(fn) { sharedBgAudioListeners_.push(fn); }
   // Slot TUNGGAL (bukan array) khusus mini-kontrol Audio Latar di kotak
@@ -389,6 +395,26 @@ const PresentationStudio = (() => {
     sharedBgAudioListeners_.forEach((fn) => { try { fn(); } catch (e) {} });
     if (previewBgAudioRefresh_) { try { previewBgAudioRefresh_(); } catch (e) {} }
   }
+  // BARU (18 Sep 2026 v5) -- banner kecil melayang di pojok Studio,
+  // dipakai kalau Layar 2 melaporkan Audio Latar GAGAL diputar
+  // (present_bgaudio_status ok:false, lihat handler window message di
+  // paling bawah file ini). Ditaruh di document.body (BUKAN di dalam
+  // panel tab tertentu) supaya tetap kelihatan operator MESKI dia sudah
+  // pindah dari tab "🎵 Kidung" ke tab lain saat pesan gagal ini tiba.
+  function showBgAudioErrorToast_(message) {
+    let box = el("psBgAudioErrorToast");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "psBgAudioErrorToast";
+      box.style.cssText = "position:fixed; left:50%; bottom:24px; transform:translateX(-50%); max-width:560px; background:#3a1414; color:#fff; border:1px solid #b91c1c; border-radius:10px; padding:12px 16px; font-size:13px; line-height:1.5; z-index:99999; box-shadow:0 6px 18px rgba(0,0,0,.4);";
+      document.body.appendChild(box);
+    }
+    box.innerHTML = `⚠️ <b>Audio Latar gagal diputar.</b> ${escapeHtml(message || "")} <button type="button" style="margin-left:8px; background:none; border:1px solid #fff; color:#fff; border-radius:6px; padding:2px 8px; cursor:pointer;">Tutup</button>`;
+    box.querySelector("button").addEventListener("click", () => box.remove());
+    clearTimeout(box._autoHideTimer);
+    box._autoHideTimer = setTimeout(() => { if (box && box.parentNode) box.remove(); }, 12000);
+  }
+
   function loadSharedBgAudio_(kind, url, label) {
     if (!url) return;
     if (kind === "yt") {
@@ -1928,6 +1954,14 @@ const PresentationStudio = (() => {
       controlsBox.hidden = !sharedBgAudio_;
       if (loopBtn) loopBtn.classList.toggle("active", !!(sharedBgAudio_ && sharedBgAudio_.loop));
       if (!sharedBgAudio_) { bgStatus_(pendingAttachLink_ ? "Audio latar dihentikan." : ""); return; }
+      // BARU (18 Sep 2026 v5) -- kalau Layar 2 baru saja melaporkan link
+      // INI gagal diputar (sharedBgAudioError_), tampilkan pesannya di
+      // sini juga (bukan cuma banner sementara showBgAudioErrorToast_())
+      // supaya tetap kelihatan operator selama panel Kidung ini terbuka.
+      if (sharedBgAudioError_ && sharedBgAudioError_.url === sharedBgAudio_.url) {
+        bgStatus_(`⚠️ ${sharedBgAudioError_.message || "Gagal diputar."}`);
+        return;
+      }
       const loopNote = sharedBgAudio_.loop ? " -- 🔁 akan diulang terus sampai ⏹ Berhenti ditekan" : " -- main 1x (tekan 🔁 Ulang kalau mau diputar terus)";
       bgStatus_(`🎧 ${sharedBgAudio_.label || "Audio latar"}${loopNote}.`);
     }
@@ -11229,6 +11263,17 @@ const PresentationStudio = (() => {
       if (data.source === "bibleAppPresenter" && data.type === "present_ready") {
         refreshStatusUi();
         applyStoredTheme();
+      }
+      // BARU (18 Sep 2026 v5) -- lihat catatan panjang di reportBgAudioStatus_()
+      // (present.html) & showBgAudioErrorToast_() di atas file ini.
+      if (data.source === "bibleAppPresenter" && data.type === "present_bgaudio_status") {
+        if (!data.ok) {
+          if (sharedBgAudio_ && sharedBgAudio_.url === data.url) sharedBgAudioError_ = { url: data.url, message: data.message };
+          showBgAudioErrorToast_(data.message);
+        } else if (sharedBgAudioError_ && sharedBgAudioError_.url === data.url) {
+          sharedBgAudioError_ = null; // link yg sama ternyata sudah berhasil jalan (mis. operator ganti/coba ulang) -- bersihkan status gagal yg lama
+        }
+        notifySharedBgAudioChange_();
       }
       // Diteruskan ke semua modul "Game Offline" terdaftar (mis. 🎡 Roda
       // Undian di js/games/roda-putar.js) -- tiap modul menyaring sendiri
