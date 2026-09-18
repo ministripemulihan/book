@@ -857,6 +857,12 @@ const MediaLibrary = (() => {
       return;
     }
 
+    if (state.activeTab === "karakter") {
+      renderKarakterTab_(body);
+      updateAddButtonVisibility_();
+      return;
+    }
+
     // Kotak cari (semua tab isi, kecuali Layar Publik)
     const searchRow = document.createElement("div");
     searchRow.className = "ml-search-row";
@@ -1551,6 +1557,235 @@ const MediaLibrary = (() => {
   }
 
   // ------------------------------------------------------------
+  // 🔤 Slogan Karakter -- tab Pustaka Media untuk mode 1 Layar (tanpa
+  // proyektor). Data (GROUPS/CHARS/ICONS) & daftar kolom (FIELDS)
+  // diambil dari window.SLOGAN_KARAKTER_DATA +
+  // window.SLOGAN_KARAKTER_FIELDS_FOR, yang diekspos oleh
+  // js/games/slogankarakter-data.js -- SATU FILE itu jugalah yang
+  // dipakai modul Studio (js/games/slogankarakter.js, mode 2 Layar).
+  // Kalau mau nambah/ubah isi karakter (termasuk 3 kolom rencana ke
+  // depan: arti/contoh/ayat), CUKUP EDIT slogankarakter-data.js --
+  // otomatis ikut muncul di tab ini juga, TIDAK PERLU ubah file ini.
+  //
+  // Alur (3 layar, persis app "Karakter Pekerja Kristus" aslinya):
+  //   1) "groups" -- judul "30 Karakter untuk Generasi Muda" + 10 kotak
+  //      kelompok (nomor + ikon + 3 nama karakter per kotak)
+  //   2) "chars"  -- daftar 3 karakter di kelompok yang dipilih
+  //   3) "detail" -- checklist kolom (default SEMUA TERCENTANG, live
+  //      preview langsung berubah tiap centang/uncek) + tombol
+  //      "Tampilkan layar penuh" (overlay fullscreen di PERANGKAT INI,
+  //      beda jalur dari showSloganKarakter() di present.html yang
+  //      itu untuk Layar 2/proyektor).
+  //
+  // Kelompok, karakter, & kolom terakhir yang dilihat diingat di
+  // localStorage, supaya operator tidak mulai dari nol tiap buka tab
+  // Pustaka Media lagi.
+  // ------------------------------------------------------------
+  const SK_LAST_KELOMPOK_KEY = "bible_app_sk_ml_last_kelompok_v1";
+  const SK_LAST_KARAKTER_KEY = "bible_app_sk_ml_last_karakter_v1";
+  const SK_LAST_FIELDS_KEY = "bible_app_sk_ml_last_fields_v1"; // JSON array
+
+  function skSaveLast_() {
+    try {
+      if (state.skKelompok) localStorage.setItem(SK_LAST_KELOMPOK_KEY, String(state.skKelompok.num));
+      if (state.skKarakter) localStorage.setItem(SK_LAST_KARAKTER_KEY, state.skKarakter);
+    } catch (e) {}
+  }
+  function skSaveLastFields_() {
+    try { localStorage.setItem(SK_LAST_FIELDS_KEY, JSON.stringify(state.skFields || [])); } catch (e) {}
+  }
+
+  // Dipanggil sekali tiap tab ini pertama kali dibuka dalam sesi ini
+  // (state.skScreen belum diisi) -- memulihkan kelompok+karakter
+  // terakhir TANPA langsung membuka layar detail, supaya operator
+  // tetap yang memilih kolomnya sendiri.
+  function skRestoreLastIfNeeded_(data) {
+    if (state.skScreen) return; // sudah ada state di sesi ini, jangan timpa
+    state.skScreen = "groups";
+    let savedNum = null, savedKarakter = null;
+    try {
+      savedNum = parseInt(localStorage.getItem(SK_LAST_KELOMPOK_KEY), 10);
+      savedKarakter = localStorage.getItem(SK_LAST_KARAKTER_KEY);
+    } catch (e) {}
+    if (!savedNum) return;
+    const g = data.GROUPS.find((x) => x.num === savedNum);
+    if (!g) return;
+    state.skKelompok = g;
+    if (savedKarakter && g.chars.includes(savedKarakter)) state.skKarakter = savedKarakter;
+  }
+
+  function renderKarakterTab_(body) {
+    const data = window.SLOGAN_KARAKTER_DATA;
+    if (!data) {
+      body.innerHTML = '<p class="ml-error">js/games/slogankarakter-data.js belum dimuat.</p>';
+      return;
+    }
+    skRestoreLastIfNeeded_(data);
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "font-family:Georgia,'Times New Roman',serif; padding:4px 2px;";
+    body.appendChild(wrap);
+
+    if (state.skScreen === "chars") renderSkChars_(wrap, data);
+    else if (state.skScreen === "detail") renderSkDetail_(wrap, data);
+    else renderSkGroups_(wrap, data);
+  }
+
+  function skBackBtn_(onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip-btn small";
+    btn.textContent = "‹ Kembali";
+    btn.addEventListener("click", onClick);
+    return btn;
+  }
+
+  // Layar 1: judul + 10 KOTAK kelompok (nomor bulat + ikon + 3 nama
+  // karakter) -- tampilannya PERSIS app "Karakter Pekerja Kristus"
+  // aslinya (lihat window.SLOGAN_KARAKTER_DATA.ICONS).
+  function renderSkGroups_(wrap, data) {
+    const head = document.createElement("div");
+    head.style.cssText = "text-align:center; margin-bottom:14px;";
+    head.innerHTML = '<div style="font-family:Georgia,\'Times New Roman\',serif; font-weight:700; font-size:19px; margin-bottom:4px;">30 Karakter untuk Generasi Muda</div><div style="font-family:\'Inter\',sans-serif; color:var(--text-soft,#5B6577); font-size:13px;">Pilih salah satu kelompok untuk melihat ketiga karakternya</div>';
+    wrap.appendChild(head);
+    const grid = document.createElement("div");
+    grid.style.cssText = "display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px;";
+    data.GROUPS.forEach((g) => {
+      const icon = data.ICONS[g.icon] || "";
+      const card = document.createElement("button");
+      card.type = "button";
+      card.style.cssText = "text-align:left; display:flex; flex-direction:column; gap:10px; border:1px solid var(--divider,#ddd); border-radius:14px; padding:14px; background:var(--surface,#fff); cursor:pointer; font-family:inherit;";
+      card.innerHTML =
+        '<div style="display:flex; align-items:center; justify-content:space-between;">' +
+          '<span style="font-family:Georgia,\'Times New Roman\',serif; font-weight:700; font-size:13px; color:#C79A46; border:1.5px solid #C79A46; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">' + g.num + '</span>' +
+          '<span style="width:20px; height:20px; opacity:.75; flex-shrink:0;">' + icon + '</span>' +
+        '</div>' +
+        '<div style="font-weight:700; font-size:16px; line-height:1.3;">' + escapeHtml_(g.chars.join(", ")) + '</div>';
+      card.addEventListener("click", () => { state.skKelompok = g; state.skKarakter = null; state.skScreen = "chars"; skSaveLast_(); renderActiveTab_(); });
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+  }
+
+  // Layar 2: 3 karakter di kelompok yang dipilih.
+  function renderSkChars_(wrap, data) {
+    wrap.appendChild(skBackBtn_(() => { state.skScreen = "groups"; renderActiveTab_(); }));
+    const g = state.skKelompok;
+    const head = document.createElement("div");
+    head.style.cssText = "font-family:'Inter',sans-serif; font-weight:700; letter-spacing:.08em; color:#C79A46; font-size:13px; margin:14px 0 4px;";
+    head.textContent = "KELOMPOK " + g.num;
+    wrap.appendChild(head);
+    g.chars.forEach((name) => {
+      const line = document.createElement("button");
+      line.type = "button";
+      line.style.cssText = "display:flex; justify-content:space-between; align-items:center; width:100%; text-align:left; padding:14px 4px; border:none; border-bottom:1px solid var(--divider,#ddd); background:none; cursor:pointer; font-family:inherit; font-size:17px; font-weight:600; color:inherit;";
+      line.innerHTML = "<span>" + escapeHtml_(name) + "</span><span>\u203a</span>";
+      line.addEventListener("click", () => { state.skKarakter = name; state.skFields = null; state.skScreen = "detail"; skSaveLast_(); renderActiveTab_(); });
+      wrap.appendChild(line);
+    });
+  }
+
+  // Layar 3: checklist kolom (DEFAULT SEMUA TERCENTANG) + preview
+  // hidup (live) + tombol fullscreen. Checklist dibangun DINAMIS dari
+  // window.SLOGAN_KARAKTER_FIELDS_FOR() -- begitu kolom "arti"/
+  // "contoh"/"ayat" diisi di slogankarakter-data.js, checkbox-nya
+  // OTOMATIS ikut muncul di sini juga.
+  function renderSkDetail_(wrap, data) {
+    wrap.appendChild(skBackBtn_(() => { state.skScreen = "chars"; renderActiveTab_(); }));
+    const karakter = state.skKarakter;
+    const info = data.CHARS[karakter];
+    const available = window.SLOGAN_KARAKTER_FIELDS_FOR(karakter);
+    const labelFor = (key) => { const f = data.FIELDS.find((x) => x.key === key); return f && f.displayLabel ? f.displayLabel : String(key).toUpperCase(); };
+
+    if (!state.skFields) {
+      let saved = null;
+      try { const raw = localStorage.getItem(SK_LAST_FIELDS_KEY); if (raw) saved = JSON.parse(raw); } catch (e) {}
+      if (Array.isArray(saved) && saved.some((k) => available.some((f) => f.key === k))) {
+        state.skFields = available.map((f) => f.key).filter((k) => saved.includes(k));
+      } else {
+        state.skFields = available.map((f) => f.key); // default: SEMUA tercentang
+      }
+    }
+
+    const head = document.createElement("div");
+    head.style.cssText = "font-weight:700; font-size:20px; margin:14px 0 12px;";
+    head.textContent = karakter;
+    wrap.appendChild(head);
+
+    available.forEach((f) => {
+      const row = document.createElement("label");
+      row.style.cssText = "display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:14px; cursor:pointer;";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = state.skFields.includes(f.key);
+      cb.addEventListener("change", () => {
+        if (cb.checked) { if (!state.skFields.includes(f.key)) state.skFields.push(f.key); }
+        else state.skFields = state.skFields.filter((k) => k !== f.key);
+        skSaveLastFields_();
+        renderActiveTab_();
+      });
+      const span = document.createElement("span");
+      span.textContent = f.label;
+      row.appendChild(cb); row.appendChild(span);
+      wrap.appendChild(row);
+    });
+
+    const box = document.createElement("div");
+    box.style.cssText = "margin-top:16px; padding:22px; border-radius:16px; background:#182B4D; color:#F6F1E6; text-align:center;";
+    if (!state.skFields.length) {
+      box.innerHTML = '<div style="opacity:.7; font-family:\'Inter\',sans-serif; font-size:13px;">Centang minimal 1 kolom di atas.</div>';
+    } else {
+      let html = '<div style="font-family:\'Inter\',sans-serif; font-weight:700; letter-spacing:.12em; font-size:13px; color:#E4C67C; margin-bottom:16px;">KARAKTER ' + escapeHtml_(karakter.toUpperCase()) + '</div>';
+      state.skFields.forEach((key, i) => {
+        if (i > 0) html += '<div style="height:1px; background:rgba(241,238,228,.2); margin:16px auto; max-width:200px;"></div>';
+        html += '<div style="font-family:\'Inter\',sans-serif; font-weight:600; letter-spacing:.1em; font-size:12px; color:#AEB4C4; margin-bottom:6px;">' + escapeHtml_(labelFor(key)) + '</div>';
+        html += '<div style="font-weight:700; font-size:19px; line-height:1.35;">' + escapeHtml_(info[key] || "") + '</div>';
+      });
+      box.innerHTML = html;
+    }
+    wrap.appendChild(box);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip-btn primary";
+    btn.style.cssText = "margin-top:16px; width:100%;";
+    btn.disabled = !state.skFields.length;
+    btn.textContent = "🖥️ Tampilkan layar penuh (perangkat ini)";
+    btn.addEventListener("click", () => { close(); openSloganKarakterFullscreen_(karakter, state.skFields, labelFor); });
+    wrap.appendChild(btn);
+  }
+
+  // Fullscreen sederhana KHUSUS mode 1 Layar (tanpa Layar 2/proyektor) --
+  // beda jalur dari showSloganKarakter() di present.html (itu untuk
+  // mode 2 Layar). Mendukung BERAPA SAJA kolom sekaligus (fields[]).
+  // Ketuk di mana saja untuk menutup.
+  //
+  // CATATAN: ini overlay MANDIRI (self-contained), BUKAN lewat
+  // openCollectionFullscreen() di js/app.js -- jadi belum kebagian
+  // tombol A+/A-/W+/W- atau tema panel yang sudah ada di sana. Kalau
+  // mau disamakan persis dengan fullscreen konten lain, perlu lihat
+  // dulu isi openCollectionFullscreen() supaya cara pasangnya
+  // konsisten (bukan tebak-tebak struktur internalnya).
+  function openSloganKarakterFullscreen_(karakter, fields, labelFor) {
+    const data = window.SLOGAN_KARAKTER_DATA;
+    const info = data.CHARS[karakter];
+    if (!info || !fields || !fields.length) return;
+    const ov = document.createElement("div");
+    ov.id = "skFullscreenOverlay";
+    ov.style.cssText = "position:fixed; inset:0; z-index:99999; background:#182B4D; color:#F6F1E6; display:flex; align-items:center; justify-content:center; text-align:center; padding:40px; box-sizing:border-box; font-family:Georgia,'Times New Roman',serif; cursor:pointer; overflow:auto;";
+    let html = '<div style="max-width:900px; margin:auto;"><div style="font-family:\'Inter\',sans-serif; font-weight:700; letter-spacing:.14em; font-size:15px; color:#E4C67C; margin-bottom:22px;">KARAKTER ' + escapeHtml_(karakter.toUpperCase()) + '</div>';
+    const bigSize = fields.length === 1 ? "clamp(22px,4.5vw,44px)" : fields.length === 2 ? "clamp(18px,3.6vw,34px)" : "clamp(15px,2.8vw,26px)";
+    fields.forEach((key, i) => {
+      if (i > 0) html += '<div style="height:1px; background:rgba(241,238,228,.2); margin:24px auto; max-width:300px;"></div>';
+      html += '<div style="font-family:\'Inter\',sans-serif; font-weight:600; letter-spacing:.1em; font-size:13px; color:#AEB4C4; margin-bottom:8px;">' + escapeHtml_(labelFor(key)) + '</div>';
+      html += '<div style="font-weight:700; font-size:' + bigSize + '; line-height:1.3;">' + escapeHtml_(info[key] || "") + '</div>';
+    });
+    html += '<div style="margin-top:34px; font-size:13px; opacity:.6;">Ketuk layar untuk menutup</div></div>';
+    ov.innerHTML = html;
+    ov.addEventListener("click", () => ov.remove());
+    document.body.appendChild(ov);
+  }
+
+  // ------------------------------------------------------------
   // 11) TABS + BUKA/TUTUP PANEL
   // ------------------------------------------------------------
   const TABS = [
@@ -1559,6 +1794,12 @@ const MediaLibrary = (() => {
     { key: "sound", label: "🔊 Efek Suara", gated: true },
     { key: "layar-publik", label: "🎆 Layar Publik", gated: true },
     { key: "kidung", label: "Kidung" },
+    // BARU (18 Sep 2026, permintaan operator) -- 🔤 Slogan Karakter,
+    // dipakai untuk mode 1 Layar (tanpa proyektor). Datanya dari
+    // window.SLOGAN_KARAKTER_DATA, diekspos oleh
+    // js/games/slogankarakter-data.js -- pastikan file itu dimuat
+    // SEBELUM media-library.js di index.html.
+    { key: "karakter", label: "🔤 Slogan Karakter" },
     { key: "favorit", label: "⭐ Favorit" },
   ];
 
