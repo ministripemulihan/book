@@ -415,25 +415,53 @@ const PresentationStudio = (() => {
     box._autoHideTimer = setTimeout(() => { if (box && box.parentNode) box.remove(); }, 12000);
   }
 
-  function loadSharedBgAudio_(kind, url, label) {
+  // DIUBAH (18 Sep 2026 v6, permintaan operator "YouTube latar per-slide,
+  // klik panah ke-2 baru mulai") -- `loop` (param ke-4, OPSIONAL) dipakai
+  // supaya startYtBgForItem_() di bawah bisa langsung memuat video dengan
+  // "Ulang terus" (loopFile) sudah aktif SEJAK AWAL, tanpa perlu klik
+  // 🔁 Ulang manual terpisah sesudahnya. Panggilan LAMA (3 argumen, mis.
+  // dari panel tab "🎵 Kidung") tetap jalan apa adanya -- `loop` kosong =
+  // false, sama seperti perilaku sebelum ini.
+  // DIUBAH (18 Sep 2026 v7, permintaan operator "Ulang Semua" -- 1 paket
+  // isi beberapa video YouTube BERBEDA, bukan cuma 1 video diulang) --
+  // `extraIds` (param ke-5, OPSIONAL, array id video YouTube LAIN, sudah
+  // diekstrak lebih dulu oleh pemanggil lewat extractYoutubeId()). Kalau
+  // diisi DAN `loop` juga true, video-video ini ditambahkan ke parameter
+  // resmi YouTube "playlist=id1,id2,id3..." di belakang video utama --
+  // YouTube SENDIRI yang akan main berurutan lalu balik ke video utama
+  // lagi selama loop=1 aktif (murni fitur bawaan YouTube, TIDAK perlu
+  // kode kita mendeteksi "video sudah habis" satu-satu). Kosong/tidak
+  // diisi = perilaku LAMA (playlist cuma berisi 1 id, video itu sendiri).
+  function loadSharedBgAudio_(kind, url, label, loop, extraIds) {
     if (!url) return;
+    let queueIds = null; // dipakai lagi oleh toggleloop di bawah, biar konsisten kalau operator pencet 🔁 manual sesudahnya
     if (kind === "yt") {
       const id = typeof extractYoutubeId === "function" ? extractYoutubeId(url) : null;
       if (!id) { alert("Link YouTube ini tidak dikenali -- periksa lagi linknya."); return; }
-      rawPost({ type: "yt_bg", embedUrl: buildYoutubeEmbedUrl(id, 0) });
+      queueIds = [id].concat(Array.isArray(extraIds) ? extraIds : []);
+      let embedUrl = buildYoutubeEmbedUrl(id, 0);
+      if (loop) embedUrl += `&loop=1&playlist=${queueIds.join(",")}`;
+      rawPost({ type: "yt_bg", embedUrl });
     } else {
       rawPost({ type: "mp3_bg", url });
     }
-    sharedBgAudio_ = { kind: kind === "yt" ? "yt" : "mp3", url, label: label || "", loop: false };
+    sharedBgAudio_ = { kind: kind === "yt" ? "yt" : "mp3", url, label: label || "", loop: !!loop, queueIds };
+    if (loop && kind !== "yt") rawPost({ type: "mp3_bg_control", action: "loop_on" }); // MP3 lewat elemen <audio> asli -- lihat toggleloop di bawah
     notifySharedBgAudioChange_();
   }
   // action: "play" | "pause" | "stop" | "toggleloop"
-  function controlSharedBgAudio_(action) {
+  // DIUBAH (18 Sep 2026 v6) -- `opts.fade` (opsional, dipakai action
+  // "stop") membuat present.html meredupkan volume dulu (~1 detik) SEBELUM
+  // benar-benar menghentikan, supaya perpindahan slide yang menghentikan
+  // audio latar YouTube (lihat handleYtBgForActiveItem_() di bawah) tidak
+  // putus mendadak/kasar. Panggilan LAMA (tanpa opts, mis. tombol "⏹
+  // Berhenti" manual) tetap berhenti SEKETIKA seperti sebelumnya.
+  function controlSharedBgAudio_(action, opts) {
     if (!sharedBgAudio_) return;
     if (action === "play" || action === "pause") {
       rawPost({ type: sharedBgAudio_.kind === "yt" ? "yt_bg_control" : "mp3_bg_control", action });
     } else if (action === "stop") {
-      rawPost({ type: sharedBgAudio_.kind === "yt" ? "yt_bg_clear" : "mp3_bg_clear" });
+      rawPost({ type: sharedBgAudio_.kind === "yt" ? "yt_bg_clear" : "mp3_bg_clear", fade: !!(opts && opts.fade) });
       sharedBgAudio_ = null;
     } else if (action === "toggleloop") {
       sharedBgAudio_.loop = !sharedBgAudio_.loop;
@@ -454,8 +482,14 @@ const PresentationStudio = (() => {
         // beda dari MP3 yang mulus.
         const id = typeof extractYoutubeId === "function" ? extractYoutubeId(sharedBgAudio_.url) : null;
         if (id) {
+          // DIUBAH (18 Sep 2026 v7) -- kalau video ini sebelumnya dimuat
+          // sebagai bagian dari paket "Ulang Semua" (sharedBgAudio_.queueIds
+          // sudah berisi beberapa id, lihat loadSharedBgAudio_()), toggle
+          // manual ini TETAP memutar seluruh paketnya, bukan cuma video
+          // yang sedang tayang saja.
+          const queueIds = (Array.isArray(sharedBgAudio_.queueIds) && sharedBgAudio_.queueIds.length) ? sharedBgAudio_.queueIds : [id];
           let url2 = buildYoutubeEmbedUrl(id, 0);
-          if (sharedBgAudio_.loop) url2 += `&loop=1&playlist=${id}`;
+          if (sharedBgAudio_.loop) url2 += `&loop=1&playlist=${queueIds.join(",")}`;
           rawPost({ type: "yt_bg", embedUrl: url2 });
         }
       }
@@ -478,14 +512,128 @@ const PresentationStudio = (() => {
   // yang aktif" yang diminta: operator cukup mencentang ▶️ Otomatis di
   // SATU item yang audionya mau jalan, item lain (kalau ada bgAudio-nya
   // tapi tidak dicentang) tetap diam sampai ditekan manual.
+  // DIUBAH (18 Sep 2026 v6, permintaan operator "YouTube latar per-slide,
+  // klik panah ke-2 baru mulai, next lagi default mati, kecuali dicentang
+  // lanjutkan") -- item ber-bgAudio.kind "yt" SEKARANG dilempar ke
+  // handleYtBgForActiveItem_() (fungsi baru di bawah), yang punya alur
+  // SENDIRI (arm/mulai lewat klik panah ke-2, stop+fade default saat
+  // pindah slide, kecuali bgAudio.continuePrev dicentang). Item mp3/mp4
+  // (atau yt LAMA yang belum punya armStart/continuePrev sama sekali --
+  // otomatis dianggap `armStart:false, continuePrev:false`, sama seperti
+  // sebelum fitur ini ada) TIDAK berubah perilakunya sama sekali di sini.
   function autoplayBgAudioIfEnabled_(it) {
-    if (!it || !it.bgAudio || !it.bgAudio.url || !it.bgAudio.autoplay) return;
-    loadSharedBgAudio_(it.bgAudio.kind || "mp3", it.bgAudio.url, it.bgAudio.label || "Audio Latar");
+    handleYtBgForActiveItem_(it); // SELALU dipanggil (bukan cuma kalau it.bgAudio ada) -- lihat catatan di fungsi itu, perlu "lupakan status menunggu klik" tiap kali slide aktif berganti, apa pun jenis item barunya
+    const bg = it && it.bgAudio;
+    if (!bg || bg.kind === "yt" || !bg.url || !bg.autoplay) return; // "yt" SUDAH ditangani lengkap oleh handleYtBgForActiveItem_() di atas
+    loadSharedBgAudio_(bg.kind || "mp3", bg.url, bg.label || "Audio Latar");
     controlSharedBgAudio_("play");
+  }
+
+  // ------------------------------------------------------------
+  // BARU (18 Sep 2026 v6, permintaan operator, lihat catatan panjang di
+  // autoplayBgAudioIfEnabled_() di atas) -- "Audio Latar YouTube per-
+  // slide" dengan alur:
+  //   1) Slide dengan bgAudio.kind "yt" + armStart TERCENTANG: begitu
+  //      slide ini masuk (panah/klik baris/stylus), musik BELUM main --
+  //      cuma "diarm" (menunggu). Operator perlu tekan panah MAJU SEKALI
+  //      LAGI (tanpa berpindah slide -- klik itu "diserap" oleh
+  //      playlistNext(), lihat di sana) baru musiknya sungguh mulai.
+  //      Badge kecil "🎵 Tekan panah lagi" muncul di Layar 2 selama
+  //      menunggu (setYtArmedIndicator_()).
+  //   2) Slide dengan bgAudio.kind "yt" + autoplay TERCENTANG (armStart
+  //      TIDAK dicentang): perilaku LAMA -- langsung main begitu masuk
+  //      slide, tanpa perlu klik tambahan.
+  //   3) Berpindah ke slide APA PUN (maju/mundur) yang TIDAK mencentang
+  //      "↩️ Lanjutkan audio sebelumnya" (bgAudio.continuePrev): kalau
+  //      ADA audio YouTube latar yang sedang main, otomatis dihentikan
+  //      dengan fade-out halus (~1 detik) dulu -- "defaultnya mati
+  //      suaranya" persis seperti diminta.
+  //   4) Berpindah ke slide yang MENCENTANG "↩️ Lanjutkan" -- audio yang
+  //      sedang main (dari slide manapun sebelumnya) DIBIARKAN APA
+  //      ADANYA, tidak dihentikan maupun dimuat ulang -- itulah cara 1
+  //      lagu YouTube "menembus" beberapa slide berturut-turut (mis.
+  //      bait 1-4 kidung yang sama) tanpa klik ekstra & tanpa jeda.
+  // CATATAN keterbatasan (disengaja, versi "mudah dulu" -- lihat pesan
+  // balasan ke operator): melompat MUNDUR dari LUAR sebuah grup
+  // "Lanjutkan" langsung ke TENGAH grup itu (mis. dari slide 9 balik ke
+  // slide 6 yang bercentang "Lanjutkan") tidak otomatis menyalakan lagi
+  // audio grup itu -- "Lanjutkan" cuma berarti "jangan sentuh apa pun",
+  // bukan "putar ulang milik grup ini". Navigasi maju berurutan (alur
+  // paling umum dipakai) & navigasi mundur SEKUENSIAL di dalam grup yang
+  // sama bekerja seperti diharapkan.
+  // ------------------------------------------------------------
+  let pendingYtArrowStart_ = null; // null ATAU { it } -- item aktif SEKARANG yang audio YouTube latarnya sudah "diarm" tapi BELUM dimulai, menunggu 1x klik panah maju lagi
+  function setYtArmedIndicator_(on) {
+    // Badge "🎵 Tekan panah lagi" di Layar 2 (present.html, elemen
+    // #ytBgArmedBadge) -- SENGAJA lewat rawPost() (type "yt_bg_armed",
+    // sudah didaftarkan di OVERLAY_TYPES js/presentation.js) supaya
+    // TIDAK ikut menimpa `lastPayload`/pratinjau slide utama, sama
+    // seperti yt_bg_control/mp3_bg_control dkk.
+    rawPost({ type: "yt_bg_armed", armed: !!on });
+  }
+  function handleYtBgForActiveItem_(it) {
+    pendingYtArrowStart_ = null; // slide aktif baru saja berganti -- lupakan status "menunggu klik" milik slide SEBELUMNYA (kalau ada & belum sempat dikonfirmasi, batal begitu saja, TIDAK otomatis mulai)
+    setYtArmedIndicator_(false);
+    const bg = it && it.bgAudio;
+    if (bg && bg.kind === "yt" && bg.continuePrev) return; // "↩️ Lanjutkan" -- JANGAN sentuh apa pun, biarkan audio yang sedang main (kalau ada) tetap jalan apa adanya
+    if (sharedBgAudio_ && sharedBgAudio_.kind === "yt") controlSharedBgAudio_("stop", { fade: true }); // default: hentikan (fade halus) audio YouTube latar yang sedang main sebelum (mungkin) memuat yang baru di bawah
+    if (!bg || bg.kind !== "yt" || !bg.url) return; // slide ini sendiri tidak punya audio YouTube latar -> selesai, tetap diam (sesuai "defaultnya mati suaranya")
+    if (bg.armStart) { pendingYtArrowStart_ = { it }; setYtArmedIndicator_(true); return; } // perlu 1x klik panah lagi -- lihat playlistNext()
+    if (bg.autoplay) startYtBgForItem_(it); // otomatis LAMA, tanpa perlu konfirmasi klik tambahan
+  }
+  // Sungguh memuat + memutar audio YouTube latar milik `it` SEKARANG JUGA
+  // -- dipanggil baik oleh handleYtBgForActiveItem_() (kalau autoplay
+  // tercentang) MAUPUN playlistNext() (kalau operator menekan panah
+  // konfirmasi ke-2 utk item yang armStart-nya tercentang).
+  function startYtBgForItem_(it) {
+    const bg = it && it.bgAudio;
+    if (!bg || !bg.url) return;
+    // BARU (18 Sep 2026 v7, permintaan operator "Ulang Semua" -- 1 paket
+    // beberapa video YouTube berbeda, bukan cuma 1 video diulang) --
+    // `bg.loopAll` + `bg.extraUrls` (diisi lewat openBgAudioDialog_() di
+    // atas). Link yang tidak dikenali di paket ini DILEWATI SAJA (bukan
+    // membatalkan semuanya) supaya 1 link salah tidak mematikan seluruh
+    // audio latar slide ini -- operator sudah diperingatkan lewat alert()
+    // begitu link itu ditempel/disimpan (lihat openBgAudioDialog_()),
+    // jadi di sini cukup diam & lanjut dengan yang valid saja.
+    let extraIds = [];
+    if (bg.loopAll && Array.isArray(bg.extraUrls) && bg.extraUrls.length) {
+      extraIds = bg.extraUrls
+        .map((u) => (typeof extractYoutubeId === "function" ? extractYoutubeId(u) : null))
+        .filter(Boolean);
+    }
+    const loop = !!bg.loopFile || !!bg.loopAll;
+    loadSharedBgAudio_("yt", bg.url, bg.label || "Audio Latar", loop, extraIds);
+    controlSharedBgAudio_("play");
+    pendingYtArrowStart_ = null;
+    setYtArmedIndicator_(false);
   }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // BARU (18 Sep 2026 v6) -- ikon kecil "🎧" di depan ref/judul baris
+  // Kumpulan Ayat, DIPISAH dari HTML baris (renderCollectionList()) supaya
+  // gampang dipetakan ke kondisi baru (armStart/continuePrev), tanpa bikin
+  // satu baris template literal tambah panjang & susah dibaca. `it.bgAudio`
+  // dianggap "ada" kalau punya `url` (mp3/mp4/yt biasa) ATAU `continuePrev`
+  // tercentang (marker "lanjutkan", boleh tanpa url sendiri -- lihat
+  // catatan panjang di openBgAudioDialog_()).
+  function bgAudioRowIconHtml_(it) {
+    const bg = it && it.bgAudio;
+    if (!bg || !(bg.url || bg.continuePrev)) return "";
+    let icon = "🎧", note = "tayangkan item ini untuk kontrol ▶/⏸/🔁/⏹";
+    // BARU (18 Sep 2026 v7) -- keterangan "Ulang" 3 kemungkinan sekarang:
+    // tidak diulang sama sekali, 1 video diulang terus (loopFile), atau
+    // 1 PAKET beberapa video berbeda diulang terus (loopAll+extraUrls).
+    const loopNote_ = bg.kind === "yt" && bg.loopAll
+      ? `, Ulang Semua (${1 + (Array.isArray(bg.extraUrls) ? bg.extraUrls.length : 0)} video)`
+      : (bg.kind === "yt" && bg.loopFile ? ", Ulang Terus" : "");
+    if (bg.kind === "yt" && bg.continuePrev) { icon = "🎧↩️"; note = "Lanjutkan audio YouTube dari slide sebelumnya (tidak mulai/hentikan apa pun sendiri)"; }
+    else if (bg.kind === "yt" && bg.armStart) { icon = "🎧🎬"; note = "YouTube latar -- perlu 1x klik panah LAGI (tanpa pindah slide) baru mulai main" + loopNote_; }
+    else if (bg.autoplay) { icon = "🎧▶️"; note = "OTOMATIS diputar begitu item ini masuk slide" + loopNote_; }
+    return ` <span title="Punya Audio Latar (${escapeHtml(bg.label || "")}) -- ${escapeHtml(note)}">${icon}</span>`;
   }
 
   // BARU (4 Sep 2026 v2, permintaan operator) -- tampilkan/sembunyikan
@@ -1045,7 +1193,7 @@ const PresentationStudio = (() => {
         // ikonnya diganti "🎧▶️" (SEKEDAR penanda visual mana yang akan
         // otomatis bunyi begitu dilangkahi panah/stylus -- lihat blok
         // ".ps-verse-row-bgaudio" di bawah utk checkbox sungguhannya).
-        `<div class="ps-verse-row-body" title="Klik untuk langsung tayang dari item ini"><span class="ps-verse-jump-icon" aria-hidden="true">▶️</span><span class="ps-verse-ref">${escapeHtml(ref)}${(it && it.bgAudio && it.bgAudio.url) ? ' <span title="Punya Audio Latar (' + escapeHtml(it.bgAudio.label || "") + (it.bgAudio.autoplay ? ") -- OTOMATIS diputar begitu item ini masuk slide" : ") -- tayangkan item ini untuk kontrol ▶/⏸/🔁/⏹") + '">' + (it.bgAudio.autoplay ? "🎧▶️" : "🎧") + '</span>' : ""}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
+        `<div class="ps-verse-row-body" title="Klik untuk langsung tayang dari item ini"><span class="ps-verse-jump-icon" aria-hidden="true">▶️</span><span class="ps-verse-ref">${escapeHtml(ref)}${bgAudioRowIconHtml_(it)}</span><span class="ps-verse-snippet">${escapeHtml(snippet)}</span></div>` +
         // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
         // mp3 unggahan/mp4/YouTube otomatis saat masuk slide, dengan 2
         // tombol mudah panah atas/bawah") -- baris kecil per item: tombol
@@ -1058,8 +1206,8 @@ const PresentationStudio = (() => {
         // meniru tombol itu (lihat wirePlaylistKeyNav() & catatan
         // autoplayBgAudioIfEnabled_() dekat sendGenericItemLive()).
         `<div class="ps-verse-row-bgaudio" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-           <button type="button" class="chip-btn small" data-bgaudio-edit title="Lampirkan/ganti/lepas link audio latar (MP3 unggahan/Drive, MP4 Drive, atau YouTube) untuk item ini">🎧 ${(it && it.bgAudio && it.bgAudio.url) ? "Ganti" : "Audio Latar"}</button>
-           ${(it && it.bgAudio && it.bgAudio.url) ? `<label class="ps-pointer-hint" style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Kalau dicentang, audio ini OTOMATIS diputar begitu item ini masuk slide (panah/PageUp-Down/stylus) -- tidak perlu tekan ▶ Play manual lagi."><input type="checkbox" data-bgauto ${it.bgAudio.autoplay ? "checked" : ""} /> ▶️ Otomatis saat masuk slide</label>` : ""}
+           <button type="button" class="chip-btn small" data-bgaudio-edit title="Lampirkan/ganti/lepas link audio latar (MP3 unggahan/Drive, MP4 Drive, atau YouTube) untuk item ini">🎧 ${(it && it.bgAudio && (it.bgAudio.url || it.bgAudio.continuePrev)) ? "Ganti" : "Audio Latar"}</button>
+           ${(it && it.bgAudio && it.bgAudio.url && it.bgAudio.kind !== "yt") ? `<label class="ps-pointer-hint" style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Kalau dicentang, audio ini OTOMATIS diputar begitu item ini masuk slide (panah/PageUp-Down/stylus) -- tidak perlu tekan ▶ Play manual lagi."><input type="checkbox" data-bgauto ${it.bgAudio.autoplay ? "checked" : ""} /> ▶️ Otomatis saat masuk slide</label>` : ""}
          </div>` +
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
@@ -1181,7 +1329,7 @@ const PresentationStudio = (() => {
     showSimpleDialog(`🎧 Audio Latar — ${genericItemRefText(it)}`, (box) => {
       const hint = document.createElement("p");
       hint.className = "simple-dialog-hint";
-      hint.textContent = "Tempel SATU link saja: MP3 (unggahan/link langsung/Google Drive), MP4 (video Google Drive -- gambarnya TIDAK ditampilkan, cuma suaranya jadi latar), atau YouTube. Kosongkan lalu Simpan untuk melepas audio latar dari item ini.";
+      hint.textContent = "Tempel SATU link saja: MP3 (unggahan/link langsung/Google Drive), MP4 (video Google Drive -- gambarnya TIDAK ditampilkan, cuma suaranya jadi latar), atau YouTube. Kosongkan lalu Simpan untuk melepas audio latar dari item ini (kecuali mencentang \"↩️ Lanjutkan\" di bawah -- itu boleh tanpa link sendiri).";
       box.appendChild(hint);
 
       const urlField = document.createElement("div");
@@ -1253,6 +1401,11 @@ const PresentationStudio = (() => {
         }
       });
 
+      // Blok "▶️ Otomatis" LAMA -- dipakai APA ADANYA utk MP3/MP4 (tidak
+      // berubah sama sekali). Untuk YouTube, blok ini DIGANTI oleh
+      // "ytStartField" (3 pilihan "kapan mulai" + Lanjutkan + Ulang) di
+      // bawah -- lebih lengkap, lihat catatan panjang di
+      // handleYtBgForActiveItem_() (dekat autoplayBgAudioIfEnabled_()).
       const autoField = document.createElement("div");
       autoField.className = "simple-dialog-field";
       const autoLabel = document.createElement("label");
@@ -1265,14 +1418,180 @@ const PresentationStudio = (() => {
       autoField.appendChild(autoLabel);
       box.appendChild(autoField);
 
+      // ------------------------------------------------------------
+      // BARU (18 Sep 2026 v6, permintaan operator "YouTube latar per-
+      // slide, klik panah ke 2 baru main, next lagi default mati kecuali
+      // dicentang lanjutkan") -- HANYA tampil kalau "Jenis link" = 📺
+      // YouTube (toggle lewat listener kindInputs di bawah). 3 bagian:
+      //   1) Radio "Kapan mulai main" (Otomatis / Klik panah lagi /
+      //      Manual saja) -- menentukan armStart & (ulang pakai) autoplay.
+      //   2) Checkbox "↩️ Lanjutkan dari slide sebelumnya" -- kalau
+      //      dicentang, radio (1) diabaikan (disabled) -- lihat catatan
+      //      panjang continuePrev di handleYtBgForActiveItem_().
+      //   3) Select "Setelah selesai" -- 1x saja / Ulang video ini terus
+      //      (loopFile) / Ulang Semua -- 1 paket beberapa video berbeda
+      //      (loopAll + extraUrls, BARU 18 Sep 2026 v7, lihat kotak
+      //      "psYtPackageField" tepat di bawah select ini).
+      // ------------------------------------------------------------
+      const ytStartField = document.createElement("div");
+      ytStartField.className = "simple-dialog-field";
+      ytStartField.style.cssText = "border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:10px 12px; margin-top:4px;";
+      const ytStartTitle = document.createElement("label");
+      ytStartTitle.textContent = "📺 Pengaturan khusus YouTube latar (per-slide):";
+      ytStartTitle.style.cssText = "font-weight:600; margin-bottom:4px; display:block;";
+      ytStartField.appendChild(ytStartTitle);
+
+      const ytStartOpts = [
+        ["auto", "▶️ Otomatis begitu slide ini muncul"],
+        ["arrow", "🎬 Tunggu klik panah SEKALI LAGI (disarankan)"],
+        ["manual", "⏸ Manual saja (operator tekan ▶ Play sendiri)"],
+      ];
+      const ytStartRadios = [];
+      const existingStartMode = existing && existing.armStart ? "arrow" : (existing && existing.autoplay ? "auto" : "manual");
+      ytStartOpts.forEach(([val, label]) => {
+        const wrapLbl = document.createElement("label");
+        wrapLbl.style.cssText = "display:flex; align-items:center; gap:6px; margin:4px 0; cursor:pointer;";
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "psYtStartMode_" + index;
+        radio.value = val;
+        if (existingStartMode === val) radio.checked = true;
+        wrapLbl.appendChild(radio);
+        wrapLbl.appendChild(document.createTextNode(" " + label));
+        ytStartField.appendChild(wrapLbl);
+        ytStartRadios.push(radio);
+      });
+
+      const continuePrevLabel = document.createElement("label");
+      continuePrevLabel.style.cssText = "display:flex; align-items:center; gap:6px; margin:8px 0 4px; cursor:pointer;";
+      const continuePrevCb = document.createElement("input");
+      continuePrevCb.type = "checkbox";
+      continuePrevCb.checked = !!(existing && existing.continuePrev);
+      continuePrevLabel.appendChild(continuePrevCb);
+      continuePrevLabel.appendChild(document.createTextNode("↩️ Lanjutkan audio YouTube dari slide sebelumnya (abaikan pilihan di atas -- slide ini TIDAK memulai/menghentikan apa pun sendiri, boleh kosongkan Link di atas)"));
+      ytStartField.appendChild(continuePrevLabel);
+
+      const loopRow = document.createElement("div");
+      loopRow.style.cssText = "display:flex; align-items:center; gap:8px; margin-top:6px;";
+      const loopLabel = document.createElement("label");
+      loopLabel.textContent = "Setelah selesai:";
+      const loopSelect = document.createElement("select");
+      // BARU (18 Sep 2026 v7) -- pilihan ke-3 "all" ("Ulang Semua") --
+      // lihat "psYtPackageField" tepat di bawah utk kotak paket videonya.
+      [
+        ["once", "▶️ Berhenti (1x saja)"],
+        ["one", "🔁 Ulang video ini terus"],
+        ["all", "🔁🔁 Ulang Semua (paket beberapa video berbeda)"],
+      ].forEach(([val, label]) => {
+        const opt = document.createElement("option");
+        opt.value = val; opt.textContent = label;
+        loopSelect.appendChild(opt);
+      });
+      // Baca data LAMA (sebelum ada `loopAll`) tetap benar: `loopFile`
+      // dulu HANYA berarti "1 video diulang" -- dipetakan ke "one".
+      const existingLoopMode_ = existing && existing.loopAll ? "all" : (existing && existing.loopFile ? "one" : "once");
+      loopSelect.value = existingLoopMode_;
+      loopRow.appendChild(loopLabel);
+      loopRow.appendChild(loopSelect);
+      ytStartField.appendChild(loopRow);
+
+      // ------------------------------------------------------------
+      // BARU (18 Sep 2026 v7, permintaan operator "Ulang Semua -- 1 paket
+      // isi beberapa video YouTube berbeda") -- HANYA tampil kalau
+      // "Setelah selesai" = "🔁🔁 Ulang Semua". Sengaja dibuat SESEDERHANA
+      // mungkin (1 kotak teks, 1 link per baris) supaya orang yang baru
+      // pertama kali pakai tidak bingung dengan tombol "+ Tambah" macam2
+      // -- cukup tempel, baris baru, tempel lagi.
+      //
+      // Cara kerjanya di balik layar (lihat startYtBgForItem_() &
+      // loadSharedBgAudio_() di atas): video di kotak "Link audio"
+      // (paling atas dialog ini) SELALU jadi video PERTAMA yang main.
+      // Video di kotak paket ini ditambahkan SESUDAHNYA, urut dari atas
+      // ke bawah. Semua id videonya ditaruh di 1 parameter resmi
+      // YouTube "playlist=id1,id2,id3,..." bersama "loop=1" -- artinya
+      // YOUTUBE SENDIRI yang mengurus giliran & putar-balik ke video
+      // pertama lagi sesudah yang terakhir selesai, TANPA kode kita
+      // perlu mendeteksi "video sudah habis" satu-satu (beda dari
+      // pemutar YouTube UTAMA/#ytView yang memang perlu deteksi begitu,
+      // lihat "yt_queue"/ytRepeatMode di present.html -- audio latar ini
+      // tidak perlu serumit itu karena videonya toh disembunyikan,
+      // cukup 1 parameter URL saja).
+      // ------------------------------------------------------------
+      const ytPackageField = document.createElement("div");
+      ytPackageField.className = "simple-dialog-field";
+      ytPackageField.style.cssText = "margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,.15);";
+      const ytPackageLabel = document.createElement("label");
+      ytPackageLabel.textContent = "🎞 Video LAIN dalam paket ini (urut mainnya, 1 link per baris):";
+      ytPackageField.appendChild(ytPackageLabel);
+      const ytPackageTextarea = document.createElement("textarea");
+      ytPackageTextarea.rows = 3;
+      ytPackageTextarea.style.cssText = "width:100%; font-family:inherit; font-size:13px;";
+      ytPackageTextarea.placeholder = "https://youtu.be/videoKedua\nhttps://youtu.be/videoKetiga\n...";
+      ytPackageTextarea.value = Array.isArray(existing && existing.extraUrls) ? existing.extraUrls.join("\n") : "";
+      ytPackageField.appendChild(ytPackageTextarea);
+      const ytPackageHint = document.createElement("p");
+      ytPackageHint.className = "simple-dialog-hint";
+      ytPackageHint.textContent = "Video di kotak \"Link audio\" PALING ATAS main duluan. Video di sini menyusul, urut dari atas ke bawah. Sesudah yang PALING BAWAH selesai, otomatis balik lagi ke video paling atas -- berulang terus sampai operator pindah slide (atau tekan ⏹ Berhenti).";
+      ytPackageField.appendChild(ytPackageHint);
+      ytStartField.appendChild(ytPackageField);
+
+      box.appendChild(ytStartField);
+
+      function syncYtLoopFields_() { ytPackageField.hidden = loopSelect.value !== "all"; }
+      loopSelect.addEventListener("change", syncYtLoopFields_);
+      syncYtLoopFields_();
+
+      // Tampilkan blok "Otomatis" LAMA hanya utk mp3/mp4, blok YouTube
+      // baru hanya utk yt -- dijalankan sekali di awal + tiap kali radio
+      // "Jenis link" diganti operator.
+      function syncBgAudioKindFields_() {
+        const kindRadio = kindInputs.find((r) => r.checked);
+        const isYt = kindRadio ? kindRadio.value === "yt" : false;
+        autoField.hidden = isYt;
+        ytStartField.hidden = !isYt;
+      }
+      kindInputs.forEach((r) => r.addEventListener("change", syncBgAudioKindFields_));
+      syncBgAudioKindFields_();
+
       return () => {
         const url = urlInput.value.trim();
-        if (!url) return { url: "", label: "", kind: "mp3", autoplay: false }; // kosong -> lepas lampiran
         const kindRadio = kindInputs.find((r) => r.checked);
-        return { url, label: labelInput.value.trim(), kind: kindRadio ? kindRadio.value : "mp3", autoplay: autoCb.checked };
+        const kind = kindRadio ? kindRadio.value : "mp3";
+        const continuePrev = kind === "yt" && continuePrevCb.checked;
+        if (!url && !continuePrev) return { url: "", label: "", kind: "mp3", autoplay: false, armStart: false, continuePrev: false, loopFile: false, loopAll: false, extraUrls: [] }; // kosong & bukan "lanjutkan" -> lepas lampiran
+        if (kind === "yt") {
+          const startMode = (ytStartRadios.find((r) => r.checked) || {}).value || "manual";
+          const loopMode = loopSelect.value; // "once" | "one" | "all"
+          // BARU (18 Sep 2026 v7) -- validasi paket "Ulang Semua" SAAT
+          // disimpan (bukan menunggu sampai slide-nya dibuka nanti di
+          // Layar 2) -- link yang tidak dikenali langsung ditolak +
+          // ditandai baris ke berapa, sama gaya dengan cek link utama
+          // di loadSharedBgAudio_() di atas. Mengembalikan `null`/`undefined`
+          // di sini membuat dialog TETAP TERBUKA (lihat showSimpleDialog(),
+          // js/app.js) supaya operator bisa membetulkan dulu.
+          let extraUrls = [];
+          if (loopMode === "all") {
+            const lines = ytPackageTextarea.value.split("\n").map((s) => s.trim()).filter(Boolean);
+            for (let i = 0; i < lines.length; i++) {
+              const okId = typeof extractYoutubeId === "function" ? extractYoutubeId(lines[i]) : null;
+              if (!okId) { alert(`Link video ke-${i + 2} di paket "Ulang Semua" tidak dikenali (baris ke-${i + 1} kotak paket):\n${lines[i]}\n\nPeriksa lagi linknya, lalu Simpan ulang.`); return null; }
+            }
+            extraUrls = lines;
+          }
+          return {
+            url, label: labelInput.value.trim(), kind: "yt",
+            autoplay: !continuePrev && startMode === "auto",
+            armStart: !continuePrev && startMode === "arrow",
+            continuePrev,
+            loopFile: loopMode === "one",
+            loopAll: loopMode === "all",
+            extraUrls,
+          };
+        }
+        return { url, label: labelInput.value.trim(), kind, autoplay: autoCb.checked, armStart: false, continuePrev: false, loopFile: false, loopAll: false, extraUrls: [] };
       };
     }, (val) => {
-      const newBgAudio = val && val.url ? val : null;
+      const newBgAudio = val && (val.url || val.continuePrev) ? val : null;
       if (updateItemBgAudioInCollection(username, colId, index, newBgAudio)) {
         if (it) it.bgAudio = newBgAudio; // lihat catatan di atas fungsi ini
         renderCollectionList();
@@ -1806,7 +2125,21 @@ const PresentationStudio = (() => {
     highlightActivePlaylistRow();
     pushMonitorStatus_(); // BARU (10 Sep 2026, sesi ke-10) -- lihat catatan di pushMonitorStatus_()
   }
-  function playlistNext() { if (activePlaylist) playlistGoTo(activePlaylist.index + 1); }
+  // DIUBAH (18 Sep 2026 v6, permintaan operator "klik panah ke 2 baru
+  // main YouTube") -- kalau slide aktif SEKARANG sedang menunggu
+  // konfirmasi (pendingYtArrowStart_ terisi, lihat handleYtBgForActiveItem_()
+  // di atas), klik panah MAJU ini SENGAJA "diserap" sebagai tombol mulai
+  // audio latar-nya SAJA -- TIDAK berpindah slide sama sekali. Klik
+  // panah maju BERIKUTNYA (sesudah audio mulai) baru sungguh pindah ke
+  // slide berikutnya seperti biasa. Panah MUNDUR (playlistPrev) TIDAK
+  // ikut menyerap klik seperti ini -- mundur selalu langsung pindah
+  // slide, status "menunggu" otomatis batal (lihat reset di
+  // handleYtBgForActiveItem_(), dipanggil dari dalam playlistGoTo()).
+  function playlistNext() {
+    if (!activePlaylist) return;
+    if (pendingYtArrowStart_) { startYtBgForItem_(pendingYtArrowStart_.it); return; }
+    playlistGoTo(activePlaylist.index + 1);
+  }
   function playlistPrev() { if (activePlaylist) playlistGoTo(activePlaylist.index - 1); }
 
   // Panah kiri/kanan papan ketik (dan Page Up/Down -- sebagian
