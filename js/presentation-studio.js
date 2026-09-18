@@ -786,7 +786,28 @@ const PresentationStudio = (() => {
     // penuh layar di Layar 2 (js/book-scene.js), jadi di kotak kecil ini
     // cukup keterangan hari keberapa yang sedang tayang.
     if (payload.type === "penciptaan") {
-      box.innerHTML = `<div class="present-preview-idle">🌱 Penciptaan — tayang di Layar 2</div>`;
+      box.innerHTML = payload.action === "awal"
+        ? `<div class="present-preview-idle">🌱 Penciptaan — Tampilan Awal (7 hari) di Layar 2</div>`
+        : `<div class="present-preview-idle">🌱 Penciptaan — tayang di Layar 2</div>`;
+      return;
+    }
+    // BARU (19 Sep 2026) -- 🔤 Slogan Karakter (js/games/slogankarakter.js).
+    // Dulu TIDAK punya blok di sini sama sekali, jadi setiap kali dipanggil
+    // kotak "Tayang" jatuh ke bawah dan tampil "Belum ada tayangan"
+    // -- padahal Layar 2 sendiri tayang (lihat catatan PERBAIKAN Kuis 9
+    // Kotak/Survei di atas untuk pola masalah yang sama).
+    if (payload.type === "slogankarakter") {
+      if (payload.action === "grid") {
+        box.innerHTML = `<div class="present-preview-idle">🔤 Slogan Karakter — Tampilan Awal (10 kotak)${payload.kelompok ? " · kotak " + escapeHtml(String(payload.kelompok)) + " disorot" : ""}</div>`;
+        return;
+      }
+      const D = window.SLOGAN_KARAKTER_DATA;
+      const info = D && D.CHARS ? D.CHARS[payload.karakter] : null;
+      const fields = Array.isArray(payload.fields) ? payload.fields : [];
+      if (!info) { box.innerHTML = `<div class="present-preview-idle">🔤 Slogan Karakter — tayang di Layar 2</div>`; return; }
+      const refHtml = `<div class="present-preview-ref">KARAKTER ${escapeHtml(String(payload.karakter).toUpperCase())}</div>`;
+      const blocks = fields.map((k) => `<div class="present-preview-text">${escapeHtml(info[k] || "")}</div>`).join("");
+      box.innerHTML = refHtml + blocks;
       return;
     }
     if (payload.type === "verse" || payload.type === "text") {
