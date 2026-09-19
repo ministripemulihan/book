@@ -495,10 +495,12 @@ function addKidungToCollection(username, name, kidungItem) {
     koorTeks: kidungItem.koorTeks || null,
     bgAudio: (kidungItem.bgAudio && (kidungItem.bgAudio.url || kidungItem.bgAudio.continuePrev))
       ? {
-          kind: kidungItem.bgAudio.kind === "yt" ? "yt" : (kidungItem.bgAudio.kind === "mp4" ? "mp4" : "mp3"),
+          kind: kidungItem.bgAudio.kind === "yt" ? "yt" : (kidungItem.bgAudio.kind === "sc" ? "sc" : (kidungItem.bgAudio.kind === "mp4" ? "mp4" : "mp3")), // "sc" = SoundCloud (BARU 19 Sep 2026)
           url: String(kidungItem.bgAudio.url || ""), label: kidungItem.bgAudio.label || "", autoplay: !!kidungItem.bgAudio.autoplay,
           // BARU (18 Sep 2026 v6) -- lihat catatan panjang di updateItemBgAudioInCollection() di atas
           armStart: !!kidungItem.bgAudio.armStart, continuePrev: !!kidungItem.bgAudio.continuePrev, loopFile: !!kidungItem.bgAudio.loopFile,
+          // PERBAIKAN (19 Sep 2026) -- loopAll & extraUrls ("Ulang Semua" paket YouTube) dulu TIDAK ikut disimpan di sini
+          loopAll: !!kidungItem.bgAudio.loopAll, extraUrls: Array.isArray(kidungItem.bgAudio.extraUrls) ? kidungItem.bgAudio.extraUrls.map(String) : [],
         }
       : null,
     // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah" (lihat
@@ -624,15 +626,21 @@ function updateKidungItemTextInCollection(username, id, index, updates) {
 // berubah. `continuePrev` SATU-SATUNYA alasan item ini boleh disimpan
 // TANPA `url` sendiri (marker "lanjutkan" murni) -- makanya syaratnya
 // `bgAudio.url || bgAudio.continuePrev`, bukan cuma `.url` seperti dulu.
+// BARU (19 Sep 2026, permintaan operator "link SoundCloud latar belakang") --
+// `kind` sekarang boleh "sc" (SoundCloud), diperlakukan seperti "yt": ikut
+// pengaturan armStart/continuePrev/loopFile & alur "klik panah SEKALI LAGI
+// baru mulai" (lihat handleBgForActiveItem_() js/presentation-studio.js).
 function updateItemBgAudioInCollection(username, id, index, bgAudio) {
   const collections = loadCollections(username);
   const col = collections[id];
   if (!col || !col.items[index]) return false;
   col.items[index].bgAudio = (bgAudio && (bgAudio.url || bgAudio.continuePrev))
     ? {
-        kind: bgAudio.kind === "yt" ? "yt" : (bgAudio.kind === "mp4" ? "mp4" : "mp3"),
+        kind: bgAudio.kind === "yt" ? "yt" : (bgAudio.kind === "sc" ? "sc" : (bgAudio.kind === "mp4" ? "mp4" : "mp3")), // "sc" = SoundCloud (BARU 19 Sep 2026)
         url: String(bgAudio.url || ""), label: bgAudio.label || "", autoplay: !!bgAudio.autoplay,
         armStart: !!bgAudio.armStart, continuePrev: !!bgAudio.continuePrev, loopFile: !!bgAudio.loopFile,
+        // PERBAIKAN (19 Sep 2026) -- loopAll & extraUrls ("Ulang Semua" paket YouTube) dulu TIDAK ikut disimpan, jadi hilang begitu halaman dimuat ulang
+        loopAll: !!bgAudio.loopAll, extraUrls: Array.isArray(bgAudio.extraUrls) ? bgAudio.extraUrls.map(String) : [],
       }
     : null;
   col.updatedAt = new Date().toISOString();
