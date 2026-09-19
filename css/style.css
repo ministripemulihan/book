@@ -5206,3 +5206,59 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 @media (max-width: 720px) {
   .ml-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
+
+
+/* ============================================================
+   BARU (19 Sep 2026, permintaan operator "gambar-gambarnya sama semua,
+   tidak kelihatan lagunya sudah nyala atau belum -- buat latarnya
+   gelap") -- STATUS Audio Latar. Latar SELALU gelap; yang berbeda
+   antar-keadaan adalah WARNA garis tepi, titik, dan tulisannya:
+   abu = belum ada | slate = dimuat | KUNING = siap (tunggu panah) |
+   biru = menyalakan | HIJAU berdenyut = SEDANG MAIN | ungu = dijeda |
+   merah = gagal. Dipakai 3 tempat: kotak besar .ps-bg-now (panel Kidung),
+   pil kecil .ps-bg-state (baris Kumpulan Ayat & kotak "Tayang"), dan
+   tombol .ps-bg-chip-on (chip link / ▶ Play / ⏸ Jeda yang sedang aktif).
+   Warna sengaja tetap gelap di tema terang maupun gelap (dipasang
+   eksplisit, tidak pakai variabel tema) supaya kontrasnya konsisten.
+   ============================================================ */
+.ps-bg-now {
+  display: flex; align-items: center; gap: 10px;
+  margin: 8px 0; padding: 10px 12px; border-radius: 10px;
+  background: #111827; color: #e5e7eb; border: 2px solid #374151;
+  font-size: 13px; line-height: 1.35;
+}
+.ps-bg-now .ps-bg-dot { width: 14px; height: 14px; border-radius: 50%; background: #6b7280; flex: 0 0 auto; }
+.ps-bg-now .ps-bg-icon { font-size: 20px; flex: 0 0 auto; }
+.ps-bg-now .ps-bg-title { font-weight: 800; letter-spacing: 0.3px; color: #f9fafb; }
+.ps-bg-now .ps-bg-sub { font-size: 12px; opacity: 0.8; word-break: break-word; }
+.ps-bg-now[data-state="loaded"]     { background: #1f2937; border-color: #9ca3af; }
+.ps-bg-now[data-state="loaded"] .ps-bg-dot { background: #9ca3af; }
+.ps-bg-now[data-state="armed"]      { background: #3b2a05; border-color: #f59e0b; }
+.ps-bg-now[data-state="armed"] .ps-bg-dot { background: #f59e0b; animation: psBgPulse 1.6s ease-in-out infinite; }
+.ps-bg-now[data-state="connecting"] { background: #0f1e46; border-color: #3b82f6; }
+.ps-bg-now[data-state="connecting"] .ps-bg-dot { background: #60a5fa; animation: psBgPulse 0.9s ease-in-out infinite; }
+.ps-bg-now[data-state="playing"]    { background: #052e1c; border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25); }
+.ps-bg-now[data-state="playing"] .ps-bg-dot { background: #22c55e; animation: psBgPulse 1s ease-in-out infinite; }
+.ps-bg-now[data-state="paused"]     { background: #1e1b2e; border-color: #a78bfa; }
+.ps-bg-now[data-state="paused"] .ps-bg-dot { background: #a78bfa; }
+.ps-bg-now[data-state="error"]      { background: #3a1414; border-color: #ef4444; }
+.ps-bg-now[data-state="error"] .ps-bg-dot { background: #ef4444; }
+@keyframes psBgPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.75); } }
+
+.ps-bg-state {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  background: #111827; color: #f9fafb; border: 2px solid #374151;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.3px; white-space: nowrap;
+}
+.ps-bg-state[hidden] { display: none; }
+.ps-bg-state[data-state="loaded"]     { background: #1f2937; border-color: #9ca3af; }
+.ps-bg-state[data-state="armed"]      { background: #3b2a05; border-color: #f59e0b; color: #fde68a; }
+.ps-bg-state[data-state="connecting"] { background: #0f1e46; border-color: #3b82f6; color: #bfdbfe; }
+.ps-bg-state[data-state="playing"]    { background: #052e1c; border-color: #22c55e; color: #bbf7d0; box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3); }
+.ps-bg-state[data-state="paused"]     { background: #1e1b2e; border-color: #a78bfa; color: #ddd6fe; }
+.ps-bg-state[data-state="error"]      { background: #3a1414; border-color: #ef4444; color: #fecaca; }
+
+.chip-btn.ps-bg-chip-on { background: #111827; color: #f9fafb; border-color: #22c55e; }
+.chip-btn.ps-bg-chip-on[data-state="loaded"] { border-color: #9ca3af; }
+.chip-btn.ps-bg-chip-on[data-state="armed"] { border-color: #f59e0b; }
+.chip-btn.ps-bg-chip-on[data-state="paused"] { border-color: #a78bfa; }
