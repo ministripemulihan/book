@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260915c" />
+<link rel="stylesheet" href="css/style.css?v=20260919b" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1928,8 +1928,21 @@
                    studio.js) untuk cara kerjanya. -->
               <label class="ps-pointer-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin:4px 0;">
                 <input type="checkbox" id="psKidungBgAutoToggle" />
-                ▶️ Otomatis nyala sendiri saat baitnya masuk slide (tidak usah tekan ▶ Play)
+                ▶️ Nyalakan lagu dengan panah kanan berikutnya (tanpa tekan ▶ Play) -- 1x panah = lagu mulai, panah lagi = pindah bait
               </label>
+              <!-- BARU (19 Sep 2026, permintaan operator "link SoundCloud bisa
+                   jalan di belakang layar, default TIDAK dimainkan; kalau
+                   dicentang, panah kanan berikutnya yang menyalakan lagunya,
+                   navigasi tetap harus mudah") -- arti checkbox di atas DIUBAH:
+                   dulu "otomatis nyala sendiri begitu bait masuk slide", sekarang
+                   "tunggu panah kanan berikutnya" (lagu TIDAK pernah menyala
+                   sendiri tanpa aba-aba). Berlaku utk link SoundCloud, YouTube
+                   maupun MP3. 2 tombol di bawah = sama dgn panah kiri/kanan
+                   papan ketik & clicker (playlistPrev()/playlistNext()). -->
+              <div class="ps-btn-row" id="psKidungNavRow">
+                <button type="button" id="psKidungNavPrevBtn" class="chip-btn small" title="Sama seperti panah kiri / PageUp / panah atas -- bait sebelumnya">◀ Sebelumnya</button>
+                <button type="button" id="psKidungNavNextBtn" class="chip-btn small" title="Sama seperti panah kanan / PageDown / panah bawah -- kalau lagu sudah &quot;siap&quot; (dicentang di atas), klik pertama menyalakan lagu, klik berikutnya pindah bait">Berikutnya ▶</button>
+              </div>
               <!-- BARU (18 Sep 2026, lanjutan permintaan operator "kadang
                    kidungnya belum ada di Sheet, tapi tetap butuh mp3/
                    Drive/YouTube latar sekali pakai") -- link manual,
@@ -1939,10 +1952,21 @@
                    atas -- lihat wireKidungManualBg_() di
                    js/presentation-studio.js. -->
               <div class="ps-yt-row">
-                <input type="text" id="psKidungBgManualInput" class="columns-lang-select" placeholder="Tempel link MP3/Google Drive atau YouTube di sini (manual)" />
+                <input type="text" id="psKidungBgManualInput" class="columns-lang-select" placeholder="Tempel link SoundCloud / YouTube / MP3 / Google Drive di sini (manual)" />
               </div>
               <div class="ps-btn-row">
                 <button type="button" id="psKidungBgManualLoadBtn" class="chip-btn small">🎧 Muat sebagai Latar</button>
+              </div>
+              <!-- BARU (19 Sep 2026, permintaan operator "gambar-gambarnya sama semua,
+                   tidak kelihatan lagunya sudah nyala atau belum, buat latarnya
+                   gelap") -- kotak status Audio Latar, SELALU gelap, warna garis &
+                   titik berubah sesuai keadaan (belum dimuat / dimuat / SIAP /
+                   menyalakan / SEDANG MAIN / dijeda / gagal). Diisi renderBgNowBar_()
+                   di js/presentation-studio.js; gayanya di css/style.css (.ps-bg-now). -->
+              <div id="psKidungBgNow" class="ps-bg-now" data-state="none" role="status" aria-live="polite">
+                <span class="ps-bg-dot" aria-hidden="true"></span>
+                <span class="ps-bg-icon" aria-hidden="true">⚪</span>
+                <span class="ps-bg-text"><span class="ps-bg-title">BELUM ADA LAGU DIMUAT</span><br /><span class="ps-bg-sub">Muat link lagu di bawah (SoundCloud / YouTube / MP3).</span></span>
               </div>
               <div class="ps-btn-row" id="psKidungBgControls" hidden>
                 <button type="button" id="psKidungBgPlayBtn" class="chip-btn small">▶ Play</button>
@@ -3903,7 +3927,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260913a"></script>
+  <script src="js/collections.js?v=20260919b"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -3924,9 +3948,9 @@
        presentation-studio.js supaya window.INDONESIA_REGENCIES sudah
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
-  <script src="js/presentation.js?v=20260913a"></script>
+  <script src="js/presentation.js?v=20260919b"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/presentation-studio.js?v=20260919a"></script>
+  <script src="js/presentation-studio.js?v=20260919c"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -3949,7 +3973,7 @@
   <script src="js/media-library.js?v=20260914b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20260915e"></script>
+  <script src="js/app.js?v=20260919b"></script>
   <script src="js/curhat.js?v=20260915a"></script>
   <script src="js/aichat.js?v=20260907a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
