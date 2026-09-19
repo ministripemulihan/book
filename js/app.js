@@ -6866,7 +6866,7 @@ function openCollectionFullscreen(col, startIndex) {
   //      klik panah lagi" TIDAK langsung main begitu slide masuk, harus
   //      ditandai dulu (fsYtArmed_) lalu menunggu 1x tekan "Selanjutnya"/
   //      panah maju LAGI (lihat goNext() di bawah) -- SAMA PERSIS pola
-  //      pendingYtArrowStart_ di Studio.
+  //      pendingBgArrowStart_ di Studio.
   //   2) continuePrev ("↩️ Lanjutkan") -- slide ini SAMA SEKALI tidak
   //      menyentuh audio latar yg sedang main (tidak mulai/hentikan apa
   //      pun), itulah cara 1 lagu YouTube menembus beberapa slide
@@ -6969,6 +6969,32 @@ function openCollectionFullscreen(col, startIndex) {
     }
     return embed;
   }
+  // BARU (19 Sep 2026, permintaan operator "link SoundCloud latar belakang") --
+  // versi Mode Layar Penuh dari Audio Latar SoundCloud (kind "sc") di Studio
+  // (lihat "sc_bg" di present.html). Link pendek on.soundcloud.com/xxx TIDAK
+  // diterima langsung oleh widget w.soundcloud.com, jadi diselesaikan dulu
+  // lewat oEmbed publik SoundCloud (SAMA seperti resolveSoundCloudSrc() di
+  // present.html); kalau oEmbed gagal (offline dst) -> fallback link apa
+  // adanya. auto_play=true karena di sini "mulai" = klik/panah operator.
+  // Keterbatasan (disengaja, versi sederhana): TIDAK ada redup halus &
+  // tidak ada "ulang terus" di mode ini -- lagu langsung berhenti saat
+  // pindah slide / ⏹, dan main 1x.
+  async function resolveScBgSrcFs_(trackUrl) {
+    const tail = "&auto_play=true&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+    try {
+      const res = await fetch("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl));
+      if (res.ok) {
+        const json = await res.json();
+        const m = /src="([^"]+)"/.exec((json && json.html) || "");
+        if (m && m[1]) {
+          const u = /[?&]url=([^&]+)/.exec(m[1]);
+          if (u && u[1]) return "https://w.soundcloud.com/player/?url=" + u[1] + tail;
+          return m[1];
+        }
+      }
+    } catch (e) { /* jaringan gagal -- lanjut ke fallback di bawah */ }
+    return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + tail;
+  }
   // Sungguh memuat + memutar audio latar milik `it` SEKARANG JUGA -- dipanggil
   // baik oleh handleFsBgAudioForItem_() (kalau autoplay tercentang) MAUPUN
   // goNext() (kalau operator menekan panah konfirmasi ke-2 utk item yang
@@ -6981,7 +7007,17 @@ function openCollectionFullscreen(col, startIndex) {
     stopFsBgAudioNow_();
     fsBgAudioActiveUrl_ = bg.url;
     fsYtArmed_ = null;
-    if (bg.kind === "yt") {
+    if (bg.kind === "sc") {
+      // BARU (19 Sep 2026) -- SoundCloud lewat iframe tersembunyi yang SAMA dengan YouTube (fsBgYtEl).
+      // Ukuran dibuat 300x166 (di luar layar) -- widget SoundCloud lebih andal di ukuran normal daripada 1x1px.
+      fsBgYtEl.style.width = "300px"; fsBgYtEl.style.height = "166px";
+      const urlNow = bg.url;
+      resolveScBgSrcFs_(urlNow).then((src) => {
+        if (fsBgAudioActiveUrl_ !== urlNow || !fsBgYtEl) return; // sudah pindah/berhenti selagi menunggu oEmbed
+        fsBgYtEl.src = src;
+      });
+    } else if (bg.kind === "yt") {
+      fsBgYtEl.style.width = "1px"; fsBgYtEl.style.height = "1px";
       let extraIds = [];
       if (bg.loopAll && Array.isArray(bg.extraUrls) && bg.extraUrls.length) {
         extraIds = bg.extraUrls.map((u) => extractYoutubeIdSimple_(u)).filter(Boolean);
@@ -7016,10 +7052,15 @@ function openCollectionFullscreen(col, startIndex) {
     fsBgHandledForItem_ = it;
     fsYtArmed_ = null; // slide (benar-benar) baru -- lupakan status "menunggu klik" milik slide SEBELUMNYA, batal begitu saja, TIDAK otomatis mulai
     const bg = it && it.bgAudio;
-    if (bg && bg.kind === "yt" && bg.continuePrev) return; // "↩️ Lanjutkan" -- JANGAN sentuh apa pun, biarkan audio yang sedang main (kalau ada) tetap jalan apa adanya
+    if (bg && (bg.kind === "yt" || bg.kind === "sc") && bg.continuePrev) return; // "↩️ Lanjutkan" -- JANGAN sentuh apa pun, biarkan audio yang sedang main (kalau ada) tetap jalan apa adanya
+    // BARU (19 Sep 2026) -- LAGU YANG SAMA sudah jalan (mis. semua bait 1 kidung
+    // membawa link yang sama, dari tab Kidung Studio): JANGAN dihentikan/
+    // dimuat ulang tiap pindah bait, sama seperti aturan di Studio
+    // (handleBgForActiveItem_()).
+    if (bg && bg.url && fsBgAudioActiveUrl_ === bg.url) return;
     if (fsBgAudioActiveUrl_) stopFsBgAudio_({ fade: true }); // default: hentikan (fade halus) audio yang sedang main sebelum (mungkin) memuat yang baru di bawah
     if (!bg || !bg.url) return; // slide ini sendiri tidak punya audio latar -> selesai, tetap diam
-    if (bg.kind === "yt" && bg.armStart) { fsYtArmed_ = it; return; } // perlu 1x klik Selanjutnya/panah lagi -- lihat goNext()
+    if (bg.armStart) { fsYtArmed_ = it; return; } // perlu 1x klik Selanjutnya/panah lagi -- lihat goNext() (DIUBAH 19 Sep 2026: berlaku utk jenis apa pun, bukan cuma YouTube)
     if (bg.autoplay) startFsBgAudioForItem_(it); // otomatis, tanpa perlu konfirmasi klik tambahan
   }
 
