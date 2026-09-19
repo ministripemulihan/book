@@ -1041,6 +1041,15 @@
      "aktif" terlihat (meski secara visual video ini memang tidak kelihatan
      sama sekali karena opacity 0). */
   #ytBg { width: 100vw; height: 100vh; position: fixed; inset: 0; border: none; opacity: 0; pointer-events: none; z-index: 0; }
+  /* BARU (19 Sep 2026, permintaan operator "link SoundCloud bisa jalan di
+     belakang layar, sama seperti audio latar YouTube") -- Audio Latar
+     SoundCloud (kind "sc"), pola SAMA dengan #ytBg di atas: widget
+     SoundCloud asli tetap dimuat & bersuara, cuma disembunyikan secara
+     visual (opacity:0, BUKAN display:none supaya audionya tidak ikut
+     berhenti) dan tidak menerima klik. BEDA dari #scView (bilah pemutar
+     SoundCloud yang memang TAMPIL & jadi "tayangan utama" lewat tab
+     "🔗 Link") -- keduanya dua iframe terpisah, tidak saling mengganggu. */
+  #scBg { width: 100vw; height: 166px; position: fixed; left: 0; top: 0; border: none; opacity: 0; pointer-events: none; z-index: 0; }
 
   /* ---- Warta (atas) & FootNote (bawah): ticker 1 baris ----
      Warna latar ticker sengaja TETAP hitam solid (bukan ikut var(--p-bg))
@@ -2285,6 +2294,7 @@
          Layar 2 ini, jadi TIDAK ada batas ukuran buatan & 100% offline. -->
     <video id="localVideoEl" hidden playsinline></video>
     <iframe id="ytBg" allow="autoplay; encrypted-media" frameborder="0" tabindex="-1"></iframe>
+    <iframe id="scBg" allow="autoplay" frameborder="0" tabindex="-1" aria-hidden="true"></iframe>
     <!-- BARU (18 Sep 2026, permintaan operator "kidung butuh mp3 latar,
          teks tetap tayang") -- Audio Latar MP3, pola SAMA PERSIS dengan
          #ytBg di atas (tersembunyi, cuma suaranya, tidak menggantikan
@@ -2584,6 +2594,42 @@
   }
   let scWidget = null; // objek SC.Widget aktif (null kalau belum ada audio SoundCloud yang dimuat)
   const ytBgEl = document.getElementById("ytBg");
+  // BARU (19 Sep 2026) -- niat "play" Audio Latar YouTube yang sedang menunggu.
+  // Kalau Studio mengirim yt_bg (muat) lalu yt_bg_control "play" BERURUTAN
+  // dalam milidetik (terjadi pada alur "klik panah SEKALI LAGI baru mulai",
+  // lihat startBgForItem_() js/presentation-studio.js), perintah playVideo
+  // pertama sering hilang karena iframe YouTube belum selesai memuat --
+  // maka dicoba ulang beberapa kali (playVideo ke pemutar yang sudah main
+  // tidak berbahaya). Dibatalkan otomatis kalau operator menekan Jeda /
+  // Berhenti / memuat video lain.
+  let ytBgWantPlay_ = false;
+  // BARU (19 Sep 2026) -- status SUNGGUHAN Audio Latar YouTube (sedang main /
+  // dijeda / selesai). Pola SAMA dengan pemutar YouTube utama (#ytView, lihat
+  // ytEl "load" & listener "message" infoDelivery di bawah): kirim
+  // {event:"listening"} berulang di detik-detik pertama, lalu pemutar
+  // mengirim balik playerState (1 = main, 2 = jeda, 0 = selesai).
+  ytBgEl.addEventListener("load", () => {
+    const srcAttr = ytBgEl.getAttribute("src");
+    if (!srcAttr || srcAttr === "about:blank" || !ytBgEl.contentWindow) return;
+    const sendListening = () => {
+      if (!ytBgEl.getAttribute("src") || !ytBgEl.contentWindow) return;
+      try { ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "listening", id: "ytBg" }), "*"); } catch (e) {}
+    };
+    sendListening();
+    [250, 600, 1200, 2000].forEach((ms) => setTimeout(sendListening, ms));
+  });
+  window.addEventListener("message", (e) => {
+    if (!ytBgEl.contentWindow || e.source !== ytBgEl.contentWindow) return;
+    let d;
+    try { d = JSON.parse(e.data); } catch (err) { return; }
+    if (!d) return;
+    let st = null;
+    if (d.event === "onStateChange" && typeof d.info === "number") st = d.info;
+    else if (d.event === "infoDelivery" && d.info && typeof d.info.playerState === "number") st = d.info.playerState;
+    if (st === null) return;
+    if (st === 1) reportBgAudioState_("yt", true);
+    else if (st === 2 || st === 0) reportBgAudioState_("yt", false);
+  });
   const kidungBgAudioEl = document.getElementById("kidungBgAudio"); // BARU (18 Sep 2026) -- Audio Latar MP3 kidung, lihat catatan di atas
   const ytBgArmedBadgeEl = document.getElementById("ytBgArmedBadge"); // BARU (18 Sep 2026 v6) -- lihat catatan di markup-nya di atas
   // BARU (18 Sep 2026 v6, permintaan operator "next lagi defaultnya mati
@@ -2649,6 +2695,129 @@
     reportBgAudioStatus_(false, kidungBgAudioEl.src, "Gagal memuat/memutar -- kemungkinan besar link Google Drive ini kena halaman \"tidak bisa dipindai virus\" (biasa terjadi untuk file cukup besar), atau file belum dibagikan \"Siapa saja yang memiliki link\". Coba buka link aslinya langsung di tab baru untuk memastikan, atau pakai hosting MP3 lain (link yang berakhiran .mp3 langsung biasanya paling aman).");
   });
   kidungBgAudioEl.addEventListener("playing", () => reportBgAudioStatus_(true, kidungBgAudioEl.src, ""));
+  // BARU (19 Sep 2026, permintaan operator "gambar-gambarnya sama semua, tidak
+  // kelihatan lagunya sudah nyala atau belum") -- lapor balik STATUS SUNGGUHAN
+  // (sedang main / tidak) ke Studio, BUKAN sekadar "perintah play sudah
+  // dikirim". Studio memakainya utk kotak status gelap "🔊 SEDANG MAIN" dst
+  // (lihat renderBgNowBar_() js/presentation-studio.js). kind: "yt"|"sc"|"mp3".
+  // Jalur SAMA dengan present_bgaudio_status di atas (window.opener).
+  function reportBgAudioState_(kind, playing) {
+    if (!window.opener) return;
+    try {
+      window.opener.postMessage({ source: "bibleAppPresenter", type: "present_bgaudio_state", kind, playing: !!playing }, location.origin);
+    } catch (e) {}
+  }
+  kidungBgAudioEl.addEventListener("playing", () => reportBgAudioState_("mp3", true));
+  kidungBgAudioEl.addEventListener("pause", () => { if (kidungBgAudioEl.getAttribute("src")) reportBgAudioState_("mp3", false); });
+  kidungBgAudioEl.addEventListener("ended", () => reportBgAudioState_("mp3", false));
+
+  // ------------------------------------------------------------
+  // BARU (19 Sep 2026, permintaan operator "tambahkan link SoundCloud yang
+  // bisa berjalan di belakang layar, default TIDAK dimainkan, kalau
+  // dicentang cukup tekan panah kanan berikutnya untuk menyalakan lagunya")
+  // -- Audio Latar SoundCloud (kind "sc"). Pola SAMA dengan Audio Latar
+  // YouTube (#ytBg) & MP3 (#kidungBgAudio) di atas, lewat 3 pesan:
+  //   "sc_bg"         = muat trek (TIDAK langsung main, auto_play=false)
+  //   "sc_bg_control" = play | pause | loop_on | loop_off
+  //   "sc_bg_clear"   = hentikan & kosongkan (data.fade = redup ~1 detik)
+  // Widget SoundCloud dimuat di iframe tersembunyi #scBg (lihat CSS) dan
+  // dikendalikan lewat SC.Widget resmi (SDK api.js di <head>).
+  //
+  // KENAPA ada "antrean play" (scBgWantPlay + pengulangan): ketika operator
+  // menekan panah kanan, Studio mengirim sc_bg LALU sc_bg_control "play"
+  // BERURUTAN dalam hitungan milidetik -- padahal widget baru bisa
+  // menerima perintah SETELAH (1) link pendek on.soundcloud.com diselesaikan
+  // oEmbed (resolveSoundCloudSrc(), async), (2) iframe selesai memuat, (3)
+  // widget SoundCloud siap. Perintah play yang datang terlalu cepat akan
+  // HILANG diam-diam kalau langsung dipanggil. Jadi "play" dicatat sebagai
+  // niat (scBgWantPlay) lalu dicoba lagi tiap 0,5 detik sampai benar-benar
+  // terdengar (event PLAY), maksimal ~7 detik.
+  //
+  // Loop: Widget API SoundCloud TIDAK punya opsi loop bawaan -- diakali
+  // lewat event FINISH: kalau loop menyala, seekTo(0) lalu play lagi (ada
+  // jeda sangat singkat, tidak semulus <audio>.loop milik MP3).
+  //
+  // Kalau tidak juga terdengar sesudah ~7 detik, dilaporkan balik ke
+  // Studio lewat reportBgAudioStatus_(false, ...) (jalur yang SAMA dengan
+  // MP3) supaya operator melihat banner peringatan -- penyebab tersering:
+  // browser memblokir suara otomatis di jendela Layar 2 yang belum pernah
+  // diklik sama sekali.
+  // ------------------------------------------------------------
+  const scBgEl = document.getElementById("scBg");
+  let scBgWidget = null;
+  let scBgReady = false;      // widget sudah siap menerima perintah (event READY, atau cadangan timer sesudah iframe load)
+  let scBgWantPlay = false;   // operator MINTA main (dicoba terus sampai benar-benar terdengar)
+  let scBgPlaying = false;    // event PLAY sudah diterima
+  let scBgLoop = false;
+  let scBgUrl = "";           // link ASLI yang dikirim Studio (dipakai apa adanya sbg kunci saat lapor balik status)
+  let scBgToken = 0;          // naik tiap trek baru dimuat / dikosongkan -- membatalkan timer & callback milik trek LAMA
+  let scBgRetryTimer = null;
+  function scBgStopRetry_() { if (scBgRetryTimer) { clearInterval(scBgRetryTimer); scBgRetryTimer = null; } }
+  function scBgRequestPlay_() {
+    if (!scBgUrl) return;
+    scBgWantPlay = true;
+    scBgStopRetry_();
+    const myToken = scBgToken;
+    let tries = 0;
+    const attempt = () => {
+      if (myToken !== scBgToken || !scBgWantPlay || scBgPlaying) { scBgStopRetry_(); return; }
+      if (scBgWidget && scBgReady) { try { scBgWidget.play(); } catch (e) {} }
+      tries++;
+      if (tries >= 14) {
+        scBgStopRetry_();
+        reportBgAudioStatus_(false, scBgUrl, "SoundCloud latar belum berbunyi. Kemungkinan (1) browser memblokir suara otomatis -- klik sekali di jendela Layar 2 lalu tekan panah/Play lagi, atau (2) link tidak valid / pemilik lagu tidak mengizinkan diputar tersemat. Coba buka linknya langsung di tab baru untuk memastikan.");
+      }
+    };
+    attempt();
+    scBgRetryTimer = setInterval(attempt, 500);
+  }
+  function fadeOutScBg_(w, durationMs, token) {
+    const steps = 10;
+    const stepMs = Math.max(30, Math.floor(durationMs / steps));
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      if (token !== scBgToken) { clearInterval(timer); return; } // sudah ada trek baru di iframe yang sama -- JANGAN ikut meredupkan trek baru itu
+      try { w.setVolume(Math.max(0, Math.round(100 * (1 - i / steps)))); } catch (e) {}
+      if (i >= steps) clearInterval(timer);
+    }, stepMs);
+  }
+  scBgEl.addEventListener("load", () => {
+    if (!scBgUrl || typeof window.SC === "undefined" || !window.SC.Widget) { scBgWidget = null; return; } // kosong (about:blank) / SDK belum termuat (offline) -- diam saja
+    const myToken = scBgToken;
+    try {
+      const w = SC.Widget(scBgEl);
+      scBgWidget = w;
+      scBgReady = false;
+      w.bind(SC.Widget.Events.READY, () => {
+        if (myToken !== scBgToken) return;
+        scBgReady = true;
+        try { w.setVolume(100); } catch (e) {}
+      });
+      w.bind(SC.Widget.Events.PLAY, () => {
+        if (myToken !== scBgToken) return;
+        scBgPlaying = true;
+        scBgStopRetry_();
+        reportBgAudioStatus_(true, scBgUrl, "");
+        reportBgAudioState_("sc", true);
+      });
+      w.bind(SC.Widget.Events.PAUSE, () => { if (myToken === scBgToken) { scBgPlaying = false; reportBgAudioState_("sc", false); } });
+      w.bind(SC.Widget.Events.FINISH, () => {
+        if (myToken !== scBgToken) return;
+        scBgPlaying = false;
+        reportBgAudioState_("sc", false);
+        if (scBgLoop) { try { w.seekTo(0); w.play(); } catch (e) {} }
+      });
+      w.bind(SC.Widget.Events.ERROR, () => {
+        if (myToken !== scBgToken) return;
+        reportBgAudioStatus_(false, scBgUrl, "SoundCloud menolak memuat link ini -- periksa lagi linknya (harus link lagu/playlist yang publik).");
+      });
+      // Cadangan: kalau event READY sudah lewat sebelum sempat di-bind
+      // (bisa terjadi kalau widget selesai sangat cepat), anggap siap
+      // sesudah 1,2 detik supaya "antrean play" di atas tidak menunggu selamanya.
+      setTimeout(() => { if (myToken === scBgToken) scBgReady = true; }, 1200);
+    } catch (e) { scBgWidget = null; }
+  });
   // BARU (28 Agu 2026) -- Repeat One/Repeat All + daftar putar (playlist)
   // untuk video YouTube utama (#ytView), lihat wireYtControls() &
   // wireYtPlaylistTab() di js/presentation-studio.js, dan handler
@@ -6461,6 +6630,7 @@
     // opacity:0, bukan display:none, supaya audionya tidak ikut berhenti).
     // ------------------------------------------------------------
     if (data.type === "yt_bg") {
+      ytBgWantPlay_ = false; // video BARU dimuat -- lupakan niat "play" milik video sebelumnya
       if (data.embedUrl) ytBgEl.src = data.embedUrl;
       return;
     }
@@ -6468,9 +6638,20 @@
       if (!ytBgEl.src || !ytBgEl.contentWindow) return;
       const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[data.action];
       if (cmd) ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
+      // BARU (19 Sep 2026) -- lihat catatan ytBgWantPlay_ di atas.
+      if (data.action === "play") {
+        ytBgWantPlay_ = true;
+        [500, 1200, 2200, 3500].forEach((ms) => setTimeout(() => {
+          if (!ytBgWantPlay_ || !ytBgEl.src || !ytBgEl.contentWindow) return;
+          try { ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*"); } catch (e) {}
+        }, ms));
+      } else if (data.action === "pause") {
+        ytBgWantPlay_ = false;
+      }
       return;
     }
     if (data.type === "yt_bg_clear") {
+      ytBgWantPlay_ = false;
       // BARU (18 Sep 2026 v6) -- `data.fade` (dikirim controlSharedBgAudio_()
       // js/presentation-studio.js begitu operator pindah slide TANPA
       // mencentang "↩️ Lanjutkan") -- redupkan dulu ~1 detik, BUKAN
@@ -6488,6 +6669,50 @@
       // BARU (18 Sep 2026 v6) -- lihat catatan panjang di badge-nya
       // sendiri (markup) & setYtArmedIndicator_() js/presentation-studio.js.
       if (ytBgArmedBadgeEl) ytBgArmedBadgeEl.hidden = !data.armed;
+      return;
+    }
+    // BARU (19 Sep 2026) -- Audio Latar SoundCloud, lihat catatan panjang
+    // di blok "scBgEl" (dekat kidungBgAudioEl di atas). data.trackUrl bisa
+    // link biasa (soundcloud.com/artis/judul) maupun link pendek
+    // (on.soundcloud.com/xxx) -- resolveSoundCloudSrc() yang sudah ada
+    // (dipakai juga tab "🔗 Link") mengurus keduanya. auto_play=false:
+    // trek cuma DIMUAT, tidak main sampai "sc_bg_control" play datang.
+    if (data.type === "sc_bg") {
+      if (!data.trackUrl) return;
+      const myToken = ++scBgToken;
+      scBgStopRetry_();
+      scBgWidget = null; scBgReady = false; scBgWantPlay = false; scBgPlaying = false; scBgLoop = false;
+      scBgUrl = data.trackUrl;
+      resolveSoundCloudSrc(data.trackUrl, false).then(function (src) {
+        if (myToken !== scBgToken) return; // sudah ada perintah muat/kosongkan yang lebih baru
+        scBgEl.src = src;
+      });
+      return;
+    }
+    if (data.type === "sc_bg_control") {
+      if (!scBgUrl) return;
+      if (data.action === "play") scBgRequestPlay_();
+      else if (data.action === "pause") { scBgWantPlay = false; scBgStopRetry_(); if (scBgWidget) { try { scBgWidget.pause(); } catch (e) {} } }
+      else if (data.action === "loop_on") scBgLoop = true;
+      else if (data.action === "loop_off") scBgLoop = false;
+      return;
+    }
+    if (data.type === "sc_bg_clear") {
+      scBgWantPlay = false; scBgStopRetry_();
+      const w = scBgWidget;
+      const hadTrack = !!scBgUrl;
+      const doClear = () => {
+        scBgToken++;
+        scBgWidget = null; scBgReady = false; scBgPlaying = false; scBgLoop = false; scBgUrl = "";
+        scBgEl.src = "about:blank"; // BUKAN "" -- kosong bisa dianggap "tidak berubah" & audio lama tetap jalan
+      };
+      if (data.fade && hadTrack && w) {
+        const tokenAtFade = scBgToken;
+        fadeOutScBg_(w, 1000, tokenAtFade);
+        setTimeout(() => { if (scBgToken === tokenAtFade) doClear(); }, 1050);
+      } else {
+        doClear();
+      }
       return;
     }
     // BARU (18 Sep 2026, permintaan operator) -- Audio Latar MP3, pola
