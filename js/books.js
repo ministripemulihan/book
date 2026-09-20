@@ -82,6 +82,74 @@ BOOKS.forEach((b) => {
   BOOK_ALIAS_INDEX[b.name.toLowerCase()] = b;
 });
 
+// ============================================================
+//  NAMA KITAB DALAM BAHASA LAIN -- BARU (14 Sep 2026, permintaan
+//  operator): supaya saran otomatis nama kitab (js/book-suggest.js)
+//  juga bisa dicari dengan mengetik nama Inggris/Mandarin/Jawa, TAPI
+//  yang otomatis DIISIKAN ke kotak TETAP nama Indonesia di atas
+//  (BOOKS[i].name) -- itu satu-satunya yang dikenali mesin pencarian
+//  ayat (parseReference/parseReferenceList). Ini CUMA daftar untuk
+//  keperluan pencocokan ketikan, bukan untuk menampilkan isi ayat
+//  dalam bahasa itu. Urutan array SAMA PERSIS dgn urutan BOOKS di
+//  atas (66 kitab, urutan kanon standar).
+// ============================================================
+const BOOK_NAMES_EN = [
+  "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy", "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel",
+  "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah", "Esther", "Job", "Psalms", "Proverbs",
+  "Ecclesiastes", "Song of Solomon", "Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel", "Hosea", "Joel", "Amos",
+  "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi",
+  "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians",
+  "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus", "Philemon", "Hebrews", "James",
+  "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude", "Revelation",
+];
+// Alkitab bahasa Mandarin (Tionghoa) -- terjemahan standar Hé Hé Běn
+// (和合本 / Chinese Union Version), urutan kanon sama seperti di atas.
+const BOOK_NAMES_ZH = [
+  "创世记", "出埃及记", "利未记", "民数记", "申命记", "约书亚记", "士师记", "路得记", "撒母耳记上", "撒母耳记下",
+  "列王纪上", "列王纪下", "历代志上", "历代志下", "以斯拉记", "尼希米记", "以斯帖记", "约伯记", "诗篇", "箴言",
+  "传道书", "雅歌", "以赛亚书", "耶利米书", "耶利米哀歌", "以西结书", "但以理书", "何西阿书", "约珥书", "阿摩司书",
+  "俄巴底亚书", "约拿书", "弥迦书", "那鸿书", "哈巴谷书", "西番雅书", "哈该书", "撒迦利亚书", "玛拉基书",
+  "马太福音", "马可福音", "路加福音", "约翰福音", "使徒行传", "罗马书", "哥林多前书", "哥林多后书", "加拉太书", "以弗所书",
+  "腓立比书", "歌罗西书", "帖撒罗尼迦前书", "帖撒罗尼迦后书", "提摩太前书", "提摩太后书", "提多书", "腓利门书", "希伯来书", "雅各书",
+  "彼得前书", "彼得后书", "约翰一书", "约翰二书", "约翰三书", "犹大书", "启示录",
+];
+// Alkitab bahasa Jawa (Lembaga Alkitab Indonesia). Nama dgn tanda
+// diakritik (é/è) -- lihat stripDiacritics_() di bawah, jadi tetap
+// cocok walau operator mengetik tanpa tanda tersebut.
+const BOOK_NAMES_JV = [
+  "Purwaning Dumadi", "Pangentasan", "Kaimaman", "Wilangan", "Andharaning Torét", "Yosua", "Para Hakim", "Rut", "1 Samuél", "2 Samuél",
+  "1 Para Raja", "2 Para Raja", "1 Babad", "2 Babad", "Ézra", "Néhémia", "Éster", "Ayub", "Masmur", "Wulang Bebasan",
+  "Juru Khotbah", "Kidung Agung", "Yésaya", "Yérémia", "Kidung Pasambat", "Yéhezkièl", "Dhanièl", "Hoséa", "Yoèl", "Amos",
+  "Obaja", "Yunus", "Mikha", "Nahum", "Habakuk", "Zéfanya", "Hagai", "Zakharia", "Maléakhi",
+  "Matius", "Markus", "Lukas", "Yohanes", "Para Rasul", "Rum", "1 Korintus", "2 Korintus", "Galatia", "Éfesus",
+  "Filipi", "Kolosé", "1 Tésalonika", "2 Tésalonika", "1 Timotius", "2 Timotius", "Titus", "Filémon", "Ibrani", "Yakobus",
+  "1 Pétrus", "2 Pétrus", "1 Yohanes", "2 Yohanes", "3 Yohanes", "Yudas", "Wahyu",
+];
+
+function stripDiacritics_(s) {
+  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// Daftar Latin (Inggris & Jawa) -- normalisasi huruf kecil + buang
+// diakritik, simpan versi ada-spasi & tanpa-spasi (spt alias IND di
+// atas, mis. "1 raja-raja" & "1raja-raja").
+[BOOK_NAMES_EN, BOOK_NAMES_JV].forEach((arr) => {
+  arr.forEach((name, i) => {
+    const book = BOOKS[i];
+    if (!book || !name) return;
+    const key = stripDiacritics_(name).toLowerCase().replace(/\./g, "");
+    if (key && !BOOK_ALIAS_INDEX[key]) BOOK_ALIAS_INDEX[key] = book;
+    const noSpace = key.replace(/\s+/g, "");
+    if (noSpace && !BOOK_ALIAS_INDEX[noSpace]) BOOK_ALIAS_INDEX[noSpace] = book;
+  });
+});
+// Aksara Han (Mandarin) -- disimpan apa adanya, tidak perlu huruf
+// besar/kecil atau diakritik.
+BOOK_NAMES_ZH.forEach((name, i) => {
+  const book = BOOKS[i];
+  if (book && name && !BOOK_ALIAS_INDEX[name]) BOOK_ALIAS_INDEX[name] = book;
+});
+
 // Singkatan 3-huruf gaya OSIS/e-Sword (Inggris) yang biasa dipakai di
 // referensi silang pada kolom Note sheet Alkitab, mis. "Psa_74:16",
 // "Gen_1:8" -- urutannya SAMA PERSIS dengan urutan BOOKS di atas (66 kitab,

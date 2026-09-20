@@ -216,6 +216,18 @@ const LocalDB = {
     });
   },
 
+  // BARU (20 Sep 2026, pustaka audio latar -- js/bg-audio-library.js) --
+  // hapus SATU kunci meta (sebelumnya cuma bisa ditimpa nilai baru).
+  async deleteMeta(key) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["meta"], "readwrite");
+      tx.objectStore("meta").delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
   async getMeta(key) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
@@ -365,7 +377,7 @@ const LocalDB = {
     });
   },
 
-  // Sama seperti di atas, tapi dipersempit per BUKU juga (Kidung vs 
+  // Sama seperti di atas, tapi dipersempit per BUKU juga (Kidung vs
   // Suplemen) -- dipakai supaya nomor yang sama di 2 buku berbeda tidak
   // ikut tercampur (lihat catatan index "byBukuNo" di open() di atas).
   //

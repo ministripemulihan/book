@@ -421,6 +421,10 @@ function normalizeKidungRecord(rec) {
     linkVideo: (get("link_video", "link video", "video") || "").trim(),
     linkYoutube: (get("link_youtube", "link youtube", "youtube") || "").trim(),
     linkMidi: (get("link_midi", "link midi", "midi") || "").trim(),
+    // BARU (20 Sep 2026, "Sumber audio per slide" tahap 2) -- kolom Sheet
+    // OPSIONAL "link_soundcloud" (link lagu SoundCloud, boleh link pendek
+    // on.soundcloud.com/...). Kolom tidak ada di Sheet = string kosong (tidak error).
+    linkSoundcloud: (get("link_soundcloud", "link soundcloud", "soundcloud") || "").trim(),
   };
 }
 

@@ -4251,6 +4251,10 @@ async function showPlanPanel() {
   // tarik progres terbaru dari Google Sheet (kalau dikonfigurasi) lalu
   // gambar ulang panel kalau ternyata ada versi lebih baru dari perangkat lain
   await refreshPlanFromRemote(currentUser);
+  // BARU (20 Sep 2026) -- ikut tarik progres Rencana Multi-Jalur (js/plans-multi.js)
+  try {
+    if (typeof PlansMulti !== "undefined") await PlansMulti.refreshFromRemote(currentUser);
+  } catch (e) { /* sinkron opsional -- panel tetap tampil dari data lokal */ }
   if (!el("planPanel").hidden) renderPlanPanel();
 }
 
@@ -4262,6 +4266,12 @@ function renderPlanPanel() {
   const title = document.createElement("h2");
   title.textContent = "Rencana Baca";
   container.appendChild(title);
+
+  // BARU (20 Sep 2026) -- kalau pengguna sudah punya Rencana Multi-Jalur
+  // (js/plans-multi.js), itu yang ditampilkan. Rencana lama TIDAK dihapus:
+  // begitu Rencana Multi-Jalur diganti/dihapus, tampilan kembali ke rencana
+  // lama (kalau ada) atau ke daftar pilihan rencana di bawah ini.
+  if (typeof PlansMulti !== "undefined" && PlansMulti.renderDetail(container)) return;
 
   if (!plan) {
     renderPlanChooser(container);
@@ -4432,6 +4442,15 @@ function renderPlanChooser(container) {
 
   const grid = document.createElement("div");
   grid.className = "plan-options";
+  // BARU (20 Sep 2026) -- 📚 Rencana Multi-Jalur (js/plans-multi.js): banyak
+  // jadwal dalam 1 hari (mis. PL 1 tahun + PB 1 tahun), bahasa per jalur.
+  if (typeof PlansMulti !== "undefined") {
+    const multiCard = document.createElement("button");
+    multiCard.className = "plan-option-card";
+    multiCard.innerHTML = `<div class="plan-option-title">📚 Rencana Multi-Jalur</div><div class="plan-option-sub">Banyak jadwal dalam 1 hari, mis. PL + PB 1 tahun</div>`;
+    multiCard.addEventListener("click", () => PlansMulti.openCreator());
+    grid.appendChild(multiCard);
+  }
   PLAN_DEFINITIONS.forEach((def) => {
     const card = document.createElement("button");
     card.className = "plan-option-card";
@@ -4636,6 +4655,16 @@ function renderPlanDetail(container, plan) {
         actions.appendChild(resetBtn);
       }
     }
+  }
+
+  // BARU (20 Sep 2026) -- buat Rencana Multi-Jalur TANPA menghapus rencana
+  // lama ini (rencana lama tetap tersimpan; lihat renderPlanPanel()).
+  if (typeof PlansMulti !== "undefined") {
+    const multiBtn = document.createElement("button");
+    multiBtn.className = "chip-btn small";
+    multiBtn.textContent = "📚 Buat Rencana Multi-Jalur";
+    multiBtn.addEventListener("click", () => PlansMulti.openCreator());
+    actions.appendChild(multiBtn);
   }
 
   const changeBtn = document.createElement("button");

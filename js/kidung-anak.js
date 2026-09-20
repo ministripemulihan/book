@@ -355,6 +355,95 @@ window.KidungAnak = (function () {
     return text.split("\n").map((line) => (isSectionLabel(line) ? `<span class="ka-section-label">${escapeHtml(line.trim().toUpperCase())}</span>` : escapeHtml(line))).join("\n");
   }
 
+  // ============================================================
+  //  JEMBATAN KE "🤖 AI PRESENTATION" (ROADMAP-ai-presentation.md,
+  //  Bagian 1 & "Yang belum selesai" poin 2, dikerjakan 4 Sep 2026)
+  //
+  //  Tujuan: ubah `song.Syair` (teks polos, baris label bagian seperti
+  //  "Reff"/"Chorus"/"Refrain" dikenali oleh isSectionLabel() yang
+  //  SUDAH ADA di atas) menjadi array bait+koor dengan BENTUK PERSIS
+  //  SAMA seperti keluaran getKidungBaitsWithKoor() di js/kidung.js:
+  //  [{ noBait, teks, koorGroup, koorTeks }, ...] -- supaya
+  //  splitKidungIntoSlides() yang SUDAH ADA (js/kidung.js, dipakai
+  //  K/S/T) bisa langsung dipakai ULANG tanpa perubahan apa pun di
+  //  sana, dan hasil slide-nya kompatibel dengan item Kumpulan Ayat
+  //  jenis "kidung" yang SUDAH ADA (js/collections.js,
+  //  addKidungToCollection) & tampilannya di Layar 2 (present.html).
+  //
+  //  Aturan pemotongan (heuristik, karena Syair Kidung Anak tidak
+  //  punya kolom "jenis baris" terpisah seperti Sheet Kidung Umum):
+  //  - Baris kosong ATAU baris label bagian (isSectionLabel()) memulai
+  //    blok baru.
+  //  - Blok yang labelnya "REFF"/"REFRAIN"/"CHORUS" (boleh diikuti
+  //    angka, mis. "REFF 1") dianggap KOOR -- isinya jadi `koorTeks`
+  //    untuk bait-bait SESUDAHNYA (persis pola Sheet Kidung Umum: koor
+  //    berlaku untuk bait-bait berikutnya sampai ada koor baru).
+  //  - Blok lain (berlabel "VERSE n" atau tanpa label sama sekali)
+  //    jadi 1 bait, diberi nomor urut otomatis (1, 2, 3, ...) --
+  //    Syair Kidung Anak umumnya tidak menomori baitnya sendiri,
+  //    beda dari Kidung Umum yang punya kolom `noBait` di Sheet.
+  //  - Kalau lagu HANYA berisi koor (tidak ada bait sama sekali, mis.
+  //    lagu pendek 1 bagian) -- fallback: blok koor itu sendiri
+  //    dipakai sebagai "bait" tanpa nomor & tanpa koorTeks terpisah,
+  //    SAMA seperti fallback "kidung koor-saja" di
+  //    getKidungBaitsWithKoor() (js/kidung.js).
+  // ============================================================
+  const KOOR_LABEL_RE = /^(REFF|REFRAIN|CHORUS)(\s*\d+)?$/;
+
+  function splitSyairIntoBaitsWithKoor(text) {
+    const lines = String(text || "").replace(/\r\n/g, "\n").split("\n");
+    const blocks = [];
+    let cur = null;
+    lines.forEach((line) => {
+      if (isSectionLabel(line)) { cur = { label: line.trim().toUpperCase(), lines: [] }; blocks.push(cur); return; }
+      if (!line.trim()) { cur = null; return; } // baris kosong = akhir blok
+      if (!cur) { cur = { label: null, lines: [] }; blocks.push(cur); }
+      cur.lines.push(line);
+    });
+    const filled = blocks.filter((b) => b.lines.length);
+
+    let koorGroup = null, koorTeks = null, koorCount = 0, baitNo = 0;
+    const baits = [];
+    filled.forEach((b) => {
+      const teks = b.lines.join("\n").trim();
+      if (b.label && KOOR_LABEL_RE.test(b.label)) {
+        koorCount++; koorGroup = "reff" + koorCount; koorTeks = teks;
+        return;
+      }
+      baitNo++;
+      baits.push({ noBait: baitNo, teks, koorGroup, koorTeks });
+    });
+
+    if (!baits.length && filled.length) {
+      // Lagu koor-saja (tanpa bait) -- sama seperti fallback di
+      // getKidungBaitsWithKoor() (js/kidung.js).
+      return filled.map((b) => ({ noBait: null, teks: b.lines.join("\n").trim(), koorGroup: null, koorTeks: null }));
+    }
+    return baits;
+  }
+
+  // Cari 1 lagu Kidung Anak berdasarkan nomor (memuat data dari Sheet
+  // dulu kalau belum termuat -- SAMA pola seperti ensureLoaded di
+  // tempat lain modul ini). `noRaw` boleh string ("120") atau angka.
+  async function findSongByNo(noRaw) {
+    const noInt = parseInt(noRaw, 10);
+    if (isNaN(noInt)) return null;
+    if (!dataLoaded) await loadData();
+    return SONGS.find((s) => parseInt(s.No, 10) === noInt) || null;
+  }
+
+  // 1 pintu masuk dipakai `parseAiPresentation()` (js/presentation-studio.js)
+  // untuk token `SA120`/`Sidang Anak 120` -- balikannya SENGAJA dibuat
+  // semirip mungkin dengan `openKidungByKeypad()` (js/kidung.js):
+  // `{ song, baits }` atau `null` kalau nomornya tidak ada di data
+  // Kidung Anak.
+  async function getBaitsForPresentation(noRaw) {
+    const song = await findSongByNo(noRaw);
+    if (!song) return null;
+    const baits = splitSyairIntoBaitsWithKoor(song.Syair || "");
+    return { song, baits };
+  }
+
   // ---------- GAMBAR REFERENSI (Google Drive share-link -> link gambar langsung) ----------
   function driveImageUrl(url) {
     if (!url) return url;
@@ -1042,5 +1131,10 @@ window.KidungAnak = (function () {
     }, { passive: true });
   }
 
-  return { renderHome };
+  // `findSongByNo`/`getBaitsForPresentation` ditambahkan 4 Sep 2026
+  // KHUSUS untuk jembatan "🤖 AI Presentation" (token `SA120`) --
+  // lihat js/presentation-studio.js, parseAiPresentation(). Tidak
+  // dipakai di alur render kartu lagu biasa (renderHome), jadi aman
+  // ditambahkan tanpa menyentuh perilaku yang sudah ada.
+  return { renderHome, findSongByNo, getBaitsForPresentation };
 })();
