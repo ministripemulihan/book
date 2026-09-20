@@ -69,7 +69,11 @@
 // Slogan Karakter tidak pernah bisa disembunyikan], + tombol "Tampilan Awal"
 // di kedua game: present.html, index.html, js/presentation-studio.js,
 // js/games/penciptaan.js, js/games/slogankarakter.js).
-const CACHE_NAME = "book-vp-shell-v16";
+// DINAIKKAN LAGI (19 Sep 2026 -- Audio Latar SoundCloud: present.html, index.html,
+// js/presentation-studio.js, js/presentation.js, js/collections.js, js/app.js).
+// DINAIKKAN LAGI (19 Sep 2026 -- Audio Latar dipindah ke js/bg-audio.js BARU, dimuat sebelum
+// js/presentation-studio.js di index.html).
+const CACHE_NAME = "book-vp-shell-v23"; // v23 (20 Sep 2026: perbaikan "Studio & notifikasi tidak bisa dibuka" -- Studio tahan berkas modul hilang, app.js init terpisah, semua ?v= dinaikkan). Sebelumnya v22 (tahap 3: pustaka upload audio, js/bg-audio-library.js + js/bg-audio-source-upload.js, present.html blob). Sebelumnya v21 (tahap 2: js/bg-audio-source-kidung.js + kolom link_soundcloud). Sebelumnya v20 (20 Sep 2026): js/bg-audio-dialog.js baru + tahap-tahap "Sumber audio"
 
 const NEVER_CACHE_HOSTS = [
   "script.google.com",

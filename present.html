@@ -2692,9 +2692,9 @@
   }
   kidungBgAudioEl.addEventListener("error", () => {
     if (!kidungBgAudioEl.src) return;
-    reportBgAudioStatus_(false, kidungBgAudioEl.src, "Gagal memuat/memutar -- kemungkinan besar link Google Drive ini kena halaman \"tidak bisa dipindai virus\" (biasa terjadi untuk file cukup besar), atau file belum dibagikan \"Siapa saja yang memiliki link\". Coba buka link aslinya langsung di tab baru untuk memastikan, atau pakai hosting MP3 lain (link yang berakhiran .mp3 langsung biasanya paling aman).");
+    reportBgAudioStatus_(false, kidungBgKey || kidungBgAudioEl.src, "Gagal memuat/memutar -- kemungkinan besar link Google Drive ini kena halaman \"tidak bisa dipindai virus\" (biasa terjadi untuk file cukup besar), atau file belum dibagikan \"Siapa saja yang memiliki link\". Coba buka link aslinya langsung di tab baru untuk memastikan, atau pakai hosting MP3 lain (link yang berakhiran .mp3 langsung biasanya paling aman).");
   });
-  kidungBgAudioEl.addEventListener("playing", () => reportBgAudioStatus_(true, kidungBgAudioEl.src, ""));
+  kidungBgAudioEl.addEventListener("playing", () => reportBgAudioStatus_(true, kidungBgKey || kidungBgAudioEl.src, ""));
   // BARU (19 Sep 2026, permintaan operator "gambar-gambarnya sama semua, tidak
   // kelihatan lagunya sudah nyala atau belum") -- lapor balik STATUS SUNGGUHAN
   // (sedang main / tidak) ke Studio, BUKAN sekadar "perintah play sudah
@@ -2743,6 +2743,9 @@
   // browser memblokir suara otomatis di jendela Layar 2 yang belum pernah
   // diklik sama sekali.
   // ------------------------------------------------------------
+  // BARU (20 Sep 2026, tahap 3) -- lihat data.type "mp3_bg" di bawah.
+  let kidungBgBlobUrl_ = "";
+  let kidungBgKey = "";
   const scBgEl = document.getElementById("scBg");
   let scBgWidget = null;
   let scBgReady = false;      // widget sudah siap menerima perintah (event READY, atau cadangan timer sesudah iframe load)
@@ -6726,7 +6729,21 @@
     // "drive.google.com/file/d/ID/view" biasa tetap bisa dipasang
     // langsung sebagai src <audio>.
     if (data.type === "mp3_bg") {
-      if (data.url) {
+      // BARU (20 Sep 2026, tahap 3 "Dari upload") -- `data.blob` = berkas audio dari
+      // pustaka upload Studio (dikirim lewat postMessage sebagai Blob). URL-nya
+      // dibuat DI SINI (milik jendela ini), jadi tidak bergantung pada Studio
+      // yang membuatnya; di-revoke saat diganti/dikosongkan (lihat mp3_bg_clear).
+      // `kidungBgKey` = kunci audio versi Studio (link asli / "upload:<id>") --
+      // dipakai saat melapor status supaya Studio bisa mencocokkannya.
+      if (data.blob) {
+        if (kidungBgBlobUrl_) { try { URL.revokeObjectURL(kidungBgBlobUrl_); } catch (e) {} }
+        kidungBgBlobUrl_ = URL.createObjectURL(data.blob);
+        kidungBgKey = data.url || "";
+        kidungBgAudioEl.src = kidungBgBlobUrl_;
+        kidungBgAudioEl.currentTime = 0;
+      } else if (data.url) {
+        if (kidungBgBlobUrl_) { try { URL.revokeObjectURL(kidungBgBlobUrl_); } catch (e) {} kidungBgBlobUrl_ = ""; }
+        kidungBgKey = data.url;
         kidungBgAudioEl.src = resolveBellAudioUrl_(data.url);
         kidungBgAudioEl.currentTime = 0;
       }
@@ -6756,11 +6773,13 @@
           kidungBgAudioEl.currentTime = 0;
           kidungBgAudioEl.src = "";
           kidungBgAudioEl.volume = 1; // reset utk pemutaran berikutnya
+          if (kidungBgBlobUrl_) { try { URL.revokeObjectURL(kidungBgBlobUrl_); } catch (e) {} kidungBgBlobUrl_ = ""; }
         }, 1050);
       } else {
         try { kidungBgAudioEl.pause(); } catch (e) {}
         kidungBgAudioEl.currentTime = 0;
         kidungBgAudioEl.src = "";
+        if (kidungBgBlobUrl_) { try { URL.revokeObjectURL(kidungBgBlobUrl_); } catch (e) {} kidungBgBlobUrl_ = ""; }
       }
       return;
     }
@@ -7034,7 +7053,7 @@
   // BARU (18 Sep 2026, permintaan operator: referensi tampilan
   // "HH:MM:SS:MSMS" yang SELALU 4 bagian, contoh "01:01:31:17") --
   // sebelumnya bagian JAM (hh) baru muncul kalau video sudah lewat 1
-  // jam (video < 1 jam cuma tampil MM:SS:ms) -- sekarang SELALU 
+  // jam (video < 1 jam cuma tampil MM:SS:ms) -- sekarang SELALU
   // ditampilkan 4 bagian (HH:MM:SS:ms) supaya formatnya konsisten sejak
   // detik pertama video, tidak berubah-ubah panjangnya di tengah jalan.
   function fmtElapsedParts_(totalSec) {
