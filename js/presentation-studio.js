@@ -373,11 +373,85 @@ const PresentationStudio = (() => {
   // BG.pendingArrow (bait yang "siap", menunggu panah kanan).
   // Peta lengkap "mau ubah apa -> fungsi mana": lihat kepala js/bg-audio.js.
   // ------------------------------------------------------------
-  if (!window.BgAudioModule) { console.error("js/bg-audio.js belum dimuat -- cek urutan <script> di index.html (harus SEBELUM presentation-studio.js)"); }
-  const BG = window.BgAudioModule.create({ rawPost, el, escapeHtml, extractYoutubeId, buildYoutubeEmbedUrl });
+  // ------------------------------------------------------------
+  // DIUBAH (20 Sep 2026, perbaikan "Studio & notifikasi tidak bisa dibuka") --
+  // Dulu baris `window.BgAudioModule.create(...)` di sini melempar TypeError
+  // kalau js/bg-audio.js tidak termuat (belum ter-upload / 404 / cache
+  // campuran). Akibatnya SELURUH file ini gagal dimuat -> Studio tidak bisa
+  // dibuka, dan js/app.js ikut error di DOMContentLoaded (typeof pada `const`
+  // yang belum terisi = ReferenceError) sehingga inisialisasi sesudahnya
+  // (termasuk AdminBell = notifikasi) tidak pernah jalan.
+  // Sekarang: modul Audio Latar dicoba dibuat dalam try/catch. Kalau gagal
+  // ATAU versinya tidak cocok (fungsi yang dibutuhkan tidak ada), dipakai
+  // "pengganti kosong" (makeBgAudioFallback_) -- Studio TETAP terbuka normal,
+  // hanya fitur Audio Latar yang nonaktif, plus banner peringatan yang
+  // menyebut berkas mana yang bermasalah (showBgAudioModuleWarning_()).
+  // ------------------------------------------------------------
+  const BG_FN_REQUIRED_ = [
+    "normBgKind_", "isManagedBgKind_", "isManagedBg_", "guessBgKindFromUrl_", "loadSharedBgAudio_",
+    "controlSharedBgAudio_", "autoplayBgAudioIfEnabled_", "handleBgForActiveItem_", "startBgForItem_",
+    "onSharedBgAudioChange_", "bgNowState_", "bgKindName_", "refreshBgRowBadges_", "showBgAudioErrorToast_",
+    "bgAudioRowIconHtml_", "bgAudioControlsHtml_", "wireBgAudioControlsInBox_", "openBgAudioDialog_",
+  ];
+  let bgAudioModuleProblem_ = ""; // teks masalah (kosong = modul sehat)
+  function makeBgAudioFallback_() {
+    const noop = () => {};
+    const noopWarn = () => { showBgAudioModuleWarning_(true); };
+    return {
+      isFallback: true,
+      shared: null, error: null, pendingArrow: null,
+      clearPreviewRefresh: noop, onChange: noop, handlePresenterMessage: () => false,
+      BG_STATE_TEXT_: { none: ["⚪", "AUDIO LATAR NONAKTIF"], loaded: ["⚪", ""], armed: ["⚪", ""], connecting: ["⚪", ""], playing: ["⚪", ""], paused: ["⚪", ""], error: ["⚪", ""] },
+      fn: {
+        normBgKind_: (k) => (k === "yt" ? "yt" : (k === "sc" ? "sc" : "mp3")),
+        isManagedBgKind_: (k) => k === "yt" || k === "sc",
+        isManagedBg_: () => false,
+        guessBgKindFromUrl_: () => "mp3",
+        loadSharedBgAudio_: noopWarn, controlSharedBgAudio_: noop, autoplayBgAudioIfEnabled_: noop,
+        handleBgForActiveItem_: noop, startBgForItem_: noop, onSharedBgAudioChange_: noop,
+        bgNowState_: () => ({ key: "none", label: "", kind: "" }), bgKindName_: () => "",
+        refreshBgRowBadges_: noop, showBgAudioErrorToast_: noop,
+        bgAudioRowIconHtml_: () => "", bgAudioControlsHtml_: () => "", wireBgAudioControlsInBox_: noop,
+        openBgAudioDialog_: noopWarn,
+      },
+    };
+  }
+  function showBgAudioModuleWarning_(useAlert) {
+    if (!bgAudioModuleProblem_) return;
+    const msg = "⚠️ Fitur Audio Latar NONAKTIF (Studio tetap bisa dipakai untuk yang lain).\n" + bgAudioModuleProblem_ +
+      "\n\nSolusi: pastikan SEMUA berkas di folder js/ (termasuk yang baru: bg-audio.js, bg-audio-dialog.js, bg-audio-library.js, bg-audio-source-kidung.js, bg-audio-source-upload.js) ter-upload ke hosting, lalu muat ulang dengan Ctrl+Shift+R.";
+    if (useAlert) { alert(msg); return; }
+    if (document.getElementById("psBgAudioWarn") || !document.body) return;
+    const bar = document.createElement("div");
+    bar.id = "psBgAudioWarn";
+    bar.style.cssText = "position:fixed; left:12px; right:12px; bottom:12px; z-index:100000; background:#3a1414; color:#fecaca; border:2px solid #ef4444; border-radius:10px; padding:10px 14px; font-size:13px; line-height:1.4; white-space:pre-wrap;";
+    bar.textContent = msg + "\n";
+    const x = document.createElement("button");
+    x.type = "button"; x.textContent = "Tutup"; x.style.cssText = "margin-top:6px;";
+    x.addEventListener("click", () => bar.remove());
+    bar.appendChild(x);
+    document.body.appendChild(bar);
+  }
+  let BG;
+  try {
+    if (!window.BgAudioModule || typeof window.BgAudioModule.create !== "function") {
+      throw new Error("Berkas js/bg-audio.js tidak termuat (belum ter-upload, 404, atau urutan <script> di index.html salah -- harus SEBELUM presentation-studio.js).");
+    }
+    BG = window.BgAudioModule.create({ rawPost, el, escapeHtml, extractYoutubeId, buildYoutubeEmbedUrl });
+    const missingFns = BG_FN_REQUIRED_.filter((n) => !BG || !BG.fn || typeof BG.fn[n] !== "function");
+    if (missingFns.length) {
+      throw new Error("Berkas js/bg-audio.js versinya tidak cocok dengan presentation-studio.js (fungsi hilang: " + missingFns.join(", ") + "). Kemungkinan berkas lama masih tersimpan di cache browser/hosting -- salah satu berkas belum ter-upload versi terbarunya.");
+    }
+  } catch (e) {
+    console.error("Audio Latar dinonaktifkan:", e);
+    bgAudioModuleProblem_ = String((e && e.message) || e);
+    BG = makeBgAudioFallback_();
+    setTimeout(() => showBgAudioModuleWarning_(false), 1500); // banner muncul beberapa detik setelah halaman siap
+  }
   const {
     normBgKind_,
-    isStreamBgKind_,
+    isManagedBgKind_,
+    isManagedBg_,
     guessBgKindFromUrl_,
     loadSharedBgAudio_,
     controlSharedBgAudio_,
@@ -710,6 +784,7 @@ const PresentationStudio = (() => {
       }
     }
     if (el("presentStudio")) el("presentStudio").hidden = false;
+    if (bgAudioModuleProblem_) showBgAudioModuleWarning_(false); // Audio Latar nonaktif -- ingatkan lagi tiap Studio dibuka
     document.body.classList.add("ps-open");
     document.documentElement.classList.add("ps-open"); // jaring tambahan untuk <html>, lihat CSS body.ps-open
     refreshStatusUi();
@@ -950,7 +1025,7 @@ const PresentationStudio = (() => {
         `<div class="ps-verse-row-bgaudio" ${(it && it.bgAudio && it.bgAudio.url) ? `data-bgurl="${escapeHtml(it.bgAudio.url)}" data-bgkind="${normBgKind_(it.bgAudio.kind)}"` : ""} style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
            <button type="button" class="chip-btn small" data-bgaudio-edit title="Lampirkan/ganti/lepas link audio latar (MP3 unggahan/Drive, MP4 Drive, YouTube, atau SoundCloud) untuk item ini">🎧 ${(it && it.bgAudio && (it.bgAudio.url || it.bgAudio.continuePrev)) ? "Ganti" : "Audio Latar"}</button>
            ${(it && it.bgAudio && it.bgAudio.url) ? '<span class="ps-bg-state" hidden></span>' : ""}
-           ${(it && it.bgAudio && it.bgAudio.url && !isStreamBgKind_(it.bgAudio.kind) && !it.bgAudio.armStart) ? `<label class="ps-pointer-hint" style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Kalau dicentang, audio ini OTOMATIS diputar begitu item ini masuk slide (panah/PageUp-Down/stylus) -- tidak perlu tekan ▶ Play manual lagi."><input type="checkbox" data-bgauto ${it.bgAudio.autoplay ? "checked" : ""} /> ▶️ Otomatis saat masuk slide</label>` : ""}
+           ${(it && it.bgAudio && it.bgAudio.url && !isManagedBg_(it.bgAudio) && !it.bgAudio.armStart) ? `<label class="ps-pointer-hint" style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Kalau dicentang, audio ini OTOMATIS diputar begitu item ini masuk slide (panah/PageUp-Down/stylus) -- tidak perlu tekan ▶ Play manual lagi."><input type="checkbox" data-bgauto ${it.bgAudio.autoplay ? "checked" : ""} /> ▶️ Otomatis saat masuk slide</label>` : ""}
          </div>` +
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
@@ -1069,12 +1144,52 @@ const PresentationStudio = (() => {
   // render ulang dulu baru autoplay-nya "sadar" ada lampiran baru.
   // (Dialog "🎧 Audio Latar": formulirnya sekarang di js/bg-audio.js -> openBgAudioDialog_(opts).
   //  Yang tersisa di sini hanya pembungkus yang menyimpan hasilnya ke Kumpulan Ayat.)
-  function openBgAudioDialog_(username, colId, index, it) {
+  // DIUBAH (20 Sep 2026, tahap 2) -- sekarang async: kalau item ini kidung,
+  // data Sheet-nya (link MP3/YouTube/SoundCloud/MIDI) dibaca dulu untuk sumber
+  // "🎼 Dari kidung ini", dan dihitung ada berapa slide kidung yang SAMA di
+  // Kumpulan ini (untuk kotak "Terapkan ke semua slide kidung ini").
+  async function openBgAudioDialog_(username, colId, index, it) {
     if (!colId) return;
+    const sameKidung = (x) => !!(it && x && x.type === "kidung" && it.type === "kidung" && x.buku === it.buku && String(x.kidungNo) === String(it.kidungNo));
+    let kidungMeta = null;
+    let groupCount = 0;
+    if (it && it.type === "kidung") {
+      try {
+        if (typeof getKidungList === "function") {
+          const list = await getKidungList(it.buku);
+          kidungMeta = (list || []).find((k) => String(k.noKidung) === String(it.kidungNo)) || null;
+        }
+      } catch (e) { kidungMeta = null; } // data Sheet tidak terbaca -- sumber "Dari kidung" saja yang hilang, sisanya tetap jalan
+      const col = (typeof loadCollections === "function" ? loadCollections(username) : {})[colId];
+      groupCount = ((col && col.items) || []).filter(sameKidung).length;
+    }
     BG.fn.openBgAudioDialog_({
       existing: (it && it.bgAudio) || null,
+      item: it,
+      username, // BARU (20 Sep 2026, tahap 3) -- pustaka upload per pengguna (sumber "📁 Dari upload")
+      kidungMeta,
+      groupCount,
       title: `🎧 Audio Latar — ${genericItemRefText(it)}`,
-      onSave: (newBgAudio) => {
+      onSave: (val) => {
+        const newBgAudio = val ? (typeof normalizeBgAudio === "function" ? normalizeBgAudio(val) : val) : null; // (normalizeBgAudio ada di js/collections.js)
+        if (val && val.applyToGroup && it && it.type === "kidung") {
+          // "Terapkan ke semua slide kidung ini": SATU kali simpan untuk semua slide kidung yang sama
+          const col = loadCollections(username)[colId];
+          const changes = [];
+          ((col && col.items) || []).forEach((x, i) => { if (sameKidung(x)) changes.push({ index: i, bgAudio: newBgAudio }); });
+          let changed = 0;
+          if (typeof updateItemsBgAudioInCollection === "function") {
+            changed = updateItemsBgAudioInCollection(username, colId, changes);
+          } else {
+            // js/collections.js versi lama (belum punya simpan-massal): simpan satu per satu
+            changes.forEach((c) => { if (updateItemBgAudioInCollection(username, colId, c.index, c.bgAudio)) changed++; });
+          }
+          if (changed) {
+            if (it) it.bgAudio = newBgAudio;
+            renderCollectionList();
+          }
+          return;
+        }
         if (updateItemBgAudioInCollection(username, colId, index, newBgAudio)) {
           if (it) it.bgAudio = newBgAudio; // `it` = REFERENSI LANGSUNG ke item yg dipakai renderCollectionList() -- kalau item ini kebetulan sedang jadi playlist aktif, tidak perlu render ulang dulu supaya "sadar" ada lampiran baru
           renderCollectionList();
@@ -1838,6 +1953,7 @@ const PresentationStudio = (() => {
       if (currentMeta && currentMeta.linkMp3_1) links.push({ kind: "mp3", url: currentMeta.linkMp3_1, label: "🎵 Latar: MP3" });
       if (currentMeta && currentMeta.linkMp3_2) links.push({ kind: "mp3", url: currentMeta.linkMp3_2, label: "🎧 Latar: MP3 (versi 2)" });
       if (currentMeta && currentMeta.linkYoutube) links.push({ kind: "yt", url: currentMeta.linkYoutube, label: "📺 Latar: Audio YouTube" });
+      if (currentMeta && currentMeta.linkSoundcloud) links.push({ kind: "sc", url: currentMeta.linkSoundcloud, label: "🎧 Latar: SoundCloud" }); // BARU (20 Sep 2026) -- kolom Sheet "link_soundcloud"
       // wrap tetap ditampilkan walau kidung ini belum punya link di Sheet
       // sama sekali (kotak link manual di bawah selalu ada) -- links.length
       // === 0 cuma mengosongkan baris tombol otomatis di atasnya.
@@ -1879,7 +1995,7 @@ const PresentationStudio = (() => {
       // tercentang: tercentang = "tunggu panah kanan berikutnya" (armStart),
       // BUKAN "putar sekarang". Default (tidak dicentang) = hanya dimuat,
       // diam sampai operator menekan ▶ Play sendiri.
-      pendingAttachLink_ = { kind, url, label, autoplay: false, armStart: armed };
+      pendingAttachLink_ = { kind, url, label, autoplay: false, armStart: armed, managed: true, source: "link" }; // managed (20 Sep 2026): MP3 dari panel ini juga ikut aturan baru
       applyPendingBgAudioToGenericItems_();
       syncBgForActiveKidungSlide_();
       const jenis = kind === "sc" ? "SoundCloud" : (kind === "yt" ? "YouTube" : "MP3");
