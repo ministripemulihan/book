@@ -493,16 +493,7 @@ function addKidungToCollection(username, name, kidungItem) {
     ikon: kidungItem.ikon || "",
     bait: Array.isArray(kidungItem.bait) ? kidungItem.bait.map((b) => ({ noBait: b.noBait, teks: b.teks })) : [],
     koorTeks: kidungItem.koorTeks || null,
-    bgAudio: (kidungItem.bgAudio && (kidungItem.bgAudio.url || kidungItem.bgAudio.continuePrev))
-      ? {
-          kind: kidungItem.bgAudio.kind === "yt" ? "yt" : (kidungItem.bgAudio.kind === "sc" ? "sc" : (kidungItem.bgAudio.kind === "mp4" ? "mp4" : "mp3")), // "sc" = SoundCloud (BARU 19 Sep 2026)
-          url: String(kidungItem.bgAudio.url || ""), label: kidungItem.bgAudio.label || "", autoplay: !!kidungItem.bgAudio.autoplay,
-          // BARU (18 Sep 2026 v6) -- lihat catatan panjang di updateItemBgAudioInCollection() di atas
-          armStart: !!kidungItem.bgAudio.armStart, continuePrev: !!kidungItem.bgAudio.continuePrev, loopFile: !!kidungItem.bgAudio.loopFile,
-          // PERBAIKAN (19 Sep 2026) -- loopAll & extraUrls ("Ulang Semua" paket YouTube) dulu TIDAK ikut disimpan di sini
-          loopAll: !!kidungItem.bgAudio.loopAll, extraUrls: Array.isArray(kidungItem.bgAudio.extraUrls) ? kidungItem.bgAudio.extraUrls.map(String) : [],
-        }
-      : null,
+    bgAudio: normalizeBgAudio(kidungItem.bgAudio), // (20 Sep 2026) satu penormal bersama, lihat normalizeBgAudio() di bawah
     // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah" (lihat
     // catatan panjang di splitKidungIntoSlides()/js/kidung.js) ikut
     // disimpan supaya kidung yang ditambahkan ke Kumpulan Ayat tetap
@@ -630,23 +621,63 @@ function updateKidungItemTextInCollection(username, id, index, updates) {
 // `kind` sekarang boleh "sc" (SoundCloud), diperlakukan seperti "yt": ikut
 // pengaturan armStart/continuePrev/loopFile & alur "klik panah SEKALI LAGI
 // baru mulai" (lihat handleBgForActiveItem_() js/presentation-studio.js).
+// ------------------------------------------------------------
+// BARU (20 Sep 2026, tahap 1-4 "Sumber audio") -- SATU penormal `bgAudio`
+// untuk semua jalur simpan (dulu 2 salinan kembar). Bentuk yang disimpan:
+//   { kind: "mp3"|"mp4"|"yt"|"sc"|"midi",
+//     url, label,                          // url "upload:<id>" = berkas di pustaka audio perangkat (tahap 3)
+//     source: "link"|"kidung"|"upload",    // asal pilihan (info/UI saja; default "link")
+//     mediaId,                             // id berkas upload (kosong kalau bukan upload)
+//     managed,                             // true = ikut aturan baru (lagu sama tidak putus, fade-out, lanjutkan)
+//     autoplay, armStart, continuePrev,    // kapan mulai
+//     loopFile, loopAll, extraUrls }       // ulang
+// Mengembalikan null kalau tidak ada url DAN bukan "Lanjutkan".
+// Data LAMA (tanpa source/mediaId/managed) tetap terbaca persis seperti dulu.
+// ------------------------------------------------------------
+function normalizeBgAudio(bg) {
+  if (!bg || !(bg.url || bg.continuePrev)) return null;
+  const k = bg.kind;
+  const kind = k === "yt" ? "yt" : (k === "sc" ? "sc" : (k === "midi" ? "midi" : (k === "mp4" ? "mp4" : "mp3")));
+  const source = bg.source === "kidung" || bg.source === "upload" ? bg.source : "link";
+  return {
+    kind,
+    url: String(bg.url || ""), label: bg.label || "", autoplay: !!bg.autoplay,
+    armStart: !!bg.armStart, continuePrev: !!bg.continuePrev, loopFile: !!bg.loopFile,
+    loopAll: !!bg.loopAll, extraUrls: Array.isArray(bg.extraUrls) ? bg.extraUrls.map(String) : [],
+    source, mediaId: bg.mediaId ? String(bg.mediaId) : "", managed: bg.managed === true,
+  };
+}
+
 function updateItemBgAudioInCollection(username, id, index, bgAudio) {
   const collections = loadCollections(username);
   const col = collections[id];
   if (!col || !col.items[index]) return false;
-  col.items[index].bgAudio = (bgAudio && (bgAudio.url || bgAudio.continuePrev))
-    ? {
-        kind: bgAudio.kind === "yt" ? "yt" : (bgAudio.kind === "sc" ? "sc" : (bgAudio.kind === "mp4" ? "mp4" : "mp3")), // "sc" = SoundCloud (BARU 19 Sep 2026)
-        url: String(bgAudio.url || ""), label: bgAudio.label || "", autoplay: !!bgAudio.autoplay,
-        armStart: !!bgAudio.armStart, continuePrev: !!bgAudio.continuePrev, loopFile: !!bgAudio.loopFile,
-        // PERBAIKAN (19 Sep 2026) -- loopAll & extraUrls ("Ulang Semua" paket YouTube) dulu TIDAK ikut disimpan, jadi hilang begitu halaman dimuat ulang
-        loopAll: !!bgAudio.loopAll, extraUrls: Array.isArray(bgAudio.extraUrls) ? bgAudio.extraUrls.map(String) : [],
-      }
-    : null;
+  col.items[index].bgAudio = normalizeBgAudio(bgAudio);
   col.updatedAt = new Date().toISOString();
   saveCollections(username, collections);
   _pushCollectionRemote(username, id, col);
   return true;
+}
+
+// BARU (20 Sep 2026, tahap 2 & 5) -- simpan audio latar BANYAK item sekaligus
+// dalam SATU kali tulis + SATU kali dorong ke awan (bukan N kali). `changes` =
+// [{ index, bgAudio }] (bgAudio null = lepas). Mengembalikan jumlah item yang diubah.
+function updateItemsBgAudioInCollection(username, id, changes) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !Array.isArray(changes)) return 0;
+  let n = 0;
+  changes.forEach((c) => {
+    if (c && Number.isInteger(c.index) && col.items[c.index]) {
+      col.items[c.index].bgAudio = normalizeBgAudio(c.bgAudio);
+      n++;
+    }
+  });
+  if (!n) return 0;
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return n;
 }
 
 function removeItemFromCollection(username, id, index) {

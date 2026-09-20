@@ -6858,6 +6858,7 @@ function openCollectionFullscreen(col, startIndex) {
   // <iframe> YouTube tersembunyi 1x1px dengan ?autoplay=1.
   let fsBgAudioEl = null;
   let fsBgYtEl = null;
+  let fsBgBlobUrl_ = ""; // BARU (20 Sep 2026, tahap 3) -- URL blob dari berkas UPLOAD (pustaka js/bg-audio-library.js) yang sedang diputar; di-revoke saat berhenti
   let fsBgAudioActiveUrl_ = null; // url yang SEDANG dimuat -- supaya tidak dimuat ulang (yg bikin lagu balik ke awal) kalau operator kebetulan lompat ke slide yg link audionya SAMA
   // BARU (18 Sep 2026, port dari Studio Presentasi/js/presentation-studio.js
   // -- permintaan operator "fitur YouTube latar per-slide yang sudah ada
@@ -6930,6 +6931,7 @@ function openCollectionFullscreen(col, startIndex) {
   function stopFsBgAudioNow_() {
     if (fsBgAudioEl) { try { fsBgAudioEl.pause(); } catch (e) {} fsBgAudioEl.removeAttribute("src"); try { fsBgAudioEl.load(); } catch (e) {} fsBgAudioEl.volume = 1; fsBgAudioEl.loop = false; }
     if (fsBgYtEl) fsBgYtEl.src = "";
+    if (fsBgBlobUrl_) { try { URL.revokeObjectURL(fsBgBlobUrl_); } catch (e) {} fsBgBlobUrl_ = ""; }
     fsBgAudioActiveUrl_ = null;
   }
   // `opts.fade` (opsional, ~1 detik) -- dipakai saat berpindah slide yang
@@ -7025,6 +7027,20 @@ function openCollectionFullscreen(col, startIndex) {
       const loop = !!bg.loopFile || !!bg.loopAll;
       const embed = buildFsYtBgEmbedUrl_(bg.url, loop, extraIds);
       if (embed) fsBgYtEl.src = embed;
+    } else if (window.BgAudioLibrary && window.BgAudioLibrary.isUploadUrl(bg.url)) {
+      // BARU (20 Sep 2026, tahap 3) -- berkas UPLOAD dari pustaka perangkat ini.
+      const keyNow = bg.url;
+      window.BgAudioLibrary.getBlob(window.BgAudioLibrary.idFromUploadUrl(keyNow)).then((blob) => {
+        if (fsBgAudioActiveUrl_ !== keyNow || !fsBgAudioEl) return; // sudah pindah/berhenti selagi membaca berkas
+        if (!blob) { console.warn("Audio latar upload tidak ditemukan di perangkat ini:", keyNow); return; }
+        if (fsBgBlobUrl_) { try { URL.revokeObjectURL(fsBgBlobUrl_); } catch (e) {} }
+        fsBgBlobUrl_ = URL.createObjectURL(blob);
+        fsBgAudioEl.volume = 1;
+        fsBgAudioEl.loop = !!bg.loopFile;
+        fsBgAudioEl.src = fsBgBlobUrl_;
+        const p = fsBgAudioEl.play();
+        if (p && p.catch) p.catch(() => {});
+      });
     } else {
       // mp3/mp4 -- link Drive dinormalisasi ke "uc?export=download" dulu
       // (driveDownloadUrl(), sudah ada di app.js) supaya bisa dipasang
@@ -7052,7 +7068,7 @@ function openCollectionFullscreen(col, startIndex) {
     fsBgHandledForItem_ = it;
     fsYtArmed_ = null; // slide (benar-benar) baru -- lupakan status "menunggu klik" milik slide SEBELUMNYA, batal begitu saja, TIDAK otomatis mulai
     const bg = it && it.bgAudio;
-    if (bg && (bg.kind === "yt" || bg.kind === "sc") && bg.continuePrev) return; // "↩️ Lanjutkan" -- JANGAN sentuh apa pun, biarkan audio yang sedang main (kalau ada) tetap jalan apa adanya
+    if (bg && bg.continuePrev) return; // DIUBAH (20 Sep 2026): "Lanjutkan" berlaku untuk jenis apa pun (dialog baru menyimpannya dengan jenis mp3) // "↩️ Lanjutkan" -- JANGAN sentuh apa pun, biarkan audio yang sedang main (kalau ada) tetap jalan apa adanya
     // BARU (19 Sep 2026) -- LAGU YANG SAMA sudah jalan (mis. semua bait 1 kidung
     // membawa link yang sama, dari tab Kidung Studio): JANGAN dihentikan/
     // dimuat ulang tiap pindah bait, sama seperti aturan di Studio
@@ -10464,12 +10480,21 @@ function initScrollTopFloatButton() {
 // ------------------------------------------------------------
 // MULAI
 // ------------------------------------------------------------
+// DIUBAH (20 Sep 2026) -- tiap inisialisasi dijalankan TERPISAH di dalam try/catch.
+// Dulu satu berkas yang gagal dimuat (mis. presentation-studio.js) membuat
+// `typeof PresentationStudio` melempar ReferenceError (const yang belum terisi),
+// sehingga baris-baris sesudahnya -- Signup, UserApproval, AdminBell (NOTIFIKASI)
+// -- tidak pernah dijalankan. Sekarang galat satu bagian hanya dicatat di Console
+// dan bagian lain tetap hidup.
+function safeInit_(name, fn) {
+  try { fn(); } catch (e) { console.error("Inisialisasi gagal (" + name + "):", e); }
+}
 document.addEventListener("DOMContentLoaded", () => {
-  initUIEvents();
-  initAuth();
-  if (typeof Presentation !== "undefined") Presentation.init();
-  if (typeof PresentationStudio !== "undefined") PresentationStudio.init();
-  if (typeof Signup !== "undefined") Signup.init();
-  if (typeof UserApproval !== "undefined") UserApproval.init();
-  if (typeof AdminBell !== "undefined") AdminBell.init();
+  safeInit_("initUIEvents", () => initUIEvents());
+  safeInit_("initAuth", () => initAuth());
+  safeInit_("Presentation", () => { if (typeof Presentation !== "undefined") Presentation.init(); });
+  safeInit_("PresentationStudio", () => { if (typeof PresentationStudio !== "undefined") PresentationStudio.init(); });
+  safeInit_("Signup", () => { if (typeof Signup !== "undefined") Signup.init(); });
+  safeInit_("UserApproval", () => { if (typeof UserApproval !== "undefined") UserApproval.init(); });
+  safeInit_("AdminBell", () => { if (typeof AdminBell !== "undefined") AdminBell.init(); });
 });
