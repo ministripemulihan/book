@@ -18,6 +18,10 @@
   <link rel="stylesheet" href="css/book-scene.css?v=20260918a" />
   <!-- BARU (20 Sep 2026) -- 📚 Rencana Baca Multi-Jalur, lihat js/plans-multi.js -->
   <link rel="stylesheet" href="css/plans-multi.css?v=20260920e" />
+  <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pengaturan Riset Tema & Mode Khotbah, lihat js/aichat-riset.js -->
+  <link rel="stylesheet" href="css/aichat-riset.css?v=20260921a" />
+  <!-- BARU (21 Sep 2026) -- 🖍️ Penanda berkategori (js/annotations.js) & ✏️ Edit Ayat Administrator (js/bible-edit.js) -->
+  <link rel="stylesheet" href="css/annotations.css?v=20260921b" />
 </head>
 <body>
 
@@ -398,6 +402,8 @@
       <button id="announcementBtn" class="more-menu-btn">📢 Pengumuman</button>
       <button id="infoKamiBtn" class="more-menu-btn">ℹ️ Info Kami</button>
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
+      <!-- BARU (21 Sep 2026) -- lihat js/annotations.js -->
+      <button id="annoMenuBtn" class="more-menu-btn">🖍️ Penanda Saya</button>
       <button id="collectionsMenuBtn" class="more-menu-btn">📚 Kumpulan Ayat</button>
       <button id="kidungMenuBtn" class="more-menu-btn">🎵 Kidung</button>
       <!-- BARU (6 Sep 2026) -- lihat js/lifestudy.js -->
@@ -414,6 +420,8 @@
       <button id="logViewerBtn" class="more-menu-btn" hidden>📊 Log Aktivitas</button>
       <!-- BARU -- persetujuan akun hasil "Daftar Akun Baru", khusus administrator -->
       <button id="userManageBtn" class="more-menu-btn" hidden>🗂️ Kelola Pengguna</button>
+      <!-- BARU (21 Sep 2026) -- riwayat edit ayat, khusus administrator (js/bible-edit.js) -->
+      <button id="bibleEditMenuBtn" class="more-menu-btn" hidden>✏️ Riwayat Edit Ayat</button>
       <!-- TAHAP 6 (ROADMAP-drive-sync.md) -- panel admin "Pemakaian
            Penyimpanan Drive", khusus administrator, sama seperti logViewerBtn/
            userManageBtn di atas. -->
@@ -3939,6 +3947,9 @@
   <script src="js/plans.js?v=20260818b"></script>
   <!-- BARU (20 Sep 2026) -- 📚 Rencana Baca Multi-Jalur (PL + PB dalam 1 hari, bahasa per jalur). Additive: js/plans.js tidak berubah. -->
   <script src="js/plans-multi.js?v=20260920e"></script>
+  <!-- BARU (21 Sep 2026) -- 🖍️ Penanda/Stabilo berkategori + ✏️ Edit Ayat oleh administrator. Additive: js/highlights.js tidak berubah. -->
+  <script src="js/annotations.js?v=20260921b"></script>
+  <script src="js/bible-edit.js?v=20260921b"></script>
   <script src="js/media.js?v=20260915d"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260920d"></script>
@@ -3985,9 +3996,11 @@
   <script src="js/media-library.js?v=20260914b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20260920e"></script>
+  <script src="js/app.js?v=20260921b"></script>
   <script src="js/curhat.js?v=20260915a"></script>
-  <script src="js/aichat.js?v=20260907a"></script>
+  <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->
+  <script src="js/aichat-riset.js?v=20260921a"></script>
+  <script src="js/aichat.js?v=20260921a"></script>
   <script src="js/langcheck.js?v=20260818b"></script>
   <script src="js/kidungversecheck.js?v=20260821a"></script>
   <!-- BARU (7 Sep 2026, permintaan operator) -- daftarkan Service Worker
