@@ -39,14 +39,14 @@ const AiChatSync = {
   enabled() {
     return !!(CONFIG.AI_CHAT_APPS_SCRIPT_URL && CONFIG.AI_CHAT_APPS_SCRIPT_URL.indexOf("http") === 0);
   },
-  async ask({ username, displayName, saudara, question, context, allowExternal, history }) {
+  async ask({ username, displayName, saudara, question, context, allowExternal, history, length, mode }) {
     const res = await fetch(CONFIG.AI_CHAT_APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       // displayName/saudara -- BARU, dipakai backend supaya AI Chat
       // menyapa pengguna dengan nama aslinya ("Saudara"/"Saudari {Nama}")
       // alih-alih selalu "Gembala", lihat AiChatCode.gs.
-      body: JSON.stringify({ type: "ai_chat", username, displayName, saudara, question, context, allowExternal, history }),
+      body: JSON.stringify({ type: "ai_chat", username, displayName, saudara, question, context, allowExternal, history, length, mode }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     return res.json();
@@ -102,6 +102,10 @@ const AI_CHAT_STOPWORDS = new Set([
 ]);
 
 function extractAiChatKeywords(question) {
+  // BARU (21 Sep 2026) -- pembersihan kata kunci yang lebih baik ada di
+  // js/aichat-riset.js (buang kata perintah/umur, tanpa batas 6 kata). Kode
+  // di bawah dibiarkan sebagai cadangan kalau modul itu tidak termuat.
+  if (typeof AiRiset !== "undefined") return AiRiset.extractKeywords(question);
   return question
     .toLowerCase()
     .replace(/[?.,!;:"'()]/g, " ")
@@ -426,30 +430,45 @@ async function gatherAiChatContext(question) {
   const verses = [];
   const notes = [];
 
-  keywords.forEach((kw) => {
-    if (verses.length >= 10 && notes.length >= 6) return;
-    const { verseResults, noteResults } = runKeywordSearch(kw, currentLang || "__all__", "both", "__all__", "normal");
-    verseResults.forEach((v) => {
-      if (verses.length >= 10) return;
-      const key = v.lang + "_" + v.id;
-      if (seenVerse.has(key)) return;
-      seenVerse.add(key);
-      const book = BOOKS.find((b) => b.num === v.bookNumber);
-      // kind: "verse" -> ditandai di daftar sumber sebagai kutipan ayat
-      // Alkitab langsung (BUKAN catatan kaki/penjelasan tambahan).
-      verses.push({ kind: "verse", ref: `${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}`, text: v.text });
+  // BARU (21 Sep 2026) -- pengumpulan bahan ber-SKOR di semua bahasa yang
+  // dipilih (bawaan Recovery Indonesia + Inggris), ayat DAN catatan kaki,
+  // lihat js/aichat-riset.js. Blok pencarian lama di bawah HANYA dipakai
+  // sebagai cadangan (modul tidak termuat / gagal / tidak menemukan apa pun).
+  if (typeof AiRiset !== "undefined") {
+    try {
+      const found = await AiRiset.searchForChat(question);
+      found.verses.forEach((v) => verses.push(v));
+      found.notes.forEach((n) => notes.push(n));
+    } catch (e) {
+      console.warn("Pencarian bahan (riset) gagal, memakai pencarian lama:", e);
+    }
+  }
+  if (!verses.length && !notes.length) {
+    keywords.forEach((kw) => {
+      if (verses.length >= 10 && notes.length >= 6) return;
+      const { verseResults, noteResults } = runKeywordSearch(kw, currentLang || "__all__", "both", "__all__", "normal");
+      verseResults.forEach((v) => {
+        if (verses.length >= 10) return;
+        const key = v.lang + "_" + v.id;
+        if (seenVerse.has(key)) return;
+        seenVerse.add(key);
+        const book = BOOKS.find((b) => b.num === v.bookNumber);
+        // kind: "verse" -> ditandai di daftar sumber sebagai kutipan ayat
+        // Alkitab langsung (BUKAN catatan kaki/penjelasan tambahan).
+        verses.push({ kind: "verse", ref: `${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}`, text: v.text });
+      });
+      noteResults.forEach((n) => {
+        if (notes.length >= 6) return;
+        if (seenNote.has(n.verseId)) return;
+        seenNote.add(n.verseId);
+        const ref = n.verse ? `${n.verse.bookName} ${n.verse.chapter}:${n.verse.verse}` : n.verseId;
+        // kind: "note" -> ditandai sebagai catatan kaki (kolom Note di Sheet
+        // Alkitab) supaya pembaca tahu ini PENJELASAN TAMBAHAN pada ayat
+        // itu, bukan teks ayatnya sendiri.
+        notes.push({ kind: "note", ref, text: n.note });
+      });
     });
-    noteResults.forEach((n) => {
-      if (notes.length >= 6) return;
-      if (seenNote.has(n.verseId)) return;
-      seenNote.add(n.verseId);
-      const ref = n.verse ? `${n.verse.bookName} ${n.verse.chapter}:${n.verse.verse}` : n.verseId;
-      // kind: "note" -> ditandai sebagai catatan kaki (kolom Note di Sheet
-      // Alkitab) supaya pembaca tahu ini PENJELASAN TAMBAHAN pada ayat
-      // itu, bukan teks ayatnya sendiri.
-      notes.push({ kind: "note", ref, text: n.note });
-    });
-  });
+  }
 
   const outline = await gatherAiChatOutlineContext(question);
 
@@ -775,6 +794,9 @@ function renderAiChatPanel() {
     _aiChatState.allowExternal = e.target.checked;
   });
 
+  // BARU (21 Sep 2026) -- bahasa yang dicari, mode & panjang jawaban (js/aichat-riset.js)
+  if (typeof AiRiset !== "undefined") AiRiset.renderControls(container);
+
   const thread = document.createElement("div");
   thread.className = "ai-chat-thread";
   thread.id = "aiChatThread";
@@ -951,6 +973,13 @@ async function handleAiChatAsk(question) {
       return; // tidak perlu memanggil Gemini sama sekali untuk kasus ini
     }
 
+    // BARU (21 Sep 2026) -- Mode Khotbah / Riset Tema & pencarian catatan kaki
+    // (js/aichat-riset.js). Kalau modul itu menangani pertanyaan ini, giliran
+    // AI sudah ditambahkan ke _aiChatState.history olehnya; alur biasa dilewati.
+    if (typeof AiRiset !== "undefined" && await AiRiset.maybeHandle(question)) {
+      return;
+    }
+
     const context = await gatherAiChatContext(question);
     const data = await AiChatSync.ask({
       username: currentUser,
@@ -960,6 +989,7 @@ async function handleAiChatAsk(question) {
       context,
       allowExternal: _aiChatState.allowExternal,
       history: _aiChatState.history.slice(0, -1).map((h) => ({ role: h.role, text: h.text })),
+      length: (typeof AiRiset !== "undefined") ? AiRiset.lengthFor() : undefined,
     });
     if (!data || !data.ok) {
       throw new Error((data && data.error) || "Gagal mendapat jawaban dari AI");

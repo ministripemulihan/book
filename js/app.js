@@ -492,6 +492,8 @@ async function startApp() {
     await resolveCurrentUserLevels(currentUser);
     if (typeof updateStatusPanel === "function") updateStatusPanel();
     refreshNotesFromRemote(currentUser);
+    // BARU (21 Sep 2026) -- 🖍️ tarik Penanda/Kategori dari server (js/annotations.js)
+    if (typeof Anno !== "undefined") Anno.pullRemote().then(() => Anno.flush()).catch(() => {});
     refreshPlanFromRemote(currentUser);
     refreshSettingsFromRemote(currentUser).then(() => {
       if (el("readingAnimToggle")) el("readingAnimToggle").checked = isReadingProgressEnabled();
@@ -1596,6 +1598,8 @@ async function updateStatusPanel() {
 //    pra gembala/inti (bukan "Kaum Saleh"/tanpa level) -- lihat hasAnyLevel().
 function updateLevelGatedMenus() {
   if (el("logViewerBtn")) el("logViewerBtn").hidden = !isAdministrator();
+  // BARU (21 Sep 2026) -- ✏️ Riwayat Edit Ayat, khusus administrator (js/bible-edit.js)
+  if (el("bibleEditMenuBtn")) el("bibleEditMenuBtn").hidden = !isAdministrator();
   if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
   // aiChatBtn: untuk TAMU jangan disembunyikan sama sekali -- biar tetap
   // kelihatan tapi "diabu-abukan" (lihat GUEST_GATED_MENU_IDS di bawah,
@@ -1634,7 +1638,7 @@ function updateLevelGatedMenus() {
 // Curhat, AI Chat, serta highlight/catatan per-ayat (tombol nomor ayat) --
 // lihat buildVerseBlock().
 // ------------------------------------------------------------
-const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "curhatBtn", "aiChatBtn", "kidungMenuBtn"];
+const GUEST_GATED_MENU_IDS = ["planToggle", "collectionsMenuBtn", "notesMenuBtn", "annoMenuBtn", "curhatBtn", "aiChatBtn", "kidungMenuBtn"];
 
 function applyGuestModeUi() {
   const guest = !!(CONFIG.GUEST_MODE_ENABLED && typeof Guest !== "undefined" && Guest.isGuest());
@@ -1694,6 +1698,14 @@ function buildIndexes() {
       chaptersByBook[lang][bookNum] = Object.keys(chObj).map(Number).sort((a, b) => a - b);
     });
   });
+
+  // BARU (21 Sep 2026) -- ✏️ Edit Ayat Administrator (js/bible-edit.js):
+  // buildIndexes() SELALU jalan setelah data Alkitab dimuat/diunduh, jadi di
+  // sinilah edit administrator diterapkan di atas teks hasil unduhan (juga
+  // setelah "Sinkronkan ulang Alkitab"), lalu dimutakhirkan dari server.
+  try {
+    if (typeof BibleEdit !== "undefined") BibleEdit.onDataReady();
+  } catch (e) { console.warn("BibleEdit.onDataReady gagal:", e); }
 }
 
 function getChapterVerses(lang, bookNum, chapter) {
@@ -2857,7 +2869,10 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
     }
     verseNumClickTimer = setTimeout(() => {
       verseNumClickTimer = null;
-      openHighlightPopup(num, block, v);
+      // BARU (21 Sep 2026) -- 🖍️ Penanda berkategori (js/annotations.js)
+      // menggantikan popup 10 warna lama; popup lama tetap jadi cadangan.
+      if (typeof Anno !== "undefined") Anno.openVersePopup(num, block, v);
+      else openHighlightPopup(num, block, v);
     }, 260);
   });
   num.addEventListener("dblclick", (e) => {
@@ -2874,7 +2889,9 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
 
   // Highlight warna pastel yang tersimpan (kalau ada) langsung dipasang
   // ke seluruh blok ayat ini saat dirender.
-  const savedHighlight = getVerseHighlight(currentUser, v.id);
+  // (BARU 21 Sep 2026) Kalau modul Penanda (js/annotations.js) aktif, warna
+  // ayat digambar olehnya (highlight lama sudah dipindahkan jadi kategori).
+  const savedHighlight = (typeof Anno !== "undefined") ? null : getVerseHighlight(currentUser, v.id);
   if (savedHighlight) block.classList.add("hl-" + savedHighlight);
 
   const textWrap = document.createElement("div");
@@ -2958,6 +2975,8 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   block.appendChild(copyBtn);
   block.appendChild(collBtn);
   block.appendChild(presentBtn);
+  // BARU (21 Sep 2026) -- tombol ✏️ Edit Ayat, hanya untuk administrator (js/bible-edit.js)
+  if (typeof BibleEdit !== "undefined") BibleEdit.decorateBlock(block, v, textWrap);
   const notePanel = buildInlineNoteCardEl(v, block, sourceVerses);
   block.appendChild(notePanel);
   if (typeof setupFootnoteMarkerHandlers === "function") {
@@ -8851,6 +8870,9 @@ function hideAllPanels() {
   if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
   if (el("allPokokPanel")) el("allPokokPanel").hidden = true;
   if (el("allMapsPanel")) el("allMapsPanel").hidden = true;
+  // BARU (21 Sep 2026) -- panel Penanda Saya & Riwayat Edit Ayat (dibuat dinamis)
+  if (el("annoPanel")) el("annoPanel").hidden = true;
+  if (el("bibleEditPanel")) el("bibleEditPanel").hidden = true;
 }
 function showEmptyState() {
   hideAllPanels();
@@ -10526,4 +10548,7 @@ document.addEventListener("DOMContentLoaded", () => {
   safeInit_("Signup", () => { if (typeof Signup !== "undefined") Signup.init(); });
   safeInit_("UserApproval", () => { if (typeof UserApproval !== "undefined") UserApproval.init(); });
   safeInit_("AdminBell", () => { if (typeof AdminBell !== "undefined") AdminBell.init(); });
+  // BARU (21 Sep 2026) -- 🖍️ Penanda berkategori & ✏️ Edit Ayat Administrator
+  safeInit_("Anno", () => { if (typeof Anno !== "undefined") Anno.init(); });
+  safeInit_("BibleEdit", () => { if (typeof BibleEdit !== "undefined") BibleEdit.init(); });
 });
