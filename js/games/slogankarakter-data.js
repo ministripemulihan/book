@@ -35,7 +35,7 @@
     "Dalam": { short: "Kebenaran dalam, pengalaman dalam.", long: "Menggali kedalaman kebenaran, tak hanya di permukaan; mencari kedalaman pengalaman, tak dangkal.", arti: "", contoh: "", ayat: "" },
     "Murni": { short: "Motivasi murni, tutur kata murni.", long: "Motivasi murni tidak campur aduk; tutur kata murni tidak berbelok-belok.", arti: "", contoh: "", ayat: "" },
     "Adil/Seimbang": { short: "Dengan seimbang menghadapi orang, dengan seimbang menangani perkara.", long: "Dengan seimbang menghadapi orang, tidak pilih kasih; dengan seimbang menangani perkara, tidak berat sebelah.", arti: "", contoh: "", ayat: "" },
-    "Tenang": { short: "Roh tenang, hati teduh.", long: "Roh tenang, bersandar Allah; hati teduh, mendapatkan perhentian.", arti: "", contoh: "", ayat: "" },
+    "Tenang": { short: "Roh Tenang, hati Tenteram.", long: "Bersandar dan percaya kepada Allah dalam roh yang tenang, Beroleh perhentian dalam hati yang tenteram.", arti: "", contoh: "", ayat: "" },
     "Tulus": { short: "Bersasaran satu, tidak menyimpang.", long: "Belajar tulus (khusus, sepenuh hati), bersasaran satu, tidak menyimpang; tidak berserakan tanpa tujuan.", arti: "", contoh: "", ayat: "" },
     "Umum": { short: "Terhadap orang perlu umum, menangani perkara perlu umum.", long: "Saling memperhatikan, berperilaku umum untuk kepentingan bersama kepada orang; sehati sepikir menangani perkara secara umum.", arti: "", contoh: "", ayat: "" },
     "Terbuka": { short: "Terbuka kepada Tuhan, terbuka kepada orang lain.", long: "Terbuka kepada Tuhan untuk mendapatkan suplai; terbuka kepada orang lain untuk mendapatkan bantuan.", arti: "", contoh: "", ayat: "" },
