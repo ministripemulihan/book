@@ -1866,12 +1866,12 @@
      #penCanvas (z-index 42) supaya kedua macam coretan bisa tampil
      bersamaan kalau operator kebetulan memakai keduanya.
      ============================================================ */
-  #localPenCanvas { position: fixed; inset: 0; z-index: 42; pointer-events: none; }
+  #localPenCanvas { position: fixed; inset: 0; z-index: 42; pointer-events: none; touch-action: none; }
   #localInkToggle {
     position: fixed; left: 14px; bottom: 14px; z-index: 96;
     width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     font-size: 20px; background: rgba(20,20,20,.55); color: #fff; border: 1px solid rgba(255,255,255,.25);
-    cursor: pointer; opacity: .55; transition: opacity .15s ease;
+    cursor: pointer; opacity: .8; transition: opacity .15s ease; touch-action: manipulation; user-select: none; -webkit-user-select: none;
   }
   #localInkToggle:hover, #localInkToggle.on { opacity: .95; }
   #localInkBar {
@@ -3040,7 +3040,78 @@
   // lihat penanganan pesan {type:"pen", action:...} di bawah. `remoteInk`
   // TERPISAH dari `localInk` (coret-coret langsung, lihat IIFE di bagian
   // paling bawah skrip ini) -- 2 macam coretan yang independen.
-  const remoteInk = (typeof InkEngine !== "undefined") ? InkEngine.create() : null;
+  // PERBAIKAN (24 Sep 2026, laporan operator "pen tidak bisa dicoret-coret") --
+  // dulu SELURUH Pen (yang dari Studio DAN coret-coret langsung di bawah)
+  // bergantung pada js/ink-engine.js: kalau berkas itu tidak termuat (belum
+  // ter-upload/ter-deploy, atau cache lama), `InkEngine` tidak ada -> tombol
+  // 🖊️ tidak berbuat apa-apa & goresan dari Studio diabaikan diam-diam.
+  // Sekarang dipakai salinan mesin yang SAMA (API identik) yang tertanam di
+  // sini bila InkEngine tidak ada, jadi Pen tetap jalan apa pun keadaan berkas
+  // itu. (js/presentation-studio.js punya salinan tertanam yang sama.)
+  function createInkEngineFallback_() {
+    let actions = [], cursor = 0, current = null;
+    function begin(id, mode, color, size) {
+      current = { id: id != null ? String(id) : "", mode: mode === "erase" ? "erase" : "draw", color: color || "#ff3b30", size: Math.max(1, Number(size) || 4), pts: [] };
+      return current;
+    }
+    function append(pts) {
+      if (!current || !pts || !pts.length) return;
+      for (let i = 0; i < pts.length; i++) {
+        const q = pts[i];
+        if (q && typeof q.x === "number" && typeof q.y === "number") current.pts.push({ x: q.x, y: q.y });
+      }
+    }
+    function end() {
+      if (!current) return null;
+      if (current.pts.length < 2) { current = null; return null; }
+      actions = actions.slice(0, cursor);
+      actions.push(current);
+      cursor = actions.length;
+      const done = current; current = null; return done;
+    }
+    function cancelCurrent() { current = null; }
+    function undo() { if (cursor <= 0) return false; cursor -= 1; current = null; return true; }
+    function redo() { if (cursor >= actions.length) return false; cursor += 1; return true; }
+    function clear() { actions = []; cursor = 0; current = null; }
+    function getActiveActions() { return actions.slice(0, cursor); }
+    function drawAction(canvas, ctx, a) {
+      if (!canvas || !ctx || !a || !a.pts || a.pts.length < 2) return;
+      ctx.save();
+      ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
+      ctx.strokeStyle = a.color || "#ff3b30";
+      ctx.lineWidth = a.size || 4;
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath();
+      for (let i = 0; i < a.pts.length; i++) {
+        const x = a.pts[i].x * canvas.width, y = a.pts[i].y * canvas.height;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    function render(canvas, ctx) {
+      if (!canvas || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const list = getActiveActions();
+      for (let i = 0; i < list.length; i++) drawAction(canvas, ctx, list[i]);
+    }
+    function drawSegmentLive(canvas, ctx, pts) {
+      if (!current || !pts || pts.length < 2) return;
+      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, pts: pts });
+    }
+    return {
+      begin, append, end, cancelCurrent, undo, redo, clear,
+      canUndo() { return cursor > 0; }, canRedo() { return cursor < actions.length; },
+      getCurrent() { return current; }, getActiveActions, historyLength() { return actions.length; },
+      drawAction, render, drawSegmentLive,
+    };
+  }
+  function makeInk_() {
+    try { if (typeof InkEngine !== "undefined" && InkEngine && typeof InkEngine.create === "function") return InkEngine.create(); } catch (e) {}
+    try { console.warn("[Pen] js/ink-engine.js tidak termuat -- memakai mesin coretan cadangan yang tertanam."); } catch (e) {}
+    return createInkEngineFallback_();
+  }
+  const remoteInk = makeInk_();
 
   // ------------------------------------------------------------
   // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar. Posisi kursor (`x`,`y`, 0..1
@@ -7236,9 +7307,9 @@
     const canvas = document.getElementById("localPenCanvas");
     const toggle = document.getElementById("localInkToggle");
     const bar = document.getElementById("localInkBar");
-    if (!canvas || !toggle || !bar || typeof InkEngine === "undefined") return;
+    if (!canvas || !toggle || !bar) return;
     const ctx = canvas.getContext("2d");
-    const ink = InkEngine.create();
+    const ink = makeInk_(); // PERBAIKAN (24 Sep 2026): selalu ada, lihat makeInk_() di atas
     let mode = "draw";
     let color = "#ff3b30";
     let size = 17;
@@ -7308,6 +7379,7 @@
     }
     function pointerDown_(e) {
       if (!active) return;
+      if (!e.touches && e.button !== undefined && e.button !== 0) return; // PERBAIKAN (24 Sep 2026): klik kanan/tengah tidak mencoret
       e.preventDefault();
       dragging = true;
       strokeSeq += 1;
