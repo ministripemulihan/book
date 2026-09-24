@@ -254,24 +254,37 @@
      backward-compatible kalau ada tema lama tersimpan tanpa field ini).
      Dipakai BERSAMA "cam-bubble" (kamera bulat) MAUPUN "cam-textbubble"
      (BARU di bawah -- teks yang bulat) -- 1 set posisi untuk keduanya. */
-  body.bubble-pos-tl #camBg, body.bubble-pos-tl #imgBg,
-  body.bubble-pos-tl #stage.stage-bubble-el {
+  /* PERBAIKAN (24 Sep 2026, laporan operator: "Kamera Kiri/Konten Kanan"
+     & "Kamera Atas/Teks Bawah" kameranya tidak muncul, tapi versi "Balik"
+     muncul) -- AKAR MASALAH: selector posisi di bawah SEBELUMNYA generik
+     (`body.bubble-pos-br #camBg`, tanpa syarat mode). Studio SELALU
+     mengirim theme.bubblePos (bawaan "br"), jadi class bubble-pos-* SELALU
+     menempel di <body> di SEMUA mode -- dan karena spesifisitasnya sama
+     (1,1,1) dengan body.cam-split/cam-split-lr/cam-subtitle #camBg tetapi
+     DITULIS LEBIH BAWAH, ia menimpa top/left/right/bottom mode-mode itu
+     (kamera terlempar ke kanan-bawah, TERTUTUP #stage yang solid). Versi
+     "Balik" cuma lolos karena selectornya lebih spesifik (1,2,1) -- itupun
+     masih bergeser 28px karena right/bottom:28px bocor. SEKARANG posisi
+     bubble DIKUNCI hanya untuk mode bulat: body.cam-bubble (kamera bulat)
+     & body.cam-textbubble (teks bulat). */
+  body.cam-bubble.bubble-pos-tl #camBg, body.cam-bubble.bubble-pos-tl #imgBg,
+  body.cam-textbubble.bubble-pos-tl #stage.stage-bubble-el {
     top: 28px; left: 28px; right: auto; bottom: auto;
   }
-  body.bubble-pos-tr #camBg, body.bubble-pos-tr #imgBg,
-  body.bubble-pos-tr #stage.stage-bubble-el {
+  body.cam-bubble.bubble-pos-tr #camBg, body.cam-bubble.bubble-pos-tr #imgBg,
+  body.cam-textbubble.bubble-pos-tr #stage.stage-bubble-el {
     top: 28px; right: 28px; left: auto; bottom: auto;
   }
-  body.bubble-pos-bl #camBg, body.bubble-pos-bl #imgBg,
-  body.bubble-pos-bl #stage.stage-bubble-el {
+  body.cam-bubble.bubble-pos-bl #camBg, body.cam-bubble.bubble-pos-bl #imgBg,
+  body.cam-textbubble.bubble-pos-bl #stage.stage-bubble-el {
     bottom: 28px; left: 28px; right: auto; top: auto;
   }
-  body.bubble-pos-br #camBg, body.bubble-pos-br #imgBg,
-  body.bubble-pos-br #stage.stage-bubble-el {
+  body.cam-bubble.bubble-pos-br #camBg, body.cam-bubble.bubble-pos-br #imgBg,
+  body.cam-textbubble.bubble-pos-br #stage.stage-bubble-el {
     bottom: 28px; right: 28px; left: auto; top: auto;
   }
-  body.bubble-pos-c #camBg, body.bubble-pos-c #imgBg,
-  body.bubble-pos-c #stage.stage-bubble-el {
+  body.cam-bubble.bubble-pos-c #camBg, body.cam-bubble.bubble-pos-c #imgBg,
+  body.cam-textbubble.bubble-pos-c #stage.stage-bubble-el {
     top: 50%; left: 50%; right: auto; bottom: auto;
     transform: translate(-50%, -50%);
   }
