@@ -10253,6 +10253,83 @@ const PresentationStudio = (() => {
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
   }
 
+  // ------------------------------------------------------------
+  // PERBAIKAN (24 Sep 2026, laporan operator "pen tidak bisa dicoret-coret,
+  // baik di Studio maupun present.html") -- AKAR MASALAH: seluruh Pen
+  // bergantung pada js/ink-engine.js (window.InkEngine). Kalau berkas itu
+  // tidak ikut ter-upload/ter-deploy, atau cache lama menahannya, `InkEngine`
+  // tidak ada -> `studioInk` dulu jadi null -> TIDAK ADA goresan yang
+  // digambar maupun dikirim ke Layar 2 (padahal komentar lama di bawah
+  // mengklaim "Pen tetap jalan" -- klaim itu ternyata tidak pernah benar).
+  // Sekarang: kalau InkEngine tidak ada, dipakai salinan mesin yang SAMA
+  // (API identik: begin/append/end/undo/redo/clear/render/...) yang tertanam
+  // di sini, jadi Pen + Penghapus + Undo/Redo tetap jalan APA PUN keadaan
+  // berkas js/ink-engine.js. (present.html punya salinan tertanam yang sama.)
+  // ------------------------------------------------------------
+  function createInkEngineFallback_() {
+    let actions = [], cursor = 0, current = null;
+    function begin(id, mode, color, size) {
+      current = { id: id != null ? String(id) : "", mode: mode === "erase" ? "erase" : "draw", color: color || "#ff3b30", size: Math.max(1, Number(size) || 4), pts: [] };
+      return current;
+    }
+    function append(pts) {
+      if (!current || !pts || !pts.length) return;
+      for (let i = 0; i < pts.length; i++) {
+        const q = pts[i];
+        if (q && typeof q.x === "number" && typeof q.y === "number") current.pts.push({ x: q.x, y: q.y });
+      }
+    }
+    function end() {
+      if (!current) return null;
+      if (current.pts.length < 2) { current = null; return null; }
+      actions = actions.slice(0, cursor);
+      actions.push(current);
+      cursor = actions.length;
+      const done = current; current = null; return done;
+    }
+    function cancelCurrent() { current = null; }
+    function undo() { if (cursor <= 0) return false; cursor -= 1; current = null; return true; }
+    function redo() { if (cursor >= actions.length) return false; cursor += 1; return true; }
+    function clear() { actions = []; cursor = 0; current = null; }
+    function getActiveActions() { return actions.slice(0, cursor); }
+    function drawAction(canvas, ctx, a) {
+      if (!canvas || !ctx || !a || !a.pts || a.pts.length < 2) return;
+      ctx.save();
+      ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
+      ctx.strokeStyle = a.color || "#ff3b30";
+      ctx.lineWidth = a.size || 4;
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath();
+      for (let i = 0; i < a.pts.length; i++) {
+        const x = a.pts[i].x * canvas.width, y = a.pts[i].y * canvas.height;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+    function render(canvas, ctx) {
+      if (!canvas || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const list = getActiveActions();
+      for (let i = 0; i < list.length; i++) drawAction(canvas, ctx, list[i]);
+    }
+    function drawSegmentLive(canvas, ctx, pts) {
+      if (!current || !pts || pts.length < 2) return;
+      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, pts: pts });
+    }
+    return {
+      begin, append, end, cancelCurrent, undo, redo, clear,
+      canUndo() { return cursor > 0; }, canRedo() { return cursor < actions.length; },
+      getCurrent() { return current; }, getActiveActions, historyLength() { return actions.length; },
+      drawAction, render, drawSegmentLive,
+    };
+  }
+  function makeInk_() {
+    try { if (typeof InkEngine !== "undefined" && InkEngine && typeof InkEngine.create === "function") return InkEngine.create(); } catch (e) {}
+    try { console.warn("[Pen] js/ink-engine.js tidak termuat -- memakai mesin coretan cadangan yang tertanam."); } catch (e) {}
+    return createInkEngineFallback_();
+  }
+
   function wirePointerPen() {
     const wrap = el("psPreviewBoxWrap");
     const dot = el("psPointerDot");
@@ -10262,9 +10339,9 @@ const PresentationStudio = (() => {
     // supaya pratinjau kecil di Studio ini SELALU sama persis dengan yang
     // ditayangkan di Layar 2 (present.html memakai instans ink engine-nya
     // sendiri, disinkronkan lewat pesan "pen" -- lihat catatan protokol di
-    // bawah). Kalau berkas itu belum termuat (mis. cache lama), Pen tetap
-    // jalan seperti sebelumnya tanpa Undo/Redo/Penghapus.
-    const studioInk = (typeof InkEngine !== "undefined") ? InkEngine.create() : null;
+    // bawah). Kalau berkas itu belum termuat (mis. cache lama / lupa ter-upload),
+    // makeInk_() memakai salinan cadangan yang tertanam di berkas ini.
+    const studioInk = makeInk_(); // PERBAIKAN (24 Sep 2026): selalu ada (cadangan tertanam kalau js/ink-engine.js tidak termuat)
     let color = "#ff3b30";
     // BARU (27 Agu 2026) -- ukuran Pen lewat progress bar (#psPenSizeSlider),
     // default 17px (disamakan kira-kira dengan ukuran dasar huruf yang
@@ -10417,6 +10494,10 @@ const PresentationStudio = (() => {
 
     function updateMode() {
       if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || eraserActive || magnifyActive || focusClickActive || boxZoomActive);
+      // PERBAIKAN (24 Sep 2026) -- kelas khusus selagi Pen/Penghapus menyala:
+      // mematikan seleksi teks & seret-gambar bawaan browser di kotak pratinjau
+      // (lihat .ps-pen-mode di css/style.css & blok mousedown di bawah).
+      if (wrap) wrap.classList.toggle("ps-pen-mode", penActive || eraserActive);
       updatePenSizeLabel_();
     }
 
@@ -10596,6 +10677,31 @@ const PresentationStudio = (() => {
       else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); doPenRedo_(); }
     });
     refreshUndoRedoBtns_();
+    // PERBAIKAN (24 Sep 2026) -- SATU titik goresan (dipakai mouse DAN sentuhan/
+    // stylus): mulai goresan baru kalau belum ada, kirim titik ke Layar 2,
+    // gambar segmen terbaru di pratinjau. Sebelumnya logika ini tertanam di
+    // mousemove saja sehingga layar sentuh tidak pernah bisa mencoret.
+    function addPenPoint_(x, y) {
+      if (!studioInk) return;
+      if (!studioInk.getCurrent()) {
+        studioInk.begin(String(penStrokeId), eraserActive ? "erase" : "draw", color, penSize);
+        rawPost({ type: "pen", action: "begin", id: String(penStrokeId), mode: eraserActive ? "erase" : "draw", color, size: penSize });
+      }
+      studioInk.append([{ x, y }]);
+      rawPost({ type: "pen", action: "append", pts: [{ x, y }] });
+      if (ctx && canvas) {
+        syncCanvasSize();
+        canvas.style.display = "block";
+        const cur = studioInk.getCurrent();
+        if (cur && cur.pts.length > 1) studioInk.drawSegmentLive(canvas, ctx, cur.pts.slice(-2));
+      }
+    }
+    function fracFromClient_(clientX, clientY) {
+      const rect = wrap.getBoundingClientRect();
+      const fx = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      const fy = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
+      return { x: fx, y: fy };
+    }
     if (wrap) {
       wrap.addEventListener("mousemove", (e) => {
         const rect = wrap.getBoundingClientRect();
@@ -10619,20 +10725,7 @@ const PresentationStudio = (() => {
         // di sini cuma mengirim 1 titik BARU lewat action:"append" (bukan
         // seluruh segmen 2 titik seperti dulu -- present.html menyimpan
         // sendiri titik sebelumnya lewat ink engine-nya, lihat js/ink-engine.js).
-        if ((penActive || eraserActive) && e.buttons === 1) {
-          if (studioInk && !studioInk.getCurrent()) {
-            studioInk.begin(String(penStrokeId), eraserActive ? "erase" : "draw", color, penSize);
-            rawPost({ type: "pen", action: "begin", id: String(penStrokeId), mode: eraserActive ? "erase" : "draw", color, size: penSize });
-          }
-          if (studioInk) studioInk.append([{ x, y }]);
-          rawPost({ type: "pen", action: "append", pts: [{ x, y }] });
-          if (ctx && canvas) {
-            syncCanvasSize();
-            canvas.style.display = "block";
-            const cur = studioInk && studioInk.getCurrent();
-            if (cur && cur.pts.length > 1) studioInk.drawSegmentLive(canvas, ctx, cur.pts.slice(-2));
-          }
-        }
+        if ((penActive || eraserActive) && e.buttons === 1) addPenPoint_(x, y);
         if (magnifyActive) {
           rawPost({ type: "magnify", on: true, x, y, percent: magnifyPercent });
         }
@@ -10648,7 +10741,17 @@ const PresentationStudio = (() => {
           rawPost({ type: "boxzoom_hover", on: true, x, y, sizePercent: boxZoomSizePercent });
         }
       });
-      wrap.addEventListener("mousedown", () => {
+      wrap.addEventListener("mousedown", (e) => {
+        // PERBAIKAN (24 Sep 2026) -- AKAR MASALAH #2 (terbukti di Chrome): kalau
+        // kotak "Tayang" berisi GAMBAR/PDF (<img> bisa diseret) atau ada teks
+        // yang terseleksi, menekan tombol mouse lalu menggeser memulai
+        // "seret-lepas" (drag & drop) bawaan browser -> Chrome MENGHENTIKAN
+        // event mousemove di tengah jalan, jadi goresan cuma beberapa titik
+        // lalu mati. preventDefault() di mousedown mencegah seret/seleksi itu.
+        if ((penActive || eraserActive) && e.button === 0) {
+          e.preventDefault();
+          try { const sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); } catch (err) {}
+        }
         // BARU (21 Sep 2026) -- goresan BARU: id unik supaya present.html
         // tahu ini goresan yang berbeda (dipakai kalau nanti perlu dibedakan;
         // hanya ada 1 goresan berjalan dalam satu waktu di sini). Belum
@@ -10710,6 +10813,29 @@ const PresentationStudio = (() => {
         rawPost({ type: "pen", action: "end" });
         refreshUndoRedoBtns_();
       }
+      // PERBAIKAN (24 Sep 2026) -- jaring pengaman tambahan: selama Pen/Penghapus
+      // menyala, seret-lepas & seleksi teks di kotak pratinjau dibatalkan.
+      wrap.addEventListener("dragstart", (e) => { if (penActive || eraserActive) e.preventDefault(); });
+      wrap.addEventListener("selectstart", (e) => { if (penActive || eraserActive) e.preventDefault(); });
+      // PERBAIKAN (24 Sep 2026) -- dukungan LAYAR SENTUH/stylus (laptop touchscreen,
+      // tablet): sebelumnya cuma ada event mouse, sedangkan geser jari di Chrome
+      // hanya menggulung halaman (tidak pernah jadi mousemove) -> tidak bisa
+      // mencoret sama sekali. Sekarang jari/stylus memakai jalur titik yang sama.
+      wrap.addEventListener("touchstart", (e) => {
+        if (!(penActive || eraserActive) || !e.touches || !e.touches.length) return;
+        e.preventDefault();
+        penStrokeId += 1;
+        const t = e.touches[0], pt = fracFromClient_(t.clientX, t.clientY);
+        addPenPoint_(pt.x, pt.y);
+      }, { passive: false });
+      wrap.addEventListener("touchmove", (e) => {
+        if (!(penActive || eraserActive) || !e.touches || !e.touches.length) return;
+        e.preventDefault();
+        const t = e.touches[0], pt = fracFromClient_(t.clientX, t.clientY);
+        addPenPoint_(pt.x, pt.y);
+      }, { passive: false });
+      wrap.addEventListener("touchend", () => { endPenStroke_(); });
+      wrap.addEventListener("touchcancel", () => { endPenStroke_(); });
       window.addEventListener("mouseup", endPenStroke_);
       wrap.addEventListener("mouseleave", () => {
         endPenStroke_();
