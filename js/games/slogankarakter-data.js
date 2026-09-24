@@ -24,36 +24,36 @@
 // ============================================================
 (function () {
   const CHARS = {
-    "Benar": { short: "Bicara harus benar, menjadi orang harus benar.", long: "Bicara harus benar, riil, tidak berpura-pura, menjadi orang yang berperilaku tulus, tidak hanya dilakukan di permukaan saja.", arti: "", contoh: "", ayat: "" },
-    "Tepat": { short: "Waktu harus tepat, bicara harus tepat.", long: "Tepat waktu tidak menyebabkan pekerjaan tertunda, tepat dalam berbicara pasti dapat diandalkan.", arti: "", contoh: "", ayat: "" },
-    "Ketat": { short: "Ketat mengikuti Tuhan, ketat dalam kehidupan.", long: "Ketat mengikuti Tuhan, tidak pernah kendor, jadwal kehidupan sehari-hari perlu ketat.", arti: "", contoh: "", ayat: "" },
-    "Rajin": { short: "Rajin berdoa, rajin melayani.", long: "Rajin berdoa tidak malas, menyala-nyala dalam roh, rajin melayani.", arti: "", contoh: "", ayat: "" },
-    "Lapang": { short: "Hati harus lapang, kapasitas harus besar.", long: "Kristus tinggal dalam hati yang lapang, bermurah hati kepada orang, memiliki kapasitas besar.", arti: "", contoh: "", ayat: "" },
-    "Cermat": { short: "Perasaan peka, penghidupan cermat.", long: "Balik dalam Roh, perasaan peka; perilaku lembut, penghidupan cermat.", arti: "", contoh: "", ayat: "" },
-    "Stabil": { short: "Sifat stabil, tekad stabil.", long: "Sifat stabil, tidak panik; tekad stabil, kokoh tidak berubah.", arti: "", contoh: "", ayat: "" },
-    "Sabar": { short: "Sabar menanti, sabar berbuah.", long: "Panjang sabar menanti, tidak gelisah; sabar berbuah, tidak kendur.", arti: "", contoh: "", ayat: "" },
-    "Dalam": { short: "Kebenaran dalam, pengalaman dalam.", long: "Menggali kedalaman kebenaran, tak hanya di permukaan; mencari kedalaman pengalaman, tak dangkal.", arti: "", contoh: "", ayat: "" },
-    "Murni": { short: "Motivasi murni, tutur kata murni.", long: "Motivasi murni tidak campur aduk; tutur kata murni tidak berbelok-belok.", arti: "", contoh: "", ayat: "" },
-    "Adil/Seimbang": { short: "Dengan seimbang menghadapi orang, dengan seimbang menangani perkara.", long: "Dengan seimbang menghadapi orang, tidak pilih kasih; dengan seimbang menangani perkara, tidak berat sebelah.", arti: "", contoh: "", ayat: "" },
-    "Tenang": { short: "Roh Tenang, hati Tenteram.", long: "Bersandar dan percaya kepada Allah dalam roh yang tenang, Beroleh perhentian dalam hati yang tenteram.", arti: "", contoh: "", ayat: "" },
-    "Tulus": { short: "Bersasaran satu, tidak menyimpang.", long: "Belajar tulus (khusus, sepenuh hati), bersasaran satu, tidak menyimpang; tidak berserakan tanpa tujuan.", arti: "", contoh: "", ayat: "" },
-    "Umum": { short: "Terhadap orang perlu umum, menangani perkara perlu umum.", long: "Saling memperhatikan, berperilaku umum untuk kepentingan bersama kepada orang; sehati sepikir menangani perkara secara umum.", arti: "", contoh: "", ayat: "" },
-    "Terbuka": { short: "Terbuka kepada Tuhan, terbuka kepada orang lain.", long: "Terbuka kepada Tuhan untuk mendapatkan suplai; terbuka kepada orang lain untuk mendapatkan bantuan.", arti: "", contoh: "", ayat: "" },
-    "Akrab": { short: "Akrab mendekati Allah, akrab dengan manusia.", long: "Bersekutu dengan Allah, mendekati Allah; bersimpati, memperhatikan, dan sayang kepada manusia.", arti: "", contoh: "", ayat: "" },
-    "Gairah": { short: "Roh bergairah, mengasihi orang dengan gairah.", long: "Bergairah dalam roh, melayani Tuhan; memberitakan Injil, mengasihi orang dengan gairah.", arti: "", contoh: "", ayat: "" },
-    "Luwes": { short: "Mendekati orang, merendahkan diri untuk mendekati orang.", long: "Menyeru dan berdoa mendekati Tuhan; rendah hati, bersimpati kepada orang, mendekati orang.", arti: "", contoh: "", ayat: "" },
-    "Teguh": { short: "Roh teguh, tekad teguh.", long: "Teguh dalam roh, tidak kecil hati; tekad teguh, tidak goyah.", arti: "", contoh: "", ayat: "" },
-    "Lembut": { short: "Hati lembut, perkataan lembut.", long: "Motivasi hati lembut, tidak mempertahankan diri; perkataan lembut, membangun orang.", arti: "", contoh: "", ayat: "" },
-    "Taat": { short: "Taat kepada Allah, menurut kepada orang.", long: "Percaya dan taat, pasti disenangi oleh Allah; menuruti otoritas, pasti tidak melanggarnya.", arti: "", contoh: "", ayat: "" },
-    "Derita": { short: "Tidak takut menderita, mau menerima penderitaan.", long: "Menderita bersama Tuhan, belajar taat; dengan tekad menderita sebagai senjata.", arti: "", contoh: "", ayat: "" },
-    "Rendah": { short: "Hati merendah, menempatkan diri pada kedudukan yang rendah.", long: "Merendahkan hati dan diri, sering melayani Tuhan; menempatkan diri pada kedudukan yang rendah, tidak sombong.", arti: "", contoh: "", ayat: "" },
-    "Miskin": { short: "Miskin dalam roh, hati senang miskin.", long: "Miskin dalam roh, menikmati Allah; hati senang miskin, mau memberi kepada orang.", arti: "", contoh: "", ayat: "" },
-    "Tekun": { short: "Tekun, mempunyai ketetapan hati, bisa bertahan lama.", long: "Tekun terhadap Tuhan, tidak putus asa; tekun maju mengarah kepada sasaran.", arti: "", contoh: "", ayat: "" },
-    "Sulit": { short: "Tidak menghindari kesulitan, mau menerima kesulitan.", long: "Menikmati anugerah Tuhan, tidak menghindari kesulitan; dengan sukarela mempersembahkan diri menerima kesulitan.", arti: "", contoh: "", ayat: "" },
-    "Tekan": { short: "Mau menerima tekanan, bisa menahan tekanan.", long: "Untuk kemuliaan mau menerima tekanan; bejana yang mulia bisa tahan tekanan.", arti: "", contoh: "", ayat: "" },
-    "Jernih": { short: "Pikiran jernih, mengerti Alkitab.", long: "Pikiran jernih hingga mendapatkan pembaruan; mengerti Alkitab, mendapatkan hikmat.", arti: "", contoh: "", ayat: "" },
-    "Murah Hati": { short: "Hati besar, baik hati terhadap orang.", long: "Mendapatkan kebaikan dan kasih yang besar dari Allah, sehingga hati menjadi besar; mau menurut perkenan Allah, berlaku baik kepada orang.", arti: "", contoh: "", ayat: "" },
-    "Bobot": { short: "Perkataan berbobot, orangnya juga berbobot.", long: "Perkataan berbobot dihargai orang; bejana yang mulia, berbobot, cocok dipakai oleh Tuhan.", arti: "", contoh: "", ayat: "" }
+    "Benar": { short: "Bicara harus benar, menjadi orang harus benar.", long: "Bicara harus benar, riil, tidak berpura-pura, menjadi orang yang berperilaku tulus, tidak hanya dilakukan di permukaan saja.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Tepat": { short: "Waktu harus tepat, bicara harus tepat.", long: "Tepat waktu tidak menyebabkan pekerjaan tertunda, tepat dalam berbicara pasti dapat diandalkan.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Ketat": { short: "Ketat mengikuti Tuhan, ketat dalam kehidupan.", long: "Ketat mengikuti Tuhan, tidak pernah kendor, jadwal kehidupan sehari-hari perlu ketat.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Rajin": { short: "Rajin berdoa, rajin melayani.", long: "Rajin berdoa tidak malas, menyala-nyala dalam roh, rajin melayani.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Lapang": { short: "Hati harus lapang, kapasitas harus besar.", long: "Kristus tinggal dalam hati yang lapang, bermurah hati kepada orang, memiliki kapasitas besar.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Cermat": { short: "Perasaan peka, penghidupan cermat.", long: "Balik dalam Roh, perasaan peka; perilaku lembut, penghidupan cermat.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Stabil": { short: "Sifat stabil, tekad stabil.", long: "Sifat stabil, tidak panik; tekad stabil, kokoh tidak berubah.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Sabar": { short: "Sabar menanti, sabar berbuah.", long: "Panjang sabar menanti, tidak gelisah; sabar berbuah, tidak kendur.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Dalam": { short: "Kebenaran dalam, pengalaman dalam.", long: "Menggali kedalaman kebenaran, tak hanya di permukaan; mencari kedalaman pengalaman, tak dangkal.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Murni": { short: "Motivasi murni, tutur kata murni.", long: "Motivasi murni tidak campur aduk; tutur kata murni tidak berbelok-belok.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Adil/Seimbang": { short: "Dengan seimbang menghadapi orang, dengan seimbang menangani perkara.", long: "Dengan seimbang menghadapi orang, tidak pilih kasih; dengan seimbang menangani perkara, tidak berat sebelah.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Tenang": { short: "Roh Tenang, hati Tenteram.", long: "Bersandar dan percaya kepada Allah dalam roh yang tenang, Beroleh perhentian dalam hati yang tenteram.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Tulus": { short: "Bersasaran satu, tidak menyimpang.", long: "Belajar tulus (khusus, sepenuh hati), bersasaran satu, tidak menyimpang; tidak berserakan tanpa tujuan.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Umum": { short: "Terhadap orang perlu umum, menangani perkara perlu umum.", long: "Saling memperhatikan, berperilaku umum untuk kepentingan bersama kepada orang; sehati sepikir menangani perkara secara umum.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Terbuka": { short: "Terbuka kepada Tuhan, terbuka kepada orang lain.", long: "Terbuka kepada Tuhan untuk mendapatkan suplai; terbuka kepada orang lain untuk mendapatkan bantuan.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Akrab": { short: "Akrab mendekati Allah, akrab dengan manusia.", long: "Bersekutu dengan Allah, mendekati Allah; bersimpati, memperhatikan, dan sayang kepada manusia.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Gairah": { short: "Roh bergairah, mengasihi orang dengan gairah.", long: "Bergairah dalam roh, melayani Tuhan; memberitakan Injil, mengasihi orang dengan gairah.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Luwes": { short: "Mendekati orang, merendahkan diri untuk mendekati orang.", long: "Menyeru dan berdoa mendekati Tuhan; rendah hati, bersimpati kepada orang, mendekati orang.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Teguh": { short: "Roh teguh, tekad teguh.", long: "Teguh dalam roh, tidak kecil hati; tekad teguh, tidak goyah.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Lembut": { short: "Hati lembut, perkataan lembut.", long: "Motivasi hati lembut, tidak mempertahankan diri; perkataan lembut, membangun orang.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Taat": { short: "Taat kepada Allah, menurut kepada orang.", long: "Percaya dan taat, pasti disenangi oleh Allah; menuruti otoritas, pasti tidak melanggarnya.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Derita": { short: "Tidak takut menderita, mau menerima penderitaan.", long: "Menderita bersama Tuhan, belajar taat; dengan tekad menderita sebagai senjata.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Rendah": { short: "Hati merendah, menempatkan diri pada kedudukan yang rendah.", long: "Merendahkan hati dan diri, sering melayani Tuhan; menempatkan diri pada kedudukan yang rendah, tidak sombong.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Miskin": { short: "Miskin dalam roh, hati senang miskin.", long: "Miskin dalam roh, menikmati Allah; hati senang miskin, mau memberi kepada orang.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Tekun": { short: "Tekun, mempunyai ketetapan hati, bisa bertahan lama.", long: "Tekun terhadap Tuhan, tidak putus asa; tekun maju mengarah kepada sasaran.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Sulit": { short: "Tidak menghindari kesulitan, mau menerima kesulitan.", long: "Menikmati anugerah Tuhan, tidak menghindari kesulitan; dengan sukarela mempersembahkan diri menerima kesulitan.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Tekan": { short: "Mau menerima tekanan, bisa menahan tekanan.", long: "Untuk kemuliaan mau menerima tekanan; bejana yang mulia bisa tahan tekanan.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Jernih": { short: "Pikiran jernih, mengerti Alkitab.", long: "Pikiran jernih hingga mendapatkan pembaruan; mengerti Alkitab, mendapatkan hikmat.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Murah Hati": { short: "Hati besar, baik hati terhadap orang.", long: "Mendapatkan kebaikan dan kasih yang besar dari Allah, sehingga hati menjadi besar; mau menurut perkenan Allah, berlaku baik kepada orang.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" },
+    "Bobot": { short: "Perkataan berbobot, orangnya juga berbobot.", long: "Perkataan berbobot dihargai orang; bejana yang mulia, berbobot, cocok dipakai oleh Tuhan.", arti: "", contoh: "", ayat: "", videoShort: "", videoLong: "" }
   };
 
   const GROUPS = [
@@ -106,7 +106,17 @@
     { key: "long", label: "Slogan Panjang", displayLabel: "SLOGAN PANJANG", always: true },
     { key: "arti", label: "Apa Artinya", displayLabel: "APA ARTINYA" },
     { key: "contoh", label: "Contoh Karakter", displayLabel: "CONTOH KARAKTER" },
-    { key: "ayat", label: "Ayat Firman Tuhan", displayLabel: "AYAT FIRMAN TUHAN" }
+    { key: "ayat", label: "Ayat Firman Tuhan", displayLabel: "AYAT FIRMAN TUHAN" },
+    // BARU (23 Sep 2026, permintaan operator) -- 2 kolom VIDEO (bukan
+    // teks): isinya link Google Drive video animasi karakter itu.
+    // Sama seperti arti/contoh/ayat, ini "rencana ke depan" -- checkbox-
+    // nya otomatis muncul sendiri (lihat fieldsFor() di bawah) begitu
+    // link videoShort/videoLong diisi untuk karakter itu di CHARS.
+    // `isVideo:true` dibaca oleh present.html, js/presentation-studio.js,
+    // dan js/media-library.js supaya kolom ini ditayangkan sebagai
+    // PEMUTAR VIDEO (iframe Drive /preview), BUKAN blok teks biasa.
+    { key: "videoShort", label: "Video Slogan Pendek", displayLabel: "VIDEO SLOGAN PENDEK", isVideo: true },
+    { key: "videoLong", label: "Video Slogan Panjang", displayLabel: "VIDEO SLOGAN PANJANG", isVideo: true }
   ];
 
   // Daftar kolom yang BOLEH dicentang untuk 1 karakter tertentu:
@@ -119,6 +129,27 @@
     return FIELDS.filter((f) => f.always || (data[f.key] && String(data[f.key]).trim() !== ""));
   }
 
+  // Helper KECIL khusus video karakter (Google Drive) -- SENGAJA taruh
+  // di sini (bukan duplikat driveFileIdFromUrl/driveEmbedPreviewUrl dari
+  // js/media.js), karena file INI satu-satunya yang dimuat di KETIGA
+  // tempat yang perlu menampilkan video karakter: present.html (Layar 2,
+  // js/media.js TIDAK dimuat di sana), js/presentation-studio.js
+  // (pratinjau mini Studio), dan js/media-library.js (mode 1 Layar).
+  // Terima link Drive bentuk apa saja (…/file/d/ID/view, …/open?id=ID,
+  // …/uc?id=ID&export=download) -> kembalikan URL "/preview" yang bisa
+  // ditanam di <iframe> dan benar-benar memutar videonya.
+  function driveEmbedUrlForVideo(url) {
+    if (!url) return null;
+    const s = String(url).trim();
+    if (!s) return null;
+    let id = null;
+    let m = s.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+    if (m) id = m[1];
+    if (!id) { m = s.match(/[?&]id=([a-zA-Z0-9_-]{10,})/); if (m) id = m[1]; }
+    return id ? "https://drive.google.com/file/d/" + id + "/preview" : null;
+  }
+
   window.SLOGAN_KARAKTER_DATA = { GROUPS, CHARS, FIELDS, ICONS };
   window.SLOGAN_KARAKTER_FIELDS_FOR = fieldsFor;
+  window.SLOGAN_KARAKTER_DRIVE_EMBED = driveEmbedUrlForVideo;
 })();
