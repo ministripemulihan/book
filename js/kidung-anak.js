@@ -23,8 +23,16 @@
 //  clipboard, tema terang/gelap KHUSUS AREA INI, lebar HP/Komputer,
 //  tombol kembali ke menu Kidung Umum.
 //  BELUM (menyusul, lihat README): lightbox gambar/video/MP3 penuh
-//  (pinch-zoom, wake lock, mode putar berantai), Layar Penuh per-tab,
-//  Pratinjau & Cetak PDF, cache offline (IndexedDB) untuk data ini.
+//  (pinch-zoom, wake lock, mode putar berantai), Pratinjau & Cetak PDF.
+//
+//  BARU (21 Sep 2026) -- 💾 Cache offline (IndexedDB): data Kidung Anak
+//  sekarang disimpan lokal di store TERPISAH "kidungAnak" (js/db.js,
+//  TIDAK menyentuh store "kidung" milik Kidung Umum sama sekali). Panel
+//  ini langsung menampilkan data dari cache itu (instan, jalan offline),
+//  lalu diam-diam menyegarkan dari Google Sheet di latar belakang -- lihat
+//  loadData() di bawah. Juga ditambah tombol "👶 Sinkronkan ulang Kidung
+//  Anak" di menu ⋮ utama (lihat wireMenuResyncButton() di bawah &
+//  index.html), supaya bisa disegarkan tanpa perlu membuka panel ini dulu.
 // ============================================================
 
 window.KidungAnak = (function () {
@@ -468,9 +476,44 @@ window.KidungAnak = (function () {
     return id ? `https://drive.google.com/file/d/${id}/preview` : null;
   }
 
-  // ---------- MUAT DATA ----------
-  async function loadData(statusEl) {
-    if (statusEl) { statusEl.textContent = "Memuat data dari Google Sheet..."; statusEl.className = "ka-status-line"; }
+  // ---------- MUAT DATA (BARU 21 Sep 2026: cache IndexedDB dulu, lalu segarkan di latar belakang) ----------
+  const HAS_CACHE = typeof LocalDB !== "undefined" && typeof LocalDB.getAllKidungAnakRows === "function";
+
+  async function loadFromCache_() {
+    if (!HAS_CACHE) return false;
+    try {
+      const rows = await LocalDB.getAllKidungAnakRows();
+      if (rows && rows.length) { SONGS = rows; dataLoaded = true; return true; }
+    } catch (err) {
+      console.warn("[KidungAnak] gagal membaca cache lokal:", err);
+    }
+    return false;
+  }
+
+  async function saveToCache_(rows) {
+    if (!HAS_CACHE) return;
+    try {
+      await LocalDB.clearKidungAnak();
+      await LocalDB.bulkPutKidungAnak(rows);
+    } catch (err) {
+      console.warn("[KidungAnak] gagal menyimpan ke cache lokal:", err);
+    }
+  }
+
+  // `opts.background` = true: dipanggil setelah cache SUDAH ditampilkan --
+  // kalau fetch gagal (offline dsb), diam-diam biarkan data cache yang
+  // sudah tampil apa adanya (jangan menimpa status dengan pesan gagal, itu
+  // akan membingungkan padahal lagu-lagunya toh sedang terlihat).
+  async function loadData(statusEl, opts) {
+    opts = opts || {};
+    const fromCacheFirst = !opts.background && !dataLoaded && (await loadFromCache_());
+    if (fromCacheFirst && statusEl) {
+      statusEl.textContent = `${SONGS.length} lagu (data tersimpan di perangkat ini). Menyegarkan dari Google Sheet…`;
+      statusEl.className = "ka-status-line";
+    } else if (statusEl && !opts.background) {
+      statusEl.textContent = "Memuat data dari Google Sheet...";
+      statusEl.className = "ka-status-line";
+    }
     try {
       const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
       if (!res.ok) throw new Error("HTTP " + res.status);
@@ -479,12 +522,69 @@ window.KidungAnak = (function () {
       if (!data.length) throw new Error("Sheet kosong atau kolom tidak sesuai");
       SONGS = data;
       dataLoaded = true;
+      await saveToCache_(data);
+      if (HAS_CACHE) { try { await LocalDB.setMeta("kidungAnakSyncedAt", new Date().toISOString()); } catch (e) { /* diabaikan */ } }
       if (statusEl) { statusEl.textContent = `Berhasil memuat ${data.length} lagu dari Google Sheet.`; statusEl.className = "ka-status-line ka-ok"; }
+      return { ok: true, count: data.length };
     } catch (err) {
       console.error("[KidungAnak] gagal memuat sheet:", err);
-      if (statusEl) { statusEl.textContent = 'Gagal memuat data. Periksa koneksi, lalu tekan "↻ Muat ulang data".'; statusEl.className = "ka-status-line ka-err"; }
+      if (statusEl) {
+        if (fromCacheFirst) {
+          // Tetap tampilkan data cache, cuma beri tahu belum sempat disegarkan.
+          statusEl.textContent = `${SONGS.length} lagu (data tersimpan di perangkat ini) — belum bisa disegarkan (periksa koneksi).`;
+          statusEl.className = "ka-status-line";
+        } else {
+          statusEl.textContent = 'Gagal memuat data. Periksa koneksi, lalu tekan "↻ Muat ulang data".';
+          statusEl.className = "ka-status-line ka-err";
+        }
+      }
+      return { ok: false, error: err };
     }
   }
+
+  // ---------- 👶 Tombol "Sinkronkan ulang Kidung Anak" di menu ⋮ utama ----------
+  // BARU (21 Sep 2026, permintaan operator) -- supaya bisa menyegarkan data
+  // tanpa perlu membuka panel Kidung Anak dulu (sebelumnya cuma ada tombol
+  // "↻ Muat ulang" DI DALAM panelnya, lihat renderHome() di bawah). Modul
+  // ini SELF-WIRED (mencari tombolnya sendiri saat berkas ini dimuat) --
+  // js/app.js TIDAK disentuh sama sekali untuk ini, konsisten dengan
+  // filosofi aditif modul ini sejak awal (lihat catatan di atas berkas ini).
+  async function resyncFromMenu_(btn) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "⏳ Menyinkronkan Kidung Anak…";
+    const res = await loadData(null, { background: true });
+    btn.disabled = false;
+    btn.textContent = original;
+    const menu = document.getElementById("moreMenu");
+    if (menu) menu.hidden = true;
+    if (res.ok) {
+      alert("Kidung Anak berhasil disinkronkan ulang (" + res.count + " lagu).");
+      // Kalau panel Kidung Anak sedang terbuka, gambar ulang daftarnya
+      // supaya lagu yang baru ditambah/diubah langsung terlihat tanpa
+      // perlu menutup-buka panel lagi.
+      if (rootPanelEl && rootPanelEl.classList.contains("ka-root") && typeof onBackCallback !== "undefined") {
+        const listEl = rootPanelEl.querySelector(".ka-song-list");
+        const searchInput = rootPanelEl.querySelector("#kaSearchInput");
+        const chipsWrap = rootPanelEl.querySelector(".ka-chips");
+        if (listEl && searchInput && chipsWrap) {
+          buildCategoryChips(chipsWrap, () => renderList(listEl, searchInput, chipsWrap));
+          renderList(listEl, searchInput, chipsWrap);
+        }
+      }
+    } else {
+      alert("Gagal menyinkronkan Kidung Anak: " + (res.error && res.error.message ? res.error.message : res.error));
+    }
+  }
+
+  function wireMenuResyncButton_() {
+    const btn = document.getElementById("kidungAnakResyncBtn");
+    if (!btn || btn.dataset.kaWired) return;
+    btn.dataset.kaWired = "1";
+    btn.addEventListener("click", () => resyncFromMenu_(btn));
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireMenuResyncButton_);
+  else wireMenuResyncButton_();
 
   // ---------- ZOOM (ukuran teks per panel per lagu) ----------
   const ZOOM_MIN = 0.5, ZOOM_MAX = 3.0;
@@ -1136,5 +1236,10 @@ window.KidungAnak = (function () {
   // lihat js/presentation-studio.js, parseAiPresentation(). Tidak
   // dipakai di alur render kartu lagu biasa (renderHome), jadi aman
   // ditambahkan tanpa menyentuh perilaku yang sudah ada.
-  return { renderHome, findSongByNo, getBaitsForPresentation };
+  return {
+    renderHome, findSongByNo, getBaitsForPresentation,
+    // Dipakai tests/kidung-anak-cache.jsdom.test.js -- tidak dipakai jalur
+    // pemakaian normal aplikasi.
+    _test: { loadData, reset() { dataLoaded = false; SONGS = []; }, getSongs: () => SONGS },
+  };
 })();

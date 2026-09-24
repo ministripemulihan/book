@@ -1738,7 +1738,19 @@ const MediaLibrary = (() => {
       state.skFields.forEach((key, i) => {
         if (i > 0) html += '<div style="height:1px; background:rgba(241,238,228,.2); margin:16px auto; max-width:200px;"></div>';
         html += '<div style="font-family:\'Inter\',sans-serif; font-weight:600; letter-spacing:.1em; font-size:12px; color:#AEB4C4; margin-bottom:6px;">' + escapeHtml_(labelFor(key)) + '</div>';
-        html += '<div style="font-weight:700; font-size:19px; line-height:1.35;">' + escapeHtml_(info[key] || "") + '</div>';
+        // BARU (23 Sep 2026) -- kolom video (videoShort/videoLong):
+        // tampilkan sebagai pemutar video (iframe Drive /preview) di
+        // preview hidup ini juga (perangkat ini, mode 1 Layar), bukan
+        // teks biasa.
+        const fieldDef = data.FIELDS.find((f) => f.key === key);
+        if (fieldDef && fieldDef.isVideo) {
+          const embedUrl = window.SLOGAN_KARAKTER_DRIVE_EMBED(info[key]);
+          html += embedUrl
+            ? '<div style="width:100%; aspect-ratio:16/9; border-radius:10px; overflow:hidden; background:#0c1526;"><iframe src="' + escapeHtml_(embedUrl) + '" allow="autoplay; encrypted-media" allowfullscreen style="width:100%; height:100%; border:0;"></iframe></div>'
+            : '<div style="opacity:.6; font-size:14px;">(Video belum diisi)</div>';
+        } else {
+          html += '<div style="font-weight:700; font-size:19px; line-height:1.35;">' + escapeHtml_(info[key] || "") + '</div>';
+        }
       });
       box.innerHTML = html;
     }
@@ -1777,7 +1789,17 @@ const MediaLibrary = (() => {
     fields.forEach((key, i) => {
       if (i > 0) html += '<div style="height:1px; background:rgba(241,238,228,.2); margin:24px auto; max-width:300px;"></div>';
       html += '<div style="font-family:\'Inter\',sans-serif; font-weight:600; letter-spacing:.1em; font-size:13px; color:#AEB4C4; margin-bottom:8px;">' + escapeHtml_(labelFor(key)) + '</div>';
-      html += '<div style="font-weight:700; font-size:' + bigSize + '; line-height:1.3;">' + escapeHtml_(info[key] || "") + '</div>';
+      // BARU (23 Sep 2026) -- kolom video (videoShort/videoLong) di
+      // layar penuh (perangkat ini): pemutar video, bukan teks.
+      const fieldDef = data.FIELDS.find((f) => f.key === key);
+      if (fieldDef && fieldDef.isVideo) {
+        const embedUrl = window.SLOGAN_KARAKTER_DRIVE_EMBED(info[key]);
+        html += embedUrl
+          ? '<div style="width:min(100%,700px); margin:0 auto; aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:#0c1526;"><iframe src="' + escapeHtml_(embedUrl) + '" allow="autoplay; encrypted-media" allowfullscreen style="width:100%; height:100%; border:0;"></iframe></div>'
+          : '<div style="opacity:.6; font-size:15px;">(Video belum diisi)</div>';
+      } else {
+        html += '<div style="font-weight:700; font-size:' + bigSize + '; line-height:1.3;">' + escapeHtml_(info[key] || "") + '</div>';
+      }
     });
     html += '<div style="margin-top:34px; font-size:13px; opacity:.6;">Ketuk layar untuk menutup</div></div>';
     ov.innerHTML = html;

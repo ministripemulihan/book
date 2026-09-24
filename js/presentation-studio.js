@@ -211,7 +211,14 @@ const PresentationStudio = (() => {
 
   let pointerActive = false;
   let penActive = false;
-  let penStroke = [];
+  // BARU (21 Sep 2026, permintaan operator) -- 🧹 Penghapus (mencoret utk
+  // menghapus): mode ke-6 yang saling eksklusif dengan Penunjuk/Pen/Kaca
+  // Pembesar/Efek Fokus/Perbesar Kotak. `penStrokeId` = id unik tiap
+  // goresan (dikirim di pesan "begin" supaya present.html tahu goresan
+  // mana yang sedang berjalan -- lihat js/ink-engine.js & wirePointerPen()
+  // di bawah untuk protokol lengkap "begin"/"append"/"end"/"undo"/"redo").
+  let eraserActive = false;
+  let penStrokeId = 0;
   // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar, lihat wirePointerPen() di bawah.
   let magnifyActive = false;
   // BARU (12 Sep 2026) -- 🎯 Efek Fokus (klik = lingkaran mengembang di
@@ -643,7 +650,19 @@ const PresentationStudio = (() => {
       const fields = Array.isArray(payload.fields) ? payload.fields : [];
       if (!info) { box.innerHTML = `<div class="present-preview-idle">🔤 Slogan Karakter — tayang di Layar 2</div>`; return; }
       const refHtml = `<div class="present-preview-ref">KARAKTER ${escapeHtml(String(payload.karakter).toUpperCase())}</div>`;
-      const blocks = fields.map((k) => `<div class="present-preview-text">${escapeHtml(info[k] || "")}</div>`).join("");
+      // BARU (23 Sep 2026) -- kolom video (videoShort/videoLong): kotak
+      // pratinjau mini ini terlalu kecil untuk iframe video sungguhan
+      // (dan sama seperti pratinjau YouTube di atas, biar tidak ada 2
+      // pemutar aktif sekaligus) -- cukup tampilkan label kecil, video
+      // aslinya tayang penuh di Layar 2 (lihat present.html).
+      const blocks = fields.map((k) => {
+        const fieldDef = D && D.FIELDS ? D.FIELDS.find((f) => f.key === k) : null;
+        if (fieldDef && fieldDef.isVideo) {
+          const has = info[k] && String(info[k]).trim();
+          return `<div class="present-preview-text">🎬 ${escapeHtml(fieldDef.label)}${has ? "" : " (belum diisi)"}</div>`;
+        }
+        return `<div class="present-preview-text">${escapeHtml(info[k] || "")}</div>`;
+      }).join("");
       box.innerHTML = refHtml + blocks;
       return;
     }
@@ -10239,6 +10258,13 @@ const PresentationStudio = (() => {
     const dot = el("psPointerDot");
     const canvas = el("psPenCanvas");
     const ctx = canvas ? canvas.getContext("2d") : null;
+    // BARU (21 Sep 2026) -- 🖊️ mesin riwayat coretan bersama (js/ink-engine.js),
+    // supaya pratinjau kecil di Studio ini SELALU sama persis dengan yang
+    // ditayangkan di Layar 2 (present.html memakai instans ink engine-nya
+    // sendiri, disinkronkan lewat pesan "pen" -- lihat catatan protokol di
+    // bawah). Kalau berkas itu belum termuat (mis. cache lama), Pen tetap
+    // jalan seperti sebelumnya tanpa Undo/Redo/Penghapus.
+    const studioInk = (typeof InkEngine !== "undefined") ? InkEngine.create() : null;
     let color = "#ff3b30";
     // BARU (27 Agu 2026) -- ukuran Pen lewat progress bar (#psPenSizeSlider),
     // default 17px (disamakan kira-kira dengan ukuran dasar huruf yang
@@ -10256,6 +10282,21 @@ const PresentationStudio = (() => {
       });
     }
     wireManualValueInput("psPenSizeValue", "psPenSizeSlider");
+    // BARU (21 Sep 2026, permintaan operator "ada pen yang tebal, tipis,
+    // super tebal") -- 3 tombol preset ketebalan; cukup MENGISI slider yang
+    // sudah ada (data-ps-pen-size-preset="4|17|40") lalu memicu ulang event
+    // "input"-nya supaya semua efek yang sudah ada (mengirim penSize baru,
+    // dst) tetap berjalan lewat SATU sumber logika (slider), sama pola
+    // dengan wireManualValueInput() di atas. Berlaku untuk Pen MAUPUN
+    // Penghapus -- keduanya memakai slider & preset yang sama (label di
+    // index.html berganti otomatis lewat updatePenSizeLabel_() di bawah).
+    document.querySelectorAll("[data-ps-pen-size-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (!sizeSlider) return;
+        sizeSlider.value = btn.dataset.psPenSizePreset;
+        sizeSlider.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    });
 
     // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar: zoom 10%-10000% (default
     // 100%), dikirim bersama posisi kursor tiap mousemove (lihat blok
@@ -10293,6 +10334,13 @@ const PresentationStudio = (() => {
       // baru terpicu kalau kotak kehilangan fokus/blur) -- blur() di
       // sini otomatis memicu "change" di atas.
       magnifyZoomValue.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); magnifyZoomValue.blur(); } });
+    }
+    // BARU (21 Sep 2026) -- label & tombol preset ketebalan berganti kata
+    // "Pen"/"Penghapus" mengikuti mode yang sedang aktif, supaya operator
+    // tidak bingung ukuran yang sedang diatur untuk yang mana.
+    function updatePenSizeLabel_() {
+      const label = el("psPenSizeFieldLabel");
+      if (label) label.textContent = eraserActive ? "Ukuran Penghapus" : "Ukuran Pen/Penunjuk";
     }
     const magnifyBtns = () => Array.from(document.querySelectorAll("[data-ps-magnify-toggle]"));
     // BARU (12 Sep 2026, permintaan operator) -- 🔲 Perbesar Kotak: ukuran
@@ -10343,7 +10391,21 @@ const PresentationStudio = (() => {
     // tombol mana yang diklik operator.
     const pointerBtns = () => Array.from(document.querySelectorAll("[data-ps-pointer-toggle]"));
     const penBtns = () => Array.from(document.querySelectorAll("[data-ps-pen-toggle]"));
+    // BARU (21 Sep 2026) -- 🧹 Penghapus, lihat catatan di atas deklarasi `eraserActive`.
+    const eraserBtns = () => Array.from(document.querySelectorAll("[data-ps-eraser-toggle]"));
     const penClearBtns = () => Array.from(document.querySelectorAll("[data-ps-pen-clear]"));
+    const undoBtns = () => Array.from(document.querySelectorAll("[data-ps-pen-undo]"));
+    const redoBtns = () => Array.from(document.querySelectorAll("[data-ps-pen-redo]"));
+    // BARU (21 Sep 2026) -- tombol Undo/Redo dinonaktifkan (bukan cuma
+    // dibiarkan tidak berbuat apa-apa) begitu riwayatnya kosong, supaya
+    // operator langsung tahu tidak ada apa pun lagi utk dibatalkan/diulang
+    // -- sama seperti Microsoft Word menyuramkan ikon Undo/Redo.
+    function refreshUndoRedoBtns_() {
+      const canUndo = !!(studioInk && studioInk.canUndo());
+      const canRedo = !!(studioInk && studioInk.canRedo());
+      undoBtns().forEach((b) => { b.disabled = !canUndo; b.classList.toggle("disabled", !canUndo); });
+      redoBtns().forEach((b) => { b.disabled = !canRedo; b.classList.toggle("disabled", !canRedo); });
+    }
 
     function syncCanvasSize() {
       if (!wrap || !canvas) return;
@@ -10354,7 +10416,8 @@ const PresentationStudio = (() => {
     }
 
     function updateMode() {
-      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || magnifyActive || focusClickActive || boxZoomActive);
+      if (wrap) wrap.classList.toggle("ps-pointer-mode", pointerActive || penActive || eraserActive || magnifyActive || focusClickActive || boxZoomActive);
+      updatePenSizeLabel_();
     }
 
     document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((chip) => {
@@ -10367,10 +10430,12 @@ const PresentationStudio = (() => {
     pointerBtns().forEach((btn) => btn.addEventListener("click", () => {
       pointerActive = !pointerActive;
       penActive = false;
+      eraserActive = false;
       magnifyActive = false;
       focusClickActive = false;
       pointerBtns().forEach((b) => b.classList.toggle("active", pointerActive));
       penBtns().forEach((b) => b.classList.remove("active"));
+      eraserBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
       deactivateBoxZoom_();
@@ -10381,10 +10446,12 @@ const PresentationStudio = (() => {
     penBtns().forEach((btn) => btn.addEventListener("click", () => {
       penActive = !penActive;
       pointerActive = false;
+      eraserActive = false;
       magnifyActive = false;
       focusClickActive = false;
       penBtns().forEach((b) => b.classList.toggle("active", penActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
+      eraserBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
       deactivateBoxZoom_();
@@ -10392,14 +10459,38 @@ const PresentationStudio = (() => {
       rawPost({ type: "magnify", on: false });
       updateMode();
     }));
+    // BARU (21 Sep 2026) -- 🧹 Penghapus: mode ke-6, SALING EKSKLUSIF dengan
+    // Penunjuk/Pen/Kaca Pembesar/Efek Fokus/Perbesar Kotak (pola sama persis
+    // dengan 5 mode lain di atas/bawah). Menggambar goresannya memakai
+    // handler mousemove yang SAMA dengan Pen (lihat blok mousemove di bawah)
+    // -- yang membedakan cuma `mode: eraserActive ? "erase" : "draw"` saat
+    // memanggil studioInk.begin()/rawPost().
+    eraserBtns().forEach((btn) => btn.addEventListener("click", () => {
+      eraserActive = !eraserActive;
+      pointerActive = false;
+      penActive = false;
+      magnifyActive = false;
+      focusClickActive = false;
+      eraserBtns().forEach((b) => b.classList.toggle("active", eraserActive));
+      pointerBtns().forEach((b) => b.classList.remove("active"));
+      penBtns().forEach((b) => b.classList.remove("active"));
+      magnifyBtns().forEach((b) => b.classList.remove("active"));
+      focusClickBtns().forEach((b) => b.classList.remove("active"));
+      deactivateBoxZoom_();
+      if (!eraserActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
+      rawPost({ type: "magnify", on: false });
+      updateMode();
+    }));
     magnifyBtns().forEach((btn) => btn.addEventListener("click", () => {
       magnifyActive = !magnifyActive;
       pointerActive = false;
       penActive = false;
+      eraserActive = false;
       focusClickActive = false;
       magnifyBtns().forEach((b) => b.classList.toggle("active", magnifyActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
       penBtns().forEach((b) => b.classList.remove("active"));
+      eraserBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
       deactivateBoxZoom_();
       if (!magnifyActive) rawPost({ type: "magnify", on: false });
@@ -10419,10 +10510,12 @@ const PresentationStudio = (() => {
       focusClickActive = !focusClickActive;
       pointerActive = false;
       penActive = false;
+      eraserActive = false;
       magnifyActive = false;
       focusClickBtns().forEach((b) => b.classList.toggle("active", focusClickActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
       penBtns().forEach((b) => b.classList.remove("active"));
+      eraserBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
       deactivateBoxZoom_();
       rawPost({ type: "pointer", on: false });
@@ -10445,11 +10538,13 @@ const PresentationStudio = (() => {
       boxZoomLocked = false;
       pointerActive = false;
       penActive = false;
+      eraserActive = false;
       magnifyActive = false;
       focusClickActive = false;
       boxZoomBtns().forEach((b) => b.classList.toggle("active", boxZoomActive));
       pointerBtns().forEach((b) => b.classList.remove("active"));
       penBtns().forEach((b) => b.classList.remove("active"));
+      eraserBtns().forEach((b) => b.classList.remove("active"));
       magnifyBtns().forEach((b) => b.classList.remove("active"));
       focusClickBtns().forEach((b) => b.classList.remove("active"));
       rawPost({ type: "pointer", on: false });
@@ -10461,8 +10556,46 @@ const PresentationStudio = (() => {
     }));
     penClearBtns().forEach((btn) => btn.addEventListener("click", () => {
       rawPost({ type: "pen", clear: true });
+      if (studioInk) studioInk.clear();
       if (ctx && canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; }
+      refreshUndoRedoBtns_();
     }));
+    // BARU (21 Sep 2026, permintaan operator "hapus yang pakai sistem
+    // model back atau control z di microsoft word") -- Undo/Redo: cukup
+    // membatalkan/mengembalikan SATU goresan terakhir (draw ATAU erase),
+    // bukan menghapus semuanya seperti 🧹 di atas. `studioInk` (pratinjau
+    // Studio) & instans ink engine present.html SAMA-SAMA menyimpan
+    // riwayatnya sendiri, disinkronkan lewat pesan {type:"pen",
+    // action:"undo"|"redo"} -- BUKAN dengan mengirim ulang seluruh
+    // coretan, supaya ringan.
+    function doPenUndo_() {
+      if (!studioInk || !studioInk.undo()) return;
+      studioInk.render(canvas, ctx);
+      rawPost({ type: "pen", action: "undo" });
+      refreshUndoRedoBtns_();
+    }
+    function doPenRedo_() {
+      if (!studioInk || !studioInk.redo()) return;
+      studioInk.render(canvas, ctx);
+      rawPost({ type: "pen", action: "redo" });
+      refreshUndoRedoBtns_();
+    }
+    undoBtns().forEach((btn) => btn.addEventListener("click", doPenUndo_));
+    redoBtns().forEach((btn) => btn.addEventListener("click", doPenRedo_));
+    // Ctrl+Z / Ctrl+Y (atau Ctrl+Shift+Z) -- HANYA aktif selagi Pen ATAU
+    // Penghapus sedang menyala, dan HANYA kalau operator tidak sedang
+    // mengetik di kotak teks lain (supaya tidak "mencuri" Ctrl+Z dari
+    // pengumuman/pesan/dst yang mungkin sedang diketik di panel lain).
+    document.addEventListener("keydown", (e) => {
+      if (!penActive && !eraserActive) return;
+      const tag = (e.target && e.target.tagName) || "";
+      if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = String(e.key || "").toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); doPenUndo_(); }
+      else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); doPenRedo_(); }
+    });
+    refreshUndoRedoBtns_();
     if (wrap) {
       wrap.addEventListener("mousemove", (e) => {
         const rect = wrap.getBoundingClientRect();
@@ -10480,22 +10613,24 @@ const PresentationStudio = (() => {
             dot.style.top = (y * 100) + "%";
           }
         }
-        if (penActive && e.buttons === 1) {
-          penStroke.push({ x, y });
-          const seg = penStroke.slice(-2);
-          rawPost({ type: "pen", stroke: seg, color, size: penSize });
+        // BARU (21 Sep 2026) -- Pen (draw) & 🧹 Penghapus (erase) BERBAGI
+        // handler ini; bedanya cuma `mode`. Protokol baru: "begin" dikirim
+        // di mousedown (lihat blok mousedown di bawah), lalu tiap gerakan
+        // di sini cuma mengirim 1 titik BARU lewat action:"append" (bukan
+        // seluruh segmen 2 titik seperti dulu -- present.html menyimpan
+        // sendiri titik sebelumnya lewat ink engine-nya, lihat js/ink-engine.js).
+        if ((penActive || eraserActive) && e.buttons === 1) {
+          if (studioInk && !studioInk.getCurrent()) {
+            studioInk.begin(String(penStrokeId), eraserActive ? "erase" : "draw", color, penSize);
+            rawPost({ type: "pen", action: "begin", id: String(penStrokeId), mode: eraserActive ? "erase" : "draw", color, size: penSize });
+          }
+          if (studioInk) studioInk.append([{ x, y }]);
+          rawPost({ type: "pen", action: "append", pts: [{ x, y }] });
           if (ctx && canvas) {
             syncCanvasSize();
             canvas.style.display = "block";
-            if (seg.length > 1) {
-              ctx.strokeStyle = color; ctx.lineWidth = penSize; ctx.lineCap = "round"; ctx.lineJoin = "round";
-              ctx.beginPath();
-              seg.forEach((pt, i) => {
-                const px = pt.x * canvas.width, py = pt.y * canvas.height;
-                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-              });
-              ctx.stroke();
-            }
+            const cur = studioInk && studioInk.getCurrent();
+            if (cur && cur.pts.length > 1) studioInk.drawSegmentLive(canvas, ctx, cur.pts.slice(-2));
           }
         }
         if (magnifyActive) {
@@ -10513,7 +10648,15 @@ const PresentationStudio = (() => {
           rawPost({ type: "boxzoom_hover", on: true, x, y, sizePercent: boxZoomSizePercent });
         }
       });
-      wrap.addEventListener("mousedown", () => { penStroke = []; });
+      wrap.addEventListener("mousedown", () => {
+        // BARU (21 Sep 2026) -- goresan BARU: id unik supaya present.html
+        // tahu ini goresan yang berbeda (dipakai kalau nanti perlu dibedakan;
+        // hanya ada 1 goresan berjalan dalam satu waktu di sini). Belum
+        // memanggil begin() di sini -- dipanggil di mousemove PERTAMA saat
+        // tombol mouse ditekan (di atas), supaya klik tanpa gerak sama
+        // sekali (tidak pernah masuk mousemove) tidak membuat goresan kosong.
+        penStrokeId += 1;
+      });
       // BARU (12 Sep 2026) -- 🎯 Efek Fokus: 1 klik di kotak pratinjau
       // (bukan gerak kursor, lihat blok mousemove di atas untuk 3 mode
       // lain) = 1 ring dikirim ke Layar 2 di titik itu persis. Dipasang
@@ -10555,7 +10698,21 @@ const PresentationStudio = (() => {
           return;
         }
       });
+      // BARU (21 Sep 2026) -- mengakhiri goresan Pen/Penghapus yang sedang
+      // berjalan (protokol "end", lihat catatan di blok mousemove di atas).
+      // Dipasang di window (bukan wrap) supaya tetap tertangkap walau mouse
+      // dilepas SETELAH keluar dari kotak pratinjau. `end()` (js/ink-engine.js)
+      // otomatis mengabaikan klik tanpa gerak (<2 titik) -- tidak masuk
+      // riwayat Undo, sesuai catatan di berkas itu.
+      function endPenStroke_() {
+        if (!studioInk || !studioInk.getCurrent()) return;
+        studioInk.end();
+        rawPost({ type: "pen", action: "end" });
+        refreshUndoRedoBtns_();
+      }
+      window.addEventListener("mouseup", endPenStroke_);
       wrap.addEventListener("mouseleave", () => {
+        endPenStroke_();
         if (pointerActive) { rawPost({ type: "pointer", on: false }); if (dot) dot.style.display = "none"; }
         if (magnifyActive) rawPost({ type: "magnify", on: false });
         // Kotak viewfinder (BELUM terkunci) ikut sembunyi saat kursor
@@ -10565,7 +10722,10 @@ const PresentationStudio = (() => {
         // (mis. mau menulis pengumuman sambil bagian itu tetap membesar).
         if (boxZoomActive && !boxZoomLocked) rawPost({ type: "boxzoom_hover", on: false });
       });
-      window.addEventListener("resize", syncCanvasSize);
+      // BARU (21 Sep 2026) -- pratinjau kecil Studio ikut digambar ulang
+      // dari riwayat (bukan cuma di-resize kosong seperti sebelumnya) saat
+      // jendela berganti ukuran, konsisten dengan present.html.
+      window.addEventListener("resize", () => { syncCanvasSize(); if (studioInk && ctx && canvas) studioInk.render(canvas, ctx); });
     }
   }
 
