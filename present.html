@@ -84,6 +84,12 @@
      TIDAK memuat/meminta izin kamera sama sekali sebelum itu (lihat
      startCamera() di skrip bawah, dipanggil HANYA saat pesan "camera"
      dengan on:true diterima dari Studio). */
+  /* BARU (23 Sep 2026) -- 🌄 Latar Master: layer PALING BELAKANG, DOM-nya
+     sebelum #camBg/#imgBg (z-index sama = urutan DOM) jadi Kamera/Gambar
+     Latar upload otomatis tampil DI DEPANNYA. Lihat js/bg-master.js. */
+  #bgMaster { position: fixed; inset: 0; z-index: 0; background: #000; transition: opacity .35s ease; }
+  #bgMaster img, #bgMaster video { width: 100%; height: 100%; object-fit: cover; display: none; }
+  #bgMaster.k-image img, #bgMaster.k-video video { display: block; }
   #camBg, #imgBg {
     position: fixed; inset: 0; z-index: 0;
     width: 100vw; height: 100vh; object-fit: cover;
@@ -1835,8 +1841,43 @@
     box-shadow: 0 0 14px 4px currentColor;
     transform: translate(-50%, -50%);
   }
-  /* ---- Pen (coret-coret) ---- */
+  /* ---- Pen (coret-coret) -- dikendalikan dari Studio (js/presentation-studio.js) ---- */
   #penCanvas { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
+
+  /* ============================================================
+     🖊️ Coret-coret LANGSUNG di Layar 2  (BARU 21 Sep 2026, permintaan
+     operator "kalau bisa juga bisa coret-coret di present.html, jadi bisa
+     2 macam"). Kanvas & tombol INI SEPENUHNYA TERPISAH dari Pen yang
+     dikendalikan dari Studio di atas -- riwayatnya sendiri (js/ink-engine.js),
+     tidak pernah dikirim/disinkronkan ke mana pun. Ditumpuk DI ATAS
+     #penCanvas (z-index 42) supaya kedua macam coretan bisa tampil
+     bersamaan kalau operator kebetulan memakai keduanya.
+     ============================================================ */
+  #localPenCanvas { position: fixed; inset: 0; z-index: 42; pointer-events: none; }
+  #localInkToggle {
+    position: fixed; left: 14px; bottom: 14px; z-index: 96;
+    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; background: rgba(20,20,20,.55); color: #fff; border: 1px solid rgba(255,255,255,.25);
+    cursor: pointer; opacity: .55; transition: opacity .15s ease;
+  }
+  #localInkToggle:hover, #localInkToggle.on { opacity: .95; }
+  #localInkBar {
+    position: fixed; left: 14px; bottom: 64px; z-index: 96;
+    display: flex; flex-wrap: wrap; gap: 6px; max-width: min(92vw, 420px);
+    background: rgba(20,20,20,.82); border: 1px solid rgba(255,255,255,.2); border-radius: 14px;
+    padding: 8px; box-shadow: 0 6px 22px rgba(0,0,0,.4);
+  }
+  #localInkBar[hidden] { display: none; }
+  #localInkBar button {
+    font-family: "Inter", Arial, sans-serif; font-size: 12.5px; font-weight: 600;
+    color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 999px; padding: 6px 11px; cursor: pointer; line-height: 1.2;
+  }
+  #localInkBar button.active { background: #d8b45c; color: #1a1206; border-color: #d8b45c; }
+  #localInkBar button:disabled { opacity: .35; cursor: default; }
+  #localInkBar .local-ink-sep { width: 1px; align-self: stretch; background: rgba(255,255,255,.2); margin: 0 2px; }
+  #localInkColorRow button { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.3); }
+  #localInkColorRow button.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
 
   /* ---- 🔍 Kaca Pembesar (BARU 27 Agu 2026) -- lihat showMagnify()/
      hideMagnify() di bawah & wirePointerPen() di js/presentation-studio.js.
@@ -2068,6 +2109,7 @@
   <!-- BARU (28 Agu 2026) -- lihat catatan panjang #camBg di <style> di
        atas. hidden secara default; muncul otomatis begitu operator
        menekan "🎥 Aktifkan Kamera" di tab "🎥 Kamera" Studio Presentasi. -->
+  <div id="bgMaster" hidden><img alt="" /><video muted loop playsinline></video></div>
   <video id="camBg" hidden autoplay playsinline muted></video>
   <!-- BARU (28 Agu 2026) -- lihat catatan #imgBg di <style> di atas. -->
   <img id="imgBg" hidden />
@@ -2437,6 +2479,34 @@
   <div id="footBar" class="ticker-bar" hidden><span class="ticker-inner" id="footText"></span></div>
 
   <canvas id="penCanvas"></canvas>
+  <!-- BARU (21 Sep 2026, permintaan operator) -- 🖊️ Coret-coret LANGSUNG di
+       Layar 2, independen dari Pen di atas (dikendalikan Studio) -- lihat
+       catatan panjang di <style> #localPenCanvas & IIFE di bagian bawah
+       skrip berkas ini. Tombol bulat kecil SELALU ada (opacity rendah,
+       pojok kiri bawah) supaya tidak mengganggu tayangan; ketuk sekali
+       untuk membuka alat coret, ketuk ✕ untuk menutup. -->
+  <canvas id="localPenCanvas"></canvas>
+  <div id="localInkToggle" title="🖊️ Coret-coret langsung di layar ini">🖊️</div>
+  <div id="localInkBar" hidden>
+    <button type="button" data-local-ink-mode="draw" class="active">✏️ Pen</button>
+    <button type="button" data-local-ink-mode="erase">🧹 Hapus</button>
+    <span class="local-ink-sep"></span>
+    <button type="button" data-local-ink-size="4">Tipis</button>
+    <button type="button" data-local-ink-size="17" class="active">Tebal</button>
+    <button type="button" data-local-ink-size="40">Super Tebal</button>
+    <span class="local-ink-sep"></span>
+    <button type="button" id="localInkUndo" title="Batalkan goresan terakhir (Ctrl+Z)">↩️</button>
+    <button type="button" id="localInkRedo" title="Ulangi goresan yang dibatalkan (Ctrl+Y)">↪️</button>
+    <button type="button" id="localInkClearAll" title="Hapus SEMUA coretan lokal ini">🗑️</button>
+    <button type="button" id="localInkClose" title="Tutup alat coret">✕</button>
+    <div id="localInkColorRow" class="local-ink-sep-row" style="display:flex;gap:6px;width:100%;margin-top:4px;">
+      <button type="button" data-local-ink-color="#ff3b30" class="active" style="background:#ff3b30" title="Merah"></button>
+      <button type="button" data-local-ink-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
+      <button type="button" data-local-ink-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+      <button type="button" data-local-ink-color="#aee1ff" style="background:#aee1ff" title="Biru muda pastel"></button>
+      <button type="button" data-local-ink-color="#b8f2c9" style="background:#b8f2c9" title="Hijau muda pastel"></button>
+    </div>
+  </div>
   <div id="pointerDot"></div>
   <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
   <div id="magnifierLens"></div>
@@ -2516,6 +2586,8 @@
        custom sendiri. Dimuat di sini (bukan cuma di index.html) karena
        Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
   <script src="js/config.js"></script>
+  <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN halaman ini -->
+  <script src="js/ink-engine.js?v=20260921a"></script>
   <!-- BARU (10 Sep 2026, sesi ke-13) -- js/soundfx.js: SATU SUMBER
        KEBENARAN daftar & sintesis efek suara "🎉 Efek Panggung", dipakai
        bersama dengan index.html (tab Studio & menu pratinjau admin).
@@ -2949,6 +3021,13 @@
   const penCanvas = document.getElementById("penCanvas");
   const penCtx = penCanvas.getContext("2d");
   penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+  // BARU (21 Sep 2026) -- coretan Pen yang dikendalikan dari Studio sekarang
+  // memakai mesin riwayat bersama (js/ink-engine.js): mendukung goresan
+  // Penghapus (destination-out) & Undo/Redo yang disinkronkan dari Studio,
+  // lihat penanganan pesan {type:"pen", action:...} di bawah. `remoteInk`
+  // TERPISAH dari `localInk` (coret-coret langsung, lihat IIFE di bagian
+  // paling bawah skrip ini) -- 2 macam coretan yang independen.
+  const remoteInk = (typeof InkEngine !== "undefined") ? InkEngine.create() : null;
 
   // ------------------------------------------------------------
   // BARU (27 Agu 2026) -- 🔍 Kaca Pembesar. Posisi kursor (`x`,`y`, 0..1
@@ -4747,12 +4826,35 @@
       const label = document.createElement("div");
       label.style.cssText = "font-family:'Inter',Arial,sans-serif; font-weight:600; letter-spacing:.12em; font-size:14px; color:#AEB4C4; margin-bottom:8px;";
       label.textContent = skLabelFor_(key);
-      const text = document.createElement("div");
-      text.className = "sk-text";
-      text.style.cssText = "font-weight:700; line-height:1.3; margin:0 auto;";
-      text.textContent = info[key] || "";
       skBlocksWrapEl.appendChild(label);
-      skBlocksWrapEl.appendChild(text);
+      // BARU (23 Sep 2026) -- kolom video (videoShort/videoLong): field
+      // ini isinya link Drive, bukan teks biasa -- tampilkan sebagai
+      // pemutar video (iframe), BUKAN blok teks "sk-text" (supaya tidak
+      // ikut skRefitActive_() yang membesarkan/mengecilkan ukuran huruf).
+      const isVideoField = window.SLOGAN_KARAKTER_DATA.FIELDS.find((f) => f.key === key && f.isVideo);
+      if (isVideoField) {
+        const embedUrl = window.SLOGAN_KARAKTER_DRIVE_EMBED(info[key]);
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "width:min(90%,900px); margin:0 auto; aspect-ratio:16/9; border-radius:12px; overflow:hidden; background:#0c1526;";
+        if (embedUrl) {
+          const frame = document.createElement("iframe");
+          frame.src = embedUrl;
+          frame.allow = "autoplay; encrypted-media";
+          frame.allowFullscreen = true;
+          frame.style.cssText = "width:100%; height:100%; border:0;";
+          wrap.appendChild(frame);
+        } else {
+          wrap.style.cssText += "display:flex; align-items:center; justify-content:center; color:#AEB4C4; font-family:'Inter',Arial,sans-serif; font-size:14px;";
+          wrap.textContent = "(Video belum diisi)";
+        }
+        skBlocksWrapEl.appendChild(wrap);
+      } else {
+        const text = document.createElement("div");
+        text.className = "sk-text";
+        text.style.cssText = "font-weight:700; line-height:1.3; margin:0 auto;";
+        text.textContent = info[key] || "";
+        skBlocksWrapEl.appendChild(text);
+      }
     });
 
     sloganKarakterViewEl.hidden = false;
@@ -5425,6 +5527,7 @@
   // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (lihat catatan #imgBg di
   // <style> & applyBgImagePayload() di bawah).
   let imgBgActive = false;
+  let bgMasterActive = false; // 🌄 Latar Master (js/bg-master.js)
   // BARU (8 Sep 2026, permintaan operator "video ada subtitle-nya") --
   // status toggle "📝 Ayat/Kidung/Pengumuman TETAP tampil di atas video"
   // (theme.videoTextOverlay, lihat applyTheme() di bawah) -- dibaca oleh
@@ -5480,9 +5583,28 @@
   // di baliknya. Muncul lagi otomatis begitu kembali ke ayat/teks/
   // kidung -- operator tidak perlu menyalakan-matikan latar manual
   // tiap ganti jenis tayangan.
+  let lastLatarKind_ = "verse";
+  const bgMasterEl = document.getElementById("bgMaster");
+  function applyBgMasterPayload(data) {
+    const img = bgMasterEl.querySelector("img"), vid = bgMasterEl.querySelector("video");
+    vid.pause(); vid.removeAttribute("src"); vid.load(); img.removeAttribute("src");
+    bgMasterActive = !!(data.on && data.url);
+    bgMasterEl.className = "";
+    if (bgMasterActive) {
+      if (data.kind === "video") { vid.src = data.url; vid.play().catch(() => {}); }
+      else img.src = data.url;
+      bgMasterEl.className = data.kind === "video" ? "k-video" : "k-image";
+      bgMasterEl.hidden = false;
+      const show = ["verse", "text", "kidung"].indexOf(lastLatarKind_) >= 0;
+      bgMasterEl.style.opacity = show ? "1" : "0";
+    } else bgMasterEl.hidden = true;
+    updateLatarDimClass();
+  }
   function setCamVisibleForKind(kind) {
-    if (!camActive && !imgBgActive) return;
+    lastLatarKind_ = kind;
     const show = kind === "verse" || kind === "text" || kind === "kidung";
+    if (bgMasterActive) bgMasterEl.style.opacity = show ? "1" : "0";
+    if (!camActive && !imgBgActive) return;
     if (camActive) camBgEl.style.opacity = show ? "1" : "0";
     if (imgBgActive) imgBgEl.style.opacity = show ? "1" : "0";
   }
@@ -5521,7 +5643,7 @@
   // kelas "cam-active" (dim overlay) menyala kalau SALAH SATU dari
   // kamera/gambar latar aktif, mati kalau dua-duanya mati.
   function updateLatarDimClass() {
-    document.body.classList.toggle("cam-active", camActive || imgBgActive);
+    document.body.classList.toggle("cam-active", camActive || imgBgActive || bgMasterActive);
   }
 
   async function startCamera(facingMode, mirror) {
@@ -6509,6 +6631,7 @@
     if (data.type === "camera") { applyCameraPayload(data); return; }
     // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (upload), lihat applyBgImagePayload().
     if (data.type === "bgimage") { applyBgImagePayload(data); return; }
+    if (data.type === "bgmaster") { applyBgMasterPayload(data); return; }
     // BARU (28 Agu 2026) -- gaya tulisan (warna tulisan/border) saat
     // 🎥 Kamera ATAU 🖼️ Gambar Latar aktif -- dipisah dari payload
     // "camera"/"bgimage" itu sendiri supaya menggeser slider border/
@@ -6784,51 +6907,43 @@
       return;
     }
     if (data.type === "pen") {
+      if (!remoteInk) return;
       if (data.clear) {
-        penStrokeHistory = [];
+        // BARU (21 Sep 2026) -- 🗑️ Hapus Semua juga mengosongkan RIWAYAT
+        // (bukan cuma piksel di kanvas), supaya Undo sesudahnya tidak
+        // "menghidupkan lagi" coretan yang sudah sengaja dihapus semua.
+        remoteInk.clear();
         penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
-        penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
+        if (penCtx) penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
         penCanvas.style.display = "none";
         return;
       }
       penCanvas.style.display = "block";
-      if (data.stroke && data.stroke.length > 1) {
-        // Simpan koordinat ASLI (pecahan 0..1, bukan px) supaya bisa
-        // digambar ulang secara akurat kalau jendela di-resize/di-split --
-        // sebelumnya canvas cuma di-resize (otomatis menghapus isi) lalu
-        // cuma segmen BARU yang digambar, jadi coretan lama hilang/
-        // terlihat terpotong saat jendela ditarik-ubah ukurannya.
-        // BARU (27 Agu 2026) -- ukuran coretan dikirim dari Studio lewat
-        // `data.size` (px), disimpan juga di riwayat supaya redraw saat
-        // resize tetap setebal aslinya (bukan selalu 4px seperti dulu).
-        penStrokeHistory.push({ pts: data.stroke, color: data.color || "#ff3b30", size: data.size || 4 });
-        if (penCanvas.width !== window.innerWidth || penCanvas.height !== window.innerHeight) {
-          redrawAllPenStrokes();
-        } else {
-          drawPenSegment(data.stroke, data.color || "#ff3b30", data.size || 4);
+      // BARU (21 Sep 2026) -- protokol baru {action:"begin"|"append"|"end"|
+      // "undo"|"redo"} menggantikan {stroke:[...]} lama, lihat catatan
+      // panjang di js/ink-engine.js & wirePointerPen() (js/presentation-
+      // studio.js) untuk kenapa (Undo/Redo & Penghapus butuh riwayat
+      // per-goresan, bukan sekadar menggambar tiap segmen langsung permanen).
+      if (data.action === "begin") { remoteInk.begin(data.id, data.mode, data.color, data.size); return; }
+      if (data.action === "append") {
+        remoteInk.append(data.pts || []);
+        const cur = remoteInk.getCurrent();
+        if (cur && cur.pts.length > 1) {
+          // Koordinat pecahan 0..1 (bukan px) supaya tetap akurat digambar
+          // ulang tiap kali ukuran jendela berubah (resize/split monitor).
+          if (penCanvas.width !== window.innerWidth || penCanvas.height !== window.innerHeight) {
+            penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+            remoteInk.render(penCanvas, penCtx);
+          }
+          remoteInk.drawSegmentLive(penCanvas, penCtx, cur.pts.slice(-2));
         }
+        return;
       }
+      if (data.action === "end") { remoteInk.end(); return; }
+      if (data.action === "undo") { if (remoteInk.undo()) remoteInk.render(penCanvas, penCtx); return; }
+      if (data.action === "redo") { if (remoteInk.redo()) remoteInk.render(penCanvas, penCtx); return; }
       return;
     }
-  }
-
-  // Riwayat semua segmen coretan Pen (koordinat pecahan 0..1) supaya bisa
-  // digambar ulang penuh & akurat tiap kali ukuran jendela berubah.
-  let penStrokeHistory = [];
-  function drawPenSegment(stroke, color, size) {
-    penCtx.strokeStyle = color;
-    penCtx.lineWidth = size || 4; penCtx.lineCap = "round"; penCtx.lineJoin = "round";
-    penCtx.beginPath();
-    stroke.forEach((pt, i) => {
-      const x = pt.x * penCanvas.width, y = pt.y * penCanvas.height;
-      if (i === 0) penCtx.moveTo(x, y); else penCtx.lineTo(x, y);
-    });
-    penCtx.stroke();
-  }
-  function redrawAllPenStrokes() {
-    penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
-    penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
-    penStrokeHistory.forEach((s) => drawPenSegment(s.pts, s.color, s.size));
   }
 
   window.addEventListener("message", (e) => {
@@ -7085,9 +7200,143 @@
     if (geomResizeTimer) clearTimeout(geomResizeTimer);
     geomResizeTimer = setTimeout(() => {
       reportGeometry();
-      if (penStrokeHistory.length) redrawAllPenStrokes();
+      if (remoteInk && remoteInk.getActiveActions().length) {
+        penCanvas.width = window.innerWidth; penCanvas.height = window.innerHeight;
+        remoteInk.render(penCanvas, penCtx);
+      }
     }, 120);
   });
+
+  // ============================================================
+  //  🖊️ Coret-coret LANGSUNG di Layar 2  (BARU 21 Sep 2026, permintaan
+  //  operator "kalau bisa juga bisa coret-coret di present.html, jadi bisa
+  //  2 macam"). SEPENUHNYA TERPISAH dari Pen yang dikendalikan dari Studio
+  //  di atas (`remoteInk`) -- kanvas, riwayat Undo/Redo, dan Pen/Penghapus
+  //  sendiri, murni lokal di jendela ini, tidak pernah dikirim ke mana pun.
+  //  #localPenCanvas hanya menangkap klik/sentuhan SELAGI mode Pen/
+  //  Penghapus aktif (pointer-events diaktifkan lewat setActive_() di
+  //  bawah) -- selain itu pointer-events:none supaya tidak mengganggu
+  //  fitur lain yang juga bisa diketuk langsung di layar ini (kuis, roda
+  //  undian, dst).
+  // ============================================================
+  (function () {
+    const canvas = document.getElementById("localPenCanvas");
+    const toggle = document.getElementById("localInkToggle");
+    const bar = document.getElementById("localInkBar");
+    if (!canvas || !toggle || !bar || typeof InkEngine === "undefined") return;
+    const ctx = canvas.getContext("2d");
+    const ink = InkEngine.create();
+    let mode = "draw";
+    let color = "#ff3b30";
+    let size = 17;
+    let active = false;
+    let dragging = false;
+    let strokeSeq = 0;
+
+    function fitCanvas_() {
+      const w = window.innerWidth, h = window.innerHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w; canvas.height = h;
+        ink.render(canvas, ctx);
+      }
+    }
+    fitCanvas_();
+
+    function refreshUndoRedo_() {
+      const u = document.getElementById("localInkUndo"), r = document.getElementById("localInkRedo");
+      if (u) u.disabled = !ink.canUndo();
+      if (r) r.disabled = !ink.canRedo();
+    }
+    function setActive_(on) {
+      active = on;
+      canvas.style.pointerEvents = on ? "auto" : "none";
+      canvas.style.cursor = on ? (mode === "erase" ? "cell" : "crosshair") : "default";
+      toggle.classList.toggle("on", on);
+    }
+    function updateModeBtns_() {
+      bar.querySelectorAll("[data-local-ink-mode]").forEach((b) => b.classList.toggle("active", b.dataset.localInkMode === mode));
+    }
+    bar.querySelectorAll("[data-local-ink-mode]").forEach((b) => {
+      b.addEventListener("click", () => { mode = b.dataset.localInkMode; setActive_(true); updateModeBtns_(); });
+    });
+    bar.querySelectorAll("[data-local-ink-size]").forEach((b) => {
+      b.addEventListener("click", () => {
+        size = Number(b.dataset.localInkSize) || 17;
+        bar.querySelectorAll("[data-local-ink-size]").forEach((x) => x.classList.toggle("active", x === b));
+      });
+    });
+    bar.querySelectorAll("[data-local-ink-color]").forEach((b) => {
+      b.addEventListener("click", () => {
+        color = b.dataset.localInkColor;
+        bar.querySelectorAll("[data-local-ink-color]").forEach((x) => x.classList.toggle("active", x === b));
+      });
+    });
+    function doUndo_() { if (ink.undo()) { ink.render(canvas, ctx); refreshUndoRedo_(); } }
+    function doRedo_() { if (ink.redo()) { ink.render(canvas, ctx); refreshUndoRedo_(); } }
+    const undoBtn = document.getElementById("localInkUndo");
+    const redoBtn = document.getElementById("localInkRedo");
+    if (undoBtn) undoBtn.addEventListener("click", doUndo_);
+    if (redoBtn) redoBtn.addEventListener("click", doRedo_);
+    const clearBtn = document.getElementById("localInkClearAll");
+    if (clearBtn) clearBtn.addEventListener("click", () => { ink.clear(); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); refreshUndoRedo_(); });
+    function closeBar_() { bar.hidden = true; setActive_(false); }
+    const closeBtn = document.getElementById("localInkClose");
+    if (closeBtn) closeBtn.addEventListener("click", closeBar_);
+    toggle.addEventListener("click", () => {
+      if (bar.hidden) { bar.hidden = false; setActive_(true); updateModeBtns_(); refreshUndoRedo_(); }
+      else closeBar_();
+    });
+
+    function posFromEvent_(e) {
+      const p = (e.touches && e.touches[0]) || e;
+      let x = p.clientX / window.innerWidth, y = p.clientY / window.innerHeight;
+      x = Math.min(1, Math.max(0, x)); y = Math.min(1, Math.max(0, y));
+      return { x: x, y: y };
+    }
+    function pointerDown_(e) {
+      if (!active) return;
+      e.preventDefault();
+      dragging = true;
+      strokeSeq += 1;
+      ink.begin("local" + strokeSeq, mode, color, size);
+      ink.append([posFromEvent_(e)]);
+    }
+    function pointerMove_(e) {
+      if (!active || !dragging) return;
+      e.preventDefault();
+      ink.append([posFromEvent_(e)]);
+      const cur = ink.getCurrent();
+      if (cur && cur.pts.length > 1) ink.drawSegmentLive(canvas, ctx, cur.pts.slice(-2));
+    }
+    function pointerUp_() {
+      if (!dragging) return;
+      dragging = false;
+      ink.end();
+      refreshUndoRedo_();
+    }
+    canvas.addEventListener("mousedown", pointerDown_);
+    canvas.addEventListener("mousemove", pointerMove_);
+    window.addEventListener("mouseup", pointerUp_);
+    canvas.addEventListener("touchstart", pointerDown_, { passive: false });
+    canvas.addEventListener("touchmove", pointerMove_, { passive: false });
+    canvas.addEventListener("touchend", pointerUp_);
+    canvas.addEventListener("touchcancel", pointerUp_);
+
+    // Ctrl+Z / Ctrl+Y selagi mode Pen/Penghapus lokal ini aktif (berguna
+    // kalau present.html dibuka di komputer dengan keyboard; di HP/tablet
+    // sentuh tombol ↩️/↪️ di atas).
+    document.addEventListener("keydown", (e) => {
+      if (!active) return;
+      const tag = (e.target && e.target.tagName) || "";
+      if (/INPUT|TEXTAREA/.test(tag)) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = String(e.key || "").toLowerCase();
+      if (k === "z" && !e.shiftKey) { e.preventDefault(); doUndo_(); }
+      else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); doRedo_(); }
+    });
+
+    window.addEventListener("resize", fitCanvas_);
+  })();
 </script>
 </body>
 </html>
