@@ -4658,6 +4658,11 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 }
 .ps-preview-box-wrap .ps-preview-box::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .ps-preview-box-wrap.ps-pointer-mode { cursor: crosshair; }
+/* PERBAIKAN (24 Sep 2026) -- selagi Pen/Penghapus menyala: tidak ada seleksi teks,
+   gambar tidak bisa diseret (seret-lepas bawaan browser membunuh event mousemove
+   sehingga goresan mati di tengah jalan), dan geser jari tidak menggulung halaman. */
+.ps-preview-box-wrap.ps-pen-mode { user-select: none; -webkit-user-select: none; touch-action: none; }
+.ps-preview-box-wrap.ps-pen-mode * { user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
 
 /* Skala font di kotak pratinjau Studio dibuat PROPORSIONAL terhadap
    lebar kotak itu sendiri (container query units, "cqw") -- meniru
