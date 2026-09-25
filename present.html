@@ -1867,30 +1867,52 @@
      bersamaan kalau operator kebetulan memakai keduanya.
      ============================================================ */
   #localPenCanvas { position: fixed; inset: 0; z-index: 42; pointer-events: none; touch-action: none; }
+  /* BARU (24 Sep 2026, permintaan operator "seperti PowerPoint, kecil, tidak
+     tampil terus-terusan") -- toolbar coret dibuat KOMPAK (tombol ikon saja) dan
+     OTOMATIS memudar setelah kursor diam ~3 detik (kelas .ink-idle), muncul lagi
+     begitu kursor digerakkan -- persis toolbar Slide Show PowerPoint. Selama
+     menggoreskan pen, toolbar tidak ikut muncul. Tombol bulat kecil di pojok
+     berganti ikon sesuai mode (✏️ Pen / 🔴 Penunjuk / 🧹 Hapus) + cincin emas
+     saat mode aktif; chip kecil #localInkBadge menyebut mode sesaat lalu hilang. */
   #localInkToggle {
-    position: fixed; left: 14px; bottom: 14px; z-index: 96;
-    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 20px; background: rgba(20,20,20,.55); color: #fff; border: 1px solid rgba(255,255,255,.25);
-    cursor: pointer; opacity: .8; transition: opacity .15s ease; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    position: fixed; left: 12px; bottom: 12px; z-index: 96;
+    width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; background: rgba(20,20,20,.55); color: #fff; border: 1px solid rgba(255,255,255,.25);
+    cursor: pointer; opacity: .35; transition: opacity .25s ease; user-select: none; -webkit-user-select: none; touch-action: manipulation;
   }
-  #localInkToggle:hover, #localInkToggle.on { opacity: .95; }
+  #localInkToggle:hover { opacity: .95; }
+  #localInkToggle.on { opacity: .9; border-color: #d8b45c; box-shadow: 0 0 0 2px rgba(216,180,92,.55); }
+  #localInkToggle.on.ink-idle { opacity: .4; }
   #localInkBar {
-    position: fixed; left: 14px; bottom: 64px; z-index: 96;
-    display: flex; flex-wrap: wrap; gap: 6px; max-width: min(92vw, 420px);
-    background: rgba(20,20,20,.82); border: 1px solid rgba(255,255,255,.2); border-radius: 14px;
-    padding: 8px; box-shadow: 0 6px 22px rgba(0,0,0,.4);
+    position: fixed; left: 12px; bottom: 54px; z-index: 96;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: max-content; max-width: min(96vw, 400px);
+    background: rgba(20,20,20,.82); border: 1px solid rgba(255,255,255,.2); border-radius: 20px;
+    padding: 5px 6px; box-shadow: 0 6px 22px rgba(0,0,0,.4); transition: opacity .3s ease;
   }
   #localInkBar[hidden] { display: none; }
+  #localInkBar.ink-idle { opacity: 0; pointer-events: none; }
   #localInkBar button {
-    font-family: "Inter", Arial, sans-serif; font-size: 12.5px; font-weight: 600;
-    color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
-    border-radius: 999px; padding: 6px 11px; cursor: pointer; line-height: 1.2;
+    font-family: "Inter", Arial, sans-serif; font-size: 12px; font-weight: 600;
+    color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px; min-width: 30px; height: 30px; padding: 0 8px; cursor: pointer; line-height: 1;
   }
   #localInkBar button.active { background: #d8b45c; color: #1a1206; border-color: #d8b45c; }
   #localInkBar button:disabled { opacity: .35; cursor: default; }
-  #localInkBar .local-ink-sep { width: 1px; align-self: stretch; background: rgba(255,255,255,.2); margin: 0 2px; }
-  #localInkColorRow button { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.3); }
+  #localInkBar .local-ink-sep { width: 1px; align-self: stretch; background: rgba(255,255,255,.2); margin: 0 1px; }
+  #localInkOptions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; padding-top: 5px; margin-top: 1px; border-top: 1px solid rgba(255,255,255,.18); }
+  #localInkOptions[hidden] { display: none; }
+  #localInkColorRow { display: flex; gap: 5px; width: 100%; margin-top: 2px; }
+  #localInkColorRow button { width: 20px; height: 20px; min-width: 20px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.3); }
   #localInkColorRow button.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
+  #localInkBadge {
+    position: fixed; left: 54px; bottom: 19px; z-index: 96; pointer-events: none; opacity: 0; transition: opacity .3s ease;
+    background: rgba(20,20,20,.75); color: #fff; font: 600 12px "Inter", Arial, sans-serif; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  #localInkBadge.show { opacity: 1; }
+  #localLaserDot {
+    position: fixed; width: 18px; height: 18px; border-radius: 50%; pointer-events: none; z-index: 95; display: none;
+    transform: translate(-50%, -50%); background: currentColor; box-shadow: 0 0 14px 5px currentColor;
+  }
 
   /* ---- 🔍 Kaca Pembesar (BARU 27 Agu 2026) -- lihat showMagnify()/
      hideMagnify() di bawah & wirePointerPen() di js/presentation-studio.js.
@@ -2499,25 +2521,31 @@
        pojok kiri bawah) supaya tidak mengganggu tayangan; ketuk sekali
        untuk membuka alat coret, ketuk ✕ untuk menutup. -->
   <canvas id="localPenCanvas"></canvas>
-  <div id="localInkToggle" title="🖊️ Coret-coret langsung di layar ini">🖊️</div>
+  <div id="localLaserDot"></div>
+  <div id="localInkBadge"></div>
+  <div id="localInkToggle" title="🖊️ Pen / Penunjuk di layar ini">🖊️</div>
   <div id="localInkBar" hidden>
-    <button type="button" data-local-ink-mode="draw" class="active">✏️ Pen</button>
-    <button type="button" data-local-ink-mode="erase">🧹 Hapus</button>
-    <span class="local-ink-sep"></span>
-    <button type="button" data-local-ink-size="4">Tipis</button>
-    <button type="button" data-local-ink-size="17" class="active">Tebal</button>
-    <button type="button" data-local-ink-size="40">Super Tebal</button>
+    <button type="button" data-local-ink-mode="off" title="Mouse biasa (berhenti mencoret, coretan tetap tampil) -- Esc">🖱️</button>
+    <button type="button" data-local-ink-mode="laser" title="Penunjuk laser (tidak meninggalkan coretan)">🔴</button>
+    <button type="button" data-local-ink-mode="draw" class="active" title="Pen">✏️</button>
+    <button type="button" data-local-ink-mode="erase" title="Penghapus">🧹</button>
     <span class="local-ink-sep"></span>
     <button type="button" id="localInkUndo" title="Batalkan goresan terakhir (Ctrl+Z)">↩️</button>
     <button type="button" id="localInkRedo" title="Ulangi goresan yang dibatalkan (Ctrl+Y)">↪️</button>
-    <button type="button" id="localInkClearAll" title="Hapus SEMUA coretan lokal ini">🗑️</button>
+    <button type="button" id="localInkClearAll" title="Hapus SEMUA coretan">🗑️</button>
+    <button type="button" id="localInkOpts" title="Warna &amp; ketebalan">🎨</button>
     <button type="button" id="localInkClose" title="Tutup alat coret">✕</button>
-    <div id="localInkColorRow" class="local-ink-sep-row" style="display:flex;gap:6px;width:100%;margin-top:4px;">
-      <button type="button" data-local-ink-color="#ff3b30" class="active" style="background:#ff3b30" title="Merah"></button>
-      <button type="button" data-local-ink-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
-      <button type="button" data-local-ink-color="#ffffff" style="background:#ffffff" title="Putih"></button>
-      <button type="button" data-local-ink-color="#aee1ff" style="background:#aee1ff" title="Biru muda pastel"></button>
-      <button type="button" data-local-ink-color="#b8f2c9" style="background:#b8f2c9" title="Hijau muda pastel"></button>
+    <div id="localInkOptions" hidden>
+      <button type="button" data-local-ink-size="4">Tipis</button>
+      <button type="button" data-local-ink-size="17" class="active">Tebal</button>
+      <button type="button" data-local-ink-size="40">Super Tebal</button>
+      <div id="localInkColorRow">
+        <button type="button" data-local-ink-color="#ff3b30" class="active" style="background:#ff3b30" title="Merah"></button>
+        <button type="button" data-local-ink-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
+        <button type="button" data-local-ink-color="#ffffff" style="background:#ffffff" title="Putih"></button>
+        <button type="button" data-local-ink-color="#aee1ff" style="background:#aee1ff" title="Biru muda pastel"></button>
+        <button type="button" data-local-ink-color="#b8f2c9" style="background:#b8f2c9" title="Hijau muda pastel"></button>
+      </div>
     </div>
   </div>
   <div id="pointerDot"></div>
@@ -7307,15 +7335,23 @@
     const canvas = document.getElementById("localPenCanvas");
     const toggle = document.getElementById("localInkToggle");
     const bar = document.getElementById("localInkBar");
+    const badge = document.getElementById("localInkBadge");
+    const laserDot = document.getElementById("localLaserDot");
+    const optsEl = document.getElementById("localInkOptions");
     if (!canvas || !toggle || !bar) return;
     const ctx = canvas.getContext("2d");
     const ink = makeInk_(); // PERBAIKAN (24 Sep 2026): selalu ada, lihat makeInk_() di atas
+    // `mode` = alat TERAKHIR yang dipilih ("draw" | "erase" | "laser"); `active`
+    // = alat itu sedang menyala (false = "🖱️ mouse biasa", coretan tetap tampil).
     let mode = "draw";
     let color = "#ff3b30";
     let size = 17;
     let active = false;
     let dragging = false;
     let strokeSeq = 0;
+    let idleTimer = null, badgeTimer = null;
+    const ICONS = { draw: "✏️", erase: "🧹", laser: "🔴" };
+    const LABELS = { off: "Mouse biasa", draw: "✏️ Pen aktif", erase: "🧹 Penghapus aktif", laser: "🔴 Penunjuk aktif" };
 
     function fitCanvas_() {
       const w = window.innerWidth, h = window.innerHeight;
@@ -7331,17 +7367,48 @@
       if (u) u.disabled = !ink.canUndo();
       if (r) r.disabled = !ink.canRedo();
     }
+    // --- toolbar memudar sendiri saat kursor diam (seperti PowerPoint) ---
+    function goIdle_() { if (bar.hidden) return; toggle.classList.add("ink-idle"); bar.classList.add("ink-idle"); }
+    function wake_() {
+      toggle.classList.remove("ink-idle"); bar.classList.remove("ink-idle");
+      clearTimeout(idleTimer);
+      if (!bar.hidden) idleTimer = setTimeout(goIdle_, 3000);
+    }
+    function showBadge_(text) {
+      if (!badge) return;
+      badge.textContent = text; badge.classList.add("show");
+      clearTimeout(badgeTimer);
+      badgeTimer = setTimeout(() => badge.classList.remove("show"), 1600);
+    }
+    function hideLaser_() { if (laserDot) laserDot.style.display = "none"; }
+    function moveLaser_(pt) {
+      if (!laserDot) return;
+      laserDot.style.color = color;
+      laserDot.style.left = pt.clientX + "px";
+      laserDot.style.top = pt.clientY + "px";
+      laserDot.style.display = "block";
+    }
     function setActive_(on) {
       active = on;
       canvas.style.pointerEvents = on ? "auto" : "none";
-      canvas.style.cursor = on ? (mode === "erase" ? "cell" : "crosshair") : "default";
+      canvas.style.cursor = on ? (mode === "laser" ? "none" : mode === "erase" ? "cell" : "crosshair") : "default";
       toggle.classList.toggle("on", on);
+      toggle.textContent = on ? ICONS[mode] : "🖊️";
+      if (!on || mode !== "laser") hideLaser_();
     }
     function updateModeBtns_() {
-      bar.querySelectorAll("[data-local-ink-mode]").forEach((b) => b.classList.toggle("active", b.dataset.localInkMode === mode));
+      const cur = active ? mode : "off";
+      bar.querySelectorAll("[data-local-ink-mode]").forEach((b) => b.classList.toggle("active", b.dataset.localInkMode === cur));
+    }
+    function applyMode_(m) {
+      if (m === "off") { setActive_(false); }
+      else { mode = m; setActive_(true); }
+      updateModeBtns_();
+      showBadge_(LABELS[m]);
+      wake_();
     }
     bar.querySelectorAll("[data-local-ink-mode]").forEach((b) => {
-      b.addEventListener("click", () => { mode = b.dataset.localInkMode; setActive_(true); updateModeBtns_(); });
+      b.addEventListener("click", () => applyMode_(b.dataset.localInkMode));
     });
     bar.querySelectorAll("[data-local-ink-size]").forEach((b) => {
       b.addEventListener("click", () => {
@@ -7355,6 +7422,8 @@
         bar.querySelectorAll("[data-local-ink-color]").forEach((x) => x.classList.toggle("active", x === b));
       });
     });
+    const optsBtn = document.getElementById("localInkOpts");
+    if (optsBtn && optsEl) optsBtn.addEventListener("click", () => { optsEl.hidden = !optsEl.hidden; });
     function doUndo_() { if (ink.undo()) { ink.render(canvas, ctx); refreshUndoRedo_(); } }
     function doRedo_() { if (ink.redo()) { ink.render(canvas, ctx); refreshUndoRedo_(); } }
     const undoBtn = document.getElementById("localInkUndo");
@@ -7363,31 +7432,39 @@
     if (redoBtn) redoBtn.addEventListener("click", doRedo_);
     const clearBtn = document.getElementById("localInkClearAll");
     if (clearBtn) clearBtn.addEventListener("click", () => { ink.clear(); if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height); refreshUndoRedo_(); });
-    function closeBar_() { bar.hidden = true; setActive_(false); }
+    function closeBar_() {
+      bar.hidden = true; setActive_(false); hideLaser_();
+      clearTimeout(idleTimer); toggle.classList.remove("ink-idle"); bar.classList.remove("ink-idle");
+      if (optsEl) optsEl.hidden = true;
+    }
     const closeBtn = document.getElementById("localInkClose");
     if (closeBtn) closeBtn.addEventListener("click", closeBar_);
     toggle.addEventListener("click", () => {
-      if (bar.hidden) { bar.hidden = false; setActive_(true); updateModeBtns_(); refreshUndoRedo_(); }
+      if (bar.hidden) { bar.hidden = false; applyMode_(mode); refreshUndoRedo_(); }
       else closeBar_();
     });
 
+    function ptFromEvent_(e) { return (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e; }
     function posFromEvent_(e) {
-      const p = (e.touches && e.touches[0]) || e;
+      const p = ptFromEvent_(e);
       let x = p.clientX / window.innerWidth, y = p.clientY / window.innerHeight;
       x = Math.min(1, Math.max(0, x)); y = Math.min(1, Math.max(0, y));
       return { x: x, y: y };
     }
     function pointerDown_(e) {
       if (!active) return;
-      if (!e.touches && e.button !== undefined && e.button !== 0) return; // PERBAIKAN (24 Sep 2026): klik kanan/tengah tidak mencoret
+      if (!e.touches && e.button !== undefined && e.button !== 0) return; // klik kanan/tengah tidak mencoret
       e.preventDefault();
+      if (mode === "laser") { dragging = true; moveLaser_(ptFromEvent_(e)); return; }
       dragging = true;
       strokeSeq += 1;
       ink.begin("local" + strokeSeq, mode, color, size);
       ink.append([posFromEvent_(e)]);
     }
     function pointerMove_(e) {
-      if (!active || !dragging) return;
+      if (!active) return;
+      if (mode === "laser") { e.preventDefault(); moveLaser_(ptFromEvent_(e)); return; }
+      if (!dragging) return;
       e.preventDefault();
       ink.append([posFromEvent_(e)]);
       const cur = ink.getCurrent();
@@ -7396,21 +7473,31 @@
     function pointerUp_() {
       if (!dragging) return;
       dragging = false;
+      if (mode === "laser") return;
       ink.end();
       refreshUndoRedo_();
     }
     canvas.addEventListener("mousedown", pointerDown_);
     canvas.addEventListener("mousemove", pointerMove_);
+    canvas.addEventListener("mouseleave", hideLaser_);
     window.addEventListener("mouseup", pointerUp_);
     canvas.addEventListener("touchstart", pointerDown_, { passive: false });
     canvas.addEventListener("touchmove", pointerMove_, { passive: false });
-    canvas.addEventListener("touchend", pointerUp_);
-    canvas.addEventListener("touchcancel", pointerUp_);
+    canvas.addEventListener("touchend", () => { pointerUp_(); if (mode === "laser") hideLaser_(); });
+    canvas.addEventListener("touchcancel", () => { pointerUp_(); hideLaser_(); });
 
-    // Ctrl+Z / Ctrl+Y selagi mode Pen/Penghapus lokal ini aktif (berguna
-    // kalau present.html dibuka di komputer dengan keyboard; di HP/tablet
-    // sentuh tombol ↩️/↪️ di atas).
+    // Toolbar muncul lagi begitu kursor bergerak (kecuali sedang menggoreskan).
+    window.addEventListener("mousemove", () => { if (!bar.hidden && !dragging) wake_(); }, true);
+    window.addEventListener("touchstart", () => { if (!bar.hidden && !dragging) wake_(); }, { capture: true, passive: true });
+
+    // Ctrl+Z / Ctrl+Y selagi mode Pen/Penghapus lokal ini aktif; Esc = keluar
+    // dari mode (seperti PowerPoint) -- Esc sekali lagi menutup toolbar.
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (active) applyMode_("off");
+        else if (!bar.hidden) closeBar_();
+        return;
+      }
       if (!active) return;
       const tag = (e.target && e.target.tagName) || "";
       if (/INPUT|TEXTAREA/.test(tag)) return;
