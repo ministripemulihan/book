@@ -1488,6 +1488,14 @@ const PresentationStudio = (() => {
     activePlaylist = { items: items || [], index: index || 0, label: label || "" };
     highlightActivePlaylistRow();
     pushMonitorStatus_();
+    // BARU (26 Sep 2026, permintaan operator "simpan jadi gambar, otomatis
+    // ditulis sesuai nama kumpulan ayat") -- present.html tidak pernah tahu
+    // nama Kumpulan Ayat/daftar yang sedang tayang (cuma menerima isi
+    // slide-nya, bukan namanya) -- dikirim terpisah di sini SETIAP kali
+    // daftar aktif berganti, disimpan present.html sbg nama BAWAAN utk
+    // tombol "💾 Simpan Gambar" (lihat present.html: data.type==="meta" &
+    // localInkSaveImage_ di bawah).
+    rawPost({ type: "meta", collectionName: label || "" });
   }
   // BARU (10 Sep 2026, sesi ke-10, "Monitor 3 -- Monitor Pembicara") --
   // diambil jadi 1 fungsi terpisah supaya bisa dipanggil dari SEMUA
@@ -10268,8 +10276,8 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------
   function createInkEngineFallback_() {
     let actions = [], cursor = 0, current = null;
-    function begin(id, mode, color, size) {
-      current = { id: id != null ? String(id) : "", mode: mode === "erase" ? "erase" : "draw", color: color || "#ff3b30", size: Math.max(1, Number(size) || 4), pts: [] };
+    function begin(id, mode, color, size, tip) {
+      current = { id: id != null ? String(id) : "", mode: mode === "erase" ? "erase" : "draw", color: color || "#ff3b30", size: Math.max(1, Number(size) || 4), tip: tip === "chisel" ? "chisel" : "round", pts: [] };
       return current;
     }
     function append(pts) {
@@ -10292,8 +10300,31 @@ const PresentationStudio = (() => {
     function redo() { if (cursor >= actions.length) return false; cursor += 1; return true; }
     function clear() { actions = []; cursor = 0; current = null; }
     function getActiveActions() { return actions.slice(0, cursor); }
+    function drawChiselAction_(canvas, ctx, a) {
+      const NIB_ANGLE = -45 * Math.PI / 180;
+      const halfW = Math.max(0.5, (a.size || 4) / 2);
+      const dx = Math.cos(NIB_ANGLE) * halfW, dy = Math.sin(NIB_ANGLE) * halfW;
+      ctx.save();
+      ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
+      ctx.fillStyle = a.color || "#ff3b30";
+      const stampAt = (x, y) => { ctx.beginPath(); ctx.arc(x, y, halfW * 0.92, 0, Math.PI * 2); ctx.fill(); };
+      const p0 = a.pts[0];
+      stampAt(p0.x * canvas.width, p0.y * canvas.height);
+      for (let i = 1; i < a.pts.length; i++) {
+        const pa = a.pts[i - 1], pb = a.pts[i];
+        const x0 = pa.x * canvas.width, y0 = pa.y * canvas.height;
+        const x1 = pb.x * canvas.width, y1 = pb.y * canvas.height;
+        ctx.beginPath();
+        ctx.moveTo(x0 - dx, y0 - dy); ctx.lineTo(x0 + dx, y0 + dy);
+        ctx.lineTo(x1 + dx, y1 + dy); ctx.lineTo(x1 - dx, y1 - dy);
+        ctx.closePath(); ctx.fill();
+        stampAt(x1, y1);
+      }
+      ctx.restore();
+    }
     function drawAction(canvas, ctx, a) {
       if (!canvas || !ctx || !a || !a.pts || a.pts.length < 2) return;
+      if (a.tip === "chisel") { drawChiselAction_(canvas, ctx, a); return; }
       ctx.save();
       ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
       ctx.strokeStyle = a.color || "#ff3b30";
@@ -10315,7 +10346,7 @@ const PresentationStudio = (() => {
     }
     function drawSegmentLive(canvas, ctx, pts) {
       if (!current || !pts || pts.length < 2) return;
-      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, pts: pts });
+      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, tip: current.tip, pts: pts });
     }
     return {
       begin, append, end, cancelCurrent, undo, redo, clear,
@@ -10508,6 +10539,41 @@ const PresentationStudio = (() => {
         color = chip.dataset.color;
       });
     });
+    // BARU (26 Sep 2026, permintaan operator, sinkron dgn present.html) --
+    // tombol roda-warna #psPointerColorPick membuka color-picker ASLI
+    // (24-bit/RGB penuh) utk MENGGANTI warna swatch kustom
+    // #psPointerColorCustomSwatch (yang dipilih lewat handler generik di
+    // atas, sama seperti swatch lain).
+    (function wirePointerCustomColor_() {
+      const swatch = el("psPointerColorCustomSwatch");
+      const pickBtn = el("psPointerColorPick");
+      const input = el("psPointerColorInput");
+      if (!pickBtn || !input) return;
+      pickBtn.addEventListener("click", () => { try { input.click(); } catch (e) {} });
+      const apply_ = () => {
+        const v = input.value || "#7c4dff";
+        if (swatch) {
+          swatch.style.background = v;
+          swatch.dataset.color = v;
+          color = v;
+          document.querySelectorAll("#psPointerColorRow .ps-color-chip").forEach((c) => c.classList.toggle("active", c === swatch));
+        }
+      };
+      input.addEventListener("input", apply_);
+      input.addEventListener("change", apply_);
+    })();
+    // BARU (26 Sep 2026, permintaan operator "ujungnya bulat, atau miring
+    // seperti kuas", sinkron dgn present.html) -- bentuk ujung goresan Pen
+    // Studio, lihat drawChiselAction_() di createInkEngineFallback_()/
+    // js/ink-engine.js. Dikirim ke Layar 2 lewat rawPost({..., tip}) di
+    // addPenPoint_() di bawah.
+    let penTip = "round";
+    document.querySelectorAll("[data-ps-pen-tip]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        penTip = btn.dataset.psPenTip === "chisel" ? "chisel" : "round";
+        document.querySelectorAll("[data-ps-pen-tip]").forEach((b) => b.classList.toggle("active", b === btn));
+      });
+    });
     pointerBtns().forEach((btn) => btn.addEventListener("click", () => {
       pointerActive = !pointerActive;
       penActive = false;
@@ -10684,8 +10750,8 @@ const PresentationStudio = (() => {
     function addPenPoint_(x, y) {
       if (!studioInk) return;
       if (!studioInk.getCurrent()) {
-        studioInk.begin(String(penStrokeId), eraserActive ? "erase" : "draw", color, penSize);
-        rawPost({ type: "pen", action: "begin", id: String(penStrokeId), mode: eraserActive ? "erase" : "draw", color, size: penSize });
+        studioInk.begin(String(penStrokeId), eraserActive ? "erase" : "draw", color, penSize, penTip);
+        rawPost({ type: "pen", action: "begin", id: String(penStrokeId), mode: eraserActive ? "erase" : "draw", color, size: penSize, tip: penTip });
       }
       studioInk.append([{ x, y }]);
       rawPost({ type: "pen", action: "append", pts: [{ x, y }] });
