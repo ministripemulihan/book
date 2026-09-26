@@ -174,7 +174,7 @@
 /* ============================================================
    LAYAR 2 (present.html) -- game "🌱 Penciptaan"
    ============================================================ */
-#penciptaanView { position: absolute; inset: 0; z-index: 2; }
+#penciptaanView { position: fixed; inset: 0; z-index: 2; }
 #penciptaanView[hidden] { display: none; }
 #penciptaanCaption { position: absolute; left: 0; right: 0; bottom: 5vh; z-index: 3; text-align: center; font-family: "Literata", Georgia, serif; font-size: clamp(20px, 3.6vw, 52px); font-weight: 700; color: #f7f3e6; text-shadow: 0 2px 26px rgba(0, 0, 0, .8); padding: 0 6vw; line-height: 1.25; }
 #penciptaanCaption small { display: block; margin-top: .35em; font-size: .52em; font-weight: 500; opacity: .85; }

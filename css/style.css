@@ -4558,6 +4558,17 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 }
 .ps-yt-live-sep { color: var(--ps-muted); font-size: 12px; }
 .ps-yt-live-duration { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 62px; }
+/* BARU (26 Sep 2026, permintaan operator "volume YouTube terlalu besar")
+   -- slider volume kecil yang duduk inline di antara tombol-tombol chip
+   di ps-preview-quicktools (lihat #psYtVolumeWrap di index.html &
+   wireYtControls() di js/presentation-studio.js). */
+.ps-yt-volume-wrap {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: 999px; background: var(--ps-tab-bg); border: 1px solid var(--ps-col-border);
+  font-size: 13px;
+}
+.ps-yt-volume-range { width: 84px; accent-color: var(--brass); }
+.ps-yt-volume-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 30px; text-align: right; }
 /* Baris video Playlist (thumb + info + aksi) sudah flex row rapat --
    progress bar-nya dipaksa turun ke baris sendiri (flex-basis 100%)
    supaya tidak menabrak thumbnail/tombol yang sudah ada. */
