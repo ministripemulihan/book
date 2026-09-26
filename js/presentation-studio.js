@@ -6051,6 +6051,9 @@ const PresentationStudio = (() => {
         rawPost({ type: "yt_bg", embedUrl });
         setYtBgStatus(`🎧 Latar: ${id} (tekan ▶ Play di bawah untuk mulai)`);
         lastBgTrack_ = { embedUrl, videoId: id, title: null };
+        // FIX (27 Sep 2026) -- track BARU belum pernah ditekan main, lihat
+        // catatan panjang di resetYtBgPlayPauseState_() (wireYoutubeTab()).
+        if (typeof window.resetYtBgPlayPauseState_ === "function") window.resetYtBgPlayPauseState_();
         // Judul otomatis (kalau sempat termuat) supaya nama simpanan
         // tidak cuma berupa id video mentah -- lihat psYtBgSaveBtn di
         // bawah.
@@ -6089,11 +6092,67 @@ const PresentationStudio = (() => {
       const s = el("psYtBgStatus");
       if (s) s.textContent = text;
     }
-    if (el("psYtBgPlayBtn")) el("psYtBgPlayBtn").addEventListener("click", () => rawPost({ type: "yt_bg_control", action: "play" }));
-    if (el("psYtBgPauseBtn")) el("psYtBgPauseBtn").addEventListener("click", () => rawPost({ type: "yt_bg_control", action: "pause" }));
+    // DIUBAH (27 Sep 2026, laporan operator "tombol play youtube latar
+    // tidak berubah jadi pause saat ditekan") -- dulu #psYtBgPlayBtn &
+    // #psYtBgPauseBtn adalah 2 tombol TERPISAH yang cuma mengirim
+    // perintah "play"/"pause" ke Layar 2 lewat rawPost() TANPA PERNAH
+    // mengubah tampilan tombolnya sendiri sama sekali (label & warna
+    // selalu diam di "▶ Play"/"⏸ Pause" apa pun yang sungguh terjadi) --
+    // operator tidak pernah tahu dari tombolnya sendiri apakah audio
+    // latar sedang main atau dijeda. Sekarang digabung jadi SATU tombol
+    // toggle (#psYtBgPlayPauseBtn, lihat index.html), meniru pola yang
+    // sama dengan tombol ▶️/⏸️ gabungan milik video UTAMA di atas
+    // (psYtPlayPauseBtn/doYtPlay_()/doYtPause_() di wireYtControls()) --
+    // status main/jeda disimpan lokal di `ytBgIsPlaying` & tombol selalu
+    // disamakan lewat SATU fungsi refreshYtBgPlayPauseUi_() saja, dipakai
+    // baik oleh klik tombol maupun oleh reset video baru di bawah.
+    //   Catatan: Layar 2 (present.html) TIDAK melaporkan balik status
+    //   main/jeda sungguhan milik #ytBg (beda dari video UTAMA yang
+    //   punya laporan "ps-yt-progress" tiap detik) -- jadi status ini
+    //   OPTIMISTIS (mengikuti tombol yang ditekan operator), sama seperti
+    //   asumsi lama, cuma sekarang tombolnya ikut menunjukkan status itu
+    //   secara visual alih-alih diam saja.
+    let ytBgIsPlaying = false;
+    const ytBgPlayPauseBtn = el("psYtBgPlayPauseBtn");
+    function refreshYtBgPlayPauseUi_() {
+      if (!ytBgPlayPauseBtn) return;
+      ytBgPlayPauseBtn.textContent = ytBgIsPlaying ? "⏸ Pause" : "▶ Play";
+      ytBgPlayPauseBtn.title = ytBgIsPlaying ? "Jeda audio latar YouTube di Layar 2" : "Putar audio latar YouTube di Layar 2";
+      ytBgPlayPauseBtn.classList.toggle("active", ytBgIsPlaying);
+    }
+    refreshYtBgPlayPauseUi_();
+    function doYtBgPlay_() {
+      rawPost({ type: "yt_bg_control", action: "play" });
+      ytBgIsPlaying = true;
+      refreshYtBgPlayPauseUi_();
+    }
+    function doYtBgPause_() {
+      rawPost({ type: "yt_bg_control", action: "pause" });
+      ytBgIsPlaying = false;
+      refreshYtBgPlayPauseUi_();
+    }
+    window.toggleYtBgPlayPause_ = function toggleYtBgPlayPause_() {
+      if (ytBgIsPlaying) doYtBgPause_(); else doYtBgPlay_();
+    };
+    if (ytBgPlayPauseBtn) ytBgPlayPauseBtn.addEventListener("click", () => window.toggleYtBgPlayPause_());
+    // Dipanggil setiap kali audio latar YouTube yang dimuat BERGANTI jadi
+    // video BARU (lihat pemanggilannya di doShow()/playAsYtBackground()
+    // di bawah) -- supaya tombol gabungan ini selalu kembali ke "▶ Play"
+    // yang benar untuk track baru yang belum pernah ditekan main, PERSIS
+    // pola resetYtPlayPauseState_() milik video utama (lihat catatan
+    // panjang di syncYtLiveBarVisibility(), atas file ini).
+    window.resetYtBgPlayPauseState_ = function resetYtBgPlayPauseState_() {
+      ytBgIsPlaying = false;
+      refreshYtBgPlayPauseUi_();
+    };
     if (el("psYtBgStopBtn")) el("psYtBgStopBtn").addEventListener("click", () => {
       rawPost({ type: "yt_bg_clear" });
       setYtBgStatus("Belum ada audio latar yang diputar.");
+      // Stop = audio latar berhenti main -- tombol gabungan ikut
+      // disamakan balik ke "▶ Play" (bukan dibiarkan menampilkan
+      // "⏸ Pause" yang sudah tidak sesuai keadaan sebenarnya), sama
+      // seperti psYtStopBtn milik video utama di atas.
+      window.resetYtBgPlayPauseState_();
     });
     // Dropdown "Pilih dari video yang sudah tersimpan" -- supaya operator
     // tidak perlu tempel ulang link, tinggal pilih dari Media Tersimpan
@@ -6170,6 +6229,9 @@ const PresentationStudio = (() => {
       rawPost({ type: "yt_bg", embedUrl });
       setYtBgStatus(`🎧 Latar: ${label || "video"} (tekan ▶ Play di bawah untuk mulai)`);
       lastBgTrack_ = { embedUrl, videoId: null, title: label || null };
+      // FIX (27 Sep 2026) -- track BARU belum pernah ditekan main, lihat
+      // catatan panjang di resetYtBgPlayPauseState_() (wireYoutubeTab()).
+      if (typeof window.resetYtBgPlayPauseState_ === "function") window.resetYtBgPlayPauseState_();
     };
     // BARU (12 Sep 2026) -- lihat catatan panjang di label tombol
     // (index.html, #psYtBgSaveBtn) untuk penjelasan akar masalahnya.
@@ -8180,25 +8242,56 @@ const PresentationStudio = (() => {
   // ditutup-buka lagi, & present.html (lewat OVERLAY_TYPES + lastFocusMode_
   // di js/presentation.js) otomatis mengirim ulang status ini kalau Layar 2
   // dibuka ulang -- jadi badge-nya benar-benar "menempel" seperti logo.
-  const FOCUS_MODE_KEY = "bible_app_focusmode_v1";
-  let focusModeOn_ = localStorage.getItem(FOCUS_MODE_KEY) === "1";
+  // DIUBAH (27 Sep 2026, permintaan operator "mau bisa hide/show larangan
+  // bicara terpisah dari larangan HP") -- dulu 1 tombol/1 key localStorage
+  // untuk 2 ikon sekaligus (FOCUS_MODE_KEY + focusModeOn_), sekarang
+  // PECAH jadi 2 tombol & 2 key localStorage independen (HP & Bicara),
+  // tiap tombol punya status nyala/mati sendiri-sendiri. Payload yang
+  // dikirim ke Layar 2 SEKARANG mengirim status GABUNGAN tiap kali salah
+  // satu ditekan ({type:"focusmode", hp, bicara}) supaya present.html
+  // (lihat handler data.type==="focusmode") selalu tahu status LENGKAP
+  // kedua ikon, bukan cuma yang baru ditekan.
+  const FOCUS_MODE_HP_KEY = "bible_app_focusmode_hp_v1";
+  const FOCUS_MODE_BICARA_KEY = "bible_app_focusmode_bicara_v1";
+  let focusModeHpOn_ = localStorage.getItem(FOCUS_MODE_HP_KEY) === "1";
+  let focusModeBicaraOn_ = localStorage.getItem(FOCUS_MODE_BICARA_KEY) === "1";
+  function sendFocusModeState_() {
+    rawPost({ type: "focusmode", hp: focusModeHpOn_, bicara: focusModeBicaraOn_ });
+  }
   function wireFocusModeToggle() {
-    const btn = el("psFocusModeToggleBtn");
-    if (!btn || btn.dataset.wired) { markFocusModeBtn_(); return; }
-    btn.dataset.wired = "1";
-    btn.addEventListener("click", () => {
-      focusModeOn_ = !focusModeOn_;
-      try { localStorage.setItem(FOCUS_MODE_KEY, focusModeOn_ ? "1" : "0"); } catch (e) {}
-      rawPost({ type: "focusmode", on: focusModeOn_ });
-      markFocusModeBtn_();
-    });
+    const hpBtn = el("psFocusModeToggleBtn");
+    if (hpBtn && !hpBtn.dataset.wired) {
+      hpBtn.dataset.wired = "1";
+      hpBtn.addEventListener("click", () => {
+        focusModeHpOn_ = !focusModeHpOn_;
+        try { localStorage.setItem(FOCUS_MODE_HP_KEY, focusModeHpOn_ ? "1" : "0"); } catch (e) {}
+        sendFocusModeState_();
+        markFocusModeBtn_();
+      });
+    }
+    const bicaraBtn = el("psFocusModeBicaraToggleBtn");
+    if (bicaraBtn && !bicaraBtn.dataset.wired) {
+      bicaraBtn.dataset.wired = "1";
+      bicaraBtn.addEventListener("click", () => {
+        focusModeBicaraOn_ = !focusModeBicaraOn_;
+        try { localStorage.setItem(FOCUS_MODE_BICARA_KEY, focusModeBicaraOn_ ? "1" : "0"); } catch (e) {}
+        sendFocusModeState_();
+        markFocusModeBtn_();
+      });
+    }
     markFocusModeBtn_();
   }
   function markFocusModeBtn_() {
-    const btn = el("psFocusModeToggleBtn");
-    if (!btn) return;
-    btn.classList.toggle("active", focusModeOn_);
-    btn.textContent = focusModeOn_ ? "✅ Larangan HP & Bicara AKTIF (klik utk matikan)" : "🚫 Tampilkan Larangan HP & Bicara";
+    const hpBtn = el("psFocusModeToggleBtn");
+    if (hpBtn) {
+      hpBtn.classList.toggle("active", focusModeHpOn_);
+      hpBtn.textContent = focusModeHpOn_ ? "✅ Larangan HP AKTIF (klik utk matikan)" : "🚫 Tampilkan Larangan Lihat HP";
+    }
+    const bicaraBtn = el("psFocusModeBicaraToggleBtn");
+    if (bicaraBtn) {
+      bicaraBtn.classList.toggle("active", focusModeBicaraOn_);
+      bicaraBtn.textContent = focusModeBicaraOn_ ? "✅ Larangan Bicara AKTIF (klik utk matikan)" : "🗣️ Tampilkan Larangan Bicara";
+    }
   }
 
   // ------------------------------------------------------------
