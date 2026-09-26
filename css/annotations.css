@@ -1,0 +1,151 @@
+/* ============================================================
+   🖍️ PENANDA / STABILO BERKATEGORI (BARU 21 Sep 2026) -- js/annotations.js
+   Stylesheet TERPISAH (css/style.css tidak diubah). Warna pastel sama dengan
+   highlight lama (.hl-*); teks di atas pastel dipaksa tinta gelap supaya
+   terbaca di semua tema (termasuk yang gelap).
+   ============================================================ */
+
+/* ---- warna kategori (dipakai swatch, titik, chip) ---- */
+.hl-swatch-yellow, .anno-chip-yellow, .anno-dot-yellow, .mk-yellow { --anno: #fbeeb0; }
+.hl-swatch-green,  .anno-chip-green,  .anno-dot-green,  .mk-green  { --anno: #cfe9d6; }
+.hl-swatch-blue,   .anno-chip-blue,   .anno-dot-blue,   .mk-blue   { --anno: #cfe2f3; }
+.hl-swatch-pink,   .anno-chip-pink,   .anno-dot-pink,   .mk-pink   { --anno: #f7d3e0; }
+.hl-swatch-purple, .anno-chip-purple, .anno-dot-purple, .mk-purple { --anno: #e1d3f5; }
+.hl-swatch-orange, .anno-chip-orange, .anno-dot-orange, .mk-orange { --anno: #fce0bf; }
+.hl-swatch-teal,   .anno-chip-teal,   .anno-dot-teal,   .mk-teal   { --anno: #cfefe7; }
+.hl-swatch-coral,  .anno-chip-coral,  .anno-dot-coral,  .mk-coral  { --anno: #f6d6cb; }
+.hl-swatch-gray,   .anno-chip-gray,   .anno-dot-gray,   .mk-gray   { --anno: #e2e2e6; }
+.hl-swatch-cream,  .anno-chip-cream,  .anno-dot-cream,  .mk-cream  { --anno: #eedfc4; }
+
+/* ---- tanda sebagian teks ---- */
+mark.anno-mark {
+  background: var(--anno, #fbeeb0);
+  color: #2b2118;
+  border-radius: 3px;
+  padding: 0 1px;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+mark.anno-mark.anno-off { background: transparent; color: inherit; cursor: text; }
+
+/* ---- titik kategori di bawah nomor ayat ---- */
+.anno-dots {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 2px; margin-top: 3px; pointer-events: none;
+}
+.anno-dot {
+  display: block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--anno, #ccc); border: 1px solid rgba(0,0,0,.35);
+}
+.anno-dot.off { opacity: .3; }
+.verse-block.anno-hidden { display: none; }
+
+/* ---- bilah kategori di atas pasal ---- */
+.anno-filter-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 0 0 12px; padding: 8px 10px;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 12px;
+}
+.anno-filter-title { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin-right: 2px; }
+.anno-filter-note { font-size: 12px; color: var(--ink-soft); flex-basis: 100%; }
+.anno-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  border: 2px solid var(--anno, var(--rule)); background: var(--paper);
+  color: var(--ink); font: inherit; font-size: 12.5px;
+}
+.anno-chip[class*="anno-chip-"]:not(.anno-chip-only):not(.anno-chip-open) { background: var(--anno); color: #2b2118; }
+.anno-chip.off { background: var(--paper) !important; color: var(--ink-soft) !important; opacity: .65; text-decoration: line-through; }
+.anno-chip.on { box-shadow: 0 0 0 2px var(--petrol); }
+.anno-chip-count { font-weight: 700; font-size: 11.5px; opacity: .8; }
+.anno-chip-only.on { background: var(--petrol); color: var(--paper); border-color: var(--petrol); }
+.anno-chip:focus-visible, .anno-cat-row:focus-visible, .anno-selbtn:focus-visible { outline: 2px solid var(--petrol); outline-offset: 2px; }
+
+/* ---- popup kategori ---- */
+.anno-popup {
+  position: fixed; z-index: 960; width: 270px; max-width: calc(100vw - 16px);
+  max-height: 70vh; overflow-y: auto;
+  background: var(--paper-raised); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 10px 10px 12px;
+}
+.anno-popup-title { font-weight: 700; font-size: 13.5px; margin: 2px 4px 8px; }
+.anno-popup-quote { font-size: 12.5px; color: var(--ink-soft); margin: 0 4px 8px; font-style: italic; }
+.anno-popup-hint { font-size: 11.5px; color: var(--ink-soft); margin: 8px 4px 4px; line-height: 1.4; }
+.anno-popup-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.anno-cat-list { display: flex; flex-direction: column; gap: 4px; }
+.anno-cat-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 10px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: inherit; font-size: 13.5px;
+}
+.anno-cat-row.active { border-color: var(--petrol); box-shadow: 0 0 0 1px var(--petrol) inset; }
+.anno-cat-name { flex: 1; }
+.anno-cat-check { font-weight: 700; color: var(--petrol); min-width: 14px; text-align: right; }
+.anno-swatch {
+  display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--anno, #ccc); border: 1px solid rgba(0,0,0,.25); flex-shrink: 0;
+}
+
+/* ---- toolbar saat teks disorot ---- */
+.anno-seltool {
+  position: fixed; z-index: 955; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100vw - 16px);
+  padding: 6px 8px; border-radius: 999px; background: var(--paper-raised);
+  border: 1px solid var(--petrol); box-shadow: var(--shadow);
+}
+.anno-selbtn {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer; padding: 0; font-size: 15px;
+  border: 2px solid rgba(0,0,0,.15); background: var(--anno, #ddd); color: #2b2118;
+}
+.anno-selbtn-all { background: var(--paper); color: var(--ink); }
+.anno-selbtn-all.on { border-color: var(--petrol); }
+
+/* ---- dialog kelola kategori ---- */
+.anno-cat-box { max-width: 480px; width: calc(100vw - 32px); max-height: 86vh; overflow-y: auto; text-align: left; }
+.anno-cat-rows { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.anno-cat-edit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.anno-icon-input { width: 44px; text-align: center; }
+.anno-name-input { flex: 1; min-width: 120px; }
+.anno-cat-new { border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 4px; }
+
+/* ---- panel "Penanda Saya" ---- */
+.anno-panel-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; align-items: center; }
+.anno-panel-search { flex: 1; min-width: 140px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: inherit; }
+.anno-panel-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.anno-panel-list { display: flex; flex-direction: column; gap: 10px; }
+.anno-row { border: 1px solid var(--rule); border-radius: 12px; padding: 8px 10px; background: var(--paper-raised); }
+.anno-row-open { width: 100%; text-align: left; }
+.anno-row-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 2px; }
+.anno-tag { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--anno, #ddd); color: #2b2118; }
+.anno-row-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+@media (max-width: 420px) {
+  .anno-popup { width: calc(100vw - 16px); }
+}
+
+/* ============================================================
+   ✏️ EDIT AYAT ADMINISTRATOR (BARU 21 Sep 2026) -- js/bible-edit.js
+   ============================================================ */
+.bedit-box { max-width: 520px; width: calc(100vw - 32px); max-height: 90vh; overflow-y: auto; text-align: left; }
+.bedit-ref { font-weight: 700; margin-bottom: 6px; }
+.bedit-hint { font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; margin: 0 0 10px; }
+.bedit-textarea {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  font: inherit; line-height: 1.5; resize: vertical;
+}
+.bedit-orig { margin: 10px 0; font-size: 13px; }
+.bedit-orig summary { cursor: pointer; color: var(--ink-soft); }
+.bedit-orig-text { margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: var(--paper); white-space: pre-wrap; }
+.bedit-pw { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-soft); font-weight: 600; margin: 8px 0; }
+.bedit-pw input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: inherit; }
+.bedit-msg { min-height: 18px; font-size: 13px; color: var(--danger, #b3261e); margin: 6px 0; }
+.bedit-actions { flex-wrap: wrap; }
+.verse-block.verse-edited .verse-text-wrap { border-bottom: 1px dotted var(--brass); }
+.bedit-list { display: flex; flex-direction: column; gap: 10px; }
+.bedit-row { border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; background: var(--paper-raised); }
+.bedit-row.reverted { opacity: .65; }
+.bedit-before, .bedit-after { font-size: 13.5px; margin-top: 6px; line-height: 1.45; }
+.bedit-before { color: var(--ink-soft); }
+.bedit-row-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }

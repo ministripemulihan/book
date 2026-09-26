@@ -1,0 +1,29 @@
+/* ============================================================
+   🔎 AI CHAT: RISET TEMA & MODE KHOTBAH (BARU 21 Sep 2026)
+   Panel pengaturan di bawah kotak "🌐 Izinkan referensi luar" -- lihat
+   js/aichat-riset.js. Stylesheet TERPISAH (css/style.css tidak diubah),
+   memakai variabel tema aplikasi supaya ikut berganti di semua tema.
+   ============================================================ */
+.ai-riset-controls {
+  margin: 0 0 14px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--paper-raised);
+}
+.ai-riset-controls > summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  list-style-position: inside;
+}
+.ai-riset-controls > summary:focus-visible { outline: 2px solid var(--petrol); outline-offset: 2px; }
+.ai-riset-body { padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+.ai-riset-langs { border: 1px solid var(--rule); border-radius: 10px; margin: 0; padding: 8px 12px 10px; }
+.ai-riset-langs legend { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); padding: 0 6px; }
+.ai-riset-lang { display: flex; align-items: flex-start; gap: 6px; font-size: 13.5px; color: var(--ink); margin: 4px 0; cursor: pointer; }
+.ai-riset-lang input { margin-top: 3px; accent-color: var(--petrol); }
+.ai-riset-hint { font-size: 12px; color: var(--ink-soft); margin: 8px 0 0; }
+.ai-riset-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+.ai-riset-field select { max-width: 100%; }
