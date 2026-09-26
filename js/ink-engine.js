@@ -37,12 +37,21 @@
     let cursor = 0;      // actions.slice(0, cursor) = yang SEDANG terlihat/aktif
     let current = null;  // aksi yang sedang digambar (antara begin() dan end())
 
-    function begin(id, mode, color, size) {
+    function begin(id, mode, color, size, tip) {
       current = {
         id: id != null ? String(id) : "",
         mode: mode === "erase" ? "erase" : "draw",
         color: color || "#ff3b30",
         size: Math.max(1, Number(size) || 4),
+        // BARU (26 Sep 2026, permintaan operator "ujungnya bulat, atau ujungnya
+        // garis miring seperti kuas") -- bentuk ujung goresan: "round" (bulat,
+        // BAWAAN, sama seperti sebelumnya -- lineCap bulat biasa) atau "chisel"
+        // (miring ala kuas kaligrafi: nib DIAM di sudut tetap 45 derajat apa pun
+        // arah goresan, jadi ketebalan tampak berubah sendiri tergantung arah
+        // tarikan tangan, persis spidol/kuas pipih sungguhan -- lihat
+        // drawChiselAction() di bawah). Parameter opsional -- kalau tidak
+        // diisi, sama sekali tidak mengubah perilaku lama (tetap "round").
+        tip: tip === "chisel" ? "chisel" : "round",
         pts: [],
       };
       return current;
@@ -101,6 +110,11 @@
     // (resize jendela, pindah 1 <-> 2 monitor, dst).
     function drawAction(canvas, ctx, a) {
       if (!canvas || !ctx || !a || !a.pts || a.pts.length < 2) return;
+      // BARU (26 Sep 2026) -- ujung "chisel" (miring ala kuas) dirender lewat
+      // jalur TERPISAH (drawChiselAction) supaya jalur "round" lama di bawah
+      // ini SAMA SEKALI TIDAK BERUBAH (tetap lineCap/lineJoin bulat + stroke()
+      // polos) -- goresan lama & pengujian yang sudah ada tidak terpengaruh.
+      if (a.tip === "chisel") { drawChiselAction(canvas, ctx, a); return; }
       ctx.save();
       ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
       ctx.strokeStyle = a.color || "#ff3b30";
@@ -114,6 +128,40 @@
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
+      ctx.restore();
+    }
+
+    // "Kuas kaligrafi" -- nib (mata pena) berbentuk PERSEGI PANJANG PIPIH yang
+    // sudutnya TETAP (nibAngle, tidak ikut berputar mengikuti arah goresan,
+    // persis kuas/spidol chisel-tip sungguhan) -- makanya tarikan SEARAH sudut
+    // nib terlihat TIPIS, tarikan TEGAK LURUS sudut nib terlihat TEBAL PENUH.
+    // Digambar sebagai rangkaian jajaran genjang (1 per segmen) + lingkaran
+    // kecil di tiap sambungan titik supaya tidak ada celah -- diisi (fill),
+    // bukan stroke(), karena lineWidth/lineCap bawaan canvas tidak bisa
+    // membuat efek nib bersudut tetap seperti ini.
+    function drawChiselAction(canvas, ctx, a) {
+      const NIB_ANGLE = -45 * Math.PI / 180; // sudut nib TETAP (kaligrafi klasik)
+      const halfW = Math.max(0.5, (a.size || 4) / 2);
+      const dx = Math.cos(NIB_ANGLE) * halfW, dy = Math.sin(NIB_ANGLE) * halfW;
+      ctx.save();
+      ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
+      ctx.fillStyle = a.color || "#ff3b30";
+      const stampAt = (x, y) => { ctx.beginPath(); ctx.arc(x, y, halfW * 0.92, 0, Math.PI * 2); ctx.fill(); };
+      const p0 = a.pts[0];
+      stampAt(p0.x * canvas.width, p0.y * canvas.height);
+      for (let i = 1; i < a.pts.length; i++) {
+        const pa = a.pts[i - 1], pb = a.pts[i];
+        const x0 = pa.x * canvas.width, y0 = pa.y * canvas.height;
+        const x1 = pb.x * canvas.width, y1 = pb.y * canvas.height;
+        ctx.beginPath();
+        ctx.moveTo(x0 - dx, y0 - dy);
+        ctx.lineTo(x0 + dx, y0 + dy);
+        ctx.lineTo(x1 + dx, y1 + dy);
+        ctx.lineTo(x1 - dx, y1 - dy);
+        ctx.closePath();
+        ctx.fill();
+        stampAt(x1, y1);
+      }
       ctx.restore();
     }
     // Gambar ULANG semua aksi yang aktif (cursor) dari kanvas kosong --
@@ -130,7 +178,7 @@
     // kursor/jari bergerak (tidak render() ulang semuanya tiap gerakan).
     function drawSegmentLive(canvas, ctx, pts) {
       if (!current || !pts || pts.length < 2) return;
-      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, pts: pts });
+      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, tip: current.tip, pts: pts });
     }
 
     return {

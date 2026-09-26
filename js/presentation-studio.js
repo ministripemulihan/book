@@ -11562,6 +11562,17 @@ const PresentationStudio = (() => {
         refreshStatusUi();
         applyStoredTheme();
       }
+      // BARU (26 Sep 2026, permintaan operator "panah atas ke slide
+      // sebelumnya, panah bawah ke slide setelahnya" dari present.html/
+      // Layar 2 -- lihat sendNavKey_() & keydown ArrowUp/ArrowDown di
+      // present.html) -- dipetakan ke playlistNext()/playlistPrev() yang
+      // SAMA yang sudah dipakai wirePlaylistKeyNav() (panah papan ketik di
+      // jendela Studio sendiri) di atas file ini, jadi perilakunya identik
+      // (tidak berbuat apa-apa kalau belum ada playlist aktif).
+      if (data.source === "bibleAppPresenter" && data.type === "present_nav_key") {
+        if (data.dir === "next") playlistNext();
+        else if (data.dir === "prev") playlistPrev();
+      }
       // BARU (18 Sep 2026 v5) -- lihat catatan panjang di reportBgAudioStatus_()
       // (present.html) & showBgAudioErrorToast_() di atas file ini.
       BG.handlePresenterMessage(data); // BARU (19 Sep 2026) -- status Audio Latar dari Layar 2, logikanya di js/bg-audio.js
