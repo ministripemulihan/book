@@ -1901,9 +1901,41 @@
   #localInkBar .local-ink-sep { width: 1px; align-self: stretch; background: rgba(255,255,255,.2); margin: 0 1px; }
   #localInkOptions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; padding-top: 5px; margin-top: 1px; border-top: 1px solid rgba(255,255,255,.18); }
   #localInkOptions[hidden] { display: none; }
-  #localInkColorRow { display: flex; gap: 5px; width: 100%; margin-top: 2px; }
+  /* BARU (26 Sep 2026, permintaan operator "garisnya bisa dijadikan horizontal
+     progress bar, ketebalannya bisa diatur") -- slider ketebalan KONTINU,
+     berdampingan dengan 3 tombol preset Tipis/Tebal/Super Tebal yang sudah ada
+     (preset tetap dipertahankan utk pilihan cepat 1 ketukan; slider utk atur
+     halus). Terisi seperti progress bar lewat --ink-size-pct yang disetel JS
+     tiap kali nilainya berubah (lihat updateSizeFill_() di skrip bawah). */
+  #localInkSizeRow { display: flex; align-items: center; gap: 7px; width: 100%; margin-top: 3px; }
+  #localInkSizeRange {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 999px; outline: none; cursor: pointer;
+    background: linear-gradient(to right, #d8b45c var(--ink-size-pct, 30%), rgba(255,255,255,.18) 0);
+  }
+  #localInkSizeRange::-webkit-slider-thumb { -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%; background: #fff; border: 2px solid #d8b45c; cursor: pointer; }
+  #localInkSizeRange::-moz-range-thumb { width: 15px; height: 15px; border-radius: 50%; background: #fff; border: 2px solid #d8b45c; cursor: pointer; }
+  #localInkSizeRange::-moz-range-track { height: 8px; border-radius: 999px; background: rgba(255,255,255,.18); }
+  #localInkSizeRange::-moz-range-progress { height: 8px; border-radius: 999px; background: #d8b45c; }
+  #localInkSizeVal { min-width: 32px; text-align: right; font: 700 11px "Inter", Arial, sans-serif; color: #fff; }
+  /* BARU (26 Sep 2026, permintaan operator "ujungnya bulat, atau miring
+     seperti kuas") -- 2 tombol bentuk ujung goresan, sama gaya tombol lain. */
+  #localInkTipRow { display: flex; align-items: center; gap: 5px; width: 100%; margin-top: 3px; }
+  #localInkTipRow .local-ink-tip-label { font: 600 11px "Inter", Arial, sans-serif; color: rgba(255,255,255,.6); margin-right: 2px; }
+  #localInkColorRow { display: flex; align-items: center; gap: 5px; width: 100%; margin-top: 2px; }
   #localInkColorRow button { width: 20px; height: 20px; min-width: 20px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.3); }
   #localInkColorRow button.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
+  /* BARU (26 Sep 2026, permintaan operator "satu warna & satu tombol untuk
+     ganti warna 24-bit") -- 1 swatch warna kustom (dipilih persis seperti
+     swatch lain) + 1 tombol roda-warna kecil di sebelahnya yang membuka
+     color-picker asli perangkat (input type=color, 24-bit/RGB penuh) untuk
+     MENGGANTI warna swatch itu. input color-nya sendiri disembunyikan --
+     cuma dipakai sebagai jembatan ke dialog pemilih warna bawaan OS/browser. */
+  #localInkCustomPick {
+    width: 20px; height: 20px; min-width: 20px; border-radius: 50%; padding: 0; cursor: pointer;
+    border: 2px solid rgba(255,255,255,.35);
+    background: conic-gradient(red, #f4d03f, lime, cyan, blue, magenta, red);
+  }
+  #localInkColorInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   #localInkBadge {
     position: fixed; left: 54px; bottom: 19px; z-index: 96; pointer-events: none; opacity: 0; transition: opacity .3s ease;
     background: rgba(20,20,20,.75); color: #fff; font: 600 12px "Inter", Arial, sans-serif; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
@@ -1954,6 +1986,33 @@
      (bukan lompat mendadak), sama untuk saat dilepas (transform balik ke
      kosong = ukuran semula). */
   #slideView { transition: transform .3s ease; }
+
+  /* ============================================================
+     🔍 Zoom Layar (BARU 26 Sep 2026, permintaan operator "tombol zoom,
+     keluar garis kotak, di luar kotak digelapkan, klik kiri langsung
+     zoom, panah geser, Esc kembali 100%") -- BEDA dari 🔲 Perbesar Kotak
+     & 🔍 Kaca Pembesar di atas: 2 fitur itu HANYA memperbesar #slideView
+     (gambar/PDF yang sedang tayang) & dikendalikan dari Studio. Zoom
+     Layar ini memperbesar SELURUH LAYAR (apa pun yang sedang tampil --
+     ayat, kidung, kuis, peta, dst), murni lokal, salah satu mode di
+     toolbar 🖊️ Coret-coret Langsung (data-local-ink-mode="zoom").
+     Tekniknya: SELURUH isi <body> (kecuali toolbar/kanvas coret & kotak
+     seleksi ini sendiri) dipindah ke satu <div id="zoomStageWrap"> lewat
+     JS (lihat wrapBodyForZoom_() di skrip bawah), lalu di-scale+geser
+     dengan CSS transform saat dikunci -- lihat catatan panjang di
+     wrapBodyForZoom_()/lockZoomAt_()/panZoom_()/resetZoom_() di skrip
+     bawah utk penjelasan lengkap kenapa aman dipakai di sini.
+     #zoomBoxSel memakai trik box-shadow spread raksasa yang SAMA dengan
+     #boxZoomHover di atas (area DALAM kotak normal, SEMUA yang di luar
+     digelapkan) -- mengikuti kursor SELAGI belum dikunci, hilang begitu
+     dikunci (transform sudah menggantikannya). ============================================================ */
+  #zoomStageWrap { width: 100%; height: 100%; }
+  #zoomStageWrap.zoom-locked { transition: transform .25s ease; }
+  #zoomBoxSel {
+    position: fixed; z-index: 97; display: none; pointer-events: none;
+    border: 3px solid rgba(255,255,255,.95); border-radius: 8px;
+    box-shadow: 0 0 0 100vmax rgba(0,0,0,.62), inset 0 0 16px rgba(0,0,0,.25);
+  }
 
   /* ---- BARU (9 Sep 2026, permintaan operator) -- 🎉 Efek Panggung ----
      Satu lapisan TETAP (tidak pernah hidden/dilepas) yang menumpuk di
@@ -2529,6 +2588,9 @@
     <button type="button" data-local-ink-mode="laser" title="Penunjuk laser (tidak meninggalkan coretan)">🔴</button>
     <button type="button" data-local-ink-mode="draw" class="active" title="Pen">✏️</button>
     <button type="button" data-local-ink-mode="erase" title="Penghapus">🧹</button>
+    <!-- BARU (26 Sep 2026, permintaan operator) -- lihat catatan panjang CSS
+         "🔍 Zoom Layar" di atas & IIFE Zoom di skrip bawah. -->
+    <button type="button" data-local-ink-mode="zoom" title="🔍 Perbesar Layar (seret/tunjuk lalu klik kiri utk zoom, panah geser, Esc kembali 100%)">🔍</button>
     <span class="local-ink-sep"></span>
     <button type="button" id="localInkUndo" title="Batalkan goresan terakhir (Ctrl+Z)">↩️</button>
     <button type="button" id="localInkRedo" title="Ulangi goresan yang dibatalkan (Ctrl+Y)">↪️</button>
@@ -2539,15 +2601,38 @@
       <button type="button" data-local-ink-size="4">Tipis</button>
       <button type="button" data-local-ink-size="17" class="active">Tebal</button>
       <button type="button" data-local-ink-size="40">Super Tebal</button>
+      <!-- BARU (26 Sep 2026, permintaan operator "dijadikan horizontal
+           progress bar, ketebalannya bisa diatur") -- slider halus,
+           berdampingan dgn 3 preset di atas (klik preset ikut menggeser
+           slider ini, & sebaliknya -- lihat updateSizeFill_() di bawah). -->
+      <div id="localInkSizeRow">
+        <input type="range" id="localInkSizeRange" min="2" max="60" step="1" value="17" title="Ketebalan (2-60px)">
+        <span id="localInkSizeVal">17px</span>
+      </div>
+      <!-- BARU (26 Sep 2026, permintaan operator "ujungnya bulat, atau
+           miring seperti kuas") -->
+      <div id="localInkTipRow">
+        <span class="local-ink-tip-label">Ujung:</span>
+        <button type="button" data-local-ink-tip="round" class="active" title="Ujung bulat">● Bulat</button>
+        <button type="button" data-local-ink-tip="chisel" title="Ujung miring ala kuas/spidol">🖌️ Kuas</button>
+      </div>
       <div id="localInkColorRow">
         <button type="button" data-local-ink-color="#ff3b30" class="active" style="background:#ff3b30" title="Merah"></button>
         <button type="button" data-local-ink-color="#f4d03f" style="background:#f4d03f" title="Kuning"></button>
         <button type="button" data-local-ink-color="#ffffff" style="background:#ffffff" title="Putih"></button>
         <button type="button" data-local-ink-color="#aee1ff" style="background:#aee1ff" title="Biru muda pastel"></button>
         <button type="button" data-local-ink-color="#b8f2c9" style="background:#b8f2c9" title="Hijau muda pastel"></button>
+        <!-- BARU (26 Sep 2026, permintaan operator "satu warna & satu
+             tombol ganti warna 24-bit") -- swatch kustom (dipilih seperti
+             swatch lain) + tombol roda-warna yang membuka color-picker
+             asli (24-bit/RGB penuh) utk MENGGANTI warna swatch ini. -->
+        <button type="button" data-local-ink-color="#7c4dff" id="localInkCustomSwatch" style="background:#7c4dff" title="Warna kustom"></button>
+        <button type="button" id="localInkCustomPick" title="Pilih warna bebas (24-bit)"></button>
+        <input type="color" id="localInkColorInput" value="#7c4dff" tabindex="-1" aria-hidden="true">
       </div>
     </div>
   </div>
+  <div id="zoomBoxSel"></div>
   <div id="pointerDot"></div>
   <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
   <div id="magnifierLens"></div>
@@ -2628,7 +2713,7 @@
        Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
   <script src="js/config.js"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN halaman ini -->
-  <script src="js/ink-engine.js?v=20260921a"></script>
+  <script src="js/ink-engine.js?v=20260926a"></script>
   <!-- BARU (10 Sep 2026, sesi ke-13) -- js/soundfx.js: SATU SUMBER
        KEBENARAN daftar & sintesis efek suara "🎉 Efek Panggung", dipakai
        bersama dengan index.html (tab Studio & menu pratinjau admin).
@@ -3078,8 +3163,8 @@
   // itu. (js/presentation-studio.js punya salinan tertanam yang sama.)
   function createInkEngineFallback_() {
     let actions = [], cursor = 0, current = null;
-    function begin(id, mode, color, size) {
-      current = { id: id != null ? String(id) : "", mode: mode === "erase" ? "erase" : "draw", color: color || "#ff3b30", size: Math.max(1, Number(size) || 4), pts: [] };
+    function begin(id, mode, color, size, tip) {
+      current = { id: id != null ? String(id) : "", mode: mode === "erase" ? "erase" : "draw", color: color || "#ff3b30", size: Math.max(1, Number(size) || 4), tip: tip === "chisel" ? "chisel" : "round", pts: [] };
       return current;
     }
     function append(pts) {
@@ -3102,8 +3187,31 @@
     function redo() { if (cursor >= actions.length) return false; cursor += 1; return true; }
     function clear() { actions = []; cursor = 0; current = null; }
     function getActiveActions() { return actions.slice(0, cursor); }
+    function drawChiselAction_(canvas, ctx, a) {
+      const NIB_ANGLE = -45 * Math.PI / 180;
+      const halfW = Math.max(0.5, (a.size || 4) / 2);
+      const dx = Math.cos(NIB_ANGLE) * halfW, dy = Math.sin(NIB_ANGLE) * halfW;
+      ctx.save();
+      ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
+      ctx.fillStyle = a.color || "#ff3b30";
+      const stampAt = (x, y) => { ctx.beginPath(); ctx.arc(x, y, halfW * 0.92, 0, Math.PI * 2); ctx.fill(); };
+      const p0 = a.pts[0];
+      stampAt(p0.x * canvas.width, p0.y * canvas.height);
+      for (let i = 1; i < a.pts.length; i++) {
+        const pa = a.pts[i - 1], pb = a.pts[i];
+        const x0 = pa.x * canvas.width, y0 = pa.y * canvas.height;
+        const x1 = pb.x * canvas.width, y1 = pb.y * canvas.height;
+        ctx.beginPath();
+        ctx.moveTo(x0 - dx, y0 - dy); ctx.lineTo(x0 + dx, y0 + dy);
+        ctx.lineTo(x1 + dx, y1 + dy); ctx.lineTo(x1 - dx, y1 - dy);
+        ctx.closePath(); ctx.fill();
+        stampAt(x1, y1);
+      }
+      ctx.restore();
+    }
     function drawAction(canvas, ctx, a) {
       if (!canvas || !ctx || !a || !a.pts || a.pts.length < 2) return;
+      if (a.tip === "chisel") { drawChiselAction_(canvas, ctx, a); return; }
       ctx.save();
       ctx.globalCompositeOperation = a.mode === "erase" ? "destination-out" : "source-over";
       ctx.strokeStyle = a.color || "#ff3b30";
@@ -3125,7 +3233,7 @@
     }
     function drawSegmentLive(canvas, ctx, pts) {
       if (!current || !pts || pts.length < 2) return;
-      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, pts: pts });
+      drawAction(canvas, ctx, { mode: current.mode, color: current.color, size: current.size, tip: current.tip, pts: pts });
     }
     return {
       begin, append, end, cancelCurrent, undo, redo, clear,
@@ -7331,6 +7439,36 @@
   //  fitur lain yang juga bisa diketuk langsung di layar ini (kuis, roda
   //  undian, dst).
   // ============================================================
+  // ============================================================
+  //  🔍 Zoom Layar -- BARU 26 Sep 2026. Lihat catatan panjang di <style>
+  //  "🔍 Zoom Layar" di atas. Membungkus SELURUH isi <body> yang SUDAH ADA
+  //  (kecuali toolbar/kanvas coret lokal & kotak seleksi zoom -- daftar
+  //  KEEP_OUT_ di bawah) ke dalam SATU <div id="zoomStageWrap">, supaya
+  //  "🔍 Perbesar Layar" bisa men-scale+menggeser SEMUANYA (apa pun yang
+  //  sedang tayang -- ayat, kidung, kuis, peta, kamera, dst) dengan SATU
+  //  CSS transform, tanpa perlu tahu/mengubah struktur tiap fitur satu per
+  //  satu. Dijalankan SEKALI, di baris pertama skrip ini (skrip ini
+  //  ditaruh persis sebelum </body>, jadi SELURUH markup <body> sudah ada
+  //  di DOM saat baris ini berjalan -- aman memindah-mindah elemen).
+  //  #zoomStageWrap sengaja diberi width:100%/height:100% eksplisit (lihat
+  //  CSS) supaya rantai `height:100%` yang dipakai #stage dkk (mewarisi
+  //  dari html/body) TIDAK putus gara-gara ada 1 lapisan pembungkus baru.
+  //  Elemen yang TETAP di luar (bukan anak zoomStageWrap) supaya toolbar
+  //  coret & kotak seleksi selalu diam di tempat (tidak ikut ter-scale)
+  //  walau layar sedang diperbesar -- goresan Pen (baik dari Studio maupun
+  //  lokal) & overlay lain SENGAJA IKUT diperbesar bersama isi layar
+  //  (dianggap "menempel" pada tayangan, bukan bagian UI alat).
+  function wrapBodyForZoom_() {
+    if (document.getElementById("zoomStageWrap")) return document.getElementById("zoomStageWrap");
+    const KEEP_OUT = ["localPenCanvas", "localLaserDot", "localInkBadge", "localInkToggle", "localInkBar", "zoomBoxSel"];
+    const wrap = document.createElement("div");
+    wrap.id = "zoomStageWrap";
+    const kids = Array.prototype.slice.call(document.body.children);
+    kids.forEach((el) => { if (KEEP_OUT.indexOf(el.id) === -1) wrap.appendChild(el); });
+    document.body.insertBefore(wrap, document.body.firstChild);
+    return wrap;
+  }
+
   (function () {
     const canvas = document.getElementById("localPenCanvas");
     const toggle = document.getElementById("localInkToggle");
@@ -7341,17 +7479,23 @@
     if (!canvas || !toggle || !bar) return;
     const ctx = canvas.getContext("2d");
     const ink = makeInk_(); // PERBAIKAN (24 Sep 2026): selalu ada, lihat makeInk_() di atas
-    // `mode` = alat TERAKHIR yang dipilih ("draw" | "erase" | "laser"); `active`
-    // = alat itu sedang menyala (false = "🖱️ mouse biasa", coretan tetap tampil).
+    const zoomWrap = wrapBodyForZoom_();
+    const zoomBoxEl = document.getElementById("zoomBoxSel");
+    // `mode` = alat TERAKHIR yang dipilih ("draw" | "erase" | "laser" | "zoom");
+    // `active` = alat itu sedang menyala (false = "🖱️ mouse biasa", coretan
+    // tetap tampil). `tip` = bentuk ujung goresan Pen ("round" | "chisel").
     let mode = "draw";
     let color = "#ff3b30";
     let size = 17;
+    let tip = "round";
     let active = false;
     let dragging = false;
     let strokeSeq = 0;
     let idleTimer = null, badgeTimer = null;
-    const ICONS = { draw: "✏️", erase: "🧹", laser: "🔴" };
-    const LABELS = { off: "Mouse biasa", draw: "✏️ Pen aktif", erase: "🧹 Penghapus aktif", laser: "🔴 Penunjuk aktif" };
+    // --- state Zoom Layar ---
+    let zoomLocked = false, zoomScale = 1, zoomTx = 0, zoomTy = 0;
+    const ICONS = { draw: "✏️", erase: "🧹", laser: "🔴", zoom: "🔍" };
+    const LABELS = { off: "Mouse biasa", draw: "✏️ Pen aktif", erase: "🧹 Penghapus aktif", laser: "🔴 Penunjuk aktif", zoom: "🔍 Zoom aktif -- klik kiri utk perbesar" };
 
     function fitCanvas_() {
       const w = window.innerWidth, h = window.innerHeight;
@@ -7395,6 +7539,10 @@
       toggle.classList.toggle("on", on);
       toggle.textContent = on ? ICONS[mode] : "🖊️";
       if (!on || mode !== "laser") hideLaser_();
+      if (!on) {
+        if (zoomBoxEl) zoomBoxEl.style.display = "none";
+        if (zoomLocked) resetZoom_();
+      }
     }
     function updateModeBtns_() {
       const cur = active ? mode : "off";
@@ -7406,14 +7554,47 @@
       updateModeBtns_();
       showBadge_(LABELS[m]);
       wake_();
+      // BARU (26 Sep 2026, permintaan operator "seperti PowerPoint, sudah
+      // pilih pen otomatis tutup pilihannya") -- panel warna/ketebalan/ujung
+      // (🎨) otomatis TERTUTUP begitu operator memilih alat (✏️/🧹/🔴/🔍/🖱️)
+      // dari baris tombol mode -- tombol alat itu sendiri jadi penanda "aktif"
+      // (lihat updateModeBtns_() & cincin emas #localInkToggle.on di atas).
+      if (optsEl) optsEl.hidden = true;
     }
     bar.querySelectorAll("[data-local-ink-mode]").forEach((b) => {
       b.addEventListener("click", () => applyMode_(b.dataset.localInkMode));
     });
+    // BARU (26 Sep 2026) -- slider ketebalan (progress bar) & 3 tombol preset
+    // saling menyinkronkan diri (klik preset -> geser slider; geser slider ->
+    // lepaskan status "active" preset, kecuali pas kena angkanya persis).
+    const sizeRange = document.getElementById("localInkSizeRange");
+    const sizeVal = document.getElementById("localInkSizeVal");
+    function updateSizeFill_() {
+      if (!sizeRange) return;
+      const min = Number(sizeRange.min) || 2, max = Number(sizeRange.max) || 60;
+      const pct = ((size - min) / (max - min)) * 100;
+      sizeRange.style.setProperty("--ink-size-pct", Math.max(0, Math.min(100, pct)) + "%");
+      if (sizeVal) sizeVal.textContent = size + "px";
+      bar.querySelectorAll("[data-local-ink-size]").forEach((x) => x.classList.toggle("active", Number(x.dataset.localInkSize) === size));
+    }
+    function setSize_(v) {
+      size = Math.max(1, Number(v) || 17);
+      if (sizeRange) sizeRange.value = String(size);
+      updateSizeFill_();
+    }
     bar.querySelectorAll("[data-local-ink-size]").forEach((b) => {
+      b.addEventListener("click", () => setSize_(Number(b.dataset.localInkSize) || 17));
+    });
+    if (sizeRange) {
+      sizeRange.addEventListener("input", () => setSize_(sizeRange.value));
+      updateSizeFill_();
+    }
+    // BARU (26 Sep 2026, permintaan operator "ujungnya bulat, atau miring
+    // seperti kuas") -- lihat drawChiselAction_()/InkEngine.drawAction di atas.
+    bar.querySelectorAll("[data-local-ink-tip]").forEach((b) => {
       b.addEventListener("click", () => {
-        size = Number(b.dataset.localInkSize) || 17;
-        bar.querySelectorAll("[data-local-ink-size]").forEach((x) => x.classList.toggle("active", x === b));
+        tip = b.dataset.localInkTip === "chisel" ? "chisel" : "round";
+        bar.querySelectorAll("[data-local-ink-tip]").forEach((x) => x.classList.toggle("active", x === b));
       });
     });
     bar.querySelectorAll("[data-local-ink-color]").forEach((b) => {
@@ -7422,6 +7603,28 @@
         bar.querySelectorAll("[data-local-ink-color]").forEach((x) => x.classList.toggle("active", x === b));
       });
     });
+    // BARU (26 Sep 2026, permintaan operator "satu warna & satu tombol ganti
+    // warna 24-bit") -- swatch kustom #localInkCustomSwatch dipilih SAMA
+    // seperti swatch lain (event delegation di atas sudah menanganinya, lihat
+    // data-local-ink-color di markup-nya). Tombol roda-warna di sebelahnya
+    // HANYA membuka color-picker asli utk MENGGANTI warna swatch itu.
+    const customSwatch = document.getElementById("localInkCustomSwatch");
+    const customPickBtn = document.getElementById("localInkCustomPick");
+    const colorInput = document.getElementById("localInkColorInput");
+    if (customPickBtn && colorInput) {
+      customPickBtn.addEventListener("click", () => { try { colorInput.click(); } catch (e) {} });
+      const applyCustomColor_ = () => {
+        const v = colorInput.value || "#7c4dff";
+        if (customSwatch) {
+          customSwatch.style.background = v;
+          customSwatch.dataset.localInkColor = v;
+          color = v;
+          bar.querySelectorAll("[data-local-ink-color]").forEach((x) => x.classList.toggle("active", x === customSwatch));
+        }
+      };
+      colorInput.addEventListener("input", applyCustomColor_);
+      colorInput.addEventListener("change", applyCustomColor_);
+    }
     const optsBtn = document.getElementById("localInkOpts");
     if (optsBtn && optsEl) optsBtn.addEventListener("click", () => { optsEl.hidden = !optsEl.hidden; });
     function doUndo_() { if (ink.undo()) { ink.render(canvas, ctx); refreshUndoRedo_(); } }
@@ -7455,14 +7658,16 @@
       if (!active) return;
       if (!e.touches && e.button !== undefined && e.button !== 0) return; // klik kanan/tengah tidak mencoret
       e.preventDefault();
+      if (mode === "zoom") { handleZoomPointerDown_(e); return; }
       if (mode === "laser") { dragging = true; moveLaser_(ptFromEvent_(e)); return; }
       dragging = true;
       strokeSeq += 1;
-      ink.begin("local" + strokeSeq, mode, color, size);
+      ink.begin("local" + strokeSeq, mode, color, size, tip);
       ink.append([posFromEvent_(e)]);
     }
     function pointerMove_(e) {
       if (!active) return;
+      if (mode === "zoom") { if (!zoomLocked) { e.preventDefault(); moveZoomBox_(e); } return; }
       if (mode === "laser") { e.preventDefault(); moveLaser_(ptFromEvent_(e)); return; }
       if (!dragging) return;
       e.preventDefault();
@@ -7473,9 +7678,73 @@
     function pointerUp_() {
       if (!dragging) return;
       dragging = false;
-      if (mode === "laser") return;
+      if (mode === "laser" || mode === "zoom") return;
       ink.end();
       refreshUndoRedo_();
+    }
+
+    // ---------- 🔍 Zoom Layar: kotak seleksi + kunci + geser + reset ----------
+    function zoomBoxSize_() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w = vw * 0.42;
+      return { w, h: w * (vh / vw) }; // rasio SAMA dgn layar -> pas mengisi penuh saat di-scale
+    }
+    function clampZoomBox_(left, top, w, h) {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      return { left: Math.min(Math.max(0, left), Math.max(0, vw - w)), top: Math.min(Math.max(0, top), Math.max(0, vh - h)) };
+    }
+    let zoomCurBox_ = null;
+    function moveZoomBox_(e) {
+      if (!zoomBoxEl) return;
+      const p = ptFromEvent_(e);
+      const { w, h } = zoomBoxSize_();
+      const c = clampZoomBox_(p.clientX - w / 2, p.clientY - h / 2, w, h);
+      zoomBoxEl.style.display = "block";
+      zoomBoxEl.style.width = w + "px"; zoomBoxEl.style.height = h + "px";
+      zoomBoxEl.style.left = c.left + "px"; zoomBoxEl.style.top = c.top + "px";
+      zoomCurBox_ = { left: c.left, top: c.top, w: w, h: h };
+    }
+    // Transform komposit: titik (zoomTx,zoomTy) di layar ASLI dipetakan ke
+    // (0,0) layar, lalu semuanya di-scale zoomScale -- lihat catatan panjang
+    // "🔍 Zoom Layar" di <style> di atas utk kenapa ini aman dipakai pada
+    // #zoomStageWrap (pembungkus SELURUH isi <body> lama).
+    function applyZoomTransform_() {
+      if (!zoomWrap) return;
+      zoomWrap.style.transformOrigin = "0 0";
+      zoomWrap.style.transform = "scale(" + zoomScale + ") translate(" + (-zoomTx) + "px, " + (-zoomTy) + "px)";
+    }
+    function lockZoomAt_(box) {
+      if (!box || !zoomWrap) return;
+      zoomScale = window.innerWidth / box.w;
+      zoomTx = box.left; zoomTy = box.top;
+      zoomWrap.classList.add("zoom-locked");
+      applyZoomTransform_();
+      if (zoomBoxEl) zoomBoxEl.style.display = "none";
+      zoomLocked = true;
+      showBadge_("🔍 " + Math.round(zoomScale * 100) + "% -- panah utk geser, Esc utk kembali 100%");
+    }
+    function handleZoomPointerDown_(e) {
+      if (zoomLocked) return; // sudah terkunci -- klik tidak berbuat apa (geser pakai panah)
+      moveZoomBox_(e);
+      lockZoomAt_(zoomCurBox_);
+    }
+    function panZoom_(dxCss, dyCss) {
+      if (!zoomLocked) return;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const boxW = vw / zoomScale, boxH = vh / zoomScale;
+      const c = clampZoomBox_(zoomTx + dxCss, zoomTy + dyCss, boxW, boxH);
+      zoomTx = c.left; zoomTy = c.top;
+      applyZoomTransform_();
+    }
+    function resetZoom_() {
+      if (!zoomWrap) return;
+      zoomWrap.classList.remove("zoom-locked");
+      zoomWrap.style.transform = "";
+      zoomLocked = false;
+    }
+    function sendNavKey_(dir) {
+      if (!window.opener) return;
+      try { window.opener.postMessage({ source: "bibleAppPresenter", type: "present_nav_key", dir: dir }, location.origin); } catch (e) {}
     }
     canvas.addEventListener("mousedown", pointerDown_);
     canvas.addEventListener("mousemove", pointerMove_);
@@ -7494,8 +7763,33 @@
     // dari mode (seperti PowerPoint) -- Esc sekali lagi menutup toolbar.
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        // setActive_(false) di dalam applyMode_("off") sudah otomatis
+        // mengembalikan Zoom Layar ke 100% (resetZoom_()) kalau sedang
+        // terkunci -- lihat setActive_() di atas.
         if (active) applyMode_("off");
         else if (!bar.hidden) closeBar_();
+        return;
+      }
+      // BARU (26 Sep 2026, permintaan operator) -- panah SELAGI Zoom Layar
+      // terkunci = geser pandangan zoom; panah di LUAR itu (keadaan normal,
+      // tidak sedang zoom) = pindah slide sebelumnya/berikutnya di Studio
+      // (dikirim lewat sendNavKey_(), diterima js/presentation-studio.js
+      // sebagai "present_nav_key" -> playlistNext()/playlistPrev(), PERSIS
+      // pintasan panah atas/bawah yang sudah ada di jendela Studio).
+      if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const tag = (e.target && e.target.tagName) || "";
+        if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+        if (zoomLocked) {
+          e.preventDefault();
+          const step = 70 / zoomScale;
+          if (e.key === "ArrowUp") panZoom_(0, -step);
+          else if (e.key === "ArrowDown") panZoom_(0, step);
+          else if (e.key === "ArrowLeft") panZoom_(-step, 0);
+          else panZoom_(step, 0);
+          return;
+        }
+        if (e.key === "ArrowUp") { e.preventDefault(); sendNavKey_("prev"); return; }
+        if (e.key === "ArrowDown") { e.preventDefault(); sendNavKey_("next"); return; }
         return;
       }
       if (!active) return;
