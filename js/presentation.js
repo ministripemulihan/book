@@ -37,6 +37,15 @@ const Presentation = (() => {
 
   let winRef = null;
   let lastPayload = null; // { type: "verse"|"text"|"clear", ref, text }
+  // BARU (26 Sep 2026, permintaan operator "🚫 Dilarang lihat HP/bicara
+  // selama Beribadah, bukan efek sekali tembak, tapi muncul TERUS seperti
+  // logo") -- badge overlay PERSISTEN (lihat OVERLAY_TYPES & catatan
+  // panjang postRaw() di bawah, & showFocusModeBadge_()/present.html) --
+  // status nyala/mati TERAKHIR disimpan di sini (terpisah dari
+  // `lastPayload`, pola SAMA seperti overlay lain: theme/warta/dst) supaya
+  // kalau Layar 2 ditutup lalu dibuka ulang, badge-nya ikut otomatis
+  // muncul lagi tanpa operator perlu menekan tombolnya sekali lagi.
+  let lastFocusMode_ = null;
   let pollTimer = null;
   // BARU (10 Sep 2026, sesi ke-10, "Monitor 3 -- Monitor Pembicara") --
   // jendela KE-3, TERPISAH TOTAL dari winRef (Layar 2, yang dilihat
@@ -473,13 +482,19 @@ const Presentation = (() => {
   // & present.html) ikut didaftarkan di sini dari awal, SAMA seperti
   // yt_bg/yt_bg_control dkk di atas -- supaya TIDAK menimpa `lastPayload`
   // (lihat catatan PERBAIKAN panjang di atas persis utk alasan yang sama).
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear", "sc_bg", "sc_bg_control", "sc_bg_clear"];
+  // BARU (26 Sep 2026) -- "focusmode" (badge "🚫 Dilarang HP/Bicara")
+  // ditambahkan ke daftar overlay, pola SAMA persis dengan theme/warta/dst
+  // di atas -- supaya toggle nyala/mati badge ini TIDAK menimpa
+  // `lastPayload` (yang harus tetap berisi ayat/kidung/dst yang
+  // sesungguhnya sedang tayang).
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear", "sc_bg", "sc_bg_control", "sc_bg_clear", "focusmode"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
+    if (payload.type === "focusmode") lastFocusMode_ = payload; // BARU (26 Sep 2026) -- lihat catatan panjang di deklarasi lastFocusMode_
     if (!winRef || winRef.closed) {
       // Overlay (pointer/pen/tick timer) tidak perlu memaksa buka jendela
       // baru berkali-kali; hanya buka untuk aksi yang jelas disengaja.
-      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote" || payload.type === "msgmid" || payload.type === "yt_bg" || payload.type === "mp3_bg" || payload.type === "sc_bg") {
+      if (OVERLAY_TYPES.indexOf(payload.type) === -1 || payload.type === "theme" || payload.type === "timer" || payload.type === "stopwatch" || payload.type === "warta" || payload.type === "footnote" || payload.type === "msgmid" || payload.type === "yt_bg" || payload.type === "mp3_bg" || payload.type === "sc_bg" || payload.type === "focusmode") {
         openWindow();
       } else {
         return;
@@ -909,6 +924,11 @@ const Presentation = (() => {
         // itu penyebab timer "tidak jalan" / "tidak hilang saat X").
         flushQueue();
         if (lastPayload) post(lastPayload);
+        // BARU (26 Sep 2026) -- kirim ulang status badge "🚫 Dilarang
+        // HP/Bicara" juga (lihat catatan panjang lastFocusMode_ di atas),
+        // LEWAT sendToWindow() langsung (BUKAN post(), supaya TIDAK ikut
+        // menimpa lastPayload yang baru saja dikirim ulang di atas).
+        if (lastFocusMode_) sendToWindow(lastFocusMode_);
       }
       // BARU (10 Sep 2026, sesi ke-10) -- lihat catatan panjang
       // openMonitorWindow()/postMonitorStatus() di atas.

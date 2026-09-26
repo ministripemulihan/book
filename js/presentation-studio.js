@@ -497,6 +497,19 @@ const PresentationStudio = (() => {
       if (payload.embedUrl && payload.embedUrl !== lastYtEmbedUrlForLiveBar) {
         lastYtEmbedUrlForLiveBar = payload.embedUrl;
         if (typeof window.resetYtLiveBar === "function") window.resetYtLiveBar();
+        // FIX (27 Sep 2026, laporan operator "ganti link YouTube, tombol
+        // Play/Pause tidak balik ke awal") -- video BARU yang baru saja
+        // dimuat BELUM main (menunggu operator menekan ▶️ sendiri, lihat
+        // catatan "needsSoundUnlock" di wireYtControls()), tapi `ytIsPlaying`
+        // (status tombol gabungan Play/Pause) dulu TIDAK pernah direset di
+        // sini -- kalau video SEBELUMNYA sempat diputar (ytIsPlaying=true),
+        // status itu "nyangkut" ikut terbawa ke video baru, tombol jadi
+        // tampil "⏸️ Pause" padahal video barunya belum pernah ditekan main
+        // sama sekali -- operator harus klik Pause dulu (tidak berefek)
+        // baru klik Play. Reset di sini (SETIAP video baru, sama seperti
+        // resetYtLiveBar() di atas) supaya tombol selalu mulai dari
+        // "▶️ Play" yang benar untuk video yang baru dimuat.
+        if (typeof window.resetYtPlayPauseState_ === "function") window.resetYtPlayPauseState_();
       }
     } else {
       wrap.hidden = true;
@@ -1567,6 +1580,60 @@ const PresentationStudio = (() => {
     return s;
   }
 
+  // PERBAIKAN (26 Sep 2026, laporan operator "kumpulan ayat sudah benar,
+  // videonya bisa lebih dari 1, bisa 2-3 link YouTube, tapi 'Ulang: Semua'
+  // tidak bisa berputar semua") -- AKAR MASALAH: setiap kali 1 item YouTube
+  // dari Kumpulan Ayat dikirim ke Layar 2 (baik jenis "youtube_link" MAUPUN
+  // "media" yang aslinya video YouTube dari Media Tersimpan), kode LAMA
+  // SELALU mengirim {type:"youtube", embedUrl} TANPA `queue`/`queueIndex`
+  // sama sekali -- present.html lalu menganggap ytQueue cuma berisi 1 video
+  // (lihat `ytQueue = Array.isArray(data.queue) && data.queue.length ?
+  // data.queue : [{embedUrl:data.embedUrl}]` di present.html), jadi syarat
+  // "🔁 Ulang: Semua" untuk lanjut ke video berikutnya (ytQueue.length > 1)
+  // TIDAK PERNAH terpenuhi -- padahal Kumpulan Ayat itu sendiri sudah benar
+  // berisi 2-3 link YouTube. Fitur "▶️ Playlist Video" (tab terpisah, lihat
+  // wireYtPlaylistTab() di bawah) TIDAK kena bug ini karena memang sudah
+  // membangun `queue` sendiri dari daftar Sheet-nya.
+  //
+  // PERBAIKAN: kalau item yang mau dikirim ini bagian dari `activePlaylist`
+  // (Kumpulan Ayat yang sedang tayang, lihat setActivePlaylist() di atas),
+  // kumpulkan SEMUA item YouTube LAIN di kumpulan yang SAMA (baik
+  // "youtube_link" maupun "media" bertipe YouTube) jadi 1 antrean `queue`,
+  // URUTANNYA mengikuti urutan aslinya di Kumpulan Ayat -- supaya
+  // present.html bisa otomatis lanjut ke video YouTube berikutnya di
+  // kumpulan itu begitu video yang sedang tayang selesai & "Ulang: Semua"
+  // aktif. Kalau cuma ada 0-1 video YouTube di kumpulan itu (atau item ini
+  // tidak sedang bagian dari kumpulan aktif sama sekali, mis. dikirim
+  // langsung dari Media Tersimpan), TIDAK ada `queue` dikirim sama sekali
+  // -- perilaku LAMA (1 video saja) tetap apa adanya, tidak ada yang rusak.
+  // `mediaItemsCache` (opsional): daftar Media Tersimpan yang SUDAH dimuat,
+  // dioper dari sendMediaSlideFromCollection() supaya tidak perlu
+  // loadMediaItems() dobel -- item "youtube_link" tidak butuh ini sama
+  // sekali (embedUrl-nya sudah tersimpan langsung di item).
+  function buildYoutubeQueueFromActivePlaylist_(currentIt, mediaItemsCache) {
+    if (!activePlaylist || !Array.isArray(activePlaylist.items)) return null;
+    if (activePlaylist.items.indexOf(currentIt) === -1) return null;
+    const resolved = []; // [{embedUrl, title, __ref: item asli}]
+    activePlaylist.items.forEach((x) => {
+      if (!x) return;
+      if (x.type === "youtube_link" && x.embedUrl) {
+        resolved.push({ embedUrl: x.embedUrl, title: x.title || "", __ref: x });
+      } else if (x.type === "media" && Array.isArray(mediaItemsCache)) {
+        const m = mediaItemsCache.find((mm) => mm.id === x.mediaItemId);
+        if (m && m.type === "youtube" && m.images && m.images.length) {
+          const eu = m.images[Math.min(x.pageIndex || 0, m.images.length - 1)];
+          resolved.push({ embedUrl: eu, title: m.name || "", __ref: x });
+        }
+      }
+    });
+    if (resolved.length < 2) return null; // cuma 1 (atau 0) video YouTube di kumpulan ini -- tidak perlu queue
+    const queueIndex = resolved.findIndex((r) => r.__ref === currentIt);
+    return {
+      queue: resolved.map((r) => ({ embedUrl: r.embedUrl, title: r.title })),
+      queueIndex: queueIndex === -1 ? 0 : queueIndex,
+    };
+  }
+
   // Kirim 1 item generik ke Layar 2 SEKARANG JUGA (live langsung, TIDAK
   // lewat antrean "Berikutnya" -- lihat stageOrSend() di atas, yang
   // TETAP dipakai apa adanya oleh Ayat Cepat/File/YouTube, tidak
@@ -1632,7 +1699,15 @@ const PresentationStudio = (() => {
       // dengan cabang it.type==="media" untuk youtube di
       // sendMediaSlideFromCollection(), cuma tanpa perlu lookup Media
       // Tersimpan sama sekali).
-      rawPost({ type: "youtube", embedUrl: it.embedUrl });
+      {
+        const payload = { type: "youtube", embedUrl: it.embedUrl };
+        // PERBAIKAN (26 Sep 2026) -- lihat catatan panjang
+        // buildYoutubeQueueFromActivePlaylist_() di atas untuk kenapa ini
+        // ditambahkan (perbaikan "Ulang: Semua" utk >1 link YouTube).
+        const q = buildYoutubeQueueFromActivePlaylist_(it, null);
+        if (q) { payload.queue = q.queue; payload.queueIndex = q.queueIndex; }
+        rawPost(payload);
+      }
       renderStudioPreview({ type: "youtube", embedUrl: it.embedUrl });
     } else if (it.type === "modescreen") {
       // BARU (9 Sep 2026) -- item "🖥️ Mode Layar" (Welcome/Next Up)
@@ -1713,7 +1788,16 @@ const PresentationStudio = (() => {
     // Playlist Video) gagal tayang (Layar 2 mencoba menampilkannya
     // sebagai <img>). Sekarang dicek dulu jenis aslinya.
     if (found.type === "youtube") {
-      rawPost({ type: "youtube", embedUrl: url });
+      const payload = { type: "youtube", embedUrl: url };
+      // PERBAIKAN (26 Sep 2026) -- lihat catatan panjang
+      // buildYoutubeQueueFromActivePlaylist_() di atas (perbaikan
+      // "Ulang: Semua" utk >1 link YouTube dalam 1 Kumpulan Ayat) --
+      // `items` di sini SUDAH dimuat sekali di atas (loadMediaItems()),
+      // dioper apa adanya supaya item "media" LAIN di kumpulan yang sama
+      // ikut terdeteksi tanpa perlu memuat ulang Media Tersimpan lagi.
+      const q = buildYoutubeQueueFromActivePlaylist_(it, items);
+      if (q) { payload.queue = q.queue; payload.queueIndex = q.queueIndex; }
+      rawPost(payload);
       renderStudioPreview({ type: "youtube", embedUrl: url });
     } else {
       rawPost({ type: "slide", imageUrl: url });
@@ -6022,17 +6106,42 @@ const PresentationStudio = (() => {
       const username = typeof currentUser !== "undefined" ? currentUser : null;
       const items = (await loadMediaItems(username)).filter((it) => it.type === "youtube");
       picker.innerHTML = '<option value="">-- pilih video tersimpan untuk diputar sebagai latar --</option>';
+      // BARU (27 Sep 2026, permintaan operator: "tidak ngerti mana yang
+      // judul ini, adalah yang mana") -- label sekarang menyertakan nama
+      // ITEM Media Tersimpan di depan kurung, supaya 2 item yang
+      // kebetulan judul videonya sama (mis. dari link yang sama disimpan
+      // 2x, lihat catatan dupBtn/dedup di bawah) tetap bisa dibedakan.
       items.forEach((item) => {
         const images = item.images || [];
         images.forEach((url, i) => {
           const lbl = (item.videoLabels && item.videoLabels[i] && item.videoLabels[i].title) || `${item.name} ${images.length > 1 ? `#${i + 1}` : ""}`;
           const opt = document.createElement("option");
           opt.value = url;
-          opt.textContent = lbl;
+          opt.textContent = lbl === item.name ? lbl : `${lbl} (${item.name})`;
+          opt.dataset.mediaId = item.id; // dipakai tombol "🗑️ Hapus dari Daftar" di bawah
           picker.appendChild(opt);
         });
       });
     }
+    // BARU (27 Sep 2026, permintaan operator: "daftar listnya tidak bisa
+    // di hapus") -- dropdown HTML biasa memang tidak bisa punya tombol
+    // hapus per baris, jadi disediakan 1 tombol di sampingnya: hapus
+    // item Media Tersimpan yang SEDANG dipilih di dropdown, pakai
+    // removeMediaItem() yang sama dengan tombol 🗑️ di panel "Media
+    // Tersimpan" (kolom kiri) -- lihat row.querySelector('[data-act="del"]')
+    // di renderMediaList() di atas.
+    if (el("psYtBgSavedDeleteBtn")) el("psYtBgSavedDeleteBtn").addEventListener("click", async () => {
+      const picker = el("psYtBgSavedPicker");
+      if (!picker || !picker.value) { alert("Pilih dulu salah satu video di dropdown sebelum menghapusnya."); return; }
+      const opt = picker.options[picker.selectedIndex];
+      const mediaId = opt.dataset.mediaId;
+      if (!mediaId || typeof removeMediaItem !== "function") return;
+      if (!confirm(`Hapus "${opt.textContent}" dari Media Tersimpan?\n\nKalau video ini punya beberapa judul tersimpan sekaligus dalam 1 item, SEMUANYA akan ikut terhapus (bukan cuma satu judul yang dipilih).`)) return;
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      await removeMediaItem(username, mediaId);
+      await populateYtBgPicker();
+      if (typeof renderMediaList === "function") renderMediaList();
+    });
     window.populateYtBgPicker = populateYtBgPicker;
     // BARU (Tahap 7, ROADMAP-drive-sync.md) -- diekspos ke window supaya
     // wireMediaUploadQueueAutoRetry() (js/collections.js, dipasang dari
@@ -6069,6 +6178,15 @@ const PresentationStudio = (() => {
       if (!lastBgTrack_ || !lastBgTrack_.embedUrl) { alert("Belum ada audio latar yang pernah diputar di perangkat ini -- tempel link & tekan \"▶️ Tampilkan\" (dengan \"Latar suara saja\" dicentang) dulu, atau pilih dari dropdown \"Pilih dari video yang sudah tersimpan\" di bawah."); return; }
       if (typeof addMediaItem !== "function") return;
       const username = typeof currentUser !== "undefined" ? currentUser : null;
+      // BARU (27 Sep 2026, permintaan operator: "daftar listnya ...
+      // sering double") -- kalau link INI sudah pernah tersimpan
+      // sebelumnya (mis. sebelumnya juga ditekan "💾 Simpan Link Latar
+      // Ini" untuk video yang sama), tidak usah bikin item baru lagi --
+      // cukup beri tahu operator item mana yang sudah ada.
+      if (typeof loadMediaItems === "function") {
+        const existing = (await loadMediaItems(username)).find((it) => it.type === "youtube" && (it.images || []).includes(lastBgTrack_.embedUrl));
+        if (existing) { alert(`Video ini sudah tersimpan sebelumnya sebagai "${existing.name}" -- tidak disimpan lagi supaya daftar tidak dobel. Pilih dari dropdown "Pilih dari video yang sudah tersimpan" kalau mau memutarnya lagi.`); return; }
+      }
       const defaultName = lastBgTrack_.title || lastBgTrack_.videoId || "Video Latar";
       const name = await promptSaveName("media", username, defaultName);
       if (name === null) return; // dibatalkan
@@ -6306,6 +6424,13 @@ const PresentationStudio = (() => {
           categories: splitKategoriRaw_(item.kategori),
           durationMinutes: item.durasiDetik ? Number(item.durasiDetik) / 60 : null,
           uploadDate: item.tanggalAsli ? parseUploadDate(item.tanggalAsli) : null,
+          // BARU (27 Sep 2026, permintaan operator) -- 3 kolom tambahan
+          // dari MediaLibraryCode.gs (sumber/keterangan/kidungRef) ikut
+          // dibawa supaya bisa dipakai filter baru (lihat
+          // computeDistinctField_()/renderExtraFilters_() di bawah).
+          sumber: item.sumber || "",
+          keterangan: item.keterangan || "",
+          kidungRef: item.kidungRef || "",
         });
       });
       return out;
@@ -6371,6 +6496,11 @@ const PresentationStudio = (() => {
           // Skema baru pakai "TanggalAsli" (kolom "tanggalasli"), skema
           // lama pakai "Tanggal"/"Upload Date" dsb.
           uploadDate: parseUploadDate(rec.tanggalasli || rec.tanggal || rec.upload || rec["upload date"] || rec.date || rec["tanggal upload"]),
+          // BARU (27 Sep 2026) -- sama seperti mapMediaLibraryItemsToVideos_()
+          // di atas, hanya tersedia kalau Sheet skema baru punya kolomnya.
+          sumber: (rec.sumber || "").trim(),
+          keterangan: (rec.keterangan || "").trim(),
+          kidungRef: (rec.kidungref || "").trim(),
         });
       });
       return out; // urutan APA ADANYA seperti baris di Sheet (atas -> bawah)
@@ -6387,6 +6517,13 @@ const PresentationStudio = (() => {
     const SORT_KEY = "bible_app_yt_playlist_sort_v1";
     let activeSort = localStorage.getItem(SORT_KEY) || "terbaru";
     let searchQuery = "";
+    // BARU (27 Sep 2026, permintaan operator: filter lebih mudah dari
+    // Sumber/Channel/Keterangan/KidungRef) -- "" berarti tidak difilter
+    // berdasarkan kolom itu, sama polanya dengan activeFilter (kategori).
+    let activeSumber = "";
+    let activeChannel = "";
+    let activeKeterangan = "";
+    let activeKidungRef = "";
 
     function sortVideos(list) {
       const arr = list.slice();
@@ -6413,10 +6550,22 @@ const PresentationStudio = (() => {
       return arr;
     }
 
+    // BARU (27 Sep 2026) -- dipakai filteredVideos() di bawah & juga
+    // renderExtraFilters_() untuk membangun pilihan dropdown; 1 fungsi
+    // generik supaya Sumber/Channel/Keterangan/KidungRef sama-sama
+    // dicocokkan case-insensitive tanpa 4x salinan kode yang mirip.
+    function fieldEq_(video, field, value) {
+      return String(video[field] || "").trim().toLowerCase() === value;
+    }
+
     function filteredVideos() {
       let list = activeFilter === "all"
         ? allVideos
         : allVideos.filter((v) => (v.categories || []).some((c) => c.trim().toLowerCase() === activeFilter));
+      if (activeSumber) list = list.filter((v) => fieldEq_(v, "sumber", activeSumber));
+      if (activeChannel) list = list.filter((v) => fieldEq_(v, "channel", activeChannel));
+      if (activeKeterangan) list = list.filter((v) => fieldEq_(v, "keterangan", activeKeterangan));
+      if (activeKidungRef) list = list.filter((v) => fieldEq_(v, "kidungRef", activeKidungRef));
       const q = searchQuery.trim().toLowerCase();
       // PERBAIKAN (4 Sep 2026 v2, permintaan operator) -- pencarian
       // SEKARANG ikut mencocokkan NAMA CHANNEL juga, tidak cuma judul
@@ -6433,15 +6582,51 @@ const PresentationStudio = (() => {
     // "Anak"/"anak" campur tidak jadi 2 tombol beda). Dipanggil ulang
     // tiap kali allVideos berubah (lihat renderFilters() di bawah &
     // pemanggilnya di loadFromMediaLibrary()/loadSheet()).
+    // BARU (27 Sep 2026, permintaan operator: "jumlah untuk youtube yang
+    // ada di setiap kategori") -- video yang dihitung mengikuti filter
+    // Sumber/Channel/Keterangan/KidungRef/pencarian yang sedang AKTIF
+    // (supaya angkanya selalu benar sesuai tampilan saat itu), TAPI
+    // TIDAK ikut filter kategori itu sendiri -- supaya semua tombol
+    // kategori tetap menunjukkan jumlah yang benar, bukan cuma yang
+    // sedang aktif dapat angka.
+    function videosForCategoryCounting_() {
+      let list = allVideos;
+      if (activeSumber) list = list.filter((v) => fieldEq_(v, "sumber", activeSumber));
+      if (activeChannel) list = list.filter((v) => fieldEq_(v, "channel", activeChannel));
+      if (activeKeterangan) list = list.filter((v) => fieldEq_(v, "keterangan", activeKeterangan));
+      if (activeKidungRef) list = list.filter((v) => fieldEq_(v, "kidungRef", activeKidungRef));
+      const q = searchQuery.trim().toLowerCase();
+      if (q) list = list.filter((v) => (v.title || "").toLowerCase().includes(q) || (v.channel || "").toLowerCase().includes(q));
+      return list;
+    }
+
     function computeKnownCategories_() {
-      const seen = new Map();
-      allVideos.forEach((v) => {
+      const seen = new Map(); // key -> { label, count }
+      videosForCategoryCounting_().forEach((v) => {
         (v.categories || []).forEach((raw) => {
           const label = String(raw || "").trim();
           if (!label) return;
           const key = label.toLowerCase();
-          if (!seen.has(key)) seen.set(key, label);
+          if (!seen.has(key)) seen.set(key, { label, count: 0 });
+          seen.get(key).count++;
         });
+      });
+      return Array.from(seen.entries())
+        .map(([key, v]) => ({ key, label: v.label, count: v.count }))
+        .sort((a, b) => a.label.localeCompare(b.label, "id", { sensitivity: "base" }));
+    }
+
+    // BARU (27 Sep 2026) -- kumpulkan nilai UNIK utk 1 kolom (dipakai isi
+    // dropdown filter Sumber/Channel/Keterangan/KidungRef di bawah), versi
+    // "apa adanya" (huruf besar/kecil asli) diambil dari kemunculan
+    // PERTAMA supaya "BEBAS"/"bebas" campur tidak jadi 2 pilihan beda.
+    function computeDistinctField_(field) {
+      const seen = new Map();
+      allVideos.forEach((v) => {
+        const label = String(v[field] || "").trim();
+        if (!label) return;
+        const key = label.toLowerCase();
+        if (!seen.has(key)) seen.set(key, label);
       });
       return Array.from(seen.entries())
         .map(([key, label]) => ({ key, label }))
@@ -6458,14 +6643,21 @@ const PresentationStudio = (() => {
     // Kategori Sheet langsung dapat tombolnya sendiri begitu video
     // termuat, TANPA perlu ubah kode/HTML lagi.
     function renderFilters() {
+      renderExtraFilters_(); // BARU (27 Sep 2026) -- dropdown Sumber/Channel/Keterangan/KidungRef ikut disegarkan tiap kali renderFilters() dipanggil (video baru dimuat, dst.)
       if (!filterWrap) return;
       filterWrap.querySelectorAll("[data-filter]:not([data-filter='all'])").forEach((btn) => btn.remove());
+      // BARU (27 Sep 2026, permintaan operator) -- tombol "Semua" ikut
+      // dikasih jumlah TOTAL video (mengikuti filter lain yang aktif,
+      // lihat videosForCategoryCounting_()), sama seperti tiap tombol
+      // kategori di bawah.
+      const allBtn = filterWrap.querySelector("[data-filter='all']");
+      if (allBtn) allBtn.textContent = `Semua (${videosForCategoryCounting_().length})`;
       computeKnownCategories_().forEach((c) => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "chip-btn small";
         btn.dataset.filter = c.key;
-        btn.textContent = c.label;
+        btn.textContent = `${c.label} (${c.count})`;
         btn.addEventListener("click", () => {
           activeFilter = c.key;
           renderFilters();
@@ -6477,6 +6669,58 @@ const PresentationStudio = (() => {
         btn.classList.toggle("active", btn.dataset.filter === activeFilter);
       });
     }
+
+    // BARU (27 Sep 2026, permintaan operator: "filter yang lebih mudah,
+    // dari sumber, keterangan, channel, kategori, kidungref") -- 4
+    // dropdown tambahan, isinya dibangun OTOMATIS dari data yang termuat
+    // (mirip computeKnownCategories_() di atas), jadi tidak perlu ubah
+    // kode lagi kalau operator menambah nilai baru di Sheet/Pustaka
+    // Media. Elemen HTML-nya OPSIONAL (index.html versi lama tanpa baris
+    // filter ini tetap jalan seperti biasa -- semua `el(...)` di bawah
+    // aman kalau null).
+    const extraFilterEls_ = {
+      sumber: el("psYtPlaylistFilterSumber"),
+      channel: el("psYtPlaylistFilterChannel"),
+      keterangan: el("psYtPlaylistFilterKeterangan"),
+      kidungRef: el("psYtPlaylistFilterKidungRef"),
+    };
+    const extraFilterState_ = {
+      sumber: () => activeSumber, channel: () => activeChannel,
+      keterangan: () => activeKeterangan, kidungRef: () => activeKidungRef,
+    };
+    const extraFilterSetters_ = {
+      sumber: (v) => { activeSumber = v; }, channel: (v) => { activeChannel = v; },
+      keterangan: (v) => { activeKeterangan = v; }, kidungRef: (v) => { activeKidungRef = v; },
+    };
+    function renderExtraFilters_() {
+      Object.keys(extraFilterEls_).forEach((field) => {
+        const sel = extraFilterEls_[field];
+        if (!sel) return;
+        const current = extraFilterState_[field]();
+        const opts = computeDistinctField_(field);
+        sel.innerHTML = `<option value="">Semua ${field === "kidungRef" ? "KidungRef" : field}</option>` +
+          opts.map((o) => `<option value="${escapeHtml(o.key)}">${escapeHtml(o.label)} (${allVideos.filter((v) => fieldEq_(v, field, o.key)).length})</option>`).join("");
+        sel.value = current;
+      });
+    }
+    Object.keys(extraFilterEls_).forEach((field) => {
+      const sel = extraFilterEls_[field];
+      if (!sel) return;
+      sel.addEventListener("change", () => {
+        extraFilterSetters_[field](sel.value);
+        renderFilters();
+        renderList();
+      });
+    });
+    const extraFilterClearBtn_ = el("psYtPlaylistFilterClear");
+    if (extraFilterClearBtn_) extraFilterClearBtn_.addEventListener("click", () => {
+      activeSumber = ""; activeChannel = ""; activeKeterangan = ""; activeKidungRef = ""; activeFilter = "all";
+      const searchInputEl_ = el("psYtPlaylistSearch");
+      if (searchInputEl_) { searchInputEl_.value = ""; searchQuery = ""; }
+      renderExtraFilters_();
+      renderFilters();
+      renderList();
+    });
 
     function renderList() {
       const videos = filteredVideos();
@@ -6500,6 +6744,7 @@ const PresentationStudio = (() => {
           <div class="ps-file-actions">
             <button type="button" class="chip-btn small primary" data-act="show">▶️ Tampilkan</button>
             <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
+            <button type="button" class="chip-btn small" data-act="bg" title="Putar video ini sebagai Audio Latar SEKARANG JUGA, tanpa perlu disimpan dulu ke Media Tersimpan">🎧 Latar</button>
             <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
           </div>`;
         // BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
@@ -6528,6 +6773,18 @@ const PresentationStudio = (() => {
             rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
             renderStudioPreview({ type: "youtube", embedUrl });
           });
+        });
+        // BARU (27 Sep 2026, permintaan operator: "supaya pilihan lagu
+        // yang bisa dijalankan di latar belakang bisa lebih banyak,
+        // karena sekarang terbatas") -- sebelumnya Audio Latar cuma bisa
+        // diisi dari Media Tersimpan (perlu disimpan dulu satu-satu).
+        // Tombol ini langsung memutar video INI (salah satu dari SEMUA
+        // video Pustaka Media, bisa ratusan) sebagai latar, tanpa
+        // langkah simpan sama sekali -- sama seperti window.playAsYtBackground()
+        // yang dipakai dropdown "Pilih dari video yang sudah tersimpan".
+        row.querySelector('[data-act="bg"]').addEventListener("click", () => {
+          const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
+          if (typeof window.playAsYtBackground === "function") window.playAsYtBackground(embedUrl, v.title);
         });
         row.querySelector('[data-act="addcol"]').addEventListener("click", async (e) => {
           const btn = e.currentTarget;
@@ -6898,6 +7155,17 @@ const PresentationStudio = (() => {
     }
     refreshPlayPauseBtnUi_();
 
+    // FIX (27 Sep 2026) -- dipanggil renderStudioPreview() (lewat
+    // syncYtLiveBarVisibility()) SETIAP KALI video YouTube yang tayang
+    // BERGANTI (embedUrl baru), supaya tombol Play/Pause gabungan ini
+    // selalu kembali ke "▶️ Play" untuk video baru yang belum pernah
+    // ditekan main -- lihat catatan panjang di titik pemanggilannya.
+    window.resetYtPlayPauseState_ = function resetYtPlayPauseState_() {
+      ytIsPlaying = false;
+      needsSoundUnlock = false; // video baru: biarkan urutan mute->play->unmute normal jalan lagi dari awal (juga sudah ditandai true oleh markYtNeedsSoundUnlock(), ini cuma jaga-jaga urutan)
+      refreshPlayPauseBtnUi_();
+    };
+
     // BARU (4 Sep 2026 v2) -- baca kolom waktu LIVE dulu: kalau isinya
     // format waktu yang valid, lompat (seek) ke situ SEBELUM main --
     // kosong/format tidak dikenali = perilaku LAMA (main/lanjut apa
@@ -7046,6 +7314,34 @@ const PresentationStudio = (() => {
       });
       applyRepeatUi();
       rawPost({ type: "yt_repeat", mode: repeatMode }); // beri tahu Layar 2 mode tersimpan begitu Studio dibuka
+    }
+    // BARU (26 Sep 2026, permintaan operator "volume YouTube terlalu
+    // besar") -- slider #psYtVolumeRange (0-100, lihat index.html).
+    // Pola SAMA seperti 🔁 Ulang di atas: disimpan ke localStorage
+    // (bawaan 70, BUKAN 100, SAMA dengan ytVolumeWanted_ bawaan di
+    // present.html) supaya tetap sama kalau Studio ditutup lalu dibuka
+    // lagi, dan langsung dikirim sekali begitu Studio dibuka supaya
+    // Layar 2 & pratinjau mini mulai dari nilai yang sama (present.html
+    // sendiri SUDAH bawaan 70 juga, jadi ini terutama menjaga kedua sisi
+    // SELALU sinkron kalau operator pernah mengubahnya sebelumnya).
+    const VOLUME_KEY = "bible_app_yt_volume_v1";
+    const volumeRange = el("psYtVolumeRange");
+    const volumeLabel = el("psYtVolumeLabel");
+    let ytVolume = parseInt(localStorage.getItem(VOLUME_KEY), 10);
+    if (isNaN(ytVolume) || ytVolume < 0 || ytVolume > 100) ytVolume = 70;
+    function applyVolumeUi_() {
+      if (volumeRange) volumeRange.value = String(ytVolume);
+      if (volumeLabel) volumeLabel.textContent = ytVolume + "%";
+    }
+    if (volumeRange) {
+      applyVolumeUi_();
+      volumeRange.addEventListener("input", () => {
+        ytVolume = parseInt(volumeRange.value, 10) || 0;
+        applyVolumeUi_();
+        localStorage.setItem(VOLUME_KEY, String(ytVolume));
+        sendYtCommand("volume", ytVolume); // -> Layar 2 (present.html), action "volume" pada handler "yt_control"
+      });
+      rawPost({ type: "yt_control", action: "volume", arg: ytVolume }); // beri tahu Layar 2 volume tersimpan begitu Studio dibuka
     }
     // Dipakai wireYoutubeTab()/wireYtPlaylistTab() supaya video baru yang
     // ditampilkan langsung ikut mode Ulang yang sedang aktif tanpa
@@ -7870,6 +8166,39 @@ const PresentationStudio = (() => {
         rawPost({ type: "bell", action: "ring", key: bells[0].key });
       });
     }
+    wireFocusModeToggle();
+  }
+
+  // BARU (26 Sep 2026, permintaan operator "efek dilarang lihat HP/bicara
+  // selama Beribadah -- tapi BUKAN efek sekali tembak, harus muncul TERUS
+  // seperti logo") -- toggle nyala/mati badge PERSISTEN #focusModeBadge di
+  // present.html, lewat payload {type:"focusmode", on:true/false}. BEDA
+  // dari semua tombol lain di wireEffectsTab() di atas (semuanya
+  // fire-and-forget): status disimpan (localStorage, pola SAMA seperti
+  // ytCaptionsEnabled/YT_CAPTIONS_KEY di atas) supaya tombolnya sendiri
+  // tetap menunjukkan status terakhir (nyala/mati) walau Studio
+  // ditutup-buka lagi, & present.html (lewat OVERLAY_TYPES + lastFocusMode_
+  // di js/presentation.js) otomatis mengirim ulang status ini kalau Layar 2
+  // dibuka ulang -- jadi badge-nya benar-benar "menempel" seperti logo.
+  const FOCUS_MODE_KEY = "bible_app_focusmode_v1";
+  let focusModeOn_ = localStorage.getItem(FOCUS_MODE_KEY) === "1";
+  function wireFocusModeToggle() {
+    const btn = el("psFocusModeToggleBtn");
+    if (!btn || btn.dataset.wired) { markFocusModeBtn_(); return; }
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", () => {
+      focusModeOn_ = !focusModeOn_;
+      try { localStorage.setItem(FOCUS_MODE_KEY, focusModeOn_ ? "1" : "0"); } catch (e) {}
+      rawPost({ type: "focusmode", on: focusModeOn_ });
+      markFocusModeBtn_();
+    });
+    markFocusModeBtn_();
+  }
+  function markFocusModeBtn_() {
+    const btn = el("psFocusModeToggleBtn");
+    if (!btn) return;
+    btn.classList.toggle("active", focusModeOn_);
+    btn.textContent = focusModeOn_ ? "✅ Larangan HP & Bicara AKTIF (klik utk matikan)" : "🚫 Tampilkan Larangan HP & Bicara";
   }
 
   // ------------------------------------------------------------
