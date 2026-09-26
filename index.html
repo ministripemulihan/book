@@ -2100,8 +2100,16 @@
 
           <div class="ps-field-label">Latar suara (Audio Latar) sedang main</div>
           <div class="ps-btn-row" id="psYtBgControls">
-            <button type="button" id="psYtBgPlayBtn" class="chip-btn small">▶ Play</button>
-            <button type="button" id="psYtBgPauseBtn" class="chip-btn small">⏸ Pause</button>
+            <!-- DIUBAH (27 Sep 2026, laporan operator "tombol play youtube
+                 latar tidak berubah jadi pause saat ditekan") -- dulu 2
+                 tombol terpisah (▶ Play & ⏸ Pause) yang TIDAK PERNAH
+                 mengubah tampilannya sendiri sama sekali (beda dari tombol
+                 ▶️/⏸️ gabungan milik video UTAMA di atas, psYtPlayPauseBtn,
+                 yang sudah lebih dulu digabung 12 Sep 2026 justru karena
+                 masalah yang SAMA). Sekarang digabung jadi SATU tombol
+                 toggle, sama persis polanya dengan psYtPlayPauseBtn --
+                 lihat wireYoutubeTab() (js/presentation-studio.js). -->
+            <button type="button" id="psYtBgPlayPauseBtn" class="chip-btn small" title="Putar/jeda audio latar YouTube di Layar 2">▶ Play</button>
             <button type="button" id="psYtBgStopBtn" class="chip-btn small danger">⏹ Stop</button>
             <!-- BARU (12 Sep 2026, laporan operator "youtube latar
                  belakang, ini tidak bisa di simpan") -- akar masalahnya:
@@ -3637,11 +3645,18 @@
                operator mematikannya sendiri lewat tombol yang sama, pola
                sama seperti toggle Kamera/Warta (BUKAN lewat
                playEffectVisual_()). Lihat wireFocusModeToggle()
-               (js/presentation-studio.js) & #focusModeBadge (present.html). -->
+               (js/presentation-studio.js) & #focusModeBadge (present.html).
+               DIUBAH (27 Sep 2026, permintaan operator "mau bisa hide/show
+               larangan bicara terpisah dari larangan HP") -- dulu 1 tombol
+               untuk 2 ikon sekaligus, sekarang 2 tombol terpisah (masing2
+               nyala/mati sendiri) supaya operator bisa, misalnya, cuma
+               menampilkan ikon "dilarang bicara" saja tanpa ikon HP, atau
+               sebaliknya. -->
           <div class="ps-field-label" style="margin-top:0;">🚫 Larangan HP &amp; Bicara (Beribadah)</div>
-          <p class="announcement-compose-hint" style="margin-top:0;">Badge PERSISTEN di pojok kanan atas Layar 2 -- TIDAK hilang sendiri, TIDAK ikut hilang saat berpindah ayat/kidung/YouTube/dst. Nyala/mati manual lewat tombol ini.</p>
+          <p class="announcement-compose-hint" style="margin-top:0;">Badge PERSISTEN di pojok kanan atas Layar 2 -- TIDAK hilang sendiri, TIDAK ikut hilang saat berpindah ayat/kidung/YouTube/dst. 2 ikon di bawah ini nyala/mati SENDIRI-SENDIRI (independen).</p>
           <div class="ps-btn-row">
-            <button type="button" class="chip-btn small" id="psFocusModeToggleBtn">🚫 Tampilkan Larangan HP &amp; Bicara</button>
+            <button type="button" class="chip-btn small" id="psFocusModeToggleBtn">🚫 Tampilkan Larangan Lihat HP</button>
+            <button type="button" class="chip-btn small" id="psFocusModeBicaraToggleBtn">🗣️ Tampilkan Larangan Bicara</button>
           </div>
         </div>
 
@@ -4073,7 +4088,7 @@
   <script src="js/bg-audio-dialog.js?v=20260920d"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20260926b"></script>
+  <script src="js/presentation-studio.js?v=20260927"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
