@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260924a" />
+<link rel="stylesheet" href="css/style.css?v=20260926a" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2522,6 +2522,22 @@
             <button type="button" class="ps-color-chip" data-color="#b8f2c9" style="background:#b8f2c9" title="Hijau muda pastel"></button>
             <button type="button" class="ps-color-chip" data-color="#e0c3fc" style="background:#e0c3fc" title="Ungu pastel"></button>
             <button type="button" class="ps-color-chip" data-color="#ffd8a8" style="background:#ffd8a8" title="Oranye pastel"></button>
+            <!-- BARU (26 Sep 2026, permintaan operator, sinkron dgn present.html
+                 "🎨 Coret-coret Langsung" -- lihat catatan di sana) -- 1 swatch
+                 kustom (dipilih sama seperti chip lain) + 1 tombol roda-warna
+                 yg membuka color-picker asli (24-bit/RGB penuh) utk menggantinya. -->
+            <button type="button" class="ps-color-chip" id="psPointerColorCustomSwatch" data-color="#7c4dff" style="background:#7c4dff" title="Warna kustom"></button>
+            <button type="button" id="psPointerColorPick" class="ps-color-wheel-btn" title="Pilih warna bebas (24-bit)"></button>
+            <input type="color" id="psPointerColorInput" value="#7c4dff" tabindex="-1" aria-hidden="true" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+          </div>
+          <!-- BARU (26 Sep 2026, permintaan operator "ujungnya bulat, atau
+               miring seperti kuas", sinkron dgn present.html -- lihat
+               drawChiselAction_() di js/presentation-studio.js). Berlaku
+               utk Pen MAUPUN Penghapus. -->
+          <div class="ps-btn-row" style="margin-top:6px;">
+            <span class="ps-pen-size-label" style="width:auto;">Ujung:</span>
+            <button type="button" class="chip-btn small active" data-ps-pen-tip="round">● Bulat</button>
+            <button type="button" class="chip-btn small" data-ps-pen-tip="chisel">🖌️ Kuas</button>
           </div>
           <!-- BARU (27 Agu 2026) -- ukuran Pen/Penunjuk lewat progress bar
                (bisa diperkecil sekali/diperbesar banget), lihat
@@ -3997,7 +4013,7 @@
        tersedia saat wireMapTab() jalan. -->
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
-  <script src="js/ink-engine.js?v=20260926a"></script>
+  <script src="js/ink-engine.js?v=20260926b"></script>
   <script src="js/presentation.js?v=20260921b"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
@@ -4008,7 +4024,7 @@
   <script src="js/bg-audio-dialog.js?v=20260920d"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20260926a"></script>
+  <script src="js/presentation-studio.js?v=20260926b"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip

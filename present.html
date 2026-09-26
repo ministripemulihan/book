@@ -1935,7 +1935,24 @@
     border: 2px solid rgba(255,255,255,.35);
     background: conic-gradient(red, #f4d03f, lime, cyan, blue, magenta, red);
   }
-  #localInkColorInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  /* BARU (26 Sep 2026, permintaan operator "fasilitas ganti background di
+     sana, dari warna gelap bisa rubah warna 24K bisa rubah warna putih")
+     -- lapisan warna POLOS di BAWAH #localPenCanvas (z-index 42) tapi DI
+     ATAS seluruh tayangan (#zoomStageWrap dkk) -- dipakai supaya operator
+     bisa mengubah Layar 2 jadi "papan tulis" 1 warna polos (gelap/putih/
+     bebas) utk menulis/menggambar bebas, lalu disimpan jadi gambar (lihat
+     #localInkOptions "Latar Belakang" & localInkSaveImage_() di skrip
+     bawah). Mati (display:none) = memperlihatkan tayangan Layar 2 asli
+     seperti biasa (bawaan, TIDAK berubah dari sebelumnya). */
+  #localInkBgLayer { position: fixed; inset: 0; z-index: 41; display: none; }
+  #localInkBgRow { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; width: 100%; margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.18); }
+  #localInkBgRow .local-ink-tip-label { font: 600 11px "Inter", Arial, sans-serif; color: rgba(255,255,255,.6); margin-right: 2px; width: 100%; }
+  #localInkBgRow button[data-local-ink-bg] { width: 20px; height: 20px; min-width: 20px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.3); }
+  #localInkBgRow button[data-local-ink-bg].active { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
+  #localInkBgRow #localInkBgOff { width: auto; height: 20px; min-width: 20px; border-radius: 10px; padding: 0 7px; font-size: 10px; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.25); }
+  #localInkBgRow #localInkBgOff.active { background: #d8b45c; color: #1a1a1a; border-color: #d8b45c; font-weight: 700; }
+  #localInkBgPick { background: conic-gradient(red, #f4d03f, lime, cyan, blue, magenta, red); }
+  #localInkBgColorInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   #localInkBadge {
     position: fixed; left: 54px; bottom: 19px; z-index: 96; pointer-events: none; opacity: 0; transition: opacity .3s ease;
     background: rgba(20,20,20,.75); color: #fff; font: 600 12px "Inter", Arial, sans-serif; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
@@ -2595,6 +2612,9 @@
     <button type="button" id="localInkUndo" title="Batalkan goresan terakhir (Ctrl+Z)">↩️</button>
     <button type="button" id="localInkRedo" title="Ulangi goresan yang dibatalkan (Ctrl+Y)">↪️</button>
     <button type="button" id="localInkClearAll" title="Hapus SEMUA coretan">🗑️</button>
+    <!-- BARU (26 Sep 2026, permintaan operator "bisa di klik simpan jadi
+         gambar") -- lihat localInkSaveImage_() di skrip bawah. -->
+    <button type="button" id="localInkSaveImage" title="Simpan coretan (+ latar belakang kalau dipilih) jadi gambar PNG">💾</button>
     <button type="button" id="localInkOpts" title="Warna &amp; ketebalan">🎨</button>
     <button type="button" id="localInkClose" title="Tutup alat coret">✕</button>
     <div id="localInkOptions" hidden>
@@ -2630,8 +2650,22 @@
         <button type="button" id="localInkCustomPick" title="Pilih warna bebas (24-bit)"></button>
         <input type="color" id="localInkColorInput" value="#7c4dff" tabindex="-1" aria-hidden="true">
       </div>
+      <!-- BARU (26 Sep 2026, permintaan operator "fasilitas ganti
+           background, dari warna gelap bisa rubah warna 24K bisa rubah
+           warna putih") -- lihat catatan panjang CSS #localInkBgLayer di
+           atas. "✖ Asli" mematikan lapisan ini (kembali ke tayangan asli). -->
+      <div id="localInkBgRow">
+        <span class="local-ink-tip-label">Latar Belakang:</span>
+        <button type="button" id="localInkBgOff" data-local-ink-bg="" class="active">✖ Asli</button>
+        <button type="button" data-local-ink-bg="#0b1220" style="background:#0b1220" title="Gelap"></button>
+        <button type="button" data-local-ink-bg="#ffffff" style="background:#ffffff" title="Putih"></button>
+        <button type="button" id="localInkBgCustomSwatch" data-local-ink-bg="#7c4dff" style="background:#7c4dff" title="Latar kustom"></button>
+        <button type="button" id="localInkBgPick" title="Pilih warna latar bebas (24-bit)"></button>
+        <input type="color" id="localInkBgColorInput" value="#7c4dff" tabindex="-1" aria-hidden="true">
+      </div>
     </div>
   </div>
+  <div id="localInkBgLayer"></div>
   <div id="zoomBoxSel"></div>
   <div id="pointerDot"></div>
   <!-- BARU (27 Agu 2026) -- lihat catatan CSS #magnifierLens di atas. -->
@@ -2713,7 +2747,7 @@
        Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
   <script src="js/config.js"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN halaman ini -->
-  <script src="js/ink-engine.js?v=20260926a"></script>
+  <script src="js/ink-engine.js?v=20260926b"></script>
   <!-- BARU (10 Sep 2026, sesi ke-13) -- js/soundfx.js: SATU SUMBER
        KEBENARAN daftar & sintesis efek suara "🎉 Efek Panggung", dipakai
        bersama dengan index.html (tab Studio & menu pratinjau admin).
@@ -7126,6 +7160,12 @@
       }
       return;
     }
+    if (data.type === "meta") {
+      // BARU (26 Sep 2026) -- lihat catatan di setActivePlaylist()
+      // (js/presentation-studio.js) & localInkSaveImage_() di bawah.
+      if (typeof data.collectionName === "string") window.__lastCollectionName = data.collectionName;
+      return;
+    }
     if (data.type === "pen") {
       if (!remoteInk) return;
       if (data.clear) {
@@ -7144,7 +7184,7 @@
       // panjang di js/ink-engine.js & wirePointerPen() (js/presentation-
       // studio.js) untuk kenapa (Undo/Redo & Penghapus butuh riwayat
       // per-goresan, bukan sekadar menggambar tiap segmen langsung permanen).
-      if (data.action === "begin") { remoteInk.begin(data.id, data.mode, data.color, data.size); return; }
+      if (data.action === "begin") { remoteInk.begin(data.id, data.mode, data.color, data.size, data.tip); return; }
       if (data.action === "append") {
         remoteInk.append(data.pts || []);
         const cur = remoteInk.getCurrent();
@@ -7460,7 +7500,7 @@
   //  (dianggap "menempel" pada tayangan, bukan bagian UI alat).
   function wrapBodyForZoom_() {
     if (document.getElementById("zoomStageWrap")) return document.getElementById("zoomStageWrap");
-    const KEEP_OUT = ["localPenCanvas", "localLaserDot", "localInkBadge", "localInkToggle", "localInkBar", "zoomBoxSel"];
+    const KEEP_OUT = ["localPenCanvas", "localLaserDot", "localInkBadge", "localInkToggle", "localInkBar", "zoomBoxSel", "localInkBgLayer"];
     const wrap = document.createElement("div");
     wrap.id = "zoomStageWrap";
     const kids = Array.prototype.slice.call(document.body.children);
@@ -7625,6 +7665,70 @@
       colorInput.addEventListener("input", applyCustomColor_);
       colorInput.addEventListener("change", applyCustomColor_);
     }
+    // ---------- 🖼️ Latar Belakang + 💾 Simpan Gambar (BARU 26 Sep 2026) ----------
+    const bgLayer = document.getElementById("localInkBgLayer");
+    function setBg_(v, srcBtn) {
+      if (bgLayer) { bgLayer.style.background = v || ""; bgLayer.style.display = v ? "block" : "none"; }
+      bar.querySelectorAll("[data-local-ink-bg]").forEach((x) => x.classList.toggle("active", srcBtn ? x === srcBtn : x.dataset.localInkBg === v));
+    }
+    bar.querySelectorAll("[data-local-ink-bg]").forEach((b) => {
+      b.addEventListener("click", () => setBg_(b.dataset.localInkBg, b));
+    });
+    const bgCustomSwatch = document.getElementById("localInkBgCustomSwatch");
+    const bgPickBtn = document.getElementById("localInkBgPick");
+    const bgColorInput = document.getElementById("localInkBgColorInput");
+    if (bgPickBtn && bgColorInput) {
+      bgPickBtn.addEventListener("click", () => { try { bgColorInput.click(); } catch (e) {} });
+      const applyCustomBg_ = () => {
+        const v = bgColorInput.value || "#7c4dff";
+        if (bgCustomSwatch) { bgCustomSwatch.style.background = v; bgCustomSwatch.dataset.localInkBg = v; }
+        setBg_(v, bgCustomSwatch);
+      };
+      bgColorInput.addEventListener("input", applyCustomBg_);
+      bgColorInput.addEventListener("change", applyCustomBg_);
+    }
+    // "Kumpulan Ayat" (atau daftar/playlist apa pun) yang sedang tayang --
+    // dikirim dari Studio lewat pesan {type:"meta"} (lihat setActivePlaylist()
+    // di js/presentation-studio.js & penanganan "meta" di atas). Kalau belum
+    // pernah ada (mis. Layar 2 baru dibuka, belum ada apa pun ditayangkan
+    // dari Kumpulan Ayat), window.__lastCollectionName tetap undefined --
+    // nama berkas jatuh ke pola tanggal-jam sesuai permintaan operator.
+    function sanitizeFileName_(s) {
+      return String(s || "").trim().replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").slice(0, 120);
+    }
+    function defaultImageName_() {
+      const nm = sanitizeFileName_(window.__lastCollectionName);
+      if (nm) return nm;
+      const d = new Date();
+      const p2 = (n) => String(n).padStart(2, "0");
+      return "book-vp-" + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + "-" + p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds());
+    }
+    function localInkSaveImage_() {
+      if (!canvas || !canvas.width || !canvas.height) return;
+      const out = document.createElement("canvas");
+      out.width = canvas.width; out.height = canvas.height;
+      const octx = out.getContext("2d");
+      // Kalau operator sudah memilih Latar Belakang (bukan "✖ Asli"), gambar
+      // itu dulu diisi warnanya SEBELUM coretan ditumpuk di atasnya --
+      // kalau "✖ Asli"/belum pernah dipilih, PNG-nya transparan (cuma
+      // coretannya saja, supaya bisa ditumpuk di atas apa pun nanti).
+      if (bgLayer && bgLayer.style.display !== "none" && bgLayer.style.background) {
+        octx.fillStyle = bgLayer.style.background;
+        octx.fillRect(0, 0, out.width, out.height);
+      }
+      octx.drawImage(canvas, 0, 0);
+      out.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = defaultImageName_() + ".png";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 4000);
+        showBadge_("💾 Tersimpan: " + a.download);
+      }, "image/png");
+    }
+    const saveImgBtn = document.getElementById("localInkSaveImage");
+    if (saveImgBtn) saveImgBtn.addEventListener("click", localInkSaveImage_);
     const optsBtn = document.getElementById("localInkOpts");
     if (optsBtn && optsEl) optsBtn.addEventListener("click", () => { optsEl.hidden = !optsEl.hidden; });
     function doUndo_() { if (ink.undo()) { ink.render(canvas, ctx); refreshUndoRedo_(); } }
