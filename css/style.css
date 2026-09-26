@@ -4284,6 +4284,10 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
 }
 .ps-color-chip.active { border-color: var(--brass); }
+/* BARU (26 Sep 2026) -- tombol "roda warna" (24-bit/RGB bebas) di sebelah
+   swatch warna kustom Pen/Penunjuk & Latar Belakang (present.html) --
+   lihat #psPointerColorPick/#psPointerColorCustomSwatch di index.html. */
+.ps-color-wheel-btn { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; background: conic-gradient(red, #f4d03f, lime, cyan, blue, magenta, red); }
 .ps-color-input { width: 100%; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer; }
 /* BARU (7 Sep 2026 v3, permintaan operator) -- progress bar 1 putaran
    💬 Pesan mode "➡️ Berjalan" (lihat #psMsgSpeedProgress & wireMessage(),
