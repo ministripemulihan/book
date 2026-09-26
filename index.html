@@ -2117,9 +2117,16 @@
           </div>
           <div class="ps-yt-hint" id="psYtBgStatus">Belum ada audio latar yang diputar.</div>
           <div class="ps-field-label">Pilih dari video yang sudah tersimpan</div>
-          <select id="psYtBgSavedPicker" class="columns-lang-select">
-            <option value="">-- pilih video tersimpan untuk diputar sebagai latar --</option>
-          </select>
+          <div class="ps-yt-row">
+            <select id="psYtBgSavedPicker" class="columns-lang-select">
+              <option value="">-- pilih video tersimpan untuk diputar sebagai latar --</option>
+            </select>
+            <!-- BARU (27 Sep 2026, permintaan operator: "daftar listnya
+                 tidak bisa di hapus") -- lihat wireYoutubeTab()
+                 (js/presentation-studio.js) untuk logikanya. -->
+            <button type="button" id="psYtBgSavedDeleteBtn" class="chip-btn small danger" title="Hapus item yang sedang dipilih di dropdown ini dari Media Tersimpan">🗑️ Hapus dari Daftar</button>
+          </div>
+          <p class="announcement-compose-hint">Tip: sekarang tidak perlu menyimpan dulu ke sini untuk punya banyak pilihan lagu latar -- di daftar "📺 Playlist Video (dari Google Sheet)" di bawah, tiap video punya tombol "🎧 Latar" sendiri untuk langsung diputar sebagai latar dari SEMUA video Pustaka Media.</p>
 
           <div class="ps-field-label">Daftar video (urut tayang ◀ ▶)</div>
           <div id="psYtQueueList" class="ps-file-list"><p class="present-saved-empty">Belum ada video di daftar.</p></div>
@@ -2151,6 +2158,19 @@
             <button type="button" class="chip-btn small" data-filter="spr">SPR</button>
             <button type="button" class="chip-btn small" data-filter="injil">Injil</button>
             <button type="button" class="chip-btn small" data-filter="bebas">Bebas</button>
+          </div>
+          <!-- BARU (27 Sep 2026, permintaan operator: "filter yang lebih
+               mudah, dari sumber, keterangan, channel, kategori,
+               kidungref") -- isi dropdown dibangun OTOMATIS dari video
+               yang termuat, lihat renderExtraFilters_()
+               (js/presentation-studio.js). -->
+          <div class="ps-field-label" style="margin-top:10px;">Filter tambahan</div>
+          <div class="ps-btn-row">
+            <select id="psYtPlaylistFilterSumber" class="columns-lang-select"><option value="">Semua sumber</option></select>
+            <select id="psYtPlaylistFilterChannel" class="columns-lang-select"><option value="">Semua channel</option></select>
+            <select id="psYtPlaylistFilterKeterangan" class="columns-lang-select"><option value="">Semua keterangan</option></select>
+            <select id="psYtPlaylistFilterKidungRef" class="columns-lang-select"><option value="">Semua KidungRef</option></select>
+            <button type="button" id="psYtPlaylistFilterClear" class="chip-btn small">✕ Bersihkan Semua Filter</button>
           </div>
           <div class="ps-field-label" style="margin-top:10px;">Urutkan</div>
           <select id="psYtPlaylistSort" class="columns-lang-select">
@@ -2355,6 +2375,19 @@
             <button type="button" id="psYtPlayPauseBtn" class="chip-btn small" title="Putar/Jeda video YouTube di Layar 2 (pintasan: P)">▶️ Play</button>
             <button type="button" id="psYtStopBtn" class="chip-btn small" title="Hentikan video YouTube di Layar 2">⏹️ Stop</button>
             <button type="button" id="psYtMuteBtn" class="chip-btn small" title="Bisukan/bunyikan video YouTube & efek suara Panggung di Layar 2 -- pintasan keyboard: M">🔇 Mute</button>
+            <!-- BARU (26 Sep 2026, permintaan operator "volume YouTube
+                 terlalu besar") -- slider volume (0-100) utk video YouTube
+                 yang SEDANG tayang di Layar 2. Bawaan 70 (BUKAN 100),
+                 disimpan ke localStorage supaya tetap sama kalau Studio
+                 ditutup lalu dibuka lagi, dan diterapkan otomatis ke SETIAP
+                 video baru yang dimuat (lihat ytVolumeWanted_ &
+                 reapplyYtLiveStateAfterReplay_() di present.html). Lihat
+                 wireYtControls() di js/presentation-studio.js utk logikanya. -->
+            <span class="ps-yt-volume-wrap" id="psYtVolumeWrap" title="Volume video YouTube di Layar 2">
+              <span aria-hidden="true">🔊</span>
+              <input type="range" id="psYtVolumeRange" class="ps-yt-volume-range" min="0" max="100" step="1" value="70" title="Volume video YouTube di Layar 2 (bawaan 70%)" />
+              <span id="psYtVolumeLabel" class="ps-yt-volume-label">70%</span>
+            </span>
             <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
           </div>
           <!-- BARU (4 Sep 2026 v2, permintaan operator) -- progress bar +
@@ -3594,6 +3627,22 @@
             <button type="button" class="chip-btn small" id="psQuickBellBtn">🔔 Bel Cepat</button>
           </div>
           <div class="ps-pointer-hint">"Break Time" langsung menayangkan Layar Istirahat dengan judul bawaan "JAM ISTIRAHAT" tanpa hitung mundur -- kalau mau atur poin/hitung mundur, tetap pakai tab "🖥️ Mode &amp; Peta" seperti biasa.</div>
+          <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
+          <!-- BARU (26 Sep 2026, permintaan operator "efek dilarang lihat
+               HP/bicara selama Beribadah -- tapi BUKAN efek sekali tembak,
+               harus muncul TERUS seperti logo") -- SENGAJA TERPISAH dari
+               tombol-tombol "Efek Panggung" lain di atas (semuanya
+               fire-and-forget, hilang sendiri beberapa detik) -- ini
+               TOGGLE nyala/mati yang tetap menempel di Layar 2 sampai
+               operator mematikannya sendiri lewat tombol yang sama, pola
+               sama seperti toggle Kamera/Warta (BUKAN lewat
+               playEffectVisual_()). Lihat wireFocusModeToggle()
+               (js/presentation-studio.js) & #focusModeBadge (present.html). -->
+          <div class="ps-field-label" style="margin-top:0;">🚫 Larangan HP &amp; Bicara (Beribadah)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Badge PERSISTEN di pojok kanan atas Layar 2 -- TIDAK hilang sendiri, TIDAK ikut hilang saat berpindah ayat/kidung/YouTube/dst. Nyala/mati manual lewat tombol ini.</p>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" id="psFocusModeToggleBtn">🚫 Tampilkan Larangan HP &amp; Bicara</button>
+          </div>
         </div>
 
         <!-- BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian
