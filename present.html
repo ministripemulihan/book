@@ -7,7 +7,7 @@
 <!-- BARU (17 Sep 2026) -- animasi "🌱 Penciptaan" (7 hari). Semua
      kelasnya berawalan bk- & dikurung di .bk-scene, jadi tidak ada satu
      pun aturan di file ini yang tersentuh olehnya. -->
-<link rel="stylesheet" href="css/book-scene.css?v=20260917a" />
+<link rel="stylesheet" href="css/book-scene.css?v=20260928a" />
 <style>
   :root {
     --p-bg: #05070c;
@@ -2793,7 +2793,7 @@
        dekat getEffectsMasterGain_() di bawah untuk cara efek ini tetap
        ikut sakelar mute-semua "M". -->
   <script src="js/soundfx.js?v=20260911c"></script>
-  <script src="js/book-scene.js?v=20260918b"></script>
+  <script src="js/book-scene.js?v=20260928a"></script>
   <!-- PERBAIKAN (19 Sep 2026, laporan operator "Slogan Karakter & Penciptaan
        tidak tampil di Layar 2") -- AKAR MASALAH #1: showSloganKarakter() &
        skLabelFor_() di bawah membaca window.SLOGAN_KARAKTER_DATA, tapi file
@@ -4973,7 +4973,7 @@
     penciptaanPrepare_();
     if (penciptaanIntroEl) penciptaanIntroEl.hidden = true; // BARU (19 Sep 2026) -- tutup kartu Tampilan Awal begitu hari dipilih
     penciptaanViewEl.hidden = false; // tampilkan DULU -- scene mengukur kotaknya sendiri saat dipasang
-    if (!penciptaanScene_) penciptaanScene_ = BookScene.mount(penciptaanStageEl, { hari: 1, ikutiJam: true });
+    if (!penciptaanScene_) penciptaanScene_ = BookScene.mount(penciptaanStageEl, { hari: 1, ikutiJam: true, paksaGerak: true });
 
     const hari = Math.max(1, Math.min(7, parseInt(data.hari, 10) || 1));
     penciptaanScene_.setHari(hari);

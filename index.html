@@ -8,14 +8,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260926a" />
+<link rel="stylesheet" href="css/style.css?v=20260928b" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
   <!-- BARU (17 Sep 2026) -- animasi "7 Hari Penciptaan": latar Layar
        Masuk + game "🌱 Penciptaan". Semua kelasnya berawalan bk- dan
        dikurung di .bk-scene, jadi tidak bisa bentrok dgn style.css. -->
-  <link rel="stylesheet" href="css/book-scene.css?v=20260918a" />
+  <link rel="stylesheet" href="css/book-scene.css?v=20260928a" />
   <!-- BARU (20 Sep 2026) -- 📚 Rencana Baca Multi-Jalur, lihat js/plans-multi.js -->
   <link rel="stylesheet" href="css/plans-multi.css?v=20260920e" />
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pengaturan Riset Tema & Mode Khotbah, lihat js/aichat-riset.js -->
@@ -2156,7 +2156,7 @@
           <!-- BARU (4 Sep 2026, permintaan operator) -- cari judul + urutkan
                daftar, lihat wireYtPlaylistTab() (js/presentation-studio.js). -->
           <div class="ps-yt-row">
-            <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Cari judul video atau nama channel..." />
+            <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Ketik judul, channel, atau kode kidung (k130, s12, t5, y7, a3, ka5)..." />
           </div>
           <div class="ps-btn-row" id="psYtPlaylistFilters">
             <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
@@ -4036,7 +4036,7 @@
   <!-- BARU (17 Sep 2026) -- pemandangan "7 Hari Penciptaan". Dimuat
        PALING AWAL karena dipakai layar Masuk (sebelum login), dan
        dipakai lagi oleh js/games/penciptaan.js di bawah. -->
-  <script src="js/book-scene.js?v=20260918b"></script>
+  <script src="js/book-scene.js?v=20260928a"></script>
   <script src="js/config.js?v=20260921c"></script>
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260914b"></script>
@@ -4066,6 +4066,7 @@
   <script src="js/media.js?v=20260915d"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260920d"></script>
+  <script src="js/kidung-ref.js?v=20260928b"></script> <!-- 28 Sep 2026: kode KidungRef K130/S130/KA13 -->
   <script src="js/kidung-ui.js?v=20260911b"></script>
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
@@ -4088,7 +4089,7 @@
   <script src="js/bg-audio-dialog.js?v=20260920d"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20260927"></script>
+  <script src="js/presentation-studio.js?v=20260928b"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4109,7 +4110,7 @@
        langsung oleh ❤️ tiap kartu). js/effectpreview.js DIHAPUS --
        digantikan tab "🎆 Layar Publik" di dalam media-library.js. -->
   <script src="js/favorites.js?v=20260911a"></script>
-  <script src="js/media-library.js?v=20260914b"></script>
+  <script src="js/media-library.js?v=20260928b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
   <script src="js/app.js?v=20260921b"></script>
