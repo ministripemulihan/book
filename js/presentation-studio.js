@@ -1889,6 +1889,19 @@ const PresentationStudio = (() => {
   // clicker) atau "➕ Daftar" (simpan ke Kumpulan Ayat lewat
   // addKidungToCollection() di js/collections.js).
   // ------------------------------------------------------------
+  // BARU (28 Sep 2026) -- jembatan dari daftar Video YouTube (kolom
+  // KidungRef: K130/S130/KA13) ke tab 🎵 Kidung. Diisi wireKidungTab().
+  let kidungTabApi_ = null;
+  // opts.audio = { videoId, title } (BARU 28 Sep 2026) -- tombol "📺 Teks":
+  // selain membuka kidungnya, video YouTube itu dimuat sebagai Audio Latar
+  // (lihat openRef() di wireKidungTab()).
+  function openKidungFromRef_(buku, no, opts) {
+    const tabBtn = document.querySelector('[data-ps-mid-tab="kidung"]');
+    if (tabBtn) tabBtn.click(); // pindah ke tab Kidung (wireTabs)
+    if (kidungTabApi_ && typeof kidungTabApi_.openRef === "function") return kidungTabApi_.openRef(buku, no, opts);
+    alert("Tab Kidung belum siap.");
+  }
+
   function wireKidungTab() {
     const bookToggleWrap = el("psKidungBookToggle");
     const noInput = el("psKidungNoInput");
@@ -1939,14 +1952,67 @@ const PresentationStudio = (() => {
 
     async function openKidung(buku, no) {
       const result = typeof openKidungByKeypad === "function" ? await openKidungByKeypad(buku, no) : null;
-      if (!result) { alert(`Kidung No. ${no} tidak ditemukan di buku ${buku}.`); return; }
+      if (!result) { alert(`Kidung No. ${no} tidak ditemukan di buku ${buku}.`); return false; }
       currentMeta = Object.assign({ buku }, result.meta || { buku, noKidung: no, judul: "" });
       currentBaits = result.baits || [];
       if (detailWrap) detailWrap.hidden = false;
       if (detailTitle) detailTitle.textContent = `${typeof formatKidungNo === "function" ? formatKidungNo(currentMeta.buku, currentMeta.noKidung) : currentMeta.noKidung} — ${currentMeta.judul || ""}`;
       renderKidungBgLinks(); // BARU (18 Sep 2026) -- lihat catatan panjang di atas fungsi ini
       renderSlides();
+      return true;
     }
+
+    // BARU (28 Sep 2026) -- Kidung Anak bukan bagian getKidungBooksOrdered()
+    // (modul terpisah, js/kidung-anak.js), jadi dibuka lewat jembatan yang
+    // SAMA seperti token "SA..." di AI Presentation (parseAiPresentation()).
+    async function openKidungAnak(no) {
+      const bridge = (window.KidungAnak && typeof window.KidungAnak.getBaitsForPresentation === "function") ? window.KidungAnak.getBaitsForPresentation : null;
+      if (!bridge) { alert("Modul Kidung Anak belum termuat."); return false; }
+      let result = null;
+      try { result = await bridge(no); } catch (e) { result = null; }
+      if (!result || !result.baits || !result.baits.length) { alert(`Kidung Anak No. ${no} tidak ditemukan atau belum punya syair.`); return false; }
+      const song = result.song || {};
+      currentMeta = {
+        buku: "Sidang Anak", noKidung: String(song.No || no), judul: song.Judul || "", ikon: "👶",
+        pengarang: song.Pengarang || "", birama: song.Birama || "",
+        jumlahBait: result.baits.filter((b) => b.noBait).length || result.baits.length,
+      };
+      currentBaits = result.baits;
+      if (detailWrap) detailWrap.hidden = false;
+      if (detailTitle) detailTitle.textContent = `👶 Kidung Anak ${currentMeta.noKidung} — ${currentMeta.judul}`;
+      renderKidungBgLinks();
+      renderSlides();
+      return true;
+    }
+
+    // Dipanggil tombol 🎵 K130 / S130 / KA13 di daftar Video YouTube.
+    // DIPERBARUI (28 Sep 2026) -- `opts.audio` ({videoId,title}) dari tombol
+    // "📺 Teks" di daftar video: sesudah kidung terbuka, video YouTube itu
+    // dimuat sebagai Audio Latar BERSAMA (cara yang sama dengan chip link
+    // di panel Audio Latar). Teks bait tetap diatur operator seperti biasa
+    // (bait per slide, koor tengah/bawah, panah kanan/kiri); lagu jalan
+    // terus di antara pindah bait. Nama buku dari kode dicocokkan longgar
+    // dengan buku sungguhan di data (Suplemen/Supplemen, Anak-anak, dst).
+    async function openRef(buku, no, opts) {
+      let ok;
+      if (buku === "Kidung Anak") {
+        ok = await openKidungAnak(no);
+      } else {
+        let real = buku;
+        try {
+          const books = await getKidungBooksOrdered();
+          if (window.KidungRef && typeof window.KidungRef.findBuku === "function") real = window.KidungRef.findBuku(buku, books) || buku;
+        } catch (e) { /* pakai nama dari kode apa adanya */ }
+        currentBuku = real;
+        renderBookToggle();
+        if (searchInput) renderSearchResults(searchInput.value);
+        ok = await openKidung(real, no);
+      }
+      const a = opts && opts.audio;
+      if (ok && a && a.videoId) loadLinkAsBg_("yt", "https://www.youtube.com/watch?v=" + a.videoId, a.title || "Video YouTube");
+      return ok;
+    }
+    kidungTabApi_ = { openRef };
 
     // ------------------------------------------------------------
     // BARU (18 Sep 2026, permintaan operator "pas syair kidung jalan,
@@ -6616,7 +6682,29 @@ const PresentationStudio = (() => {
     // renderExtraFilters_() untuk membangun pilihan dropdown; 1 fungsi
     // generik supaya Sumber/Channel/Keterangan/KidungRef sama-sama
     // dicocokkan case-insensitive tanpa 4x salinan kode yang mirip.
+    // DIPERBARUI (28 Sep 2026) -- khusus kolom kidungRef, 1 video boleh
+    // berisi BEBERAPA kode ("K130, S5") dan boleh ditulis kode singkat
+    // (K/S/KA) ATAU format lama "Kidung|130" -- dicocokkan per TOKEN lewat
+    // window.KidungRef (js/kidung-ref.js), bukan seluruh isi kolom.
+    // BARU (28 Sep 2026) -- pencarian ketik. Cocok bila kata ada di judul /
+    // channel / sumber / keterangan, ATAU kode kidung yang diketik (k130,
+    // "s 12", t5, y7, a3, ka5, "kidung 130") sama persis dengan salah satu
+    // kode di kolom KidungRef video itu.
+    function matchesQuery_(v, q) {
+      if (!q) return true;
+      const text = [v.title, v.channel, v.sumber, v.keterangan].join("\n").toLowerCase();
+      if (text.includes(q)) return true;
+      if (window.KidungRef && v.kidungRef) {
+        const qt = window.KidungRef.parseToken(q);
+        if (qt && qt.kind === "kidung") return window.KidungRef.parse(v.kidungRef).some((t) => t.key === qt.key);
+      }
+      return false;
+    }
+
     function fieldEq_(video, field, value) {
+      if (field === "kidungRef" && window.KidungRef) {
+        return window.KidungRef.parse(video[field]).some((t) => t.key === value);
+      }
       return String(video[field] || "").trim().toLowerCase() === value;
     }
 
@@ -6633,7 +6721,7 @@ const PresentationStudio = (() => {
       // SEKARANG ikut mencocokkan NAMA CHANNEL juga, tidak cuma judul
       // video (mis. ketik "TS Media" langsung ketemu semua videonya,
       // walau kata itu tidak ada di judul manapun).
-      if (q) list = list.filter((v) => (v.title || "").toLowerCase().includes(q) || (v.channel || "").toLowerCase().includes(q));
+      if (q) list = list.filter((v) => matchesQuery_(v, q));
       return sortVideos(list);
     }
 
@@ -6658,7 +6746,7 @@ const PresentationStudio = (() => {
       if (activeKeterangan) list = list.filter((v) => fieldEq_(v, "keterangan", activeKeterangan));
       if (activeKidungRef) list = list.filter((v) => fieldEq_(v, "kidungRef", activeKidungRef));
       const q = searchQuery.trim().toLowerCase();
-      if (q) list = list.filter((v) => (v.title || "").toLowerCase().includes(q) || (v.channel || "").toLowerCase().includes(q));
+      if (q) list = list.filter((v) => matchesQuery_(v, q));
       return list;
     }
 
@@ -6684,7 +6772,12 @@ const PresentationStudio = (() => {
     // PERTAMA supaya "BEBAS"/"bebas" campur tidak jadi 2 pilihan beda.
     function computeDistinctField_(field) {
       const seen = new Map();
+      const perToken = field === "kidungRef" && window.KidungRef; // 28 Sep 2026 -- 1 pilihan per kode (K130, S5, ...), bukan per isi kolom utuh
       allVideos.forEach((v) => {
+        if (perToken) {
+          window.KidungRef.parse(v[field]).forEach((t) => { if (!seen.has(t.key)) seen.set(t.key, t.label); });
+          return;
+        }
         const label = String(v[field] || "").trim();
         if (!label) return;
         const key = label.toLowerCase();
@@ -6692,7 +6785,7 @@ const PresentationStudio = (() => {
       });
       return Array.from(seen.entries())
         .map(([key, label]) => ({ key, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, "id", { sensitivity: "base" }));
+        .sort((a, b) => a.label.localeCompare(b.label, "id", { sensitivity: "base", numeric: perToken }));
     }
 
     // DIPERBARUI (11 Sep 2026, permintaan operator: "kategori yang saya
@@ -6784,14 +6877,32 @@ const PresentationStudio = (() => {
       renderList();
     });
 
-    function renderList() {
+    // BARU (28 Sep 2026) -- daftar ditampilkan BERTAHAP (60 per halaman) supaya
+    // ratusan video tidak dirender sekaligus; tombol "Tampilkan lagi" menambah
+    // baris tanpa menggambar ulang / melompatkan scroll. Ganti filter atau
+    // ketikan pencarian -> mulai dari 60 pertama lagi.
+    const YT_PAGE_SIZE_ = 60;
+    let ytRenderLimit_ = YT_PAGE_SIZE_;
+    let ytRenderSig_ = "";
+    function renderList(appendMore) {
       const videos = filteredVideos();
       if (!videos.length) {
         listWrap.innerHTML = `<p class="present-saved-empty">${allVideos.length ? "Tidak ada video untuk filter ini." : "Belum ada video dimuat -- tempel link Google Sheet lalu tekan \"🔄 Muat Ulang\"."}</p>`;
         return;
       }
-      listWrap.innerHTML = "";
-      videos.forEach((v, i) => {
+      const sig = [activeFilter, activeSumber, activeChannel, activeKeterangan, activeKidungRef, searchQuery, videos.length, videos[0].videoId].join("|");
+      let startIdx = 0;
+      if (appendMore === true && sig === ytRenderSig_) {
+        startIdx = listWrap.querySelectorAll(".ps-yt-playlist-row").length;
+        const oldMore = listWrap.querySelector(".ps-yt-more-row");
+        if (oldMore) oldMore.remove();
+      } else {
+        if (sig !== ytRenderSig_) { ytRenderSig_ = sig; ytRenderLimit_ = YT_PAGE_SIZE_; }
+        listWrap.innerHTML = "";
+      }
+      const endIdx = Math.min(videos.length, ytRenderLimit_);
+      videos.slice(startIdx, endIdx).forEach((v, k) => {
+        const i = startIdx + k; // indeks di daftar PENUH (dipakai antrean "Ulang: Semua")
         const row = document.createElement("div");
         row.className = "ps-yt-playlist-row";
         const tagsHtml = (v.categories || [])
@@ -6809,6 +6920,49 @@ const PresentationStudio = (() => {
             <button type="button" class="chip-btn small" data-act="bg" title="Putar video ini sebagai Audio Latar SEKARANG JUGA, tanpa perlu disimpan dulu ke Media Tersimpan">🎧 Latar</button>
             <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
           </div>`;
+        // BARU (28 Sep 2026, permintaan operator) -- isi kolom KidungRef
+        // (K130 / S130 / KA13, boleh banyak dipisah koma) tampil sebagai
+        // tombol kecil; ditekan -> membuka kidung itu di tab 🎵 Kidung.
+        // Token tanpa K/S/KA (tulisan biasa) tampil sebagai teks abu-abu
+        // biasa, tidak bisa ditekan. Lihat js/kidung-ref.js.
+        if (window.KidungRef && v.kidungRef) {
+          const toks = window.KidungRef.parse(v.kidungRef);
+          if (toks.length) {
+            const refsWrap = document.createElement("span");
+            refsWrap.className = "ps-yt-playlist-refs";
+            toks.forEach((t) => {
+              if (t.kind === "kidung") {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "ps-yt-ref-chip";
+                b.dataset.buku = t.buku;
+                b.dataset.no = t.no;
+                b.textContent = "🎵 " + t.label;
+                b.title = "Buka " + t.buku + " No. " + t.no + " di tab Kidung";
+                b.addEventListener("click", () => openKidungFromRef_(t.buku, t.no));
+                refsWrap.appendChild(b);
+                // BARU (28 Sep 2026) -- 📺 Teks: buka teks kidung + jadikan
+                // video INI audio latarnya. Bait per slide & posisi koor
+                // diatur di tab Kidung (yang terbuka otomatis).
+                const tb = document.createElement("button");
+                tb.type = "button";
+                tb.className = "ps-yt-ref-show";
+                tb.dataset.buku = t.buku;
+                tb.dataset.no = t.no;
+                tb.textContent = "📺 Teks";
+                tb.title = "Buka teks " + t.label + " di tab Kidung DAN pakai video ini sebagai audio latar (lagu tetap jalan sambil bait berpindah)";
+                tb.addEventListener("click", () => openKidungFromRef_(t.buku, t.no, { audio: { videoId: v.videoId, title: v.title } }));
+                refsWrap.appendChild(tb);
+              } else {
+                const sp = document.createElement("span");
+                sp.className = "ps-yt-ref-text";
+                sp.textContent = t.raw;
+                refsWrap.appendChild(sp);
+              }
+            });
+            row.querySelector(".ps-yt-playlist-info").appendChild(refsWrap);
+          }
+        }
         // BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
         // mulai" per video, sama persis mekanismenya dengan kotak tempel-
         // link manual di atas (createYtSeekBar()). Kalau kolom opsional
@@ -6869,6 +7023,17 @@ const PresentationStudio = (() => {
         });
         listWrap.appendChild(row);
       });
+      if (videos.length > endIdx) {
+        const more = document.createElement("div");
+        more.className = "ps-yt-more-row";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip-btn small primary";
+        btn.textContent = `⬇️ Tampilkan ${Math.min(YT_PAGE_SIZE_, videos.length - endIdx)} lagi (menampilkan ${endIdx} dari ${videos.length})`;
+        btn.addEventListener("click", () => { ytRenderLimit_ += YT_PAGE_SIZE_; renderList(true); });
+        more.appendChild(btn);
+        listWrap.appendChild(more);
+      }
     }
 
     // BARU (28 Agu 2026) -- link CADANGAN ("Publish to web" -> CSV,

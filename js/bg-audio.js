@@ -549,7 +549,19 @@
       }
       function refresh() {
         const on = isThisOneLoaded_();
-        if (loadBtn) loadBtn.textContent = on ? "▶ Play" : `🎧 ${bgAudio.label || "Audio Latar"}`;
+        // FIX (27 Sep 2026, laporan operator "tombol play YouTube latar
+        // tidak berubah jadi toggle pause, jadi terkesan belum di-play")
+        // -- dulu tombol ini SELALU tertulis "▶ Play" begitu lagu ini
+        // dimuat, TIDAK PEDULI apakah sungguh SEDANG MAIN atau masih
+        // DIJEDA -- jadi walau lagunya sudah bersuara, tombolnya sendiri
+        // masih kelihatan seperti belum pernah ditekan. Sekarang labelnya
+        // ikut status main SUNGGUHAN (sharedBgAudio_.playing, diisi dari
+        // laporan present_bgaudio_state Layar 2 -- lihat bgNowState_()),
+        // sama seperti kotak status gelap (stBadge) di bawah ini yang
+        // memang sudah akurat. Tombol tetap bisa ditekan kapan pun (aman
+        // dikirim ulang "play" walau sedang main).
+        const playingNow = !!(on && sharedBgAudio_ && sharedBgAudio_.playing);
+        if (loadBtn) loadBtn.textContent = playingNow ? "🔊 Sedang Main" : (on ? "▶ Play" : `🎧 ${bgAudio.label || "Audio Latar"}`);
         if (pauseBtn) pauseBtn.hidden = !on;
         if (loopBtn) { loopBtn.hidden = !on; loopBtn.classList.toggle("active", !!(on && sharedBgAudio_.loop)); }
         if (stopBtn) stopBtn.hidden = !on;

@@ -249,7 +249,14 @@ const CONFIG = {
   // dicoba lagi nanti (saat online lagi / Media Tersimpan dibuka lagi)
   // TANPA operator harus mengunggah ulang manual dari awal. Lihat
   // queueMediaUpload()/processMediaUploadQueue() di js/collections.js.
-  DB_VERSION: 8,
+  // v9 (21 Sep 2026): menambah store "kidungAnak" -- cache offline untuk
+  // data Kidung Anak (js/kidung-anak.js), yang sebelumnya SELALU fetch
+  // ulang dari Google Sheet tiap panel itu dibuka (tidak tersimpan lokal
+  // sama sekali, beda dari Kidung Umum yang sudah punya store "kidung"
+  // sejak v4). Sekarang panel Kidung Anak langsung menampilkan data dari
+  // cache ini (instan, jalan offline), lalu diam-diam menyegarkan dari
+  // Sheet di latar belakang -- lihat loadData() di js/kidung-anak.js.
+  DB_VERSION: 9,
   STORE_NAME: "verses",
   USERS_STORE_NAME: "users",
   MEDIA_STORE_NAME: "studioMedia",
@@ -259,6 +266,8 @@ const CONFIG = {
   // js/outlines.js) supaya bisa diindeks per no_kidung untuk pencarian
   // cepat & konsisten dengan pola store lain di sini.
   KIDUNG_STORE_NAME: "kidung",
+  // v9 -- lihat catatan DB_VERSION di atas.
+  KIDUNG_ANAK_STORE_NAME: "kidungAnak",
 
   // ----------------------------------------------------------
   // 4) UKURAN HURUF AYAT (tombol A- / A+ di header)

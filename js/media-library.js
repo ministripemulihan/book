@@ -176,6 +176,11 @@ const MediaLibrary = (() => {
   //     sudah diubah supaya tetap ketemu walau kolomnya berisi banyak).
   // ------------------------------------------------------------
   function parseKidungRefString_(str) {
+    // BARU (28 Sep 2026) -- kode singkat K130/S130/KA13 ikut dikenali
+    // (js/kidung-ref.js); disimpan ulang dalam bentuk "Buku|No".
+    if (window.KidungRef) {
+      return window.KidungRef.parse(str).filter((t) => t.kind === "kidung").map((t) => ({ buku: t.buku, noKidung: t.no }));
+    }
     return String(str || "")
       .split(",")
       .map((s) => s.trim())
@@ -186,6 +191,13 @@ const MediaLibrary = (() => {
         return { buku: tok.slice(0, idx).trim(), noKidung: tok.slice(idx + 1).trim() };
       })
       .filter(Boolean);
+  }
+  // BARU (28 Sep 2026) -- token KidungRef yang BUKAN kidung (tulisan biasa,
+  // mis. "Doa pembuka") tidak punya chip di form, jadi dipisah di sini dan
+  // ditempel lagi saat simpan supaya TIDAK hilang tanpa sengaja saat edit.
+  function extraTextKidungRefs_(str) {
+    if (!window.KidungRef) return [];
+    return window.KidungRef.parse(str).filter((t) => t.kind === "text").map((t) => t.raw);
   }
   function joinKidungRefs_(list) {
     return (list || []).map((k) => k.buku + "|" + k.noKidung).join(",");
@@ -377,6 +389,12 @@ const MediaLibrary = (() => {
     // "nyangkut" saat pindah ke tab lain lalu balik lagi ke YouTube.
     filterKategori: "",
     filterChannel: "",
+    // BARU (28 Sep 2026, permintaan operator) -- 3 filter tambahan tab YouTube
+    // (Sumber / Keterangan / KidungRef), lihat renderYoutubeFilterRow_().
+    // Nilai khusus KidungRef: "__ada" (punya referensi kidung) / "__tanpa".
+    filterSumber: "",
+    filterKeterangan: "",
+    filterKidungRef: "",
   };
 
   function el_(id) { return document.getElementById(id); }
@@ -549,6 +567,43 @@ const MediaLibrary = (() => {
     // BARU (14 Sep 2026) -- tombol "📝 Syair" HANYA muncul kalau item ini
     // memang sudah diisi syair/liriknya (spec.onShowSyair kosong kalau
     // tidak ada, lihat itemToCard_()).
+    // BARU (28 Sep 2026) -- kode KidungRef (K130/S130/KA13) jadi tombol:
+    // 📖 = lihat isi kidung di kotak, ➡️ = buka menu Kidung langsung ke
+    // nomornya. Tulisan biasa (tanpa K/S/KA) tampil sebagai teks saja.
+    if (spec.kidungRef && !spec.noKidungChips && window.KidungRef) {
+      const toks = window.KidungRef.parse(spec.kidungRef);
+      if (toks.length) {
+        const wrap = document.createElement("div");
+        wrap.className = "ml-kref-row";
+        toks.forEach((t) => {
+          if (t.kind !== "kidung") {
+            const sp = document.createElement("span");
+            sp.className = "ml-kref-text";
+            sp.textContent = t.raw;
+            wrap.appendChild(sp);
+            return;
+          }
+          const grp = document.createElement("span");
+          grp.className = "ml-kref-group";
+          const view = document.createElement("button");
+          view.type = "button";
+          view.className = "ml-kref-btn";
+          view.textContent = "📖 " + t.label;
+          view.title = "Lihat isi " + t.buku + " No. " + t.no;
+          view.addEventListener("click", (e) => { e.stopPropagation(); showKidungContentDialog_(t.buku, t.no); });
+          const go = document.createElement("button");
+          go.type = "button";
+          go.className = "ml-kref-btn ml-kref-go";
+          go.textContent = "➡️";
+          go.title = "Buka menu Kidung ke " + t.buku + " No. " + t.no;
+          go.addEventListener("click", (e) => { e.stopPropagation(); goToKidung_(t.buku, t.no); });
+          grp.appendChild(view);
+          grp.appendChild(go);
+          wrap.appendChild(grp);
+        });
+        body.appendChild(wrap);
+      }
+    }
     if (spec.onShowSyair) {
       const syairBtn = document.createElement("button");
       syairBtn.type = "button";
@@ -703,7 +758,8 @@ const MediaLibrary = (() => {
   // ------------------------------------------------------------
   // 8) TAB "Semua" / "🎬 YouTube" / "🔊 Efek Suara" / "Kidung"
   // ------------------------------------------------------------
-  function itemToCard_(item) {
+  function itemToCard_(item) { return makeItemCard_(item, false); }
+  function makeItemCard_(item, plain) {
     const isOwner = String(item.diuploadOleh || "").toLowerCase() === String(currentUser || "").toLowerCase();
     const canManage = isOwner || isAdministrator();
     return buildCard_({
@@ -718,6 +774,8 @@ const MediaLibrary = (() => {
       link: item.link,
       gambar: item.gambar,
       durasiDetik: item.durasiDetik,
+      kidungRef: item.kidungRef,
+      noKidungChips: !!plain, // dipakai layar baca kidung (bagian "Referensi Media Lain") -- di sana tombol kidung tidak perlu
       canManage,
       onPlay: () => playItem_(item),
       onEdit: () => openAddForm_({ jenis: item.jenis, editItem: item }),
@@ -794,7 +852,10 @@ const MediaLibrary = (() => {
   function matchesSearch_(item) {
     if (!state.search) return true;
     const q = state.search.toLowerCase();
-    return [item.nama, item.channel, item.kategori, item.keterangan].filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
+    // DIPERLUAS (28 Sep 2026) -- ikut mencari Sumber, Link, dan KidungRef
+    // (baik teks aslinya "K130" maupun bentuk panjang "Kidung 130").
+    const kref = item.kidungRef ? [item.kidungRef].concat(window.KidungRef ? window.KidungRef.parse(item.kidungRef).reduce((acc, t) => acc.concat(t.kind === "kidung" ? [t.label, t.buku + " " + t.no] : [t.raw]), []) : []) : [];
+    return [item.nama, item.channel, item.kategori, item.keterangan, item.sumber, item.link].concat(kref).filter(Boolean).some((s) => String(s).toLowerCase().includes(q));
   }
 
   // ------------------------------------------------------------
@@ -818,10 +879,193 @@ const MediaLibrary = (() => {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "id"));
   }
 
-  function matchesYoutubeFilters_(item) {
-    if (state.filterKategori && parseKategoriString(item.kategori).indexOf(state.filterKategori) === -1) return false;
-    if (state.filterChannel && (item.channel || "").trim().toLowerCase() !== state.filterChannel.toLowerCase()) return false;
+  // DIPERLUAS (28 Sep 2026) -- 5 filter (Sumber, Channel, Keterangan,
+  // Kategori, KidungRef). `skip` = nama filter yang DILEWATI (dipakai
+  // menghitung angka di dropdown filter itu sendiri: jumlah per pilihan
+  // mengikuti filter LAIN yang sedang aktif, tapi tidak filternya sendiri,
+  // supaya semua pilihan tetap punya angka yang benar).
+  function ytSumberOf_(item) { return resolveSumber_(item.sumber, item.link) || ""; }
+  function ytKidungKeys_(item) { return window.KidungRef ? window.KidungRef.parse(item.kidungRef).map((t) => t.key) : []; }
+  function matchesYoutubeFilters_(item, skip) {
+    if (skip !== "kategori" && state.filterKategori && parseKategoriString(item.kategori).indexOf(state.filterKategori) === -1) return false;
+    if (skip !== "channel" && state.filterChannel && (item.channel || "").trim().toLowerCase() !== state.filterChannel.toLowerCase()) return false;
+    if (skip !== "sumber" && state.filterSumber && ytSumberOf_(item).toLowerCase() !== state.filterSumber.toLowerCase()) return false;
+    if (skip !== "keterangan" && state.filterKeterangan && String(item.keterangan || "").trim().toLowerCase() !== state.filterKeterangan.toLowerCase()) return false;
+    if (skip !== "kidungref" && state.filterKidungRef) {
+      const keys = ytKidungKeys_(item);
+      if (state.filterKidungRef === "__ada") { if (!keys.some((k) => k.indexOf("text:") !== 0)) return false; }
+      else if (state.filterKidungRef === "__tanpa") { if (String(item.kidungRef || "").trim()) return false; }
+      else if (keys.indexOf(state.filterKidungRef) === -1) return false;
+    }
     return true;
+  }
+  function anyYoutubeFilterActive_() {
+    return !!(state.filterKategori || state.filterChannel || state.filterSumber || state.filterKeterangan || state.filterKidungRef);
+  }
+  function clearYoutubeFilters_() {
+    state.filterKategori = ""; state.filterChannel = ""; state.filterSumber = "";
+    state.filterKeterangan = ""; state.filterKidungRef = "";
+  }
+  function youtubeItems_() { return state.items.filter((it) => it.jenis === "youtube"); }
+
+  // Bangun daftar pilihan { value, label, count } untuk 1 filter.
+  function youtubeFacet_(name) {
+    const base = youtubeItems_().filter(matchesSearch_).filter((it) => matchesYoutubeFilters_(it, name));
+    const map = new Map(); // value -> { label, count, sort }
+    const add = (value, label, sort) => {
+      if (!value) return;
+      const k = value.toLowerCase();
+      if (!map.has(k)) map.set(k, { value, label, count: 0, sort: sort || label });
+      map.get(k).count++;
+    };
+    base.forEach((it) => {
+      if (name === "kategori") parseKategoriString(it.kategori).forEach((k) => add(k, k));
+      else if (name === "channel") add((it.channel || "").trim(), (it.channel || "").trim());
+      else if (name === "sumber") add(ytSumberOf_(it), ytSumberOf_(it));
+      else if (name === "keterangan") { const k = String(it.keterangan || "").trim(); add(k, k.length > 45 ? k.slice(0, 44) + "…" : k); }
+      else if (name === "kidungref" && window.KidungRef) {
+        window.KidungRef.parse(it.kidungRef).forEach((t) => {
+          const order = t.kind === "kidung" ? ({ "Kidung": "a", "Suplemen": "b", "Kidung Anak": "c" }[t.buku] || "d") + t.buku.toLowerCase() + String(t.no).padStart(6, "0") : "z" + t.raw.toLowerCase();
+          add(t.key, t.kind === "kidung" ? t.label : "✎ " + t.raw, order);
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (name === "kidungref" ? (a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0) : a.sort.localeCompare(b.sort, "id")));
+  }
+
+  function filteredYoutube_() {
+    return youtubeItems_().filter(matchesSearch_).filter((it) => matchesYoutubeFilters_(it));
+  }
+
+  // BARU (28 Sep 2026, permintaan operator) -- baris filter + total tab
+  // YouTube. Dibangun ulang (tanpa menyentuh kotak cari, supaya ketikan
+  // tidak putus) tiap kali cari/filter berubah, biar angka di dropdown
+  // selalu cocok dengan yang tampil.
+  function renderYoutubeFilterRow_(filterRow, countEl, grid) {
+    const total = youtubeItems_().length;
+    const shown = filteredYoutube_().length;
+    const withRef = youtubeItems_().filter((it) => ytKidungKeys_(it).some((k) => k.indexOf("text:") !== 0)).length;
+    const noRef = youtubeItems_().filter((it) => !String(it.kidungRef || "").trim()).length;
+    countEl.innerHTML = `📊 Total <b>${total}</b> video di Pustaka Media · tampil <b>${shown}</b>${(shown !== total) ? " (terfilter)" : ""} · <b>${withRef}</b> punya referensi kidung`;
+
+    const sel = (id, label, allLabel, name, current, extraOpts) => {
+      const opts = youtubeFacet_(name);
+      return `<label class="ml-filter-field"><span>${label}</span><select id="${id}" aria-label="Filter ${label}">
+        <option value="">${allLabel}</option>${extraOpts || ""}
+        ${opts.map((o) => `<option value="${escapeAttr_(o.value)}" ${current.toLowerCase() === o.value.toLowerCase() ? "selected" : ""}>${escapeHtml_(o.label)} (${o.count})</option>`).join("")}
+      </select></label>`;
+    };
+    const refExtra = `<option value="__ada" ${state.filterKidungRef === "__ada" ? "selected" : ""}>✅ Punya referensi kidung (${withRef})</option><option value="__tanpa" ${state.filterKidungRef === "__tanpa" ? "selected" : ""}>— Tanpa referensi (${noRef})</option>`;
+    filterRow.innerHTML =
+      sel("mlFilterSumber", "Sumber", "Semua sumber", "sumber", state.filterSumber) +
+      sel("mlFilterChannel", "Channel", "Semua channel", "channel", state.filterChannel) +
+      sel("mlFilterKategori", "Kategori", "Semua kategori", "kategori", state.filterKategori) +
+      sel("mlFilterKeterangan", "Keterangan", "Semua keterangan", "keterangan", state.filterKeterangan) +
+      sel("mlFilterKidungRef", "KidungRef", "Semua KidungRef", "kidungref", state.filterKidungRef, refExtra) +
+      (anyYoutubeFilterActive_() || state.search ? `<button type="button" id="mlFilterClear" class="chip-btn small">✕ Bersihkan filter</button>` : "");
+
+    const bind = (id, key) => {
+      const s = filterRow.querySelector("#" + id);
+      if (s) s.addEventListener("change", (e) => { state[key] = e.target.value; refreshYoutube_(filterRow, countEl, grid); });
+    };
+    bind("mlFilterSumber", "filterSumber"); bind("mlFilterChannel", "filterChannel");
+    bind("mlFilterKategori", "filterKategori"); bind("mlFilterKeterangan", "filterKeterangan");
+    bind("mlFilterKidungRef", "filterKidungRef");
+    const clr = filterRow.querySelector("#mlFilterClear");
+    if (clr) clr.addEventListener("click", () => {
+      clearYoutubeFilters_(); state.search = "";
+      const si = el_("mlSearchInput"); if (si) si.value = "";
+      refreshYoutube_(filterRow, countEl, grid);
+    });
+  }
+  function refreshYoutube_(filterRow, countEl, grid) {
+    renderYoutubeFilterRow_(filterRow, countEl, grid);
+    renderGridForTab_(grid);
+  }
+
+  // ------------------------------------------------------------
+  // 8c) KIDUNG DARI KARTU (BARU, 28 Sep 2026) -- 📖 lihat isi / ➡️ buka
+  // menu Kidung ke nomornya. Kidung & Suplemen lewat openKidungByKeypad()
+  // (js/kidung.js), Kidung Anak lewat jembatan window.KidungAnak (modul
+  // terpisah) -- SAMA seperti yang dipakai Studio Presentasi.
+  // ------------------------------------------------------------
+  async function loadKidungForRef_(buku, no) {
+    if (buku === "Kidung Anak") {
+      const bridge = window.KidungAnak && typeof window.KidungAnak.getBaitsForPresentation === "function" ? window.KidungAnak.getBaitsForPresentation : null;
+      if (!bridge) return null;
+      const r = await bridge(no).catch(() => null);
+      if (!r || !r.baits || !r.baits.length) return null;
+      return { judul: (r.song && r.song.Judul) || "", pengarang: (r.song && r.song.Pengarang) || "", baits: r.baits };
+    }
+    if (typeof openKidungByKeypad !== "function") return null;
+    let r = await openKidungByKeypad(buku, no).catch(() => null);
+    if ((!r || !r.baits || !r.baits.length) && typeof resyncKidungSheet === "function") {
+      try { await resyncKidungSheet(); r = await openKidungByKeypad(buku, no).catch(() => null); } catch (e) { /* biarkan */ }
+    }
+    if (!r || !r.baits || !r.baits.length) return null;
+    return { judul: (r.meta && r.meta.judul) || "", pengarang: (r.meta && r.meta.pengarang) || "", baits: r.baits };
+  }
+
+  function kidungBodyHtml_(baits) {
+    let lastKoor = null;
+    return baits.map((b) => {
+      let html = "";
+      if (b.teks) html += `<div class="ml-kv-bait">${b.noBait ? `<span class="ml-kv-no">${escapeHtml_(String(b.noBait))}</span>` : ""}${escapeHtml_(b.teks).replace(/\n/g, "<br>")}</div>`;
+      if (b.koorTeks && b.koorTeks !== lastKoor) { html += `<div class="ml-kv-koor"><span class="ml-kv-no">Koor</span>${escapeHtml_(b.koorTeks).replace(/\n/g, "<br>")}</div>`; }
+      lastKoor = b.koorTeks || null;
+      return html;
+    }).join("");
+  }
+
+  async function showKidungContentDialog_(buku, no) {
+    let ov = el_("mlKidungViewOverlay");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "mlKidungViewOverlay";
+      ov.className = "info-kami-overlay ml-kv-overlay";
+      ov.hidden = true;
+      document.body.appendChild(ov);
+      ov.addEventListener("click", (e) => { if (e.target === ov) ov.hidden = true; });
+    }
+    const label = window.KidungRef ? window.KidungRef.parseToken(buku === "Kidung" ? "K" + no : buku === "Suplemen" ? "S" + no : buku === "Kidung Anak" ? "KA" + no : buku + "|" + no).label : buku + " " + no;
+    ov.innerHTML = `<div class="info-kami-box ml-syair-box ml-kv-box">
+      <div class="info-kami-header"><h2 id="mlKvTitle">🎵 ${escapeHtml_(label)}</h2>
+        <div class="info-kami-header-actions"><button type="button" id="mlKvCloseBtn" class="icon-btn" aria-label="Tutup">✕</button></div></div>
+      <div class="ml-syair-body" id="mlKvBody" style="white-space:normal">Memuat kidung…</div>
+      <div class="ml-kv-foot"><button type="button" id="mlKvGoBtn" class="chip-btn small primary">➡️ Buka di menu Kidung</button></div>
+    </div>`;
+    ov.hidden = false;
+    el_("mlKvCloseBtn").addEventListener("click", () => { ov.hidden = true; });
+    el_("mlKvGoBtn").addEventListener("click", () => { ov.hidden = true; goToKidung_(buku, no); });
+    const data = await loadKidungForRef_(buku, no);
+    const bodyEl = el_("mlKvBody");
+    if (!bodyEl) return;
+    if (!data) { bodyEl.textContent = `${buku} No. ${no} tidak ditemukan (belum ada di data kidung).`; return; }
+    el_("mlKvTitle").textContent = `🎵 ${label} — ${data.judul}`;
+    bodyEl.innerHTML = kidungBodyHtml_(data.baits);
+  }
+
+  async function goToKidung_(buku, no) {
+    close(); // tutup Pustaka Media dulu
+    const ov = el_("mlKidungViewOverlay"); if (ov) ov.hidden = true;
+    try {
+      if (typeof showKidungPanel !== "function") { alert("Menu Kidung belum siap."); return; }
+      await showKidungPanel();
+      if (buku === "Kidung Anak") {
+        const panel = document.getElementById("kidungPanel");
+        if (window.KidungAnak && panel) {
+          await window.KidungAnak.renderHome(panel, typeof renderKidungHome === "function" ? renderKidungHome : null);
+          const song = await window.KidungAnak.findSongByNo(no).catch(() => null);
+          const inp = panel.querySelector("#kaSearchInput");
+          if (song && inp) { inp.value = song.Judul || ""; inp.dispatchEvent(new Event("input", { bubbles: true })); }
+          else if (!song) alert(`Kidung Anak No. ${no} tidak ditemukan.`);
+        }
+        return;
+      }
+      if (typeof openKidungReader === "function") await openKidungReader(buku, no);
+    } catch (err) {
+      alert("Gagal membuka kidung: " + (err && err.message ? err.message : String(err)));
+    }
   }
 
   function renderGrid_(container, cards, emptyMsg) {
@@ -870,52 +1114,30 @@ const MediaLibrary = (() => {
     body.appendChild(searchRow);
     searchRow.querySelector("#mlSearchInput").addEventListener("input", (e) => {
       state.search = e.target.value;
-      renderGridForTab_(grid);
+      if (state.activeTab === "youtube" && typeof ytFilterRow !== "undefined" && ytFilterRow) refreshYoutube_(ytFilterRow, ytCountEl, grid);
+      else renderGridForTab_(grid);
     });
 
-    // BARU (14 Sep 2026) -- baris filter Kategori + Channel, HANYA di
-    // tab "🎬 YouTube" (permintaan operator). Opsi diisi dari
-    // distinctYoutubeKategori_()/distinctYoutubeChannels_() supaya
-    // otomatis ikut kategori/channel baru tanpa ubah kode.
+    // DIPERBARUI (28 Sep 2026, permintaan operator) -- tab "🎬 YouTube"
+    // sekarang punya baris total + 5 filter (Sumber, Channel, Kategori,
+    // Keterangan, KidungRef) dengan jumlah di tiap pilihan. Kotak cari
+    // juga mencari Sumber/Keterangan/Link/KidungRef.
+    let ytFilterRow = null, ytCountEl = null;
     if (state.activeTab === "youtube") {
-      const kategoriOpts = distinctYoutubeKategori_();
-      const channelOpts = distinctYoutubeChannels_();
-      const filterRow = document.createElement("div");
-      filterRow.className = "ml-filter-row";
-      filterRow.innerHTML = `
-        <select id="mlFilterKategori" aria-label="Filter kategori">
-          <option value="">Semua kategori</option>
-          ${kategoriOpts.map((k) => `<option value="${escapeAttr_(k)}" ${state.filterKategori === k ? "selected" : ""}>${escapeHtml_(k)}</option>`).join("")}
-        </select>
-        <select id="mlFilterChannel" aria-label="Filter channel">
-          <option value="">Semua channel</option>
-          ${channelOpts.map((c) => `<option value="${escapeAttr_(c)}" ${state.filterChannel === c ? "selected" : ""}>${escapeHtml_(c)}</option>`).join("")}
-        </select>
-        ${(state.filterKategori || state.filterChannel) ? `<button type="button" id="mlFilterClear" class="chip-btn small">✕ Bersihkan filter</button>` : ""}
-      `;
-      body.appendChild(filterRow);
-      filterRow.querySelector("#mlFilterKategori").addEventListener("change", (e) => {
-        state.filterKategori = e.target.value;
-        renderActiveTab_();
-      });
-      filterRow.querySelector("#mlFilterChannel").addEventListener("change", (e) => {
-        state.filterChannel = e.target.value;
-        renderActiveTab_();
-      });
-      const clearBtn = filterRow.querySelector("#mlFilterClear");
-      if (clearBtn) {
-        clearBtn.addEventListener("click", () => {
-          state.filterKategori = "";
-          state.filterChannel = "";
-          renderActiveTab_();
-        });
-      }
+      ytCountEl = document.createElement("div");
+      ytCountEl.className = "ml-count-line";
+      ytCountEl.id = "mlYtCount";
+      body.appendChild(ytCountEl);
+      ytFilterRow = document.createElement("div");
+      ytFilterRow.className = "ml-filter-row";
+      body.appendChild(ytFilterRow);
     }
 
     const grid = document.createElement("div");
     grid.className = "ml-grid";
     body.appendChild(grid);
 
+    if (ytFilterRow) renderYoutubeFilterRow_(ytFilterRow, ytCountEl, grid);
     renderGridForTab_(grid);
     updateAddButtonVisibility_();
   }
@@ -927,8 +1149,8 @@ const MediaLibrary = (() => {
       state.items.filter((it) => it.jenis === "youtube" || (it.jenis === "sound" && canSeeSound())).filter(matchesSearch_).forEach((it) => cards.push(itemToCard_(it)));
       renderGrid_(grid, cards, "Belum ada media. Tekan \"➕ Tambah\" untuk menambah yang pertama.");
     } else if (tab === "youtube") {
-      const cards = state.items.filter((it) => it.jenis === "youtube").filter(matchesSearch_).filter(matchesYoutubeFilters_).map(itemToCard_);
-      const filterActive = !!(state.filterKategori || state.filterChannel);
+      const cards = filteredYoutube_().map((it) => itemToCard_(it));
+      const filterActive = anyYoutubeFilterActive_();
       renderGrid_(grid, cards, filterActive ? "Tidak ada video yang cocok dengan filter ini." : "Belum ada video/audio YouTube. Tekan \"➕ Tambah\" untuk menambah.");
     } else if (tab === "sound") {
       const cards = [];
@@ -1365,7 +1587,9 @@ const MediaLibrary = (() => {
     // dibaca operator. Diisi awal dari editItem.kidungRef (mode edit)
     // ATAU o.kidungRef (dipanggil dari layar baca 1 kidung, format
     // TUNGGAL -- lihat js/kidung-ui.js buildKidungMediaRefSection()).
-    let kidungRefState = parseKidungRefString_(editItem ? editItem.kidungRef : (o.kidungRef || ""));
+    const kidungRefInitial_ = editItem ? editItem.kidungRef : (o.kidungRef || "");
+    let kidungRefState = parseKidungRefString_(kidungRefInitial_);
+    const kidungRefTextExtra_ = extraTextKidungRefs_(kidungRefInitial_);
     const kidungChipsEl = el_("mlFormKidungChips");
     const kidungSearchInput = el_("mlFormKidungSearch");
     const kidungResultsEl = el_("mlFormKidungResults");
@@ -1514,7 +1738,7 @@ const MediaLibrary = (() => {
         keterangan: el_("mlFormKeterangan").value.trim(),
         kategori,
         link,
-        kidungRef: joinKidungRefs_(kidungRefState),
+        kidungRef: [joinKidungRefs_(kidungRefState)].concat(kidungRefTextExtra_).filter(Boolean).join(","),
         ayatRef: joinAyatRefs_(ayatRefState),
         syair: jenis === "youtube" ? (el_("mlFormSyair") ? el_("mlFormSyair").value.trim() : "") : "",
         visibility,
@@ -1849,8 +2073,7 @@ const MediaLibrary = (() => {
         state.search = "";
         // BARU (14 Sep 2026) -- filter kategori/channel cuma relevan di
         // tab YouTube, reset tiap pindah tab supaya tidak "nyangkut".
-        state.filterKategori = "";
-        state.filterChannel = "";
+        clearYoutubeFilters_();
         renderTabs_();
         renderActiveTab_();
       });
@@ -1919,7 +2142,7 @@ const MediaLibrary = (() => {
     // openAddForm_ dari awal) & `onSaved(item)` (callback opsional,
     // dipanggil setelah tambah/edit berhasil disimpan).
     openAddForm: openAddForm_,
-    renderItemCard: itemToCard_,
+    renderItemCard: (item) => makeItemCard_(item, true),
     // BARU (12 Sep 2026, sesi perbaikan bug pemutaran) -- dipakai ulang
     // js/presentation-studio.js (tombol efek suara kontribusi di tab
     // "🎉 Efek Panggung") supaya link Drive "share" biasa juga diubah
