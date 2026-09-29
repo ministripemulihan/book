@@ -4535,6 +4535,22 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   background: var(--ps-tab-bg); color: var(--ps-ink-soft); border-radius: 4px; padding: 1px 5px;
 }
 #psYtPlaylistFilters { flex-wrap: wrap; }
+/* BARU (28 Sep 2026) -- kode KidungRef (K130/S130/KA13) di baris video YouTube Studio */
+.ps-yt-playlist-refs { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.ps-yt-ref-chip {
+  font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+  background: var(--ps-tab-bg); color: var(--ps-ink-soft);
+  border: 1px solid var(--ps-card-border); border-radius: 999px; padding: 1px 8px;
+}
+.ps-yt-ref-chip:hover, .ps-yt-ref-chip:focus-visible { border-color: var(--brass); color: var(--brass); }
+/* BARU (28 Sep 2026) -- tombol "📺 Teks" (teks kidung + video ini jadi audio latar) & baris "Tampilkan lagi" */
+.ps-yt-ref-show {
+  font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+  background: var(--brass); color: #fff; border: 1px solid var(--brass); border-radius: 999px; padding: 1px 8px;
+}
+.ps-yt-ref-show:hover, .ps-yt-ref-show:focus-visible { filter: brightness(1.1); }
+.ps-yt-more-row { display: flex; justify-content: center; padding: 8px 0; }
+.ps-yt-ref-text { font-size: 11px; color: var(--ps-muted); }
 
 /* BARU (4 Sep 2026, permintaan operator) -- progress bar horizontal +
    tombol "✏️" untuk memilih detik MULAI pemutaran video, dipakai
@@ -5067,6 +5083,25 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
   background: var(--paper); color: var(--ink); font-family: var(--font-ui);
   font-size: 13px; max-width: 220px;
 }
+/* BARU (28 Sep 2026) -- total, filter berlabel, tombol kidung di kartu, kotak isi kidung */
+.ml-count-line { font-size: 13px; color: var(--ink-soft); margin: 0 0 8px; }
+.ml-filter-field { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--ink-soft); }
+.ml-filter-field select { min-width: 130px; }
+.ml-kref-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; align-items: center; }
+.ml-kref-group { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; }
+.ml-kref-btn {
+  font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; border: 0;
+  background: var(--paper); color: var(--ink); padding: 3px 8px;
+}
+.ml-kref-btn:hover, .ml-kref-btn:focus-visible { background: var(--rule); }
+.ml-kref-go { border-left: 1px solid var(--rule); padding: 3px 7px; }
+.ml-kref-text { font-size: 11px; color: var(--ink-soft); }
+.ml-kv-overlay { z-index: 1200; }
+.ml-kv-box { max-width: 560px; }
+.ml-kv-bait, .ml-kv-koor { margin: 0 0 12px; line-height: 1.65; font-size: 15px; }
+.ml-kv-koor { font-style: italic; padding-left: 12px; border-left: 3px solid var(--rule); }
+.ml-kv-no { display: inline-block; min-width: 1.6em; margin-right: 6px; font-weight: 700; color: var(--ink-soft); font-style: normal; }
+.ml-kv-foot { padding: 10px 22px 16px; border-top: 1px solid var(--rule); }
 .ml-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));

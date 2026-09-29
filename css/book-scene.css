@@ -180,5 +180,6 @@
 #penciptaanCaption small { display: block; margin-top: .35em; font-size: .52em; font-weight: 500; opacity: .85; }
 
 @media (prefers-reduced-motion: reduce) {
-  .bk-scene *, .bk-scene *::before, .bk-scene *::after { animation: none !important; }
+  /* 28 Sep 2026: Layar 2 (present.html) memasang .bk-force-motion -- gerak ikan/burung memang isi tayangan */
+  .bk-scene:not(.bk-force-motion) *, .bk-scene:not(.bk-force-motion) *::before, .bk-scene:not(.bk-force-motion) *::after { animation: none !important; }
 }
