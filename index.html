@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20260928b" />
+<link rel="stylesheet" href="css/style.css?v=20260930d" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1121,6 +1121,24 @@
             <input type="range" id="psCollectionThumbSizeSlider" min="32" max="220" step="4" value="44" style="flex:1;" />
             <input type="number" id="psCollectionThumbSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="32" max="220" step="4" value="44" title="Ketik ukuran thumbnail manual (32-220px), lalu tekan Enter" />px
           </div>
+          <!-- BARU (30 Sep 2026) keterangan warna tombol 🎧 Audio Latar + cara pakai -->
+          <div class="ps-bg-legend" aria-label="Arti warna tombol Audio Latar">
+            <span class="ps-bg-legend-title">🎧 Arti warna:</span>
+            <span class="ps-bg-legend-chip" data-k="empty" title="Kuning, tulisan 'Audio Latar (kosong)': item ini belum punya lagu latar. Klik untuk memasang.">Kuning = kosong</span>
+            <span class="ps-bg-legend-chip" data-k="filled" title="Hijau, tulisan 'Ganti ✓': item ini sudah punya lagu latar dan bisa diputar. Klik untuk mengganti atau melepas.">Hijau = sudah terisi</span>
+            <span class="ps-bg-legend-chip" data-k="continue" title="Biru, tulisan 'Lanjutan': item ini melanjutkan lagu dari slide sebelumnya (lagu tidak putus).">Biru = lanjutan</span>
+            <span class="ps-bg-legend-chip" data-k="error" title="Merah: lagu untuk item ini gagal diputar (link salah, tidak boleh disematkan, atau internet bermasalah).">Merah = gagal</span>
+          </div>
+          <details class="ps-bg-legend-how">
+            <summary>❓ Fungsi &amp; cara pakai tombol 🎧 Audio Latar</summary>
+            <div>Memasang lagu latar untuk SATU item. Lagu diputar di belakang layar, sementara teks/ayat/slide tetap tampil di Layar 2.</div>
+            <ol>
+              <li>Klik tombol 🎧 pada item.</li>
+              <li>Pilih sumber: link YouTube, SoundCloud, MP3/Drive, atau upload.</li>
+              <li>Pilih mode mulai: manual, otomatis, atau tunggu panah kanan.</li>
+              <li>Simpan. Tombol berubah hijau.</li>
+            </ol>
+          </details>
           <div id="psCollectionList" class="ps-verse-list"></div>
         </div>
 
@@ -2000,6 +2018,17 @@
                   <select id="psKidungBgRateSelect" class="chip-select" title="Kecepatan lagu YouTube (0,25x sampai 2x)"><option value="0.25">0,25x</option><option value="0.5">0,5x</option><option value="0.75">0,75x</option><option value="1" selected>1x (normal)</option><option value="1.25">1,25x</option><option value="1.5">1,5x</option><option value="1.75">1,75x</option><option value="2">2x</option></select>
                 </label>
               </div>
+              <!-- BARU (30 Sep 2026) progress bar + geser posisi lagu (diisi renderBgProgress_() di js/presentation-studio.js) -->
+              <div class="ps-bg-prog" hidden>
+                <span class="ps-bg-prog-time">0:00</span>
+                <input type="range" class="ps-bg-prog-range" min="0" max="1000" value="0" step="1" title="Geser untuk pindah posisi lagu" />
+                <span class="ps-bg-prog-dur">0:00</span>
+                <button type="button" class="chip-btn small" data-bgseek="-10" title="Mundur 10 detik">⏪ 10d</button>
+                <button type="button" class="chip-btn small" data-bgseek="10" title="Maju 10 detik">10d ⏩</button>
+                <button type="button" class="chip-btn small" data-bgseek="mid" title="Loncat ke tengah-tengah lagu">⏯ Tengah</button>
+                <button type="button" class="chip-btn small" data-bgseek="resume" title="Kalau lagu macet/kembali ke awal: sambung lagi dari posisi terakhir yang tercatat" hidden>🔄 Sambung lagi</button>
+                <span class="ps-bg-prog-warn"></span>
+              </div>
               <p id="psKidungBgStatus" class="announcement-compose-hint"></p>
             </div>
             <div class="ps-field-label">Mode tampilan slide</div>
@@ -2121,6 +2150,16 @@
             <label class="ps-pointer-hint" style="display:inline-flex; align-items:center; gap:4px;">⏩ Kecepatan
               <select id="psYtBgRateSelect" class="chip-select" title="Kecepatan audio latar YouTube (0,25x sampai 2x)"><option value="0.25">0,25x</option><option value="0.5">0,5x</option><option value="0.75">0,75x</option><option value="1" selected>1x (normal)</option><option value="1.25">1,25x</option><option value="1.5">1,5x</option><option value="1.75">1,75x</option><option value="2">2x</option></select>
             </label>
+            <div class="ps-bg-prog" hidden style="flex-basis:100%; width:100%;">
+                <span class="ps-bg-prog-time">0:00</span>
+                <input type="range" class="ps-bg-prog-range" min="0" max="1000" value="0" step="1" title="Geser untuk pindah posisi lagu" />
+                <span class="ps-bg-prog-dur">0:00</span>
+                <button type="button" class="chip-btn small" data-bgseek="-10" title="Mundur 10 detik">⏪ 10d</button>
+                <button type="button" class="chip-btn small" data-bgseek="10" title="Maju 10 detik">10d ⏩</button>
+                <button type="button" class="chip-btn small" data-bgseek="mid" title="Loncat ke tengah-tengah lagu">⏯ Tengah</button>
+                <button type="button" class="chip-btn small" data-bgseek="resume" title="Kalau lagu macet/kembali ke awal: sambung lagi dari posisi terakhir yang tercatat" hidden>🔄 Sambung lagi</button>
+                <span class="ps-bg-prog-warn"></span>
+              </div>
             <!-- BARU (12 Sep 2026, laporan operator "youtube latar
                  belakang, ini tidak bisa di simpan") -- akar masalahnya:
                  menekan "▶️ Tampilkan" sambil "Latar suara saja" dicentang
@@ -4093,13 +4132,13 @@
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
-  <script src="js/bg-audio.js?v=20260930b"></script>
+  <script src="js/bg-audio.js?v=20260930c"></script>
   <!-- BARU (20 Sep 2026, tahap 1) -- dialog "Sumber audio". Sumber tambahan (tahap 2-3) mendaftar lewat BgAudioDialog.registerSource(). -->
   <script src="js/bg-audio-library.js?v=20260920d"></script> <!-- tahap 3: pustaka upload (IndexedDB) -->
   <script src="js/bg-audio-dialog.js?v=20260920d"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20260930b"></script>
+  <script src="js/presentation-studio.js?v=20260930c"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip

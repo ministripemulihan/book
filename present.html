@@ -2901,6 +2901,10 @@
     let d;
     try { d = JSON.parse(e.data); } catch (err) { return; }
     if (!d) return;
+    // BARU (30 Sep 2026) -- laporan posisi/durasi lagu latar YouTube ke Studio (progress bar).
+    if (d.event === "infoDelivery" && d.info && typeof d.info.currentTime === "number") {
+      reportBgAudioProgress_("yt", d.info.currentTime, typeof d.info.duration === "number" ? d.info.duration : 0);
+    }
     let st = null;
     if (d.event === "onStateChange" && typeof d.info === "number") st = d.info;
     else if (d.event === "infoDelivery" && d.info && typeof d.info.playerState === "number") st = d.info.playerState;
@@ -2985,6 +2989,20 @@
       window.opener.postMessage({ source: "bibleAppPresenter", type: "present_bgaudio_state", kind, playing: !!playing }, location.origin);
     } catch (e) {}
   }
+  // BARU (30 Sep 2026) -- posisi lagu (detik) ke Studio, maksimal ~1x/detik. kind: "yt"|"mp3"|"sc".
+  let lastBgProgressAt_ = 0;
+  function reportBgAudioProgress_(kind, currentTime, duration, force) {
+    if (!window.opener) return;
+    const now = Date.now();
+    if (!force && now - lastBgProgressAt_ < 900) return;
+    lastBgProgressAt_ = now;
+    try {
+      window.opener.postMessage({ source: "bibleAppPresenter", type: "present_bgaudio_progress", kind, currentTime: Number(currentTime) || 0, duration: Number(duration) || 0 }, location.origin);
+    } catch (e) {}
+  }
+  kidungBgAudioEl.addEventListener("timeupdate", () => {
+    if (kidungBgAudioEl.getAttribute("src")) reportBgAudioProgress_("mp3", kidungBgAudioEl.currentTime, isFinite(kidungBgAudioEl.duration) ? kidungBgAudioEl.duration : 0);
+  });
   kidungBgAudioEl.addEventListener("playing", () => reportBgAudioState_("mp3", true));
   kidungBgAudioEl.addEventListener("pause", () => { if (kidungBgAudioEl.getAttribute("src")) reportBgAudioState_("mp3", false); });
   kidungBgAudioEl.addEventListener("ended", () => reportBgAudioState_("mp3", false));
@@ -3081,6 +3099,12 @@
         scBgStopRetry_();
         reportBgAudioStatus_(true, scBgUrl, "");
         reportBgAudioState_("sc", true);
+      });
+      w.bind(SC.Widget.Events.PLAY_PROGRESS, (e) => {
+        if (myToken !== scBgToken || !e) return;
+        const cur = (Number(e.currentPosition) || 0) / 1000;
+        const dur = e.relativePosition > 0 ? cur / e.relativePosition : 0;
+        reportBgAudioProgress_("sc", cur, dur);
       });
       w.bind(SC.Widget.Events.PAUSE, () => { if (myToken === scBgToken) { scBgPlaying = false; reportBgAudioState_("sc", false); } });
       w.bind(SC.Widget.Events.FINISH, () => {
@@ -7181,6 +7205,12 @@
     }
     if (data.type === "yt_bg_control") {
       if (!ytBgEl.src || !ytBgEl.contentWindow) return;
+      // BARU (30 Sep 2026) -- geser ke detik tertentu (progress bar / tombol Tengah di Studio).
+      if (data.action === "seek") {
+        const sec = Math.max(0, Number(data.seconds) || 0);
+        try { ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "seekTo", args: [sec, true] }), "*"); } catch (e) {}
+        return;
+      }
       const cmd = { play: "playVideo", pause: "pauseVideo", mute: "mute", unmute: "unMute" }[data.action];
       if (cmd) ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args: [] }), "*");
       // BARU (19 Sep 2026) -- lihat catatan ytBgWantPlay_ di atas.
@@ -7241,6 +7271,7 @@
       else if (data.action === "pause") { scBgWantPlay = false; scBgStopRetry_(); if (scBgWidget) { try { scBgWidget.pause(); } catch (e) {} } }
       else if (data.action === "loop_on") scBgLoop = true;
       else if (data.action === "loop_off") scBgLoop = false;
+      else if (data.action === "seek") { if (scBgWidget) { try { scBgWidget.seekTo(Math.max(0, Number(data.seconds) || 0) * 1000); } catch (e) {} } }
       return;
     }
     if (data.type === "sc_bg_clear") {
@@ -7296,6 +7327,7 @@
       if (!kidungBgAudioEl.src) return;
       if (data.action === "play") { const p = kidungBgAudioEl.play(); if (p && p.catch) p.catch(() => {}); }
       else if (data.action === "pause") kidungBgAudioEl.pause();
+      else if (data.action === "seek") { try { kidungBgAudioEl.currentTime = Math.max(0, Number(data.seconds) || 0); } catch (e) {} }
       // BARU (18 Sep 2026 v3, permintaan operator "diulang-ulang sampai
       // bosan yang dengar, atau bisa jadi cuma 1x saja") -- `.loop`
       // bawaan elemen <audio>, berulang MULUS begitu lagu habis, tanpa
