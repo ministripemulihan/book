@@ -407,7 +407,7 @@ const PresentationStudio = (() => {
     return {
       isFallback: true,
       shared: null, error: null, pendingArrow: null,
-      clearPreviewRefresh: noop, onChange: noop, handlePresenterMessage: () => false,
+      clearPreviewRefresh: noop, onChange: noop, onProgress: noop, handlePresenterMessage: () => false,
       BG_STATE_TEXT_: { none: ["⚪", "AUDIO LATAR NONAKTIF"], loaded: ["⚪", ""], armed: ["⚪", ""], connecting: ["⚪", ""], playing: ["⚪", ""], paused: ["⚪", ""], error: ["⚪", ""] },
       fn: {
         normBgKind_: (k) => (k === "yt" ? "yt" : (k === "sc" ? "sc" : "mp3")),
@@ -1056,7 +1056,7 @@ const PresentationStudio = (() => {
         // meniru tombol itu (lihat wirePlaylistKeyNav() & catatan
         // autoplayBgAudioIfEnabled_() dekat sendGenericItemLive()).
         `<div class="ps-verse-row-bgaudio" ${(it && it.bgAudio && it.bgAudio.url) ? `data-bgurl="${escapeHtml(it.bgAudio.url)}" data-bgkind="${normBgKind_(it.bgAudio.kind)}"` : ""} style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-           <button type="button" class="chip-btn small" data-bgaudio-edit title="Lampirkan/ganti/lepas link audio latar (MP3 unggahan/Drive, MP4 Drive, YouTube, atau SoundCloud) untuk item ini">🎧 ${(it && it.bgAudio && (it.bgAudio.url || it.bgAudio.continuePrev)) ? "Ganti" : "Audio Latar"}</button>
+           <button type="button" class="chip-btn small ps-bg-editbtn" data-bgaudio-edit data-bgset="${(it && it.bgAudio && it.bgAudio.url) ? "filled" : ((it && it.bgAudio && it.bgAudio.continuePrev) ? "continue" : "empty")}" title="${(it && it.bgAudio && it.bgAudio.url) ? "✅ Item ini SUDAH punya audio latar. Klik untuk ganti / lepas." : ((it && it.bgAudio && it.bgAudio.continuePrev) ? "🔗 Item ini melanjutkan lagu dari slide sebelumnya. Klik untuk mengubah." : "⚠️ KOSONG — belum ada audio latar untuk item ini. Klik untuk memasang (MP3 / YouTube / SoundCloud).")}">🎧 ${(it && it.bgAudio && it.bgAudio.url) ? "Ganti ✓" : ((it && it.bgAudio && it.bgAudio.continuePrev) ? "Lanjutan" : "Audio Latar (kosong)")}</button>
            ${(it && it.bgAudio && it.bgAudio.url) ? '<span class="ps-bg-state" hidden></span>' : ""}
            ${(it && it.bgAudio && it.bgAudio.url && !isManagedBg_(it.bgAudio) && !it.bgAudio.armStart) ? `<label class="ps-pointer-hint" style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Kalau dicentang, audio ini OTOMATIS diputar begitu item ini masuk slide (panah/PageUp-Down/stylus) -- tidak perlu tekan ▶ Play manual lagi."><input type="checkbox" data-bgauto ${it.bgAudio.autoplay ? "checked" : ""} /> ▶️ Otomatis saat masuk slide</label>` : ""}
          </div>` +
@@ -2140,6 +2140,72 @@ const PresentationStudio = (() => {
       bgStatus_(`🎧 ${BG.shared.label || "Audio latar"}${loopNote}.`);
     }
     onSharedBgAudioChange_(refreshBgControlsUi_);
+    // ------------------------------------------------------------
+    // BARU (30 Sep 2026) -- PROGRESS BAR lagu latar + geser posisi (YouTube/MP3/SoundCloud).
+    // Posisi dilaporkan Layar 2 ~1x/detik (present_bgaudio_progress). Dipakai di 2 tempat:
+    // tab 🎵 Kidung & tab 📺 YouTube (elemen .ps-bg-prog). Tombol: ⏪10d, 10d⏩, ⏯ Tengah,
+    // dan 🔄 Sambung lagi (muncul kalau lagu terdeteksi macet: seek ke posisi terakhir + play).
+    // ------------------------------------------------------------
+    function fmtBgTime_(sec) {
+      sec = Math.max(0, Math.floor(Number(sec) || 0));
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), ss = sec % 60;
+      return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(ss).padStart(2, "0");
+    }
+    let bgProgDragging_ = false;
+    function renderBgProgress_() {
+      const a = BG.shared;
+      document.querySelectorAll(".ps-bg-prog").forEach((box) => {
+        if (!a) { box.hidden = true; return; }
+        box.hidden = false;
+        const pos = a.pos || 0, dur = a.dur || 0;
+        const range = box.querySelector(".ps-bg-prog-range");
+        const tEl = box.querySelector(".ps-bg-prog-time"), dEl = box.querySelector(".ps-bg-prog-dur");
+        const warn = box.querySelector(".ps-bg-prog-warn"), resume = box.querySelector('[data-bgseek="resume"]');
+        if (range && !bgProgDragging_) range.value = dur > 0 ? String(Math.min(1000, Math.round(pos / dur * 1000))) : "0";
+        if (tEl && !bgProgDragging_) tEl.textContent = fmtBgTime_(pos);
+        if (dEl) dEl.textContent = dur > 0 ? fmtBgTime_(dur) : "--:--";
+        // macet: status "main" tapi posisi tidak maju > 6 detik
+        const stalled = !!(a.playing && a.posAt && Date.now() - a.posAt > 6000);
+        if (warn) warn.textContent = stalled ? "⚠️ Posisi tidak maju — lagu macet? (cek internet)" : (a.pos === undefined && a.started ? "Menunggu laporan posisi dari Layar 2…" : "");
+        if (resume) resume.hidden = !(stalled || (a.started && !a.playing && pos > 3));
+      });
+    }
+    if (typeof BG.onProgress === "function") BG.onProgress(renderBgProgress_); // aman kalau bg-audio.js lama masih ter-cache
+    onSharedBgAudioChange_(renderBgProgress_);
+    setInterval(() => { if (BG.shared) renderBgProgress_(); }, 1000); // supaya deteksi "macet" tetap jalan walau laporan berhenti datang
+    document.querySelectorAll(".ps-bg-prog").forEach((box) => {
+      const range = box.querySelector(".ps-bg-prog-range");
+      if (range) {
+        range.addEventListener("input", () => {
+          bgProgDragging_ = true;
+          const d = (BG.shared && BG.shared.dur) || 0;
+          const t = box.querySelector(".ps-bg-prog-time");
+          if (t) t.textContent = fmtBgTime_(d * Number(range.value) / 1000);
+        });
+        range.addEventListener("change", () => {
+          const d = (BG.shared && BG.shared.dur) || 0;
+          bgProgDragging_ = false;
+          if (!(d > 0)) { showBgAudioInfoToast_("⏱ Durasi lagu belum diketahui — tunggu lagu mulai berbunyi dulu.", "warn"); return; }
+          controlSharedBgAudio_("seek", { seconds: d * Number(range.value) / 1000 });
+        });
+      }
+      box.querySelectorAll("[data-bgseek]").forEach((btn) => btn.addEventListener("click", () => {
+        const a = BG.shared; if (!a) return;
+        const mode = btn.getAttribute("data-bgseek");
+        const pos = a.pos || 0, dur = a.dur || 0;
+        if (mode === "mid") {
+          if (!(dur > 0)) { showBgAudioInfoToast_("⏱ Durasi lagu belum diketahui — tunggu lagu mulai berbunyi dulu.", "warn"); return; }
+          controlSharedBgAudio_("seek", { seconds: dur / 2 });
+          showBgAudioInfoToast_("⏯ Loncat ke tengah lagu (" + fmtBgTime_(dur / 2) + ")", "info");
+        } else if (mode === "resume") {
+          controlSharedBgAudio_("seek", { seconds: pos });
+          controlSharedBgAudio_("play");
+        } else {
+          const n = Number(mode) || 0;
+          controlSharedBgAudio_("seek", { seconds: Math.max(0, dur > 0 ? Math.min(dur - 1, pos + n) : pos + n) });
+        }
+      }));
+    });
     function renderKidungBgLinks() {
       const wrap = el("psKidungBgWrap");
       const linksBox = el("psKidungBgLinks");

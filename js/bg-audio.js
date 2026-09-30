@@ -97,6 +97,10 @@
     // menggambar slide kidung baru (lihat sana), supaya tidak menumpuk
     // referensi ke elemen lama yang sudah dibuang dari DOM.
     let previewBgAudioRefresh_ = null;
+    // BARU (30 Sep 2026) -- posisi/durasi lagu latar (dilaporkan Layar 2 ~1x/detik) untuk progress bar di Studio.
+    const bgProgressListeners_ = [];
+    function notifyBgProgress_() { bgProgressListeners_.forEach((fn) => { try { fn(); } catch (e) {} }); }
+    function onBgProgress_(fn) { if (typeof fn === "function") bgProgressListeners_.push(fn); }
     function notifySharedBgAudioChange_() {
       sharedBgAudioListeners_.forEach((fn) => { try { fn(); } catch (e) {} });
       if (previewBgAudioRefresh_) { try { previewBgAudioRefresh_(); } catch (e) {} }
@@ -164,6 +168,8 @@
       if (!wrap) return;
       wrap.querySelectorAll(".ps-verse-row-bgaudio[data-bgurl]").forEach((box) => {
         const st = bgNowState_(box.getAttribute("data-bgurl"), box.getAttribute("data-bgkind"));
+        const editBtn = box.querySelector(".ps-bg-editbtn"); // tombol "🎧 Audio Latar/Ganti": merah kalau lagu item ini gagal diputar
+        if (editBtn) { if (st.key === "error") editBtn.setAttribute("data-bgerr", "1"); else editBtn.removeAttribute("data-bgerr"); }
         const badge = box.querySelector(".ps-bg-state");
         if (!badge) return;
         if (st.key === "none") { badge.hidden = true; badge.removeAttribute("data-state"); badge.textContent = ""; return; }
@@ -319,7 +325,7 @@
     function controlSharedBgAudio_(action, opts) {
       if (!sharedBgAudio_) {
         // BARU (30 Sep 2026) -- dulu diam saja. Sekarang operator diberi tahu.
-        if (action === "play" || action === "pause" || action === "toggleloop" || action === "stop" || action === "rate") {
+        if (action === "play" || action === "pause" || action === "toggleloop" || action === "stop" || action === "rate" || action === "seek") {
           if (!(opts && (opts.silent || opts.fade))) showBgAudioInfoToast_("⚪ Belum ada audio yang dimuat, jadi tombol ini tidak menjalankan apa pun. Pilih/muat link lagu dulu (chip \"🎧 Latar\", tombol \"📺 Teks\", atau tempel link), baru tekan ▶ Play.", "warn");
         }
         return;
@@ -357,6 +363,13 @@
         rawPost({ type: bgMsgPrefix_(sharedBgAudio_.kind) + "_clear", fade: !!(opts && opts.fade) });
         if (!(opts && (opts.silent || opts.fade))) showBgAudioInfoToast_("⏹ Audio dihentikan: " + (sharedBgAudio_.label || "audio latar"), "info");
         sharedBgAudio_ = null;
+      } else if (action === "seek") {
+        // BARU (30 Sep 2026) -- geser ke detik tertentu (progress bar / tombol "Tengah" di Studio).
+        const sec = Math.max(0, Number(opts && opts.seconds) || 0);
+        rawPost({ type: bgMsgPrefix_(sharedBgAudio_.kind) + "_control", action: "seek", seconds: sec });
+        sharedBgAudio_.pos = sec; sharedBgAudio_.posAt = Date.now();
+        notifyBgProgress_();
+        return; // tidak perlu notifySharedBgAudioChange_() (tidak menggambar ulang daftar)
       } else if (action === "rate") {
         // BARU (30 Sep 2026) -- kecepatan lagu, hanya YouTube (lewat API resmi setPlaybackRate).
         const r = Number(opts && opts.rate);
@@ -672,6 +685,17 @@
         }
         return true;
       }
+      if (data.type === "present_bgaudio_progress") {
+        if (sharedBgAudio_ && sharedBgAudio_.kind === data.kind) {
+          const prev = sharedBgAudio_.pos;
+          sharedBgAudio_.pos = Number(data.currentTime) || 0;
+          if (Number(data.duration) > 0) sharedBgAudio_.dur = Number(data.duration);
+          // posAt hanya dimajukan kalau posisinya BERGERAK -- dipakai mendeteksi lagu "macet"
+          if (prev === undefined || Math.abs(sharedBgAudio_.pos - prev) > 0.05) sharedBgAudio_.posAt = Date.now();
+          notifyBgProgress_();
+        }
+        return true;
+      }
       if (data.type === "present_bgaudio_status") {
         if (!data.ok) {
           if (sharedBgAudio_ && sharedBgAudio_.url === data.url) sharedBgAudioError_ = { url: data.url, message: data.message };
@@ -696,6 +720,7 @@
       clearPreviewRefresh() { previewBgAudioRefresh_ = null; },
       onChange: onSharedBgAudioChange_,
       handlePresenterMessage,
+      onProgress: onBgProgress_,
       // --- fungsi bernama sama persis dengan aslinya di presentation-studio.js ---
       fn: {
         normBgKind_, isManagedBgKind_, bgMsgPrefix_, guessBgKindFromUrl_,
