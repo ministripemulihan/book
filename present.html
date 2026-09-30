@@ -2872,6 +2872,14 @@
   // tidak berbahaya). Dibatalkan otomatis kalau operator menekan Jeda /
   // Berhenti / memuat video lain.
   let ytBgWantPlay_ = false;
+  // BARU (30 Sep 2026) -- kecepatan putar Audio Latar YouTube (0.25-2), dari Studio (yt_bg_rate).
+  // Direset ke 1 tiap video BARU dimuat (yt_bg tanpa keepRate); dipasang ulang setiap iframe selesai
+  // dimuat & saat "play" diulang, karena YouTube mengembalikan ke 1x ketika video dimuat.
+  let ytBgRate_ = 1;
+  function applyYtBgRate_() {
+    if (!ytBgEl.getAttribute("src") || !ytBgEl.contentWindow) return;
+    try { ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setPlaybackRate", args: [ytBgRate_] }), "*"); } catch (e) {}
+  }
   // BARU (19 Sep 2026) -- status SUNGGUHAN Audio Latar YouTube (sedang main /
   // dijeda / selesai). Pola SAMA dengan pemutar YouTube utama (#ytView, lihat
   // ytEl "load" & listener "message" infoDelivery di bawah): kirim
@@ -2886,6 +2894,7 @@
     };
     sendListening();
     [250, 600, 1200, 2000].forEach((ms) => setTimeout(sendListening, ms));
+    if (ytBgRate_ !== 1) [600, 1500, 3000].forEach((ms) => setTimeout(applyYtBgRate_, ms));
   });
   window.addEventListener("message", (e) => {
     if (!ytBgEl.contentWindow || e.source !== ytBgEl.contentWindow) return;
@@ -7161,7 +7170,13 @@
     // ------------------------------------------------------------
     if (data.type === "yt_bg") {
       ytBgWantPlay_ = false; // video BARU dimuat -- lupakan niat "play" milik video sebelumnya
+      if (!data.keepRate) ytBgRate_ = 1; // video baru = kecepatan normal (muat ulang utk 🔁 memakai keepRate)
       if (data.embedUrl) ytBgEl.src = data.embedUrl;
+      return;
+    }
+    if (data.type === "yt_bg_rate") {
+      const r = Number(data.rate);
+      if (r >= 0.25 && r <= 2) { ytBgRate_ = r; applyYtBgRate_(); [500, 1500].forEach((ms) => setTimeout(applyYtBgRate_, ms)); }
       return;
     }
     if (data.type === "yt_bg_control") {
@@ -7174,6 +7189,7 @@
         [500, 1200, 2200, 3500].forEach((ms) => setTimeout(() => {
           if (!ytBgWantPlay_ || !ytBgEl.src || !ytBgEl.contentWindow) return;
           try { ytBgEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*"); } catch (e) {}
+          if (ytBgRate_ !== 1) applyYtBgRate_();
         }, ms));
       } else if (data.action === "pause") {
         ytBgWantPlay_ = false;

@@ -438,10 +438,12 @@
            tombol disesuaikan otomatis lewat updateResyncBtnLabel() di
            js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
            Pokok Kitab / Garis Besar / Peta+Gambar juga (lihat confirmAndSync). -->
-      <button id="resyncBtn" class="more-menu-btn">🔄 Sinkronkan ulang Alkitab</button>
-      <button id="resyncUsersBtn" class="more-menu-btn">👥 Sinkronkan ulang daftar pengguna</button>
+      <!-- BARU: SATU tombol "Sinkronkan ulang" menggantikan 3 tombol terpisah di bawah (masih ada di DOM, disembunyikan, karena kode lain masih merujuknya). -->
+      <button id="syncAllBtn" class="more-menu-btn">🔄 Sinkronkan ulang</button>
+      <button id="resyncBtn" class="more-menu-btn" style="display:none">🔄 Sinkronkan ulang Alkitab</button>
+      <button id="resyncUsersBtn" class="more-menu-btn" style="display:none">👥 Sinkronkan ulang daftar pengguna</button>
       <!-- BARU (21 Sep 2026) -- lihat js/kidung-anak.js (wireMenuResyncButton_/resyncFromMenu_); tombol ini SELF-WIRED oleh berkas itu, js/app.js tidak disentuh -->
-      <button id="kidungAnakResyncBtn" class="more-menu-btn">👶 Sinkronkan ulang Kidung Anak</button>
+      <button id="kidungAnakResyncBtn" class="more-menu-btn" style="display:none">👶 Sinkronkan ulang Kidung Anak</button>
 
       <div class="more-menu-section">
         <div class="more-menu-section-title">👁️ Tampilan Ayat</div>
@@ -1992,6 +1994,11 @@
                      lama) tiap kali audio BARU dimuat. -->
                 <button type="button" id="psKidungBgLoopBtn" class="chip-btn small" title="Putar berulang terus sampai dihentikan manual (tekan lagi utk matikan)">🔁 Ulang</button>
                 <button type="button" id="psKidungBgStopBtn" class="chip-btn small danger">⏹ Berhenti</button>
+                <!-- BARU (30 Sep 2026) -- kecepatan lagu YouTube 0,25x-2x (seperti YouTube), bawaan 1x.
+                     Hanya tampil kalau lagu yang dimuat dari YouTube. -->
+                <label id="psKidungBgRateWrap" class="ps-pointer-hint" style="display:inline-flex; align-items:center; gap:4px;" hidden>⏩ Kecepatan
+                  <select id="psKidungBgRateSelect" class="chip-select" title="Kecepatan lagu YouTube (0,25x sampai 2x)"><option value="0.25">0,25x</option><option value="0.5">0,5x</option><option value="0.75">0,75x</option><option value="1" selected>1x (normal)</option><option value="1.25">1,25x</option><option value="1.5">1,5x</option><option value="1.75">1,75x</option><option value="2">2x</option></select>
+                </label>
               </div>
               <p id="psKidungBgStatus" class="announcement-compose-hint"></p>
             </div>
@@ -2111,6 +2118,9 @@
                  lihat wireYoutubeTab() (js/presentation-studio.js). -->
             <button type="button" id="psYtBgPlayPauseBtn" class="chip-btn small" title="Putar/jeda audio latar YouTube di Layar 2">▶ Play</button>
             <button type="button" id="psYtBgStopBtn" class="chip-btn small danger">⏹ Stop</button>
+            <label class="ps-pointer-hint" style="display:inline-flex; align-items:center; gap:4px;">⏩ Kecepatan
+              <select id="psYtBgRateSelect" class="chip-select" title="Kecepatan audio latar YouTube (0,25x sampai 2x)"><option value="0.25">0,25x</option><option value="0.5">0,5x</option><option value="0.75">0,75x</option><option value="1" selected>1x (normal)</option><option value="1.25">1,25x</option><option value="1.5">1,5x</option><option value="1.75">1,75x</option><option value="2">2x</option></select>
+            </label>
             <!-- BARU (12 Sep 2026, laporan operator "youtube latar
                  belakang, ini tidak bisa di simpan") -- akar masalahnya:
                  menekan "▶️ Tampilkan" sambil "Latar suara saja" dicentang
@@ -4071,7 +4081,7 @@
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
-  <script src="js/kidung-anak.js?v=20260921c"></script>
+  <script src="js/kidung-anak.js?v=20260930a"></script>
   <!-- BARU (9 Sep 2026) -- data koordinat 514 kabupaten/kota, lihat
        catatan panjang di file itu sendiri. Dimuat SEBELUM
        presentation-studio.js supaya window.INDONESIA_REGENCIES sudah
@@ -4083,13 +4093,13 @@
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
-  <script src="js/bg-audio.js?v=20260920d"></script>
+  <script src="js/bg-audio.js?v=20260930b"></script>
   <!-- BARU (20 Sep 2026, tahap 1) -- dialog "Sumber audio". Sumber tambahan (tahap 2-3) mendaftar lewat BgAudioDialog.registerSource(). -->
   <script src="js/bg-audio-library.js?v=20260920d"></script> <!-- tahap 3: pustaka upload (IndexedDB) -->
   <script src="js/bg-audio-dialog.js?v=20260920d"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20260928b"></script>
+  <script src="js/presentation-studio.js?v=20260930b"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4113,7 +4123,8 @@
   <script src="js/media-library.js?v=20260928b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20260921b"></script>
+  <script src="js/app.js?v=20260930c"></script>
+  <script src="js/sync-checklist.js?v=20260930a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->
   <script src="js/aichat-riset.js?v=20260921a"></script>
