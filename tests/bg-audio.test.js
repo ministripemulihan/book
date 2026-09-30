@@ -172,5 +172,15 @@ expect("guessBgKindFromUrl_", F.guessBgKindFromUrl_("https://on.soundcloud.com/x
   m = posts.length; F.loadSharedBgAudio_("mp3", "http://x/a.mp3", "a");
   expect("setelah antrean kosong, pesan kembali sinkron", types(m).join() === "mp3_bg", types(m));
   F.controlSharedBgAudio_("stop");
+  // BARU (30 Sep 2026) -- progress bar & geser posisi
+  F.loadSharedBgAudio_("yt", "https://youtu.be/abc123", "lagu");
+  let ticks = 0; BG.onProgress(() => { ticks++; });
+  BG.handlePresenterMessage({ source: "bibleAppPresenter", type: "present_bgaudio_progress", kind: "yt", currentTime: 12, duration: 240 });
+  expect("progress: posisi & durasi tercatat", BG.shared.pos === 12 && BG.shared.dur === 240 && ticks === 1, BG.shared);
+  BG.handlePresenterMessage({ source: "bibleAppPresenter", type: "present_bgaudio_progress", kind: "sc", currentTime: 99, duration: 10 });
+  expect("progress: laporan jenis lain diabaikan", BG.shared.pos === 12, BG.shared);
+  m = posts.length; F.controlSharedBgAudio_("seek", { seconds: 120 });
+  expect("seek: kirim yt_bg_control seek 120 detik", JSON.stringify(posts.slice(m)) === JSON.stringify([{ type: "yt_bg_control", action: "seek", seconds: 120 }]), posts.slice(m));
+  F.controlSharedBgAudio_("stop");
   console.log(ok ? "\nALL PASS" : "\nSOME FAIL"); process.exit(ok ? 0 : 1);
 })();
