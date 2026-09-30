@@ -6,8 +6,10 @@
 //   3) Media Tersimpan Studio Presentasi (store "studioMedia")
 //   4) Teks Kidung/Hymn (store "kidung") — dari Google Sheet Kidung,
 //      lihat js/kidung.js
+//   5) Teks Kidung Anak (store "kidungAnak") — dari Google Sheet Kidung
+//      Anak, lihat js/kidung-anak.js (BARU, 21 Sep 2026)
 //  Setelah tersimpan, aplikasi TIDAK perlu memanggil server lagi
-//  untuk membaca Alkitab/Kidung maupun untuk login berikutnya.
+//  untuk membaca Alkitab/Kidung/Kidung Anak maupun untuk login berikutnya.
 // ============================================================
 const LocalDB = {
   _db: null,
@@ -101,6 +103,14 @@ const LocalDB = {
         if (!db.objectStoreNames.contains(CONFIG.MEDIA_QUEUE_STORE_NAME)) {
           const queueStore = db.createObjectStore(CONFIG.MEDIA_QUEUE_STORE_NAME, { keyPath: "id" });
           queueStore.createIndex("byUsername", "username", { unique: false });
+        }
+        // v9 -- store "kidungAnak" (BARU, 21 Sep 2026): cache offline untuk
+        // js/kidung-anak.js, TERPISAH dari store "kidung" (Kidung Umum) di
+        // atas -- tidak menyentuh/mengubah store itu sama sekali. keyPath
+        // "id" = nomor lagu ("No" di Sheet Kidung Anak), lihat
+        // bulkPutKidungAnak() di bawah untuk cara id ini dibentuk.
+        if (!db.objectStoreNames.contains(CONFIG.KIDUNG_ANAK_STORE_NAME)) {
+          db.createObjectStore(CONFIG.KIDUNG_ANAK_STORE_NAME, { keyPath: "id" });
         }
       };
       req.onsuccess = (e) => {
@@ -423,6 +433,65 @@ const LocalDB = {
     return new Promise((resolve, reject) => {
       const tx = db.transaction([CONFIG.KIDUNG_STORE_NAME], "readonly");
       const req = tx.objectStore(CONFIG.KIDUNG_STORE_NAME).count();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // ---------------- Kidung Anak (BARU, 21 Sep 2026) ----------------
+  // Cache offline untuk js/kidung-anak.js -- pola PERSIS sama seperti
+  // store "kidung" (Kidung Umum) di atas, di object store TERPISAH
+  // ("kidungAnak") supaya sama sekali tidak menyentuh data Kidung Umum.
+  async clearKidungAnak() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_ANAK_STORE_NAME], "readwrite");
+      tx.objectStore(CONFIG.KIDUNG_ANAK_STORE_NAME).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // `rows` = array objek lagu apa adanya dari parseCSV() (js/kidung-anak.js),
+  // yaitu {No, Judul, ...} dengan nama kolom persis header Sheet. Tiap baris
+  // dibungkus { id, row } sebelum disimpan -- id dibentuk dari kolom "No"
+  // (dijaga tetap unik walau ada baris kosong/dobel lewat sufiks urutan),
+  // supaya keyPath "id" di atas selalu terisi walau "No" kosong/tidak unik.
+  async bulkPutKidungAnak(rows) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_ANAK_STORE_NAME], "readwrite");
+      const store = tx.objectStore(CONFIG.KIDUNG_ANAK_STORE_NAME);
+      const seen = {};
+      rows.forEach((row, i) => {
+        const base = String((row && row.No) || "").trim() || "row" + i;
+        const n = (seen[base] = (seen[base] || 0) + 1);
+        const id = n > 1 ? base + "_" + n : base;
+        store.put({ id, row });
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  // Mengembalikan array objek lagu APA ADANYA (sudah dilepas dari
+  // pembungkus { id, row } di atas) -- pemanggil (js/kidung-anak.js) tidak
+  // perlu tahu detail pembungkusannya.
+  async getAllKidungAnakRows() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_ANAK_STORE_NAME], "readonly");
+      const req = tx.objectStore(CONFIG.KIDUNG_ANAK_STORE_NAME).getAll();
+      req.onsuccess = () => resolve((req.result || []).map((x) => x.row));
+      req.onerror = (e) => reject(e.target.error);
+    });
+  },
+
+  async countKidungAnakRows() {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([CONFIG.KIDUNG_ANAK_STORE_NAME], "readonly");
+      const req = tx.objectStore(CONFIG.KIDUNG_ANAK_STORE_NAME).count();
       req.onsuccess = () => resolve(req.result);
       req.onerror = (e) => reject(e.target.error);
     });

@@ -194,6 +194,29 @@
       box._autoHideTimer = setTimeout(() => { if (box && box.parentNode) box.remove(); }, 12000);
     }
 
+    // BARU (30 Sep 2026, permintaan operator "tombol audio ditekan atau tidak
+    // tidak ada bedanya") -- pemberitahuan singkat (hijau/kuning/abu) di pojok
+    // Studio untuk setiap aksi tombol audio: sudah berjalan, dijeda, dihentikan,
+    // atau BELUM ADA audio yang dimuat. kind: "ok" | "warn" | "info".
+    function showBgAudioInfoToast_(message, kind) {
+      try { showBgAudioInfoToastImpl_(message, kind); } catch (e) { /* notifikasi tidak boleh mengganggu pemutaran audio */ }
+    }
+    function showBgAudioInfoToastImpl_(message, kind) {
+      if (typeof document === "undefined" || !document.body) return;
+      let box = el("psBgAudioInfoToast");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "psBgAudioInfoToast";
+        box.setAttribute("role", "status");
+        document.body.appendChild(box);
+      }
+      const col = { ok: ["#0f2e1a", "#16a34a"], warn: ["#3a2a08", "#d97706"], info: ["#1e293b", "#64748b"] }[kind || "info"] || ["#1e293b", "#64748b"];
+      box.style.cssText = "position:fixed; left:50%; bottom:76px; transform:translateX(-50%); max-width:520px; background:" + col[0] + "; color:#fff; border:1px solid " + col[1] + "; border-radius:10px; padding:10px 14px; font-size:13px; line-height:1.45; z-index:99998; box-shadow:0 6px 18px rgba(0,0,0,.4); pointer-events:none;";
+      box.textContent = message || "";
+      clearTimeout(box._autoHideTimer);
+      box._autoHideTimer = setTimeout(() => { if (box && box.parentNode) box.remove(); }, kind === "warn" ? 6000 : 3500);
+    }
+
     // BARU (19 Sep 2026, permintaan operator "tambahkan link SoundCloud yang
     // bisa berjalan di belakang layar") -- Audio Latar sekarang punya 3 JENIS
     // sumber: "yt" (iframe YouTube), "sc" (widget SoundCloud, BARU) dan "mp3"
@@ -294,7 +317,13 @@
     // putus mendadak/kasar. Panggilan LAMA (tanpa opts, mis. tombol "⏹
     // Berhenti" manual) tetap berhenti SEKETIKA seperti sebelumnya.
     function controlSharedBgAudio_(action, opts) {
-      if (!sharedBgAudio_) return;
+      if (!sharedBgAudio_) {
+        // BARU (30 Sep 2026) -- dulu diam saja. Sekarang operator diberi tahu.
+        if (action === "play" || action === "pause" || action === "toggleloop" || action === "stop" || action === "rate") {
+          if (!(opts && (opts.silent || opts.fade))) showBgAudioInfoToast_("⚪ Belum ada audio yang dimuat, jadi tombol ini tidak menjalankan apa pun. Pilih/muat link lagu dulu (chip \"🎧 Latar\", tombol \"📺 Teks\", atau tempel link), baru tekan ▶ Play.", "warn");
+        }
+        return;
+      }
       if (action === "play" || action === "pause") {
         rawPost({ type: bgMsgPrefix_(sharedBgAudio_.kind) + "_control", action });
         if (action === "pause") { sharedBgAudio_.wantPlay = false; sharedBgAudio_.playing = false; }
@@ -303,6 +332,19 @@
           sharedBgAudio_.wantPlay = true;
           sharedBgAudio_.playRequestedAt = Date.now();
           setTimeout(() => { try { notifySharedBgAudioChange_(); } catch (e) {} }, 5200); // jendela 5 detik utk laporan status sungguhan, lihat bgNowState_()
+          // BARU (30 Sep 2026) -- notifikasi: perintah terkirim, lalu dicek apakah Layar 2 benar-benar melaporkan "main".
+          if (!(opts && opts.silent)) {
+            const playedRef = sharedBgAudio_, nm = playedRef.label || "Audio latar";
+            showBgAudioInfoToast_("▶ Perintah PLAY dikirim: " + nm + " (menunggu Layar 2 mulai bersuara…)", "info");
+            setTimeout(() => {
+              if (sharedBgAudio_ !== playedRef || !playedRef.wantPlay) return;
+              if (playedRef.playing) showBgAudioInfoToast_("🔊 Audio berjalan: " + nm, "ok");
+              else if (playedRef.kind === "yt") showBgAudioInfoToast_("⚠️ " + nm + " belum terdengar. Pastikan Layar 2 (present) terbuka & sudah pernah diklik sekali (aturan autoplay browser), lalu tekan ▶ Play lagi.", "warn");
+            }, 3800);
+          }
+        }
+        if (action === "pause" && !(opts && opts.silent)) showBgAudioInfoToast_("⏸ Audio dijeda: " + (sharedBgAudio_.label || "audio latar"), "info");
+        if (action === "play") {
           // Operator menekan ▶ Play manual selagi slide "menunggu panah" untuk lagu
           // yang SAMA -> anggap sudah terpenuhi, JANGAN biarkan panah berikutnya
           // "diserap" lagi sebagai tombol mulai (harusnya langsung pindah bait).
@@ -313,9 +355,18 @@
         }
       } else if (action === "stop") {
         rawPost({ type: bgMsgPrefix_(sharedBgAudio_.kind) + "_clear", fade: !!(opts && opts.fade) });
+        if (!(opts && (opts.silent || opts.fade))) showBgAudioInfoToast_("⏹ Audio dihentikan: " + (sharedBgAudio_.label || "audio latar"), "info");
         sharedBgAudio_ = null;
+      } else if (action === "rate") {
+        // BARU (30 Sep 2026) -- kecepatan lagu, hanya YouTube (lewat API resmi setPlaybackRate).
+        const r = Number(opts && opts.rate);
+        if (sharedBgAudio_.kind !== "yt") { showBgAudioInfoToast_("⏩ Pengaturan kecepatan hanya untuk lagu YouTube.", "warn"); return; }
+        if (!(r >= 0.25 && r <= 2)) return;
+        rawPost({ type: "yt_bg_rate", rate: r });
+        showBgAudioInfoToast_("⏩ Kecepatan lagu: " + ("" + r).replace(".", ",") + "x", "info");
       } else if (action === "toggleloop") {
         sharedBgAudio_.loop = !sharedBgAudio_.loop;
+        showBgAudioInfoToast_(sharedBgAudio_.loop ? "🔁 Ulang terus: NYALA" : "🔁 Ulang terus: MATI (main 1x)", "info");
         if (sharedBgAudio_.kind !== "yt") {
           // MP3/MP4/Drive lewat elemen <audio> asli (#kidungBgAudio) --
           // BARU (18 Sep 2026) -- kind "mp4" numpang jalur audio yang SAMA
@@ -345,7 +396,7 @@
             const queueIds = (Array.isArray(sharedBgAudio_.queueIds) && sharedBgAudio_.queueIds.length) ? sharedBgAudio_.queueIds : [id];
             let url2 = buildYoutubeEmbedUrl(id, 0);
             if (sharedBgAudio_.loop) url2 += `&loop=1&playlist=${queueIds.join(",")}`;
-            rawPost({ type: "yt_bg", embedUrl: url2 });
+            rawPost({ type: "yt_bg", embedUrl: url2, keepRate: true }); // keepRate: 🔁 memuat ulang embed, kecepatan pilihan operator dipertahankan
           }
         }
       }
@@ -651,7 +702,7 @@
         loadSharedBgAudio_, controlSharedBgAudio_, autoplayBgAudioIfEnabled_,
         setYtArmedIndicator_, handleBgForActiveItem_, startBgForItem_,
         notifySharedBgAudioChange_, onSharedBgAudioChange_,
-        bgNowState_, bgKindName_, refreshBgRowBadges_, showBgAudioErrorToast_,
+        bgNowState_, bgKindName_, refreshBgRowBadges_, showBgAudioErrorToast_, showBgAudioInfoToast_,
         bgAudioRowIconHtml_, bgAudioControlsHtml_, wireBgAudioControlsInBox_,
         openBgAudioDialog_, isManagedBg_, isManagedBgKind_,
       },

@@ -98,6 +98,95 @@ function totalOutlineBytesLastSync() {
   return (_lastOutlineFetchBytes.pokok || 0) + (_lastOutlineFetchBytes.garisBesar || 0) + (_lastOutlineFetchBytes.peta || 0);
 }
 
+// ------------------------------------------------------------
+//  Bersihkan teks "Pokok Kitab" jadi HTML yang AMAN & RAPI, siap
+//  dipasang langsung lewat innerHTML (bukan lagi ditampilkan sebagai
+//  teks mentah yang isinya kelihatan tanda "<p>", "<strong>" dst apa
+//  adanya). Dipakai terutama untuk kolom Inggris, yang di sheet-nya
+//  sering berisi markup HTML yang agak "rusak" hasil salin-tempel
+//  (mis. <strong> dibuka di satu <p> tapi baru ditutup 1-2 <p>
+//  KEMUDIAN, harusnya ditutup di <p> yang sama). Kolom Indonesia &
+//  Mandarin biasanya teks polos tanpa tag sama sekali -- itu dilewatkan
+//  sebagai teks biasa (di-escape, baris baru jadi <br>).
+// ------------------------------------------------------------
+const POKOK_HTML_ALLOWED_TAGS = new Set(["P", "BR", "B", "STRONG", "I", "EM", "SUP", "SUB"]);
+
+function escapeHtmlForPokok(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function cleanPokokKitabHtml(raw) {
+  const str = String(raw == null ? "" : raw).trim();
+  if (!str) return "";
+
+  // Tidak ada tag HTML sama sekali (kasus paling umum utk Indonesia &
+  // Mandarin) -- escape saja & ubah baris baru jadi <br>.
+  if (!/<[a-z][^>]*>/i.test(str)) {
+    return escapeHtmlForPokok(str).replace(/\r\n|\r|\n/g, "<br>");
+  }
+
+  let html = str;
+
+  // Rapikan pola paling sering rusak: "<p> <strong> X1 </p><p> X2 </p>
+  // ...<p> Xn </p><p></strong></p>" -- strong dibuka di paragraf
+  // PERTAMA tapi baru ditutup di paragraf TERAKHIR (kosong, cuma
+  // berisi tag penutup), padahal seharusnya ditutup per-paragraf
+  // sendiri². Dua-tiga baris judul kitab (mis. "The Epistle of Paul" /
+  // "to the" / "ROMANS") maupun label satu baris (mis. "Subject:")
+  // sama-sama memakai pola ini.
+  //  - Kalau baris pertama berupa LABEL yang diakhiri ":" DAN cuma ada
+  //    persis 2 baris (mis. "Subject:" + isinya) -> gabung jadi SATU
+  //    baris "Label: isi" (label tebal, isi menyusul di baris yang sama).
+  //  - Selain itu (judul kitab 2-3 baris) -> setiap baris jadi
+  //    paragraf sendiri, semuanya tetap tebal.
+  html = html.replace(
+    /<p>\s*<strong>\s*([\s\S]*?)\s*<p>\s*<\/strong>\s*<\/p>/gi,
+    (m, inner) => {
+      const lines = inner.split(/<\/p>\s*<p>/i).map((s) => s.trim()).filter(Boolean);
+      if (!lines.length) return "";
+      if (lines.length === 2 && /:\s*$/.test(lines[0])) {
+        return `<p><strong>${lines[0]}</strong> ${lines[1]}</p>`;
+      }
+      return lines.map((line) => `<p><strong>${line}</strong></p>`).join("");
+    }
+  );
+
+  // Buang paragraf kosong (cuma spasi/&nbsp;, atau cuma tag stray
+  // seperti "</strong>" yatim yang tersisa) yang tersisa.
+  html = html.replace(/<p>\s*(?:&nbsp;|<\/?strong>|<\/?b>)*\s*<\/p>/gi, "");
+
+  if (typeof document === "undefined") return html; // (mis. dites di Node tanpa DOM)
+
+  // Tahap terakhir: whitelist tag -- parse ke elemen sementara, buang
+  // tag/atribut apa pun DI LUAR daftar putih (tapi teksnya tetap
+  // disimpan), supaya aman dari <script>/<img onerror=...> dst kalau
+  // suatu saat isi sheet-nya ditulis sembarangan.
+  const holder = document.createElement("div");
+  holder.innerHTML = html;
+  (function walk(node) {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === 1) {
+        if (!POKOK_HTML_ALLOWED_TAGS.has(child.tagName)) {
+          child.replaceWith(document.createTextNode(child.textContent));
+          return;
+        }
+        [...child.attributes].forEach((a) => child.removeAttribute(a.name));
+        walk(child);
+      } else if (child.nodeType !== 3) {
+        child.remove();
+      }
+    });
+  })(holder);
+  // Sapu terakhir: buang <p> yang ternyata kosong (mis. sisa dari tag
+  // yatim seperti "</strong>" yang tidak menghasilkan apa-apa setelah
+  // di-parse browser) supaya tidak ada baris kosong aneh saat tampil.
+  holder.querySelectorAll("p").forEach((p) => {
+    if (!p.textContent.trim()) p.remove();
+  });
+  return holder.innerHTML;
+}
+
 // ---------------- Sheet A: Pokok Kitab ----------------
 async function fetchPokokKitabSheet() {
   const url = outlineSheetsConfig().pokokKitabCsvUrl;
@@ -111,7 +200,7 @@ async function fetchPokokKitabSheet() {
     bookNum: rowNum(r, ["book number", "booknumber", "no kitab"]),
     bookName: rowStr(r, ["book name", "bookname"]),
     lang: normalizeLangValue(rowStr(r, ["bahasa", "language", "lang"])),
-    pokok: rowStr(r, ["pokok kitab", "pokok"]),
+    pokok: cleanPokokKitabHtml(rowStr(r, ["pokok kitab", "pokok"])),
   })).filter((r) => r.bookNum && r.pokok);
   saveOutlineToCache("pokok", rows);
   return rows;
@@ -173,6 +262,31 @@ async function pokokKitabRows() { return getRowsCachedOrFetch("pokok", fetchPoko
 async function garisBesarRows() { return getRowsCachedOrFetch("garis_besar", fetchGarisBesarSheet); }
 async function petaGambarRows() { return getRowsCachedOrFetch("peta_gambar", fetchPetaGambarSheet); }
 
+// ------------------------------------------------------------
+//  VERSI "SYNC-DARI-CACHE-SAJA" (tanpa await/network) -- dipakai supaya
+//  baris "📌 Pokok / 📋 Garis Besar / 🗺️ Peta+Gambar" di atas grid nomor
+//  pasal bisa dirender BERSAMAAN dengan grid-nya sendiri (satu kali cat
+//  layar saja), BUKAN disisipkan belakangan setelah fetch async selesai.
+//  Itulah penyebab bug lama: baris info nongol belakangan -> nomor pasal
+//  di bawahnya ikut turun -> jari yang sudah menyasar ke nomor pasal
+//  malah kena tombol yang baru muncul. Kalau cache belum ada sama sekali
+//  (pengguna belum pernah sinkron), fungsi ini mengembalikan null supaya
+//  pemanggilnya tahu harus jatuh balik ke cara lama (async, hanya terjadi
+//  SEKALI di percobaan pertama sebelum ada cache).
+// ------------------------------------------------------------
+function pokokKitabRowsFromCacheOnly() {
+  const c = loadOutlineFromCache("pokok");
+  return c && c.rows ? c.rows : null;
+}
+function garisBesarRowsFromCacheOnly() {
+  const c = loadOutlineFromCache("garis_besar");
+  return c && c.rows ? c.rows : null;
+}
+function petaGambarRowsFromCacheOnly() {
+  const c = loadOutlineFromCache("peta_gambar");
+  return c && c.rows ? c.rows : null;
+}
+
 // Sinkron ulang ketiganya langsung dari server -- dipanggil otomatis dari
 // syncFromServer() di js/app.js setiap kali tombol menu ⋮ → "Sinkronkan
 // ulang Alkitab" / "Unduh Data Alkitab" ditekan, jadi tidak perlu tombol
@@ -190,17 +304,27 @@ async function resyncAllOutlineSheets() {
 //  HELPER TAMPILAN
 // ------------------------------------------------------------
 
-// Teks "Pokok Kitab" untuk satu kitab+bahasa tertentu (fallback ke
+// Cari satu baris Pokok Kitab yang cocok dari daftar `rows` (fallback ke
 // bahasa Indonesia kalau bahasa aktif belum diisi, lalu fallback ke
 // bahasa APA SAJA yang tersedia untuk kitab itu -- lebih baik tampil
-// dalam bahasa lain daripada tidak tampil sama sekali).
+// dalam bahasa lain daripada tidak tampil sama sekali). Fungsi MURNI
+// (tidak fetch apa-apa) supaya bisa dipakai baik oleh versi async
+// (getPokokKitabFor) maupun versi sync-dari-cache (dipakai renderChapterPickerExtra
+// di js/app.js supaya tidak ada jeda yang menggeser tombol pasal).
+function pickPokokRowFor(rows, bookNum, lang) {
+  if (!rows || !rows.length) return null;
+  const wanted = normalizeLangValue(lang);
+  return rows.find((r) => r.bookNum === bookNum && r.lang === wanted)
+    || rows.find((r) => r.bookNum === bookNum && r.lang === "ind")
+    || rows.find((r) => r.bookNum === bookNum)
+    || null;
+}
+
+// Teks (HTML aman, sudah dibersihkan -- lihat cleanPokokKitabHtml di
+// fetchPokokKitabSheet) "Pokok Kitab" untuk satu kitab+bahasa tertentu.
 async function getPokokKitabFor(bookNum, lang) {
   const rows = await pokokKitabRows();
-  if (!rows.length) return null;
-  const wanted = normalizeLangValue(lang);
-  const hit = rows.find((r) => r.bookNum === bookNum && r.lang === wanted)
-    || rows.find((r) => r.bookNum === bookNum && r.lang === "ind")
-    || rows.find((r) => r.bookNum === bookNum);
+  const hit = pickPokokRowFor(rows, bookNum, lang);
   return hit ? hit.pokok : null;
 }
 
@@ -209,9 +333,10 @@ async function getPokokKitabFor(bookNum, lang) {
 // Sama seperti Pokok Kitab: fallback ke bahasa Indonesia lalu ke bahasa
 // apa saja yang tersedia, supaya tidak "hilang" hanya karena kode bahasa
 // tidak persis cocok.
-async function getOutlineForBook(bookNum, lang) {
-  const rows = await garisBesarRows();
-  const forBook = rows.filter((r) => r.bookNum === bookNum);
+// Fungsi MURNI (tidak fetch) -- lihat catatan di pickPokokRowFor di atas,
+// alasan sama: dipakai ulang oleh versi async & versi sync-dari-cache.
+function pickOutlineRowsForBook(rows, bookNum, lang) {
+  const forBook = (rows || []).filter((r) => r.bookNum === bookNum);
   const wanted = normalizeLangValue(lang);
   let filtered = forBook.filter((r) => r.lang === wanted);
   if (!filtered.length) filtered = forBook.filter((r) => r.lang === "ind");
@@ -222,6 +347,11 @@ async function getOutlineForBook(bookNum, lang) {
     return a.level - b.level;
   });
   return filtered;
+}
+
+async function getOutlineForBook(bookNum, lang) {
+  const rows = await garisBesarRows();
+  return pickOutlineRowsForBook(rows, bookNum, lang);
 }
 
 // Entri Garis Besar yang MULAI PERSIS di ayat ini (chapter:verse) --

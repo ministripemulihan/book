@@ -197,6 +197,13 @@
     var onJam = typeof opts.onJam === "function" ? opts.onJam : function () {};
 
     container.classList.add("bk-scene");
+    // BARU (28 Sep 2026) -- opts.paksaGerak: dipakai Layar 2 (present.html).
+    // Di layar proyeksi, gerak ikan/burung/awan ADALAH isi tayangan, jadi
+    // tidak boleh ikut dimatikan oleh pengaturan "kurangi gerakan" milik
+    // sistem (mis. Windows "Animation effects" mati, Android "Remove
+    // animations") -- lihat css/book-scene.css (:not(.bk-force-motion)).
+    // Layar Masuk TIDAK memakai opsi ini, jadi tetap menghormati pengaturan itu.
+    if (opts.paksaGerak) container.classList.add("bk-force-motion");
     container.innerHTML = SVG_TPL.replace(/\{\{UID\}\}/g, uid);
 
     function $(i) { return document.getElementById(uid + "_" + i); }
@@ -275,6 +282,9 @@
         var wrap=el('g',{class:maju?'bk-swim':'bk-swim-rev'});
         wrap.style.animationDuration=(34-s*10+rnd(-4,4)).toFixed(1)+'s';
         wrap.style.animationDelay=(-rnd(0,34)).toFixed(1)+'s';
+        /* BARU (28 Sep 2026) -- posisi diam cadangan: kalau animasi dimatikan sistem, ikan tersebar
+           di layar, tidak menumpuk di tepi kiri. Saat animasi jalan, keyframe menimpa nilai ini. */
+        wrap.style.transform='translateX('+rnd(80,1120).toFixed(0)+'px)';
         /* gambar dasar ikan menghadap kiri, jadi yang bergerak ke kanan perlu dibalik */
         var skala=maju? ('-'+s.toFixed(2)) : s.toFixed(2);
         var f=el('g',{transform:'translate(0,'+y+') scale('+skala+',1) scale(1,'+s.toFixed(2)+')',opacity:rnd(.6,.95).toFixed(2)});
@@ -561,9 +571,15 @@
         k.appendChild(f);
       }
       var a=$('anak');
-      a.appendChild(orangPlaceholder('anak1',150,648,.92,'#3A2A1E',null,false));
-      a.appendChild(orangPlaceholder('anak2',1060,648,.92,'#4A2E20','#F2C94C',true));
-      a.appendChild(ayamJago('ayam7',230,652));
+      // BARU (28 Sep 2026, permintaan operator: di Layar Masuk hari 7, dua
+      // orang dirapatkan berdampingan) -- opts.orangRapat. Dulu x=150 & x=1060
+      // (di ujung kiri/kanan), sehingga di layar sempit/HP (scene dipotong
+      // 'slice' ke bagian tengah) keduanya terpotong keluar layar. Pusat scene
+      // x=600; lebar tiap orang ~80, jadi jarak 110 = berdampingan tanpa bertabrakan.
+      var rapat=!!opts.orangRapat;
+      a.appendChild(orangPlaceholder('anak1',rapat?545:150,648,.92,'#3A2A1E',null,false));
+      a.appendChild(orangPlaceholder('anak2',rapat?655:1060,648,.92,'#4A2E20','#F2C94C',true));
+      a.appendChild(ayamJago('ayam7',rapat?440:230,652));
     })();
     terapkanSemuaJadwal();                 /* pertama kali */
     setInterval_(function(){ if(!manual) terapkanSemuaJadwal(); }, 30000);
@@ -719,7 +735,7 @@
     if (!host || host.dataset.bkMounted === "1") return;
     host.dataset.bkMounted = "1";
 
-    var sc = mount(host, { hari: 1, ikutiJam: true });
+    var sc = mount(host, { hari: 1, ikutiJam: true, orangRapat: true }); // orangRapat: 28 Sep 2026, hari 7 berdampingan
     window.BookSceneLogin = sc;
 
     var bar = document.getElementById("loginBookDays");
