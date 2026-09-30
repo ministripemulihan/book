@@ -223,7 +223,7 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    berakhir) yang belum pernah dilihat pengguna ini.
    ============================================================ */
 .announcement-big-overlay {
-  position: fixed; inset: 0; z-index: 300;
+  position: fixed; inset: 0; z-index: 1300; /* 30 Sep 2026: dulu 300 -> muncul DI BELAKANG Studio (z-index 900); dipakai juga dialog Sinkronkan ulang */
   background: rgba(20, 16, 10, 0.72);
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
@@ -324,7 +324,7 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    .info-kami-overlay/.info-kami-box (lihat di bawah) supaya konsisten,
    tapi 1 kolom saja (isinya lebih ringkas). */
 .kidung-info-overlay {
-  position: fixed; inset: 0; z-index: 320;
+  position: fixed; inset: 0; z-index: 1300;
   background: rgba(20, 16, 10, 0.72);
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
@@ -662,7 +662,7 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
    ketik polos)
    ============================================================ */
 .simple-dialog-overlay {
-  position: fixed; inset: 0; z-index: 300;
+  position: fixed; inset: 0; z-index: 1300; /* 30 Sep 2026: dulu 300 -> muncul DI BELAKANG Studio (z-index 900) */
   background: rgba(20, 15, 10, 0.5);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
@@ -1428,7 +1428,7 @@ input { font-family: inherit; }
    A+/A- mengatur --info-kami-font-scale (lihat js/infokami.js).
    ============================================================ */
 .info-kami-overlay {
-  position: fixed; inset: 0; z-index: 320;
+  position: fixed; inset: 0; z-index: 1300;
   background: rgba(20, 16, 10, 0.72);
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
@@ -5317,3 +5317,33 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .chip-btn.ps-bg-chip-on[data-state="loaded"] { border-color: #9ca3af; }
 .chip-btn.ps-bg-chip-on[data-state="armed"] { border-color: #f59e0b; }
 .chip-btn.ps-bg-chip-on[data-state="paused"] { border-color: #a78bfa; }
+
+/* ============================================================
+   BARU (30 Sep 2026) -- tombol "🎧 Audio Latar" di baris Kumpulan Ayat dibedakan warna:
+   KUNING = kosong (belum ada audio), HIJAU = sudah terisi, BIRU = melanjutkan slide sebelumnya,
+   MERAH = lagu item ini gagal diputar.
+   ============================================================ */
+.ps-bg-editbtn[data-bgset="empty"]    { background: #fde047; border-color: #ca8a04; color: #422006; font-weight: 800; }
+.ps-bg-editbtn[data-bgset="filled"]   { background: #16a34a; border-color: #166534; color: #fff; font-weight: 800; }
+.ps-bg-editbtn[data-bgset="continue"] { background: #2563eb; border-color: #1e40af; color: #fff; font-weight: 800; }
+.ps-bg-editbtn[data-bgerr="1"]        { background: #dc2626 !important; border-color: #7f1d1d !important; color: #fff !important; }
+
+/* Progress bar lagu latar (Studio) */
+.ps-bg-prog { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.ps-bg-prog[hidden] { display: none; }
+.ps-bg-prog-range { flex: 1 1 160px; min-width: 120px; cursor: pointer; accent-color: #22c55e; }
+.ps-bg-prog-time, .ps-bg-prog-dur { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.ps-bg-prog-warn { flex-basis: 100%; font-size: 12px; color: #b45309; font-weight: 700; }
+.ps-bg-prog-warn:empty { display: none; }
+
+/* BARU (30 Sep 2026) -- keterangan warna tombol "Audio Latar" di baris Kumpulan Ayat */
+.ps-bg-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; font-size: 12px; }
+.ps-bg-legend-title { font-weight: 800; }
+.ps-bg-legend-chip { padding: 2px 9px; border-radius: 999px; border: 1px solid; font-weight: 800; cursor: help; }
+.ps-bg-legend-chip[data-k="empty"]    { background: #fde047; border-color: #ca8a04; color: #422006; }
+.ps-bg-legend-chip[data-k="filled"]   { background: #16a34a; border-color: #166534; color: #fff; }
+.ps-bg-legend-chip[data-k="continue"] { background: #2563eb; border-color: #1e40af; color: #fff; }
+.ps-bg-legend-chip[data-k="error"]    { background: #dc2626; border-color: #7f1d1d; color: #fff; }
+.ps-bg-legend-how { margin: 4px 0 8px; font-size: 12px; }
+.ps-bg-legend-how summary { cursor: pointer; font-weight: 800; }
+.ps-bg-legend-how ol { margin: 4px 0 0 18px; padding: 0; line-height: 1.5; }
