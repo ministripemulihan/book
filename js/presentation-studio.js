@@ -417,7 +417,7 @@ const PresentationStudio = (() => {
         loadSharedBgAudio_: noopWarn, controlSharedBgAudio_: noop, autoplayBgAudioIfEnabled_: noop,
         handleBgForActiveItem_: noop, startBgForItem_: noop, onSharedBgAudioChange_: noop,
         bgNowState_: () => ({ key: "none", label: "", kind: "" }), bgKindName_: () => "",
-        refreshBgRowBadges_: noop, showBgAudioErrorToast_: noop,
+        refreshBgRowBadges_: noop, showBgAudioErrorToast_: noop, showBgAudioInfoToast_: noop,
         bgAudioRowIconHtml_: () => "", bgAudioControlsHtml_: () => "", wireBgAudioControlsInBox_: noop,
         openBgAudioDialog_: noopWarn,
       },
@@ -470,6 +470,7 @@ const PresentationStudio = (() => {
     bgKindName_,
     refreshBgRowBadges_,
     showBgAudioErrorToast_,
+    showBgAudioInfoToast_ = () => {}, // BARU (30 Sep 2026) -- default aman kalau bg-audio.js lama masih ter-cache
     bgAudioRowIconHtml_,
     bgAudioControlsHtml_,
     wireBgAudioControlsInBox_,
@@ -2009,7 +2010,18 @@ const PresentationStudio = (() => {
         ok = await openKidung(real, no);
       }
       const a = opts && opts.audio;
-      if (ok && a && a.videoId) loadLinkAsBg_("yt", "https://www.youtube.com/watch?v=" + a.videoId, a.title || "Video YouTube");
+      if (ok && a && a.videoId) {
+        loadLinkAsBg_("yt", "https://www.youtube.com/watch?v=" + a.videoId, a.title || "Video YouTube");
+        // BARU (30 Sep 2026, permintaan operator "YouTube tetap nyala DAN teks tampil") --
+        // 📺 Teks sekarang LANGSUNG memutar YouTube-nya (dulu cuma dimuat, operator harus
+        // menekan ▶ Play sendiri). Layar 2 mengulang perintah play sampai iframe siap.
+        // Teks bait tetap diatur operator (bait per slide, koor, panah); lagu jalan terus
+        // di antara pindah bait. Notifikasi "sedang berjalan" muncul dari controlSharedBgAudio_().
+        if (BG.shared && BG.shared.url === "https://www.youtube.com/watch?v=" + a.videoId) {
+          controlSharedBgAudio_("play");
+          bgStatus_("🔊 YouTube berjalan bersama teks: " + (a.title || "Video YouTube") + " -- tekan ▶️ Tayangkan di bait yang diinginkan; lagu tidak putus saat pindah bait.");
+        }
+      }
       return ok;
     }
     kidungTabApi_ = { openRef };
@@ -2101,12 +2113,19 @@ const PresentationStudio = (() => {
       if (playBtn) playBtn.classList.toggle("ps-bg-chip-on", st.key === "playing" || st.key === "connecting");
       if (pauseBtn) pauseBtn.classList.toggle("ps-bg-chip-on", st.key === "paused");
     }
+    let lastRateShared_ = null; // BARU (30 Sep 2026) -- lihat refreshBgControlsUi_()
+    function setBgRateBoth_(v) { ["psKidungBgRateSelect", "psYtBgRateSelect"].forEach((id) => { const e = el(id); if (e) e.value = String(v); }); }
+    if (el("psKidungBgRateSelect")) el("psKidungBgRateSelect").addEventListener("change", (e) => { setBgRateBoth_(e.target.value); controlSharedBgAudio_("rate", { rate: e.target.value }); });
     function refreshBgControlsUi_() {
       const controlsBox = el("psKidungBgControls");
       const loopBtn = el("psKidungBgLoopBtn");
       renderBgNowBar_();
       if (!controlsBox) return;
       controlsBox.hidden = !BG.shared;
+      // BARU (30 Sep 2026) -- pilihan kecepatan: hanya utk lagu YouTube; kembali 1x tiap lagu BARU dimuat.
+      const rateWrap = el("psKidungBgRateWrap"), rateSel = el("psKidungBgRateSelect");
+      if (rateWrap) rateWrap.hidden = !(BG.shared && BG.shared.kind === "yt");
+      if (rateSel && BG.shared !== lastRateShared_) { lastRateShared_ = BG.shared; rateSel.value = "1"; const o = el("psYtBgRateSelect"); if (o) o.value = "1"; }
       if (loopBtn) loopBtn.classList.toggle("active", !!(BG.shared && BG.shared.loop));
       if (!BG.shared) { bgStatus_(pendingAttachLink_ ? "Audio latar dihentikan." : ""); return; }
       // BARU (18 Sep 2026 v5) -- kalau Layar 2 baru saja melaporkan link
@@ -6208,9 +6227,18 @@ const PresentationStudio = (() => {
     // pola resetYtPlayPauseState_() milik video utama (lihat catatan
     // panjang di syncYtLiveBarVisibility(), atas file ini).
     window.resetYtBgPlayPauseState_ = function resetYtBgPlayPauseState_() {
+      if (el("psYtBgRateSelect")) el("psYtBgRateSelect").value = "1"; // BARU (30 Sep 2026) -- video latar baru = kecepatan 1x (Layar 2 juga mereset)
       ytBgIsPlaying = false;
       refreshYtBgPlayPauseUi_();
     };
+    if (el("psYtBgRateSelect")) el("psYtBgRateSelect").addEventListener("change", (e) => {
+      // BARU (30 Sep 2026) -- kecepatan audio latar YouTube 0,25x-2x (kedua pilihan kecepatan disamakan)
+      const r = Number(e.target.value);
+      if (!(r >= 0.25 && r <= 2)) return;
+      const k = el("psKidungBgRateSelect"); if (k) k.value = String(r);
+      rawPost({ type: "yt_bg_rate", rate: r });
+      showBgAudioInfoToast_("⏩ Kecepatan audio latar: " + String(r).replace(".", ",") + "x", "info");
+    });
     if (el("psYtBgStopBtn")) el("psYtBgStopBtn").addEventListener("click", () => {
       rawPost({ type: "yt_bg_clear" });
       setYtBgStatus("Belum ada audio latar yang diputar.");

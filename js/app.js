@@ -852,8 +852,29 @@ function showBibleNotDownloadedState(message) {
   empty.hidden = false;
 }
 
+// Mode "di belakang layar" (dipakai js/sync-checklist.js): layar loading penuh
+// TIDAK dipakai, progres tampil di pil kecil di bawah layar.
+let _bgSync = false;
+let _bgSyncText = "";
+function bgSyncPill_() {
+  let p = document.getElementById("bgSyncPill");
+  if (!p) {
+    p = document.createElement("div");
+    p.id = "bgSyncPill";
+    p.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;background:#1f2937;color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;max-width:92vw;box-shadow:0 4px 14px rgba(0,0,0,.3)";
+    document.body.appendChild(p);
+  }
+  return p;
+}
+function bgSyncPillShow_(text, autoHideMs) {
+  const p = bgSyncPill_();
+  p.textContent = text;
+  p.hidden = false;
+  if (autoHideMs) setTimeout(() => { p.hidden = true; }, autoHideMs);
+}
 function setLoadingText(t) {
   el("loadingText").textContent = t;
+  if (_bgSync) { _bgSyncText = t; bgSyncPillShow_("🔄 " + t); }
 }
 function setLoadingProgress(pct) {
   el("loadingProgress").style.width = pct + "%";
@@ -1084,10 +1105,12 @@ function normalizeSyncParts_(parts) {
   return { bible: true, kidung: true, sounds: !!parts };
 }
 
-async function syncFromServer(isFirstTime, partsArg) {
+async function syncFromServer(isFirstTime, partsArg, opts) {
   const parts = normalizeSyncParts_(partsArg);
+  const bg = !!(opts && opts.background);
+  _bgSync = bg;
   const overlay = el("loadingOverlay");
-  overlay.hidden = false;
+  overlay.hidden = bg;
   const dlInfo = await getInitialDownloadInfo();
   const sizeMB = dlInfo.bibleMb;
   // Daftar nama bagian yang benar-benar dipilih -- dipakai untuk teks
@@ -1241,6 +1264,21 @@ async function syncFromServer(isFirstTime, partsArg) {
     if (allRecords) bibleData = allRecords;
     setTimeout(() => {
       overlay.hidden = true;
+      if (bg) {
+        _bgSync = false;
+        bgSyncPillShow_("✅ Sinkron selesai", 3500);
+        if (allRecords) {
+          // Tanpa membangun ulang seluruh layar supaya bacaan yang sedang dibuka tidak terganggu.
+          buildIndexes();
+          updateStatusPanel();
+          updateResyncBtnLabel();
+          if (typeof refreshDataDownloadUi_ === "function") refreshDataDownloadUi_();
+        } else {
+          if (typeof refreshDataDownloadUi_ === "function") refreshDataDownloadUi_();
+          if (typeof updateStatusPanel === "function") updateStatusPanel();
+        }
+        return;
+      }
       if (allRecords) {
         afterDataReady();
       } else {
@@ -1252,6 +1290,11 @@ async function syncFromServer(isFirstTime, partsArg) {
       }
     }, 250);
   } catch (err) {
+    if (bg) {
+      _bgSync = false;
+      bgSyncPillShow_("⚠️ Sinkron gagal: " + err.message, 8000);
+      return;
+    }
     setLoadingText("Gagal mengambil data: " + err.message + ". Periksa URL Google Sheet Alkitab di config.js, lalu muat ulang halaman.");
     setLoadingProgress(0);
   }
@@ -4634,11 +4677,18 @@ function renderPlanDetail(container, plan) {
     openPlanStartPicker(
       { label: plan.label, days: plan.days, titlePrefix: "📅 Ubah Tanggal Mulai", confirmLabel: "💾 Simpan Tanggal" },
       (startDate, markCatchup) => {
+        // FIX (30 Sep 2026) -- dulu centang hari HANYA ditambah, tidak pernah dihapus,
+        // jadi memilih 1 Jan/1 Feb/1 Mar/1 Apr selalu berakhir di hari yang sama
+        // (centang lama tertumpuk) dan tombol \"Lanjutkan\" tidak ikut tanggal.
+        // Sekarang centang DIHITUNG ULANG dari tanggal yang baru dipilih:
+        //   - opsi \"tandai selesai\" dicentang -> hari 1..(hari ini - 1) tercentang, sisanya kosong
+        //   - tidak dicentang -> semua kosong (mulai Hari 1)
+        const had = plan.completed.filter(Boolean).length;
+        const rebuilt = buildCatchupCompleted_(plan.days, startDate, markCatchup);
+        const willHave = rebuilt.filter(Boolean).length;
+        if (had > willHave && !confirm(`Tanggal mulai diubah. Centang lama (${had} hari) akan dihitung ulang mengikuti tanggal baru (${willHave} hari tercentang). Lanjutkan?`)) return;
         plan.startDate = startDate.toISOString();
-        if (markCatchup) {
-          const clamped = elapsedPlanDays_(plan.days, startDate);
-          for (let i = 0; i < clamped; i++) plan.completed[i] = true;
-        }
+        plan.completed = rebuilt;
         savePlan(currentUser, plan);
         renderPlanPanel();
       }
@@ -8315,7 +8365,11 @@ async function loadAndRenderDriveUsagePanel() {
   if (!report || !report.ok) {
     const p = document.createElement("p");
     p.className = "media-empty";
-    p.textContent = "Gagal mengambil data: " + ((report && report.error) || "tidak diketahui sebabnya.");
+    const errTxt = String((report && report.error) || "tidak diketahui sebabnya.");
+    const isPerm = /DriveApp|izin|permission|authorization/i.test(errTxt);
+    p.textContent = isPerm
+      ? "⚠️ Apps Script belum diberi izin mengakses Google Drive. Buka editor Apps Script → pilih fungsi getDriveRootFolder_ → tekan ▷ Run → klik Izinkan (Allow), lalu Deploy → Manage deployments → Edit → Versi baru → Deploy. Setelah itu tekan 🔄 Segarkan. (Detail teknis: " + errTxt + ")"
+      : "Gagal mengambil data: " + errTxt;
     bodyWrap.appendChild(p);
     return;
   }
@@ -10363,6 +10417,7 @@ function initUIEvents() {
       alert("Gagal menyinkronkan daftar pengguna: " + e.message);
     }
   });
+  // Tombol gabungan "🔄 Sinkronkan ulang" (syncAllBtn) ditangani js/sync-checklist.js
   el("readingAnimToggle").addEventListener("change", (e) => {
     setSetting(currentUser, "readingProgressAnimation", e.target.checked);
     resetReadingProgressFlags(); // supaya tidak langsung "nembak" toast kalau baru dinyalakan lagi

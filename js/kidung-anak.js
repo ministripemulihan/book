@@ -1238,6 +1238,9 @@ window.KidungAnak = (function () {
   // ditambahkan tanpa menyentuh perilaku yang sudah ada.
   return {
     renderHome, findSongByNo, getBaitsForPresentation,
+    // Dipakai tombol gabungan "🔄 Sinkronkan ulang" di menu ⋮ (js/app.js).
+    resyncQuiet: () => loadData(null, { background: true }),
+    sheetUrl: SHEET_CSV_URL,
     // Dipakai tests/kidung-anak-cache.jsdom.test.js -- tidak dipakai jalur
     // pemakaian normal aplikasi.
     _test: { loadData, reset() { dataLoaded = false; SONGS = []; }, getSongs: () => SONGS },
