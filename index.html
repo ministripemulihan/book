@@ -2002,7 +2002,6 @@
               </div>
               <div class="ps-btn-row" id="psKidungBgControls" hidden>
                 <button type="button" id="psKidungBgPlayBtn" class="chip-btn small">▶ Play</button>
-                <button type="button" id="psKidungBgPauseBtn" class="chip-btn small">⏸ Jeda</button>
                 <!-- BARU (18 Sep 2026 v3, permintaan operator "1x habis
                      minta diulangi lagi sampai bosen, atau bisa jadi
                      cuma 1x saja") -- toggle: tekan sekali nyala (lagu
@@ -2011,7 +2010,7 @@
                      tekan lagi mati. Bawaan MATI (main 1x, perilaku
                      lama) tiap kali audio BARU dimuat. -->
                 <button type="button" id="psKidungBgLoopBtn" class="chip-btn small" title="Putar berulang terus sampai dihentikan manual (tekan lagi utk matikan)">🔁 Ulang</button>
-                <button type="button" id="psKidungBgStopBtn" class="chip-btn small danger">⏹ Berhenti</button>
+                <button type="button" id="psKidungBgStopBtn" class="chip-btn small danger" title="Berhenti total. Tekan ▶ Play lagi = mulai dari awal">⏹ Stop</button>
                 <!-- BARU (30 Sep 2026) -- kecepatan lagu YouTube 0,25x-2x (seperti YouTube), bawaan 1x.
                      Hanya tampil kalau lagu yang dimuat dari YouTube. -->
                 <label id="psKidungBgRateWrap" class="ps-pointer-hint" style="display:inline-flex; align-items:center; gap:4px;" hidden>⏩ Kecepatan
@@ -4155,13 +4154,13 @@
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
-  <script src="js/bg-audio.js?v=20260930c"></script>
+  <script src="js/bg-audio.js?v=20261001b"></script>
   <!-- BARU (20 Sep 2026, tahap 1) -- dialog "Sumber audio". Sumber tambahan (tahap 2-3) mendaftar lewat BgAudioDialog.registerSource(). -->
   <script src="js/bg-audio-library.js?v=20260920d"></script> <!-- tahap 3: pustaka upload (IndexedDB) -->
-  <script src="js/bg-audio-dialog.js?v=20260920d"></script>
+  <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261001a"></script>
+  <script src="js/presentation-studio.js?v=20261001b"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
