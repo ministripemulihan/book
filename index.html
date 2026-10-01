@@ -2831,6 +2831,29 @@
             <input type="number" id="psContentScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="140" step="1" value="100" title="Ketik angka Ukuran Konten manual (60-140), lalu tekan Enter" />%
           </div>
           <div class="ps-pointer-hint">Mengatur seberapa lebar kotak teks memakai layar -- persempit supaya latar (Kamera/Gambar) lebih terlihat di tepi, atau lebarkan supaya teks memakai hampir seluruh layar.</div>
+          <!-- BARU (1 Okt 2026, permintaan operator) -- pengaturan tampilan
+               Kidung di Layar 2: SATU jarak seragam antar bait/koor, ukuran
+               tulisan "KOOR:", dan warna nomor bait. Lihat applyTheme()
+               di present.html & wireKidungLook di js/presentation-studio.js. -->
+          <div class="ps-field-label">🎵 Jarak Bait / Koor (Kidung)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psKidungGapDec" class="chip-btn small" title="Rapatkan jarak bait/koor">≡-</button>
+            <input type="range" id="psKidungGap" min="0" max="300" value="100" style="flex:1;" />
+            <button type="button" id="psKidungGapInc" class="chip-btn small" title="Renggangkan jarak bait/koor">≡+</button>
+            <input type="number" id="psKidungGapValue" class="ps-pen-size-value ps-pen-size-value-input" min="0" max="300" step="1" value="100" title="Ketik angka Jarak Bait/Koor (0-300), lalu tekan Enter" />%
+          </div>
+          <div class="ps-field-label">🎵 Ukuran Tulisan "KOOR" (Kidung)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psKoorLabelScaleDec" class="chip-btn small" title="Kecilkan tulisan KOOR">A-</button>
+            <input type="range" id="psKoorLabelScale" min="100" max="300" value="160" style="flex:1;" />
+            <button type="button" id="psKoorLabelScaleInc" class="chip-btn small" title="Besarkan tulisan KOOR">A+</button>
+            <input type="number" id="psKoorLabelScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="100" max="300" step="1" value="160" title="Ketik angka ukuran tulisan KOOR (100-300), lalu tekan Enter" />%
+          </div>
+          <label class="ps-checkbox-row" style="display:flex; gap:6px; align-items:center; margin:6px 0;">
+            <input type="checkbox" id="psKidungNoColor" checked style="margin:0;" />
+            Nomor bait berwarna (sama dengan warna "KOOR") supaya jelas sudah ganti bait
+          </label>
+          <div class="ps-pointer-hint">Satu pengaturan jarak untuk semuanya: bait 1 → Koor → bait 2 → dst memakai jarak yang sama. Geser ke kiri untuk merapatkan.</div>
           <!-- BARU (12 Sep 2026, permintaan operator "apa bisa saat pdf di
                upload hasil tampilnya bisa di pilih, apa mau orisinil ...
                atau strech atau bisa di zoom") -- 3 model ukuran untuk
@@ -4138,7 +4161,7 @@
   <script src="js/bg-audio-dialog.js?v=20260920d"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20260930c"></script>
+  <script src="js/presentation-studio.js?v=20261001a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip

@@ -891,35 +891,32 @@
      sendiri warna putih/normal SAMA seperti bait biasa (dulu seluruh
      blok koor -- label & syair -- kuning semua, lihat .kidung-koor-line
      di bawah yang sekarang TIDAK lagi menimpa warna). */
-  .kidung-bait-line {
-    /* BARU (4 Sep 2026, permintaan operator) -- jarak antar BLOK bait
-       (dulu clamp() tetap, TIDAK ikut slider "Spasi Baris" sama sekali --
-       jadi kalau jarak ini terasa kebesaran, operator tidak py cara
-       mengecilkannya). Sekarang ikut skala var(--p-line-height) yang
-       sama dipakai slider itu (nilai bawaan 1.35 => rasio 1, tidak
-       berubah kalau slider belum disentuh sama sekali) -- geser slider
-       ke kiri (mis. 60%) merapatkan jarak antar bait JUGA, bukan cuma
-       spasi antar baris di dalam 1 bait yang panjang.
-       BARU (13 Sep 2026) -- sengaja TETAP pakai var(--p-line-height)
-       MENTAH (tanpa lantai 0.95 seperti #text di atas) supaya jarak
-       antar blok ini bisa terus mengecil sampai nyaris dempet waktu
-       slider "Spasi Baris" ditekan ke batas bawah barunya (20%). */
-    margin: 0 auto calc(clamp(4px, 1.6vh, 20px) * var(--p-line-height, 1.35) / 1.35);
+  /* BARU (1 Okt 2026, permintaan operator) -- SATU jarak seragam antar
+     semua blok Kidung (bait 1 -> Koor -> bait 2 -> bait 3 ...). Dulu
+     jaraknya tidak sama (bait->Koor besar, Koor->bait kecil) karena
+     label "Koor:" berupa inline-block kecil di dalam baris setinggi
+     huruf penuh + ada .kidung-line-gap terpisah. Sekarang tiap blok
+     (.kidung-bait-line & .kidung-koor-line) cuma punya margin-bawah
+     yang SAMA = --p-kidung-gap (slider "Jarak Bait/Koor" di tab
+     Tampilan, 100% = bawaan), blok terakhir tanpa margin. */
+  .kidung-bait-line, .kidung-koor-line {
+    margin: 0 auto calc(clamp(2px, 1vh, 14px) * var(--p-kidung-gap, 1));
   }
-  .kidung-line-gap { display: block; height: calc(clamp(2px, 1vh, 14px) * var(--p-line-height, 1.35) / 1.35); }
-  .kidung-koor-line {
-    /* Warna & bold TIDAK dipaksa lagi di sini -- syair koor ikut warna
-       tema biasa (var(--p-ink), sama seperti bait), cuma label "Koor:"
-       (.kidung-koor-label di bawah) yang tetap kuning & bold. */
-  }
+  .kidung-bait-line:last-child, .kidung-koor-line:last-child { margin-bottom: 0; }
+  .kidung-line-gap { display: none; }
+  /* Nomor bait ("1.", "2.") diberi warna sama dengan label Koor supaya
+     jemaat langsung tahu sudah ganti bait (bisa dimatikan di Studio). */
+  .kidung-no { color: var(--p-kidung-no, var(--p-koor, #ffd84a)); font-weight: 700; }
   .kidung-koor-label {
-    display: inline-block;
+    display: block;
     font-family: "Inter", Arial, sans-serif;
-    font-weight: 700;
-    font-size: 0.5em;
-    letter-spacing: 0.04em;
+    font-weight: 800;
+    /* Ukuran label "KOOR:" ikut slider "Ukuran tulisan KOOR" (100% = 0,5em) */
+    font-size: calc(0.5em * var(--p-koor-label-scale, 1.6));
+    line-height: 1.1;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    margin-bottom: 0.3em;
+    margin-bottom: 0.25em;
     color: var(--p-koor, #ffd84a);
   }
   @keyframes fadeUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
@@ -6119,6 +6116,11 @@
     if (theme.lineHeight) root.setProperty("--p-line-height", theme.lineHeight);
     // BARU (28 Agu 2026) -- lihat catatan --p-content-scale di <style> di atas.
     if (theme.contentScale) root.setProperty("--p-content-scale", theme.contentScale);
+    // BARU (1 Okt 2026) -- tampilan Kidung: jarak seragam antar bait/koor,
+    // ukuran label "KOOR:", dan warna nomor bait.
+    if (typeof theme.kidungGap === "number") root.setProperty("--p-kidung-gap", theme.kidungGap);
+    if (typeof theme.koorLabelScale === "number") root.setProperty("--p-koor-label-scale", theme.koorLabelScale);
+    if (typeof theme.kidungNoColor === "boolean") root.setProperty("--p-kidung-no", theme.kidungNoColor ? "var(--p-koor, #ffd84a)" : "currentColor");
     // BARU (4 Sep 2026) -- toggle "Tebal" (Bold): beda dari properti lain
     // di atas (yang pakai `if (theme.x)`, dilewati kalau falsy/kosong),
     // ini BOOLEAN -- harus dicek `typeof ... === "boolean"` supaya nilai
@@ -6794,37 +6796,20 @@
       refSubEl.hidden = !kidungSub;
       refSubEl.textContent = kidungSub;
       const escKidung = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-      const baitLineHtml = (b) => `<div class="kidung-bait-line">${escKidung((b.noBait ? b.noBait + ". " : "") + (b.teks || "")).replace(/\n/g, "<br>")}</div>`;
+      const baitLineHtml = (b) => `<div class="kidung-bait-line">${b.noBait ? `<span class="kidung-no">${escKidung(b.noBait)}.</span> ` : ""}${escKidung(b.teks || "").replace(/\n/g, "<br>")}</div>`;
       const koorBlockHtml = data.koorTeks
-        ? `<div class="kidung-koor-line"><span class="kidung-koor-label">Koor:</span><br>${escKidung(data.koorTeks).replace(/\n/g, "<br>")}</div>`
+        ? `<div class="kidung-koor-line"><span class="kidung-koor-label">Koor:</span>${escKidung(data.koorTeks).replace(/\n/g, "<br>")}</div>`
         : "";
-      const gapHtml = '<div class="kidung-line-gap">&nbsp;</div>';
       const baits = data.bait || [];
-      // BARU (13 Sep 2026, permintaan operator) -- "Koor di tengah"
-      // (checkbox #psKidungKoorMidToggle di Studio Presentasi, lihat
-      // koorMid di splitKidungIntoSlides()/js/kidung.js): kalau AKTIF
-      // & slide ini punya >1 bait + koor, koor disisipkan PERSIS
-      // sesudah bait PERTAMA (meniru layout buku kidung cetak: bait 1,
-      // Koor, baru bait 2 dst) -- bukan ditempel di paling akhir
-      // seperti bawaan.
-      // BARU (13 Sep 2026 v2, permintaan operator "masih ada jarak jauh
-      // ke koor") -- antara bait PERTAMA & koor, sengaja TIDAK ditambah
-      // .kidung-line-gap terpisah lagi (dulu ditumpuk: margin-bottom
-      // bawaan .kidung-bait-line + gap terpisah = 2x jarak sekaligus,
-      // kelihatan jauh dibanding mockup yang "Koor:"-nya nempel persis
-      // di bawah baris terakhir bait 1). Sekarang cuma pakai margin-
-      // bottom bawaan .kidung-bait-line itu SAJA (masih ikut slider
-      // "Spasi Baris" di tab 🎨 Tampilan, cuma tidak dobel lagi) --
-      // antara koor & sisa bait tetap pakai gapHtml seperti biasa
-      // (blok koor sendiri tidak punya margin-bottom bawaan).
+      // "Koor di tengah" (checkbox #psKidungKoorMidToggle): koor disisipkan
+      // sesudah bait PERTAMA. BARU (1 Okt 2026): jarak antar SEMUA blok
+      // kini seragam (lihat .kidung-bait-line/.kidung-koor-line di atas),
+      // tidak ada lagi gapHtml terpisah.
       let textHtml;
       if (data.koorMid && data.koorTeks && baits.length > 1) {
-        const firstHtml = baitLineHtml(baits[0]);
-        const restHtml = baits.slice(1).map(baitLineHtml).join(gapHtml);
-        textHtml = firstHtml + koorBlockHtml + gapHtml + restHtml;
+        textHtml = baitLineHtml(baits[0]) + koorBlockHtml + baits.slice(1).map(baitLineHtml).join("");
       } else {
-        const baitHtml = baits.map(baitLineHtml).join(gapHtml);
-        textHtml = baitHtml + (koorBlockHtml ? gapHtml + koorBlockHtml : "");
+        textHtml = baits.map(baitLineHtml).join("") + koorBlockHtml;
       }
       textEl.innerHTML = textHtml;
     }
