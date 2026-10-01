@@ -709,7 +709,7 @@ const PresentationStudio = (() => {
       // (payload.koorMid) -- koor disisipkan sesudah bait pertama,
       // bukan ditempel di akhir.
       const baits = payload.bait || [];
-      const baitLine = (b) => `<div class="present-preview-text">${escapeHtml((b.noBait ? b.noBait + ". " : "") + (b.teks || ""))}</div>`;
+      const baitLine = (b) => `<div class="present-preview-text">${b.noBait ? `<b style="color:var(--ps-preview-koor,#ffd84a);">${escapeHtml(b.noBait)}.</b> ` : ""}${escapeHtml(b.teks || "")}</div>`;
       const koorBlock = payload.koorTeks
         ? `<div class="present-preview-text" style="margin-top:6px;"><b style="color:#ffd84a;">Koor:</b> ${escapeHtml(payload.koorTeks)}</div>`
         : "";
@@ -11624,7 +11624,7 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -11670,6 +11670,12 @@ const PresentationStudio = (() => {
     // BARU (28 Agu 2026) -- "Ukuran Konten" (lebar kotak teks di
     // layar), lihat catatan --p-content-scale di present.html.
     if (el("psContentScale")) el("psContentScale").value = String(Math.round((theme.contentScale || 1) * 100));
+    // BARU (1 Okt 2026) -- pulihkan pengaturan tampilan Kidung.
+    if (el("psKidungGap")) el("psKidungGap").value = String(Math.round((typeof theme.kidungGap === "number" ? theme.kidungGap : 1) * 100));
+    if (el("psKidungGapValue")) el("psKidungGapValue").value = Math.round((typeof theme.kidungGap === "number" ? theme.kidungGap : 1) * 100);
+    if (el("psKoorLabelScale")) el("psKoorLabelScale").value = String(Math.round((theme.koorLabelScale || 1.6) * 100));
+    if (el("psKoorLabelScaleValue")) el("psKoorLabelScaleValue").value = Math.round((theme.koorLabelScale || 1.6) * 100);
+    if (el("psKidungNoColor")) el("psKidungNoColor").checked = theme.kidungNoColor !== false;
     // BARU (6 Sep 2026) -- pulihkan slider "Ukuran Timer/Stopwatch" saat
     // panel Studio dibuka ulang/dimuat ulang, pola sama seperti
     // psContentScale di atas.
@@ -11785,7 +11791,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor } });
   }
 
   function saveAndSendTheme(partial) {
@@ -11809,7 +11815,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -11973,6 +11979,31 @@ const PresentationStudio = (() => {
     if (el("psLineHeightDec")) el("psLineHeightDec").addEventListener("click", () => { el("psLineHeight").value = Math.max(20, Number(el("psLineHeight").value) - 10); applyLineHeight(); });
     if (el("psLineHeightInc")) el("psLineHeightInc").addEventListener("click", () => { el("psLineHeight").value = Math.min(250, Number(el("psLineHeight").value) + 10); applyLineHeight(); });
     wireManualValueInput("psLineHeightValue", "psLineHeight");
+
+    // BARU (1 Okt 2026, permintaan operator) -- tampilan Kidung di Layar 2:
+    // jarak seragam bait/koor, ukuran tulisan "KOOR:", warna nomor bait.
+    function wireKidungLook() {
+      function applyKidungGap() {
+        const pct = Number(el("psKidungGap").value);
+        if (el("psKidungGapValue")) el("psKidungGapValue").value = pct;
+        saveAndSendTheme({ kidungGap: pct / 100 });
+      }
+      function applyKoorLabelScale() {
+        const pct = Number(el("psKoorLabelScale").value);
+        if (el("psKoorLabelScaleValue")) el("psKoorLabelScaleValue").value = pct;
+        saveAndSendTheme({ koorLabelScale: pct / 100 });
+      }
+      if (el("psKidungGap")) el("psKidungGap").addEventListener("input", applyKidungGap);
+      if (el("psKoorLabelScale")) el("psKoorLabelScale").addEventListener("input", applyKoorLabelScale);
+      if (el("psKidungGapDec")) el("psKidungGapDec").addEventListener("click", () => { el("psKidungGap").value = Math.max(0, Number(el("psKidungGap").value) - 10); applyKidungGap(); });
+      if (el("psKidungGapInc")) el("psKidungGapInc").addEventListener("click", () => { el("psKidungGap").value = Math.min(300, Number(el("psKidungGap").value) + 10); applyKidungGap(); });
+      if (el("psKoorLabelScaleDec")) el("psKoorLabelScaleDec").addEventListener("click", () => { el("psKoorLabelScale").value = Math.max(100, Number(el("psKoorLabelScale").value) - 20); applyKoorLabelScale(); });
+      if (el("psKoorLabelScaleInc")) el("psKoorLabelScaleInc").addEventListener("click", () => { el("psKoorLabelScale").value = Math.min(300, Number(el("psKoorLabelScale").value) + 20); applyKoorLabelScale(); });
+      wireManualValueInput("psKidungGapValue", "psKidungGap");
+      wireManualValueInput("psKoorLabelScaleValue", "psKoorLabelScale");
+      if (el("psKidungNoColor")) el("psKidungNoColor").addEventListener("change", () => saveAndSendTheme({ kidungNoColor: !!el("psKidungNoColor").checked }));
+    }
+    wireKidungLook();
 
     // BARU (28 Agu 2026) -- "Ukuran Konten": lebar kotak teks/jarak
     // tepi di Layar 2 (lihat --p-content-scale di present.html) --
