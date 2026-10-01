@@ -153,7 +153,7 @@
     }
     const BG_STATE_TEXT_ = {
       none: ["⚪", "BELUM ADA LAGU DIMUAT"],
-      loaded: ["⏸", "DIMUAT — belum main"],
+      loaded: ["⏸", "DIMUAT — belum main (Play = mulai dari awal)"],
       armed: ["🎬", "SIAP — tekan panah kanan ▶ sekali, lagu mulai"],
       connecting: ["⏳", "MENYALAKAN… menunggu bunyi"],
       playing: ["🔊", "SEDANG MAIN"],
@@ -330,6 +330,13 @@
         }
         return;
       }
+      if (action === "play" && sharedBgAudio_.cleared) {
+        // BARU (1 Okt 2026) -- lagu habis di-⏹ Stop (opts.keep): isi Layar 2 sudah dikosongkan,
+        // jadi Play = muat ulang lagu yang sama lalu putar DARI AWAL.
+        const a0 = sharedBgAudio_;
+        loadSharedBgAudio_(a0.kind, a0.url, a0.label, a0.loop, Array.isArray(a0.queueIds) ? a0.queueIds.slice(1) : []);
+        if (!sharedBgAudio_ || sharedBgAudio_.cleared) return; // gagal dimuat (mis. link tidak dikenali) -- pesan sudah ditampilkan
+      }
       if (action === "play" || action === "pause") {
         rawPost({ type: bgMsgPrefix_(sharedBgAudio_.kind) + "_control", action });
         if (action === "pause") { sharedBgAudio_.wantPlay = false; sharedBgAudio_.playing = false; }
@@ -361,8 +368,18 @@
         }
       } else if (action === "stop") {
         rawPost({ type: bgMsgPrefix_(sharedBgAudio_.kind) + "_clear", fade: !!(opts && opts.fade) });
-        if (!(opts && (opts.silent || opts.fade))) showBgAudioInfoToast_("⏹ Audio dihentikan: " + (sharedBgAudio_.label || "audio latar"), "info");
-        sharedBgAudio_ = null;
+        if (!(opts && (opts.silent || opts.fade))) showBgAudioInfoToast_("⏹ Audio dihentikan: " + (sharedBgAudio_.label || "audio latar") + (opts && opts.keep ? " (tekan ▶ Play untuk mulai lagi dari awal)" : ""), "info");
+        if (opts && opts.keep) {
+          // BARU (1 Okt 2026, permintaan operator "tombol stop -> saat play mulai lagi dari awal") --
+          // tombol ⏹ Stop manual TIDAK melupakan lagunya: tetap tercatat (kondisi "dimuat, belum main")
+          // sehingga tombol ▶ Play tetap tampil & memutar ulang dari awal. Pemanggil lain
+          // (pindah slide / fade, tes) tetap memakai stop biasa = lupakan lagunya (null).
+          const a = sharedBgAudio_;
+          sharedBgAudio_ = { kind: a.kind, url: a.url, label: a.label, loop: a.loop, queueIds: a.queueIds, started: false, viaArm: false, playing: false, everPlayed: false, stateSeen: false, wantPlay: false, playRequestedAt: 0, cleared: true, pos: 0, posAt: 0, external: !!a.external };
+          sharedBgAudioError_ = null;
+        } else {
+          sharedBgAudio_ = null;
+        }
       } else if (action === "seek") {
         // BARU (30 Sep 2026) -- geser ke detik tertentu (progress bar / tombol "Tengah" di Studio).
         const sec = Math.max(0, Number(opts && opts.seconds) || 0);
@@ -414,6 +431,42 @@
         }
       }
       notifySharedBgAudioChange_();
+    }
+
+    // BARU (1 Okt 2026, permintaan operator "tombol play/pause/stop diseragamkan") --
+    // SATU tombol Play/Pause untuk semua panel, labelnya mengikuti status SUNGGUHAN lagu
+    // (bgNowState_), bukan tebakan lokal tiap panel:
+    //   sedang main / menyalakan  -> tombol "⏸ Pause" (menjeda, posisi lagu tetap)
+    //   dijeda / dimuat / berhenti / siap -> tombol "▶ Play" (melanjutkan; kalau habis ⏹ Stop = dari awal)
+    // ⏹ Stop = berhenti total (Play berikutnya dari awal).
+    function bgIsRunning_() {
+      if (!sharedBgAudio_) return false;
+      const k = bgNowState_().key;
+      return k === "playing" || k === "connecting";
+    }
+    function bgPlayPauseLabel_() { return bgIsRunning_() ? "⏸ Pause" : "▶ Play"; }
+    function toggleBgPlayPause_(opts) {
+      if (!sharedBgAudio_) { controlSharedBgAudio_("play", opts); return; } // memunculkan peringatan "belum ada audio"
+      controlSharedBgAudio_(bgIsRunning_() ? "pause" : "play", opts);
+    }
+    // Lagu latar yang DIMUAT di luar modul ini (tab 📺 YouTube "Latar suara saja" langsung
+    // mengirim yt_bg ke Layar 2) didaftarkan di sini supaya Studio punya SATU sumber status.
+    // `external` = jangan dihentikan otomatis saat pindah slide (perilaku lama tetap).
+    function adoptSharedBgAudio_(kind, url, label) {
+      sharedBgAudio_ = { kind: normBgKind_(kind), url, label: label || "", loop: false, queueIds: null, started: false, viaArm: false, playing: false, everPlayed: false, stateSeen: false, wantPlay: false, playRequestedAt: 0, external: true };
+      sharedBgAudioError_ = null;
+      notifySharedBgAudioChange_();
+    }
+    // Setelah pengaturan "Kapan mulai main" slide aktif DIUBAH lewat dialog: sesuaikan status
+    // "menunggu panah" + badge "Tekan panah lagi" di Layar 2.
+    //   Tunggu panah -> badge muncul; Manual / Otomatis / Tanpa audio -> badge hilang.
+    function syncArmForItem_(it) {
+      const bg = it && it.bgAudio;
+      const wantArm = !!(bg && bg.url && bg.armStart && !bg.continuePrev);
+      const alreadyStarted = !!(sharedBgAudio_ && bg && sharedBgAudio_.url === bg.url && sharedBgAudio_.started);
+      if (wantArm && !alreadyStarted) pendingBgArrowStart_ = { it };
+      else pendingBgArrowStart_ = null;
+      setYtArmedIndicator_(!!pendingBgArrowStart_);
     }
 
     // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
@@ -514,7 +567,7 @@
       // (fade halus). Berlaku untuk audio YouTube/SoundCloud (perilaku LAMA
       // untuk YouTube) DAN audio jenis apa pun yang dimulai lewat alur panah
       // (viaArm) -- MP3 yang diputar manual dari panel tetap dibiarkan seperti dulu.
-      if (sharedBgAudio_ && (isManagedBgKind_(sharedBgAudio_.kind) || sharedBgAudio_.viaArm)) controlSharedBgAudio_("stop", { fade: true });
+      if (sharedBgAudio_ && !sharedBgAudio_.external && (isManagedBgKind_(sharedBgAudio_.kind) || sharedBgAudio_.viaArm)) controlSharedBgAudio_("stop", { fade: true });
       if (!bg || !bg.url) return; // slide ini sendiri tidak punya audio latar -> selesai, tetap diam (sesuai "defaultnya mati suaranya")
       if (bg.armStart) { pendingBgArrowStart_ = { it }; setYtArmedIndicator_(true); return; } // perlu 1x klik panah lagi -- lihat playlistNext()
       if (isManagedBg_(bg) && bg.autoplay) startBgForItem_(it); // otomatis LAMA, tanpa perlu konfirmasi klik tambahan
@@ -590,9 +643,8 @@
       return `<div class="ps-btn-row ps-preview-bg-audio" style="margin-top:8px; flex-wrap:wrap;">
         <span class="ps-bg-state" data-bgpv="state" hidden></span>
         <button type="button" class="chip-btn small" data-bgpv="load">🎧 ${escapeHtml(bgAudio.label || "Audio Latar")}</button>
-        <button type="button" class="chip-btn small" data-bgpv="pause" hidden>⏸ Jeda</button>
         <button type="button" class="chip-btn small" data-bgpv="loop" hidden>🔁 Ulang</button>
-        <button type="button" class="chip-btn small danger" data-bgpv="stop" hidden>⏹ Berhenti</button>
+        <button type="button" class="chip-btn small danger" data-bgpv="stop" hidden>⏹ Stop</button>
       </div>`;
     }
     // `box`: elemen #psPreviewBox (innerHTML SUDAH berisi bgAudioControlsHtml_()
@@ -605,7 +657,6 @@
       const row = box.querySelector(".ps-preview-bg-audio");
       if (!row) return;
       const loadBtn = row.querySelector('[data-bgpv="load"]');
-      const pauseBtn = row.querySelector('[data-bgpv="pause"]');
       const loopBtn = row.querySelector('[data-bgpv="loop"]');
       const stopBtn = row.querySelector('[data-bgpv="stop"]');
       function isThisOneLoaded_() {
@@ -624,9 +675,9 @@
         // sama seperti kotak status gelap (stBadge) di bawah ini yang
         // memang sudah akurat. Tombol tetap bisa ditekan kapan pun (aman
         // dikirim ulang "play" walau sedang main).
-        const playingNow = !!(on && sharedBgAudio_ && sharedBgAudio_.playing);
-        if (loadBtn) loadBtn.textContent = playingNow ? "🔊 Sedang Main" : (on ? "▶ Play" : `🎧 ${bgAudio.label || "Audio Latar"}`);
-        if (pauseBtn) pauseBtn.hidden = !on;
+        // DIUBAH (1 Okt 2026) -- Play & Jeda digabung: 1 tombol, "⏸ Pause" saat main, "▶ Play" selain itu.
+        const runningNow = !!(on && bgIsRunning_());
+        if (loadBtn) { loadBtn.textContent = runningNow ? "⏸ Pause" : (on ? "▶ Play" : `🎧 ${bgAudio.label || "Audio Latar"}`); loadBtn.classList.toggle("active", runningNow); }
         if (loopBtn) { loopBtn.hidden = !on; loopBtn.classList.toggle("active", !!(on && sharedBgAudio_.loop)); }
         if (stopBtn) stopBtn.hidden = !on;
         // BARU (19 Sep 2026) -- kotak status gelap kecil di sebelah tombol (lihat bgNowState_())
@@ -638,12 +689,11 @@
         }
       }
       if (loadBtn) loadBtn.addEventListener("click", () => {
-        if (isThisOneLoaded_()) controlSharedBgAudio_("play");
+        if (isThisOneLoaded_()) toggleBgPlayPause_();
         else loadSharedBgAudio_(bgAudio.kind || "mp3", bgAudio.url, bgAudio.label || "Audio Latar");
       });
-      if (pauseBtn) pauseBtn.addEventListener("click", () => controlSharedBgAudio_("pause"));
       if (loopBtn) loopBtn.addEventListener("click", () => controlSharedBgAudio_("toggleloop"));
-      if (stopBtn) stopBtn.addEventListener("click", () => controlSharedBgAudio_("stop"));
+      if (stopBtn) stopBtn.addEventListener("click", () => controlSharedBgAudio_("stop", { keep: true }));
       previewBgAudioRefresh_ = refresh;
       refresh();
     }
@@ -730,11 +780,12 @@
         bgNowState_, bgKindName_, refreshBgRowBadges_, showBgAudioErrorToast_, showBgAudioInfoToast_,
         bgAudioRowIconHtml_, bgAudioControlsHtml_, wireBgAudioControlsInBox_,
         openBgAudioDialog_, isManagedBg_, isManagedBgKind_,
+        toggleBgPlayPause_, bgIsRunning_, bgPlayPauseLabel_, adoptSharedBgAudio_, syncArmForItem_,
       },
       BG_STATE_TEXT_,
     };
   }
 
   // VERSION dipakai untuk mendiagnosis "berkas campuran" (lihat tests & catatan di presentation-studio.js).
-  global.BgAudioModule = { create, VERSION: "2026-09-20.4" };
+  global.BgAudioModule = { create, VERSION: "2026-10-01.1" };
 })(typeof window !== "undefined" ? window : globalThis);

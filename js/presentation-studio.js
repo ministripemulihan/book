@@ -474,6 +474,11 @@ const PresentationStudio = (() => {
     bgAudioRowIconHtml_,
     bgAudioControlsHtml_,
     wireBgAudioControlsInBox_,
+    // BARU (1 Okt 2026) -- default aman kalau bg-audio.js lama masih ter-cache
+    toggleBgPlayPause_ = () => controlSharedBgAudio_("play"),
+    bgIsRunning_ = () => false,
+    adoptSharedBgAudio_ = () => {},
+    syncArmForItem_ = () => {},
   } = BG.fn;
   const BG_STATE_TEXT_ = BG.BG_STATE_TEXT_; // teks + ikon tiap status (dipakai kotak status di panel Kidung)
 
@@ -1181,6 +1186,22 @@ const PresentationStudio = (() => {
   // data Sheet-nya (link MP3/YouTube/SoundCloud/MIDI) dibaca dulu untuk sumber
   // "🎼 Dari kidung ini", dan dihitung ada berapa slide kidung yang SAMA di
   // Kumpulan ini (untuk kotak "Terapkan ke semua slide kidung ini").
+  // BARU (1 Okt 2026, laporan operator "pilih Manual tapi tulisan 'Tekan panah lagi untuk mulai
+  // musik' masih muncul di Layar 2") -- dulu simpan dialog TIDAK menyentuh status "menunggu panah"
+  // slide yang sedang tayang, jadi badge tetap tampil (dan panah berikutnya malah menyalakan
+  // lagu padahal sudah Manual). Sekarang: setelah Simpan, item di playlist aktif yang sama ikut
+  // diperbarui lalu status menunggu-panah + badge disesuaikan (Tunggu panah -> muncul; selain itu -> hilang).
+  function bgItemSig_(x) {
+    if (!x) return "";
+    const c = Object.assign({}, x); delete c.bgAudio;
+    try { return JSON.stringify(c); } catch (e) { return String(Math.random()); }
+  }
+  function applySavedBgToActivePlaylist_(isSame, newBgAudio) {
+    if (!activePlaylist || !Array.isArray(activePlaylist.items)) return;
+    activePlaylist.items.forEach((x) => { if (x && isSame(x)) x.bgAudio = newBgAudio; });
+    const act = activePlaylist.items[activePlaylist.index];
+    if (act && isSame(act)) syncArmForItem_(act);
+  }
   async function openBgAudioDialog_(username, colId, index, it) {
     if (!colId) return;
     const sameKidung = (x) => !!(it && x && x.type === "kidung" && it.type === "kidung" && x.buku === it.buku && String(x.kidungNo) === String(it.kidungNo));
@@ -1219,12 +1240,15 @@ const PresentationStudio = (() => {
           }
           if (changed) {
             if (it) it.bgAudio = newBgAudio;
+            applySavedBgToActivePlaylist_((x) => sameKidung(x), newBgAudio);
             renderCollectionList();
           }
           return;
         }
         if (updateItemBgAudioInCollection(username, colId, index, newBgAudio)) {
           if (it) it.bgAudio = newBgAudio; // `it` = REFERENSI LANGSUNG ke item yg dipakai renderCollectionList() -- kalau item ini kebetulan sedang jadi playlist aktif, tidak perlu render ulang dulu supaya "sadar" ada lampiran baru
+          const sig = bgItemSig_(it);
+          applySavedBgToActivePlaylist_((x) => x === it || bgItemSig_(x) === sig, newBgAudio);
           renderCollectionList();
         }
       },
@@ -2108,10 +2132,14 @@ const PresentationStudio = (() => {
         b.classList.toggle("ps-bg-chip-on", same);
         b.setAttribute("data-state", same ? st.key : "");
       });
+      // DIUBAH (1 Okt 2026) -- Play & Jeda digabung jadi 1 tombol: "⏸ Pause" saat lagu main, "▶ Play" selain itu.
       const playBtn = el("psKidungBgPlayBtn");
-      const pauseBtn = el("psKidungBgPauseBtn");
-      if (playBtn) playBtn.classList.toggle("ps-bg-chip-on", st.key === "playing" || st.key === "connecting");
-      if (pauseBtn) pauseBtn.classList.toggle("ps-bg-chip-on", st.key === "paused");
+      if (playBtn) {
+        const running = st.key === "playing" || st.key === "connecting";
+        playBtn.textContent = running ? "⏸ Pause" : "▶ Play";
+        playBtn.title = running ? "Jeda lagu (posisi tetap, tekan lagi untuk melanjutkan)" : "Putar / lanjutkan lagu (kalau habis ⏹ Stop = mulai dari awal)";
+        playBtn.classList.toggle("ps-bg-chip-on", running);
+      }
     }
     let lastRateShared_ = null; // BARU (30 Sep 2026) -- lihat refreshBgControlsUi_()
     function setBgRateBoth_(v) { ["psKidungBgRateSelect", "psYtBgRateSelect"].forEach((id) => { const e = el(id); if (e) e.value = String(v); }); }
@@ -2136,7 +2164,7 @@ const PresentationStudio = (() => {
         bgStatus_(`⚠️ ${BG.error.message || "Gagal diputar."}`);
         return;
       }
-      const loopNote = BG.shared.loop ? " -- 🔁 akan diulang terus sampai ⏹ Berhenti ditekan" : " -- main 1x (tekan 🔁 Ulang kalau mau diputar terus)";
+      const loopNote = BG.shared.loop ? " -- 🔁 akan diulang terus sampai ⏹ Stop ditekan" : " -- main 1x (tekan 🔁 Ulang kalau mau diputar terus)";
       bgStatus_(`🎧 ${BG.shared.label || "Audio latar"}${loopNote}.`);
     }
     onSharedBgAudioChange_(refreshBgControlsUi_);
@@ -2283,8 +2311,7 @@ const PresentationStudio = (() => {
         }
       });
     }
-    if (el("psKidungBgPlayBtn")) el("psKidungBgPlayBtn").addEventListener("click", () => controlSharedBgAudio_("play"));
-    if (el("psKidungBgPauseBtn")) el("psKidungBgPauseBtn").addEventListener("click", () => controlSharedBgAudio_("pause"));
+    if (el("psKidungBgPlayBtn")) el("psKidungBgPlayBtn").addEventListener("click", () => toggleBgPlayPause_());
     // BARU (18 Sep 2026 v3, permintaan operator "1x habis dan minta
     // diulangi lagi sampai bosen yang dengar, tapi bisa jadi hanya 1x
     // saja") -- toggle, BUKAN tombol sekali-pakai: tekan lagi utk
@@ -2293,7 +2320,7 @@ const PresentationStudio = (() => {
     if (el("psKidungBgLoopBtn")) el("psKidungBgLoopBtn").addEventListener("click", () => controlSharedBgAudio_("toggleloop"));
     if (el("psKidungBgStopBtn")) {
       el("psKidungBgStopBtn").addEventListener("click", () => {
-        controlSharedBgAudio_("stop");
+        controlSharedBgAudio_("stop", { keep: true }); // keep: lagu tetap tercatat, ▶ Play berikutnya mulai dari awal
         // BARU (19 Sep 2026) -- ⏹ Berhenti = operator SENGAJA mematikan lagu ->
         // lepas juga status "tunggu panah" (kalau tidak, panah kanan berikutnya
         // akan "diserap" lagi utk menyalakan lagu yang baru saja dimatikan).
@@ -6200,6 +6227,7 @@ const PresentationStudio = (() => {
         // Audio latar langsung dikirim, terlepas dari mode 1/dual monitor
         // (tidak ada konsep "pratinjau" untuk audio latar).
         rawPost({ type: "yt_bg", embedUrl });
+        adoptSharedBgAudio_("yt", embedUrl, "YouTube " + id); // BARU (1 Okt 2026) -- daftarkan ke status bersama (tombol Play/Pause/Stop seragam)
         setYtBgStatus(`🎧 Latar: ${id} (tekan ▶ Play di bawah untuk mulai)`);
         lastBgTrack_ = { embedUrl, videoId: id, title: null };
         // FIX (27 Sep 2026) -- track BARU belum pernah ditekan main, lihat
@@ -6263,15 +6291,22 @@ const PresentationStudio = (() => {
     //   OPTIMISTIS (mengikuti tombol yang ditekan operator), sama seperti
     //   asumsi lama, cuma sekarang tombolnya ikut menunjukkan status itu
     //   secara visual alih-alih diam saja.
-    let ytBgIsPlaying = false;
+    // DIUBAH (1 Okt 2026, permintaan operator "play/pause/stop diseragamkan, ada yang bingung
+    // mau pause & play lagi") -- tombol ini TIDAK LAGI menebak sendiri (ytBgIsPlaying lokal yang
+    // tetap tertulis "Play" walau lagu sedang main dari Kumpulan Ayat). Sekarang labelnya dibaca dari
+    // status SUNGGUHAN lagu latar (BG: bgNowState_), sama persis dengan tombol di tab Kidung:
+    // main -> "⏸ Pause", selain itu -> "▶ Play". ⏹ Stop -> Play berikutnya mulai dari awal.
+    let ytBgIsPlaying = false; // cadangan saja, dipakai bila modul Audio Latar nonaktif
     const ytBgPlayPauseBtn = el("psYtBgPlayPauseBtn");
     function refreshYtBgPlayPauseUi_() {
       if (!ytBgPlayPauseBtn) return;
-      ytBgPlayPauseBtn.textContent = ytBgIsPlaying ? "⏸ Pause" : "▶ Play";
-      ytBgPlayPauseBtn.title = ytBgIsPlaying ? "Jeda audio latar YouTube di Layar 2" : "Putar audio latar YouTube di Layar 2";
-      ytBgPlayPauseBtn.classList.toggle("active", ytBgIsPlaying);
+      const running = BG.isFallback ? ytBgIsPlaying : bgIsRunning_();
+      ytBgPlayPauseBtn.textContent = running ? "⏸ Pause" : "▶ Play";
+      ytBgPlayPauseBtn.title = running ? "Jeda audio latar (posisi tetap, tekan lagi untuk melanjutkan)" : "Putar / lanjutkan audio latar (kalau habis ⏹ Stop = mulai dari awal)";
+      ytBgPlayPauseBtn.classList.toggle("active", running);
     }
     refreshYtBgPlayPauseUi_();
+    onSharedBgAudioChange_(refreshYtBgPlayPauseUi_);
     function doYtBgPlay_() {
       rawPost({ type: "yt_bg_control", action: "play" });
       ytBgIsPlaying = true;
@@ -6283,17 +6318,16 @@ const PresentationStudio = (() => {
       refreshYtBgPlayPauseUi_();
     }
     window.toggleYtBgPlayPause_ = function toggleYtBgPlayPause_() {
-      if (ytBgIsPlaying) doYtBgPause_(); else doYtBgPlay_();
+      if (BG.isFallback) { if (ytBgIsPlaying) doYtBgPause_(); else doYtBgPlay_(); return; }
+      toggleBgPlayPause_();
+      refreshYtBgPlayPauseUi_();
     };
     if (ytBgPlayPauseBtn) ytBgPlayPauseBtn.addEventListener("click", () => window.toggleYtBgPlayPause_());
-    // Dipanggil setiap kali audio latar YouTube yang dimuat BERGANTI jadi
-    // video BARU (lihat pemanggilannya di doShow()/playAsYtBackground()
-    // di bawah) -- supaya tombol gabungan ini selalu kembali ke "▶ Play"
-    // yang benar untuk track baru yang belum pernah ditekan main, PERSIS
-    // pola resetYtPlayPauseState_() milik video utama (lihat catatan
-    // panjang di syncYtLiveBarVisibility(), atas file ini).
+    // Dipanggil setiap kali audio latar YouTube yang dimuat BERGANTI jadi video BARU (doShow()/
+    // playAsYtBackground()) -- sekarang cukup menyegarkan tombol dari status lagu (lagu barunya
+    // sudah didaftarkan lewat adoptSharedBgAudio_() sebelum fungsi ini dipanggil).
     window.resetYtBgPlayPauseState_ = function resetYtBgPlayPauseState_() {
-      if (el("psYtBgRateSelect")) el("psYtBgRateSelect").value = "1"; // BARU (30 Sep 2026) -- video latar baru = kecepatan 1x (Layar 2 juga mereset)
+      if (el("psYtBgRateSelect")) el("psYtBgRateSelect").value = "1"; // video latar baru = kecepatan 1x (Layar 2 juga mereset)
       ytBgIsPlaying = false;
       refreshYtBgPlayPauseUi_();
     };
@@ -6306,8 +6340,9 @@ const PresentationStudio = (() => {
       showBgAudioInfoToast_("⏩ Kecepatan audio latar: " + String(r).replace(".", ",") + "x", "info");
     });
     if (el("psYtBgStopBtn")) el("psYtBgStopBtn").addEventListener("click", () => {
-      rawPost({ type: "yt_bg_clear" });
-      setYtBgStatus("Belum ada audio latar yang diputar.");
+      // DIUBAH (1 Okt 2026) -- lewat modul Audio Latar (keep) supaya status SATU & ▶ Play berikutnya mulai dari awal.
+      if (!BG.isFallback && BG.shared) { controlSharedBgAudio_("stop", { keep: true }); setYtBgStatus("⏹ Dihentikan. Tekan ▶ Play untuk memutar lagi dari awal."); }
+      else { rawPost({ type: "yt_bg_clear" }); setYtBgStatus("Belum ada audio latar yang diputar."); }
       // Stop = audio latar berhenti main -- tombol gabungan ikut
       // disamakan balik ke "▶ Play" (bukan dibiarkan menampilkan
       // "⏸ Pause" yang sudah tidak sesuai keadaan sebenarnya), sama
@@ -6387,6 +6422,7 @@ const PresentationStudio = (() => {
     // maupun video yang sudah tersimpan.
     window.playAsYtBackground = function playAsYtBackground(embedUrl, label) {
       rawPost({ type: "yt_bg", embedUrl });
+      adoptSharedBgAudio_("yt", embedUrl, label || "Video YouTube"); // BARU (1 Okt 2026) -- lihat doShow()
       setYtBgStatus(`🎧 Latar: ${label || "video"} (tekan ▶ Play di bawah untuk mulai)`);
       lastBgTrack_ = { embedUrl, videoId: null, title: label || null };
       // FIX (27 Sep 2026) -- track BARU belum pernah ditekan main, lihat

@@ -204,7 +204,7 @@
       const startRadios = [
         ["arrow", "🎬 Tunggu klik panah SEKALI LAGI (disarankan)"],
         ["auto", "▶️ Otomatis begitu slide ini muncul"],
-        ["manual", "⏸ Manual saja (operator tekan ▶ Play sendiri)"],
+        ["manual", "⏸ Manual saja (tidak menjalankan sound lagu)"],
       ].map(([val, text]) => {
         const { wrap, radio } = radioLabel(startName, val, text, startMode0 === val);
         wrap.style.display = "flex";
