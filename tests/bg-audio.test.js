@@ -182,5 +182,38 @@ expect("guessBgKindFromUrl_", F.guessBgKindFromUrl_("https://on.soundcloud.com/x
   m = posts.length; F.controlSharedBgAudio_("seek", { seconds: 120 });
   expect("seek: kirim yt_bg_control seek 120 detik", JSON.stringify(posts.slice(m)) === JSON.stringify([{ type: "yt_bg_control", action: "seek", seconds: 120 }]), posts.slice(m));
   F.controlSharedBgAudio_("stop");
+  // ---- 1 Okt 2026: Play/Pause/Stop seragam + badge "Tekan panah lagi" ----
+  {
+    const YT = "https://youtu.be/abcdefghijk";
+    F.loadSharedBgAudio_("yt", YT, "Lagu YT");
+    let k = posts.length;
+    F.toggleBgPlayPause_();
+    expect("toggle #1 (belum main) -> play", types(k).includes("yt_bg_control:play"), types(k));
+    BG.handlePresenterMessage({ source: "bibleAppPresenter", type: "present_bgaudio_state", kind: "yt", playing: true });
+    expect("label saat main = Pause", F.bgPlayPauseLabel_() === "⏸ Pause", F.bgPlayPauseLabel_());
+    k = posts.length; F.toggleBgPlayPause_();
+    expect("toggle #2 (sedang main) -> pause", types(k).includes("yt_bg_control:pause") && !types(k).includes("yt_bg_control:play"), types(k));
+    expect("label saat dijeda = Play", F.bgPlayPauseLabel_() === "▶ Play" && F.bgNowState_().key === "paused", F.bgNowState_());
+    k = posts.length; F.toggleBgPlayPause_();
+    expect("toggle #3 (dijeda) -> play lagi TANPA muat ulang", JSON.stringify(types(k)) === '["yt_bg_control:play"]', types(k));
+    BG.handlePresenterMessage({ source: "bibleAppPresenter", type: "present_bgaudio_state", kind: "yt", playing: true });
+    k = posts.length; F.controlSharedBgAudio_("stop", { keep: true });
+    expect("Stop keep -> kirim yt_bg_clear, lagu tetap tercatat", types(k).includes("yt_bg_clear") && !!BG.shared && BG.shared.url === YT, types(k));
+    expect("setelah Stop status = dimuat & label Play", F.bgNowState_().key === "loaded" && F.bgPlayPauseLabel_() === "▶ Play", F.bgNowState_());
+    k = posts.length; F.toggleBgPlayPause_();
+    expect("Play sesudah Stop -> muat ulang + play (dari awal)", JSON.stringify(types(k)) === '["yt_bg","yt_bg_control:play"]', types(k));
+    F.controlSharedBgAudio_("stop");
+    expect("stop biasa tetap melupakan lagu", BG.shared === null, BG.shared);
+    F.adoptSharedBgAudio_("yt", "https://www.youtube.com/embed/zzzzzzzzzzz", "Latar tab YT");
+    k = posts.length; F.handleBgForActiveItem_({ bgAudio: null });
+    expect("lagu dari tab YouTube tidak di-fade saat pindah slide", !types(k).some((t) => t.includes("clear")), types(k));
+    F.controlSharedBgAudio_("stop");
+    const itArm = { bgAudio: { kind: "yt", url: YT, label: "L", armStart: true, autoplay: false } };
+    k = posts.length; F.syncArmForItem_(itArm);
+    expect("pilih Tunggu panah -> badge muncul", !!BG.pendingArrow && types(k).includes("yt_bg_armed:true"), types(k));
+    itArm.bgAudio = Object.assign({}, itArm.bgAudio, { armStart: false });
+    k = posts.length; F.syncArmForItem_(itArm);
+    expect("pilih Manual -> badge hilang & tidak menunggu panah", BG.pendingArrow === null && types(k).includes("yt_bg_armed:false"), types(k));
+  }
   console.log(ok ? "\nALL PASS" : "\nSOME FAIL"); process.exit(ok ? 0 : 1);
 })();
