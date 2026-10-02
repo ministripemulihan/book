@@ -5347,3 +5347,42 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .ps-bg-legend-how { margin: 4px 0 8px; font-size: 12px; }
 .ps-bg-legend-how summary { cursor: pointer; font-weight: 800; }
 .ps-bg-legend-how ol { margin: 4px 0 0 18px; padding: 0; line-height: 1.5; }
+
+/* ============================================================
+   2 Okt 2026 -- PERBAIKAN pemutar YouTube Pustaka Media "tidak tampil"
+   PENYEBAB: sejak 30 Sep (e) panel Pustaka Media (.info-kami-overlay)
+   naik ke z-index 1300 supaya tampil di atas Studio, tapi jendela
+   pemutar (.ml-player-overlay = 360), form Tambah/Edit (.ml-form-overlay
+   = 340) dan kotak kidung (.ml-kv-overlay = 1200) TIDAK ikut naik ->
+   semuanya terbuka DI BELAKANG panel Pustaka Media (video tetap
+   "diputar" tapi tidak kelihatan). Tiga nilai ini dinaikkan di atas 1300.
+   ============================================================ */
+.ml-form-overlay   { z-index: 1310; }
+.ml-kv-overlay     { z-index: 1320; }
+.ml-player-overlay { z-index: 1330; }
+
+/* Header pemutar: judul dipotong rapi, tombol tidak terdorong keluar di HP */
+.ml-player-header { gap: 8px; }
+.ml-player-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.ml-player-header-actions { flex: 0 0 auto; }
+.ml-player-btn { text-decoration: none; display: inline-flex; align-items: center; white-space: nowrap; }
+.ml-player-btn[hidden] { display: none !important; }
+.ml-pl-short { display: none; }
+.ml-player-hint { padding: 8px 14px; font-size: 12px; line-height: 1.4; color: var(--ink-soft); background: var(--paper-raised); border-top: 1px solid var(--rule); }
+.ml-player-hint[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  .ml-player-overlay { padding: 8px; }
+  .ml-pl-long { display: none; }
+  .ml-pl-short { display: inline; }
+}
+
+/* Mode LAYAR PENUH (tombol ⛶): memenuhi seluruh layar HP/komputer;
+   dipakai sebagai cadangan di iPhone & saat Fullscreen API ditolak. */
+.ml-player-overlay.ml-player-full { padding: 0; background: #000; align-items: stretch; }
+.ml-player-overlay.ml-player-full .ml-player-box {
+  max-width: none; width: 100%; height: 100%; border-radius: 0;
+  display: flex; flex-direction: column; background: #000;
+}
+.ml-player-overlay.ml-player-full .ml-player-header { background: rgba(0,0,0,.75); color: #fff; border-bottom: 0; flex: 0 0 auto; }
+.ml-player-overlay.ml-player-full .ml-player-body { aspect-ratio: auto; flex: 1 1 auto; min-height: 0; }
+.ml-player-overlay.ml-player-full .ml-player-hint { display: none; }
