@@ -660,7 +660,14 @@ const MediaLibrary = (() => {
       // tampil dengan tombol ▶️ bawaan YouTube -- sekali ditekan
       // operator DIJAMIN keluar suara (itu klik langsung di dalam
       // pemutarnya sendiri, bukan trik autoplay).
-      openPlayerOverlay_(`<iframe src="https://www.youtube.com/embed/${youtubeIdFromLink(item.link)}?playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`, item.nama, item.link);
+      // PERBAIKAN (2 Okt 2026) -- (a) link yang ID videonya tidak bisa dibaca
+      // (mis. link playlist/kanal) dulu menghasilkan iframe kosong; sekarang
+      // langsung dibuka di tab/aplikasi YouTube. (b) iframe diberi izin
+      // `fullscreen` + referrerpolicy resmi YouTube (cegah error 153 "konfigurasi
+      // pemutar") supaya tombol layar penuh bawaan YouTube juga jalan di HP.
+      const ytId_ = youtubeIdFromLink(item.link);
+      if (!ytId_) { window.open(item.link, "_blank"); return; }
+      openPlayerOverlay_(`<iframe src="https://www.youtube.com/embed/${ytId_}?playsinline=1&rel=0" title="${escapeHtml_(item.nama || "YouTube")}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`, item.nama, "https://www.youtube.com/watch?v=" + ytId_);
     } else if (sumber === "soundcloud") {
       openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(item.link)}&auto_play=true"></iframe>`, item.nama, item.link);
     } else if (sumber === "mp3" || (sumber === "google_drive" && /\.(mp3|wav|m4a)(\?|$)/i.test(item.link))) {
@@ -696,33 +703,111 @@ const MediaLibrary = (() => {
       ov = document.createElement("div");
       ov.id = "mlPlayerOverlay";
       ov.className = "ml-player-overlay";
+      // PERBAIKAN (2 Okt 2026) -- header pemutar sekarang punya tombol
+      // "⛶ Layar Penuh" (HP & komputer) dan tombol berlabel "▶ Buka di
+      // YouTube" (dulu cuma ikon 🔗 kecil), + petunjuk kalau video diblokir
+      // pemiliknya untuk disematkan.
       ov.innerHTML = `
         <div class="ml-player-box">
           <div class="ml-player-header">
-            <span id="mlPlayerTitle"></span>
+            <span id="mlPlayerTitle" class="ml-player-title"></span>
             <div class="ml-player-header-actions">
-              <a id="mlPlayerOpenLink" class="icon-btn" href="#" target="_blank" rel="noopener" title="Buka link aslinya" aria-label="Buka link aslinya" hidden>🔗</a>
+              <button type="button" id="mlPlayerFsBtn" class="chip-btn small ml-player-btn" title="Layar penuh" aria-label="Layar penuh">⛶<span class="ml-pl-long"> Layar Penuh</span></button>
+              <a id="mlPlayerOpenLink" class="chip-btn small ml-player-btn" href="#" target="_blank" rel="noopener" title="Buka link aslinya" aria-label="Buka link aslinya" hidden>🔗</a>
               <button type="button" id="mlPlayerCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
             </div>
           </div>
           <div class="ml-player-body" id="mlPlayerBody"></div>
+          <div class="ml-player-hint" id="mlPlayerHint" hidden>Video tidak muncul atau ada tulisan “tidak tersedia”? Tekan <b>▶ Buka di YouTube</b>.</div>
         </div>`;
       document.body.appendChild(ov);
       ov.addEventListener("click", (e) => { if (e.target === ov) closePlayerOverlay_(); });
       el_("mlPlayerCloseBtn").addEventListener("click", closePlayerOverlay_);
+      el_("mlPlayerFsBtn").addEventListener("click", togglePlayerFullscreen_);
+      // Layar penuh sungguhan keluar lewat Esc / gestur sistem -> samakan tampilan.
+      const onFsChange = () => {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          ov.classList.remove("ml-player-full");
+          syncPlayerFsLabel_();
+        }
+      };
+      document.addEventListener("fullscreenchange", onFsChange);
+      document.addEventListener("webkitfullscreenchange", onFsChange);
+      // Esc: keluar dari mode layar penuh dulu; kalau tidak sedang penuh, tutup pemutar.
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape" || ov.hidden) return;
+        if (ov.classList.contains("ml-player-full")) exitPlayerFullscreen_(); else closePlayerOverlay_();
+      });
     }
     el_("mlPlayerTitle").textContent = title || "";
     el_("mlPlayerBody").innerHTML = innerHtml;
     const openLink = el_("mlPlayerOpenLink");
+    const isYt = !!(fallbackLink && youtubeIdFromLink(fallbackLink));
     if (openLink) {
-      if (fallbackLink) { openLink.href = fallbackLink; openLink.hidden = false; }
-      else { openLink.hidden = true; openLink.removeAttribute("href"); }
+      if (fallbackLink) {
+        openLink.href = fallbackLink;
+        openLink.innerHTML = isYt ? '▶<span class="ml-pl-long"> Buka di YouTube</span><span class="ml-pl-short"> YouTube</span>' : "🔗";
+        openLink.title = isYt ? "Buka di YouTube / aplikasi YouTube" : "Buka link aslinya";
+        openLink.hidden = false;
+      } else { openLink.hidden = true; openLink.removeAttribute("href"); }
     }
+    const hint = el_("mlPlayerHint");
+    if (hint) hint.hidden = !isYt;
+    // Tombol layar penuh hanya berguna untuk video (bukan pemutar audio 60px).
+    const fsBtn = el_("mlPlayerFsBtn");
+    if (fsBtn) fsBtn.hidden = /^<audio/i.test(String(innerHtml || "").trim());
+    ov.classList.remove("ml-player-full");
+    syncPlayerFsLabel_();
     ov.hidden = false;
+  }
+  function syncPlayerFsLabel_() {
+    const ov = el_("mlPlayerOverlay"), b = el_("mlPlayerFsBtn");
+    if (!ov || !b) return;
+    const full = ov.classList.contains("ml-player-full");
+    b.innerHTML = (full ? "🗗" : "⛶") + '<span class="ml-pl-long">' + (full ? " Kecilkan" : " Layar Penuh") + "</span>";
+    b.title = full ? "Kembali ke ukuran biasa" : "Layar penuh";
+    b.setAttribute("aria-label", b.title);
+  }
+  // Layar penuh 2 lapis supaya jalan di semua perangkat: (1) kelas CSS
+  // `.ml-player-full` memenuhi seluruh layar (satu-satunya yang jalan di
+  // iPhone, yang tidak mendukung Fullscreen API untuk elemen biasa), lalu
+  // (2) mencoba Fullscreen API sungguhan (Android/komputer: bar browser ikut
+  // hilang) + kunci landscape di HP -- kalau ditolak, mode CSS tetap jalan.
+  function enterPlayerFullscreen_() {
+    const ov = el_("mlPlayerOverlay");
+    if (!ov) return;
+    ov.classList.add("ml-player-full");
+    syncPlayerFsLabel_();
+    const req = ov.requestFullscreen || ov.webkitRequestFullscreen;
+    if (!req) return;
+    try {
+      const p = req.call(ov);
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          try { if (window.screen && screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(() => {}); } catch (e) { /* abaikan */ }
+        }).catch(() => { /* ditolak -> mode CSS tetap berjalan */ });
+      }
+    } catch (e) { /* mode CSS tetap berjalan */ }
+  }
+  function exitPlayerFullscreen_() {
+    const ov = el_("mlPlayerOverlay");
+    try { if (window.screen && screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { /* abaikan */ }
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitFullscreenElement && document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } catch (e) { /* abaikan */ }
+    if (ov) ov.classList.remove("ml-player-full");
+    syncPlayerFsLabel_();
+  }
+  function togglePlayerFullscreen_() {
+    const ov = el_("mlPlayerOverlay");
+    if (!ov) return;
+    if (ov.classList.contains("ml-player-full")) exitPlayerFullscreen_(); else enterPlayerFullscreen_();
   }
   function closePlayerOverlay_() {
     const ov = el_("mlPlayerOverlay");
     if (!ov) return;
+    exitPlayerFullscreen_();
     el_("mlPlayerBody").innerHTML = "";
     ov.hidden = true;
   }
@@ -2122,6 +2207,11 @@ const MediaLibrary = (() => {
     if (overlay) overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      // 2 Okt 2026: kalau jendela pemutar sedang terbuka, Esc hanya untuk
+      // pemutar (keluar layar penuh / tutup pemutar) -- bukan menutup panel
+      // Pustaka Media di belakangnya sekaligus.
+      const pl = el_("mlPlayerOverlay");
+      if (pl && !pl.hidden) return;
       const ov = el_("mediaLibraryOverlay");
       if (ov && !ov.hidden) close();
     });
