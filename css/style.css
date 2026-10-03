@@ -5155,6 +5155,8 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .ml-card-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
 .ml-card-meta { font-size: 11px; color: var(--ink-soft); margin-top: 4px; }
 .ml-empty, .ml-loading { color: var(--ink-soft); text-align: center; padding: 30px 0; }
+/* BARU (3 Okt 2026) -- bar info daftar tersimpan/offline di panel Pustaka Media */
+#mlNotice { padding: 6px 10px; margin: 0 0 8px; font-size: 12px; border-radius: 8px; background: rgba(127,127,127,.12); }
 .ml-error { color: var(--danger); font-size: 13px; }
 .ml-hint { color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
 
