@@ -390,10 +390,58 @@ const KIDUNG_MEDIA_FILTERS = [
   { key: "__all__", label: "Semua" },
   { key: "mp3", label: "🎵 MP3", test: (k) => !!(k.linkMp3_1 || k.linkMp3_2) },
   { key: "video", label: "🎬 Video/MP4", test: (k) => !!k.linkVideo },
-  { key: "youtube", label: "▶️ YouTube", test: (k) => !!k.linkYoutube },
+  // DIPERBARUI (4 Okt 2026): YouTube = kolom link_youtube di Sheet kidung ATAU video
+  // Pustaka Media yang KidungRef-nya menunjuk kidung ini (K51, S1, A1, T1, Y1, KA1,
+  // Kidung|51). Himpunan kunci diisi async oleh loadKidungYoutubeRefKeys_().
+  { key: "youtube", label: "▶️ YouTube", test: (k) => !!k.linkYoutube || kidungHasYoutubeRef_(k) },
   { key: "midi", label: "🎹 MIDI", test: (k) => !!k.linkMidi },
 ];
 let kidungListMediaFilter = "__all__";
+
+// ---- Video Pustaka Media <-> daftar kidung (dipakai chip ▶️ YouTube & layar baca) ----
+// Daftar lengkap Pustaka Media dipakai bersama & disimpan 2 menit supaya buka daftar /
+// geser kidung tidak mengunduh ulang; offline memakai daftar tersimpan (komputer).
+async function kidungLoadAllMedia_(force) {
+  const now = Date.now();
+  const c = window.__kidungRefAllCache;
+  if (!force && c && c.items && now - c.t < 120000) return c.items;
+  try {
+    const items = await MediaLibrary.Sync.list({});
+    window.__kidungRefAllCache = { t: Date.now(), items };
+    return items;
+  } catch (err) {
+    let cached = null;
+    try { cached = MediaLibrary.Sync.cachedList ? await MediaLibrary.Sync.cachedList({}) : null; } catch (e) { /* abaikan */ }
+    if (cached && Array.isArray(cached.items)) { window.__kidungRefAllCache = { t: Date.now() - 100000, items: cached.items }; return cached.items; }
+    throw err;
+  }
+}
+function kidungRefKey_(buku, no) {
+  const n = parseInt(no, 10);
+  if (!Number.isFinite(n) || !window.KidungRef) return "";
+  return window.KidungRef.bukuLooseKey(window.KidungRef.normBuku(buku || "Kidung")) + "|" + n;
+}
+let kidungYoutubeRefKeys = new Set(); // kunci kidung yang punya video YouTube di Pustaka Media
+function kidungHasYoutubeRef_(k) { return kidungYoutubeRefKeys.size > 0 && kidungYoutubeRefKeys.has(kidungRefKey_(k.buku, k.noKidung)); }
+function isYoutubeMediaItem_(it) {
+  const link = String(it && it.link || "");
+  const sumber = String(it && it.sumber || "").toLowerCase();
+  return /youtu\.?be/i.test(link) || sumber === "youtube" || (!sumber && String(it && it.jenis || "").toLowerCase() === "youtube");
+}
+// Isi kidungYoutubeRefKeys dari Pustaka Media -> Promise<jumlah kidung>. Tidak pernah melempar.
+async function loadKidungYoutubeRefKeys_() {
+  try {
+    if (typeof MediaLibrary === "undefined" || !MediaLibrary.Sync || !MediaLibrary.Sync.enabled() || !window.KidungRef) return 0;
+    const all = await kidungLoadAllMedia_(false);
+    const keys = new Set();
+    all.forEach((it) => {
+      if (!isYoutubeMediaItem_(it) || !it.kidungRef) return;
+      window.KidungRef.parse(it.kidungRef).forEach((t) => { if (t.kind === "kidung") keys.add(kidungRefKey_(t.buku, t.no)); });
+    });
+    kidungYoutubeRefKeys = keys;
+    return keys.size;
+  } catch (e) { return 0; }
+}
 // Filter cepat berdasarkan nomor di layar "📋 Daftar" (lihat renderKidungList()
 // di bawah) -- string angka saja (sudah dibuang non-digitnya), kosong berarti
 // tidak ada filter nomor aktif.
@@ -442,7 +490,8 @@ async function renderKidungList(bukuFilter) {
   // Baris chip filter media -- hanya tampil kalau memang ada kidung yang
   // punya minimal 1 link media di buku ini (kalau tidak ada satupun, chip
   // ini cuma bikin bingung karena semua akan kosong).
-  const anyHasMedia = fullList.some((k) => k.linkMp3_1 || k.linkMp3_2 || k.linkVideo || k.linkYoutube || k.linkMidi);
+  const mlOn = typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled();
+  const anyHasMedia = mlOn || fullList.some((k) => k.linkMp3_1 || k.linkMp3_2 || k.linkVideo || k.linkYoutube || k.linkMidi);
   const countLabel = document.createElement("p");
   countLabel.className = "kidung-search-count";
   const box = document.createElement("div");
@@ -509,6 +558,11 @@ async function renderKidungList(bukuFilter) {
   panel.appendChild(countLabel);
   panel.appendChild(box);
   renderFilteredList();
+  // DIPERBARUI (4 Okt 2026): video Pustaka Media (KidungRef K51/S1/A1/T1/Y1/KA1) ikut
+  // dihitung di chip ▶️ YouTube. Daftar tampil duluan, lalu diperbarui begitu data tiba.
+  if (mlOn) {
+    loadKidungYoutubeRefKeys_().then(() => { if (panel.contains(box)) renderFilteredList(); });
+  }
 }
 
 // Berapa hasil ditampilkan per "halaman" -- dulu di-hardcode 100 lalu
@@ -1361,27 +1415,10 @@ function buildKidungMediaRefSection(meta) {
     if (window.KidungRef && typeof window.KidungRef.refersTo === "function") return window.KidungRef.refersTo(raw, meta.buku || "Kidung", meta.noKidung);
     return raw.split(/[,;\n]+/).map((x) => x.trim()).indexOf(kidungRef) !== -1; // cadangan: format lama persis
   }
-  async function loadAllMedia_(force) {
-    const now = Date.now();
-    const c = window.__kidungRefAllCache;
-    if (!force && c && c.items && now - c.t < 120000) return c.items;
-    try {
-      const items = await MediaLibrary.Sync.list({});
-      window.__kidungRefAllCache = { t: Date.now(), items };
-      return items;
-    } catch (err) {
-      // Offline / server gagal: pakai daftar tersimpan kalau ada (komputer).
-      let cached = null;
-      try { cached = MediaLibrary.Sync.cachedList ? await MediaLibrary.Sync.cachedList({}) : null; } catch (e) { /* abaikan */ }
-      if (cached && Array.isArray(cached.items)) { window.__kidungRefAllCache = { t: Date.now() - 100000, items: cached.items }; return cached.items; }
-      throw err;
-    }
-  }
-
   async function reload(force) {
     renderGridState_('<p class="ml-loading">Memuat referensi media…</p>');
     try {
-      const all = await loadAllMedia_(force === true);
+      const all = await kidungLoadAllMedia_(force === true);
       const items = all.filter(kidungRefMatch_);
       grid.innerHTML = "";
       if (!items.length) {
