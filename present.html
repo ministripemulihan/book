@@ -3164,6 +3164,38 @@
   // restart internal YouTube sendiri yang belum selesai (laporan serupa
   // pernah terjadi di ytIgnoreInfoUntil_/setYtSrc_() di atas untuk kasus
   // lain -- pola jeda singkatnya sama).
+  // BARU (4 Okt 2026, permintaan operator) -- kecepatan putar video YouTube
+  // utama (0,25x-2x, seperti YouTube). BAWAAN 1x; kembali ke 1x tiap video
+  // BARU dimuat (lihat setYtSrc_()), tetap dipertahankan kalau video yang
+  // SAMA diulang (Ulang: Satu Video / Semua dengan 1 video).
+  let ytRateWanted_ = 1;
+  function applyYtRate_() {
+    if (!ytEl.contentWindow || ytEl.hidden || !ytEl.src) return;
+    try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setPlaybackRate", args: [ytRateWanted_] }), "*"); } catch (e) {}
+  }
+  function reportYtRate_() { // beri tahu Studio supaya slider kecepatannya ikut sinkron (mis. kembali ke 1x di video baru)
+    if (!window.opener) return;
+    try { window.opener.postMessage({ source: "bibleAppPresenter", type: "present_yt_rate", rate: ytRateWanted_ }, location.origin); } catch (e) {}
+  }
+  // PERBAIKAN (4 Okt 2026, laporan operator "diulang 1x, teks muncul lagi
+  // padahal sudah dimatikan") -- AKAR MASALAH: (1) "cc_load_policy=0" di
+  // embedUrl BUKAN berarti "paksa mati", hanya "ikuti pengaturan akun/
+  // browser" -- kalau YouTube di browser itu diset selalu menampilkan
+  // teks, teks tetap muncul; (2) setelah video di-restart/diputar ulang
+  // YouTube memuat modul teks BELAKANGAN (bisa 1-3 detik setelah main),
+  // jadi 1x perintah "unloadModule" di 500ms (reapplyYtLiveStateAfterReplay_)
+  // sering kalah cepat; (3) video yang dimuat ulang (src sama/baru) tidak
+  // dikirimi perintah CC sama sekali. PERBAIKAN: preferensi CC ditegakkan
+  // BERULANG (beberapa waktu) setiap video dimuat DAN setiap kali video
+  // mulai main (state 1) -- bukan sekali saja.
+  function enforceYtCaptions_(delays) {
+    const wantCC = ytCaptionsWanted_ === null ? false : ytCaptionsWanted_;
+    const ccFunc = wantCC ? "loadModule" : "unloadModule";
+    (wantCC ? [600] : (delays || [200, 900, 2000, 3500])).forEach((ms) => setTimeout(() => {
+      if (!ytEl.contentWindow || ytEl.hidden || !ytEl.src) return;
+      try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: ccFunc, args: ["captions"] }), "*"); } catch (e) {}
+    }, ms));
+  }
   function reapplyYtLiveStateAfterReplay_() {
     // PERBAIKAN (26 Sep 2026 v2, laporan operator "defaultnya teks/CC
     // nyala lagi walau BELUM PERNAH disentuh tombol CC-nya sama sekali")
@@ -3190,6 +3222,8 @@
         const muteFunc = wantMute ? "mute" : "unMute";
         try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: muteFunc, args: [] }), "*"); } catch (e) {}
       }
+      applyYtRate_(); // BARU (4 Okt 2026) -- kecepatan tetap dipertahankan saat video yang SAMA diulang
+      enforceYtCaptions_(); // PERBAIKAN (4 Okt 2026) -- tegakkan CC berulang, bukan sekali
       // BARU (26 Sep 2026) -- lihat catatan panjang di deklarasi ytVolumeWanted_ di atas.
       if (ytVolumeWanted_ !== null) {
         try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [ytVolumeWanted_] }), "*"); } catch (e) {}
@@ -3232,6 +3266,7 @@
     ytIgnoreInfoUntil_ = Date.now() + 400;
     if (ytNextUpCardEl) ytNextUpCardEl.classList.remove("show"); // video baru mulai -- sembunyikan kartu "Berikutnya" sisa video lama
     ytElapsedBase_ = null; ytElapsedPlaying_ = false; // BARU (17 Sep 2026) -- Jam Tengah jangan kebawa detik video lama
+    ytRateWanted_ = 1; reportYtRate_(); // BARU (4 Okt 2026) -- video baru = kecepatan 1x
     ytEl.src = url;
   }
   // BARU (16 Sep 2026, permintaan operator "30 detik terakhir apa bisa
@@ -7096,6 +7131,15 @@
         }
         return;
       }
+      // PERBAIKAN (4 Okt 2026) -- preferensi CC dicatat walau belum ada video
+      // (Studio mengirimnya sekali saat dibuka), supaya video PERTAMA pun benar.
+      if (data.action === "cc") ytCaptionsWanted_ = !!data.arg;
+      // BARU (4 Okt 2026) -- kecepatan putar 0,25x-2x.
+      if (data.action === "rate") {
+        const r = Number(data.arg);
+        if (r >= 0.25 && r <= 2) { ytRateWanted_ = r; applyYtRate_(); [500, 1500].forEach((ms) => setTimeout(applyYtRate_, ms)); }
+        return;
+      }
       // Kalau belum ada video yang tayang, abaikan saja (tidak error).
       if (ytEl.hidden || !ytEl.src || !ytEl.contentWindow) return;
       // BARU (28 Agu 2026) -- "stop": ⏹️ Stop di Studio. "stopVideo" (beda
@@ -7424,6 +7468,8 @@
       try { ytEl.contentWindow.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [ytVolumeWanted_] }), "*"); } catch (e) {}
     };
     [250, 600, 1200, 2000].forEach((ms) => setTimeout(applyWantedVolume_, ms));
+    enforceYtCaptions_(); // PERBAIKAN (4 Okt 2026) -- lihat catatan di enforceYtCaptions_()
+    [600, 1500].forEach((ms) => setTimeout(applyYtRate_, ms));
     // PERBAIKAN (4 Sep 2026, permintaan operator) -- laporan: "▶️ Play
     // pertama kali kadang tidak terasa, progress bar diam/tidak bisa
     // digeser, sampai ditekan ⏸️ Pause lalu ▶️ Play lagi baru jalan".
@@ -7531,6 +7577,10 @@
     if (state === ytLastState) return;
     const prevState = ytLastState;
     ytLastState = state;
+    if (state === 1) { // mulai/lanjut main (termasuk setelah diulang) -- tegakkan CC & kecepatan lagi
+      enforceYtCaptions_([200, 1000, 2500]);
+      if (ytRateWanted_ !== 1) [200, 900].forEach((ms) => setTimeout(applyYtRate_, ms));
+    }
     if (state === 0 && prevState !== null) { // 0 = berakhir (ended)
       if (ytRepeatMode === "one") {
         ytSendCommand("seekTo", [0, true]);

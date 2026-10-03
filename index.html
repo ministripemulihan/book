@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261003a" />
+<link rel="stylesheet" href="css/style.css?v=20261004a" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2444,6 +2444,15 @@
               <input type="range" id="psYtVolumeRange" class="ps-yt-volume-range" min="0" max="100" step="1" value="70" title="Volume video YouTube di Layar 2 (bawaan 70%)" />
               <span id="psYtVolumeLabel" class="ps-yt-volume-label">70%</span>
             </span>
+            <!-- BARU (4 Okt 2026, permintaan operator) -- slider KECEPATAN video
+                 YouTube utama: 0,25x - 2x seperti YouTube, bawaan 1x (klik
+                 tulisannya untuk kembali ke 1x). Lihat wireYtControls() di
+                 js/presentation-studio.js & action "rate" di present.html. -->
+            <span class="ps-yt-speed-wrap" id="psYtSpeedWrap" title="Kecepatan video YouTube di Layar 2 (0,25x - 2x, bawaan 1x)">
+              <span aria-hidden="true">⏩</span>
+              <input type="range" id="psYtSpeedRange" class="ps-yt-speed-range" min="0" max="7" step="1" value="3" title="Kecepatan video YouTube di Layar 2 (bawaan 1x)" />
+              <span id="psYtSpeedLabel" class="ps-yt-speed-label" title="Klik untuk kembali ke 1x">1x</span>
+            </span>
             <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
           </div>
           <!-- BARU (4 Sep 2026 v2, permintaan operator) -- progress bar +
@@ -4151,7 +4160,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
   <script src="js/ink-engine.js?v=20260926b"></script>
-  <script src="js/presentation.js?v=20260921b"></script>
+  <script src="js/presentation.js?v=20261004a"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
@@ -4161,7 +4170,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261003a"></script>
+  <script src="js/presentation-studio.js?v=20261004a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
