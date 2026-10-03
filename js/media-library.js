@@ -46,6 +46,88 @@ const MediaLibrary = (() => {
   // ------------------------------------------------------------
   // 1) DATA SYNC -- bicara ke apps-script/MediaLibraryCode.gs
   // ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // 1a) CACHE OFFLINE DAFTAR (BARU, 2 Okt 2026, permintaan operator --
+  //     "daftar YouTube bisa tampil duluan & tetap tampil saat offline;
+  //     datanya sudah 800 baris, nanti sampai 2000").
+  //     Hasil `media_list` terakhir disimpan di IndexedDB TERSENDIRI
+  //     ("book-vp-medialist") -- BUKAN di localStorage (batas ~5 MB dibagi
+  //     seluruh aplikasi, 2000 baris + syair bisa melewatinya) dan BUKAN di
+  //     js/db.js (tidak perlu menaikkan DB_VERSION, tidak menyentuh data
+  //     lama). Kunci = jenis + username, jadi akun lain di perangkat yang
+  //     sama TIDAK melihat item pribadi "hanya saya" milik akun ini.
+  //     Semua operasi cache AMAN GAGAL (privat/IndexedDB mati -> diam saja,
+  //     perilaku lama tetap jalan).
+  // ------------------------------------------------------------
+  const ListCache_ = (() => {
+    const DB_NAME = "book-vp-medialist", STORE = "lists";
+    let dbPromise = null;
+    function openDb_() {
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise((resolve, reject) => {
+        try {
+          if (typeof indexedDB === "undefined") { reject(new Error("IndexedDB tidak tersedia")); return; }
+          const req = indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = () => { try { req.result.createObjectStore(STORE); } catch (e) { /* sudah ada */ } };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error || new Error("gagal membuka cache"));
+          req.onblocked = () => reject(new Error("cache terblokir"));
+        } catch (e) { reject(e); }
+      });
+      dbPromise.catch(() => { dbPromise = null; }); // coba lagi nanti kalau gagal sekarang
+      return dbPromise;
+    }
+    function key_(opts) {
+      const o = opts || {};
+      return (o.jenis || "all") + "|" + String(typeof currentUser !== "undefined" && currentUser ? currentUser : "").toLowerCase();
+    }
+    // Daftar yang DIFILTER (kidungRef / ayatRef) cuma sebagian isi -> tidak disimpan.
+    function cacheable_(opts) { const o = opts || {}; return !o.kidungRef && !o.ayatRef && desktopOnly_(); }
+    // BARU (3 Okt 2026, permintaan operator -- "daftar tampil offline di komputer,
+    // di HP offline tidak perlu"): cache daftar hanya dipakai di KOMPUTER.
+    // HP/tablet (UA seluler atau layar sentuh tanpa mouse) -> tidak menyimpan &
+    // tidak membaca (perilaku lama). Isi CONFIG.MEDIA_LIBRARY_OFFLINE_LIST = "semua"
+    // di js/config.js kalau suatu hari ingin berlaku di HP juga.
+    function desktopOnly_() {
+      try {
+        if (typeof CONFIG !== "undefined" && CONFIG && CONFIG.MEDIA_LIBRARY_OFFLINE_LIST === "semua") return true;
+        const ua = (typeof navigator !== "undefined" && navigator.userAgent) || "";
+        if (/Android|iPhone|iPad|iPod|Mobile|Silk|Opera Mini/i.test(ua)) return false;
+        if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 1 && /Macintosh/.test(ua)) return false; // iPad mode desktop
+        if (typeof matchMedia === "function" && matchMedia("(pointer: coarse) and (hover: none)").matches) return false;
+        return true;
+      } catch (e) { return true; }
+    }
+    async function get(opts) {
+      if (!cacheable_(opts)) return null;
+      const db = await openDb_();
+      return new Promise((resolve) => {
+        try {
+          const r = db.transaction(STORE, "readonly").objectStore(STORE).get(key_(opts));
+          r.onsuccess = () => {
+            const v = r.result;
+            resolve(v && Array.isArray(v.items) ? { items: v.items, savedAt: v.savedAt || 0 } : null);
+          };
+          r.onerror = () => resolve(null);
+        } catch (e) { resolve(null); }
+      });
+    }
+    async function set(opts, items) {
+      if (!cacheable_(opts) || !Array.isArray(items)) return;
+      const db = await openDb_();
+      await new Promise((resolve) => {
+        try {
+          const tx = db.transaction(STORE, "readwrite");
+          tx.objectStore(STORE).put({ items, savedAt: Date.now() }, key_(opts));
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+          tx.onabort = () => resolve();
+        } catch (e) { resolve(); }
+      });
+    }
+    return { get, set, enabled: desktopOnly_ };
+  })();
+
   const Sync = {
     enabled() {
       return !!(CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL && CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL.indexOf("http") === 0);
@@ -65,8 +147,26 @@ const MediaLibrary = (() => {
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       if (!data || !data.ok) throw new Error((data && data.error) || "Gagal memuat Pustaka Media");
-      return data.items || [];
+      const items = data.items || [];
+      // BARU (2 Okt 2026): simpan untuk dipakai saat offline / tampil duluan (lihat 1a).
+      ListCache_.set(o, items).catch(() => {});
+      return items;
     },
+    // BARU (2 Okt 2026) -- daftar TERAKHIR yang tersimpan (tanpa internet)
+    // -> Promise<{items, savedAt}|null>. Dipakai Studio (📺 Playlist Video)
+    // supaya daftar langsung tampil sebelum jaringan menjawab / saat offline.
+    // Dibatasi 2 detik: kalau IndexedDB macet/terblokir, pemanggil TETAP lanjut
+    // ke jaringan (hasil null), tidak ikut menggantung.
+    async cachedList(opts) {
+      try {
+        return await Promise.race([
+          ListCache_.get(opts || {}),
+          new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
+        ]);
+      } catch (e) { return null; }
+    },
+    // BARU (3 Okt 2026) -- true kalau perangkat ini memakai cache daftar (komputer).
+    cacheAvailable() { try { return ListCache_.enabled(); } catch (e) { return false; } },
     async add(fields) {
       const res = await fetch(CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL, {
         method: "POST",
@@ -395,6 +495,7 @@ const MediaLibrary = (() => {
     filterSumber: "",
     filterKeterangan: "",
     filterKidungRef: "",
+    notice: "",
   };
 
   function el_(id) { return document.getElementById(id); }
@@ -410,12 +511,37 @@ const MediaLibrary = (() => {
     }
     state.loading = true;
     state.error = "";
+    state.notice = "";
     renderActiveTab_();
-    try {
-      state.items = await Sync.list({});
+    // BARU (3 Okt 2026) -- jaringan langsung jalan; daftar TERSIMPAN (semua jenis:
+    // YouTube, efek suara, dst -- hanya daftarnya, bukan isi file) tampil LANGSUNG
+    // kalau jaringan belum menjawab, dan tetap dipakai kalau offline (komputer saja,
+    // lihat desktopOnly_()). Video/suara tetap butuh internet untuk diputar.
+    let netDone = false;
+    const netP = Sync.list({});
+    netP.then(() => { netDone = true; }, () => { netDone = true; });
+    let cached = null;
+    try { cached = await Sync.cachedList({}); } catch (e) { cached = null; }
+    const hasCache = !!(cached && cached.items && cached.items.length);
+    const fmtSaved = (t) => { try { return new Date(t).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+    if (hasCache && !netDone && !state.items.length) {
+      state.items = cached.items;
       state.loaded = true;
+      state.notice = "📂 Daftar tersimpan (" + fmtSaved(cached.savedAt) + ") — memperbarui…";
+      renderActiveTab_();
+    }
+    try {
+      state.items = await netP;
+      state.loaded = true;
+      state.notice = "";
     } catch (err) {
-      state.error = "Gagal memuat Pustaka Media: " + (err && err.message ? err.message : String(err));
+      if (hasCache) {
+        if (!state.items.length) state.items = cached.items;
+        state.loaded = true;
+        state.notice = "📴 Tidak ada koneksi — menampilkan daftar tersimpan (" + fmtSaved(cached.savedAt) + "). Daftar bisa dilihat; video & suara bisa diputar setelah online.";
+      } else {
+        state.error = "Gagal memuat Pustaka Media: " + (err && err.message ? err.message : String(err)) + (Sync.cacheAvailable() ? " (belum ada daftar tersimpan — buka sekali saat online supaya tersimpan untuk offline.)" : "");
+      }
     } finally {
       state.loading = false;
       renderActiveTab_();
@@ -451,8 +577,11 @@ const MediaLibrary = (() => {
       thumb.style.backgroundImage = `url("${spec.gambar.replace(/"/g, "")}")`;
     } else if (sumberUntukGambar_ === "youtube") {
       const thumbUrl = youtubeThumbnail(spec.link);
-      if (thumbUrl) thumb.style.backgroundImage = `url("${thumbUrl}")`;
-      else thumb.style.background = colorForKey_(spec.id || spec.nama);
+      // BARU (3 Okt 2026): lewat YtThumbCache supaya offline memakai salinan tersimpan / gambar pengganti.
+      if (thumbUrl) {
+        if (typeof YtThumbCache !== "undefined" && YtThumbCache.bindBackground) YtThumbCache.bindBackground(thumb, thumbUrl);
+        else thumb.style.backgroundImage = `url("${thumbUrl}")`;
+      } else thumb.style.background = colorForKey_(spec.id || spec.nama);
     } else {
       thumb.style.background = colorForKey_(spec.id || spec.nama);
       const emoji = document.createElement("span");
@@ -1179,6 +1308,13 @@ const MediaLibrary = (() => {
     }
 
     body.innerHTML = "";
+    if (state.notice) {
+      const note = document.createElement("p");
+      note.className = "ml-loading";
+      note.id = "mlNotice";
+      note.textContent = state.notice;
+      body.appendChild(note);
+    }
 
     if (state.activeTab === "layar-publik") {
       renderLayarPublikTab_(body);

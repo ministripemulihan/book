@@ -7198,15 +7198,43 @@ const PresentationStudio = (() => {
     // di sini supaya urutan `allVideos` tetap "lama -> baru" PERSIS
     // seperti kontrak lama dari parseSheetCsv().
     async function loadFromMediaLibrary() {
+      // BARU (2 Okt 2026, permintaan operator -- daftar sudah 800+ baris, nanti
+      // 2000): jaringan langsung dimulai, DI SAMPING itu daftar TERSIMPAN dari
+      // kunjungan online terakhir dibaca & ditampilkan LANGSUNG kalau jaringan
+      // belum menjawab. Kalau jaringan gagal/offline, daftar tersimpan tetap
+      // dipakai (video memang tidak bisa diputar tanpa internet, tapi daftarnya
+      // tetap ada). Pembacaan cache dibatasi waktu (lihat Sync.cachedList), jadi
+      // tidak pernah menahan pemuatan dari jaringan.
+      const fmtSaved = (t) => { try { return new Date(t).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
+      let netDone = false;
+      const netP = MediaLibrary.Sync.list({ jenis: "youtube" });
+      netP.then(() => { netDone = true; }, () => { netDone = true; });
       if (statusEl) statusEl.textContent = "⏳ Memuat dari Pustaka Media…";
+      let cached = null;
+      try { cached = await MediaLibrary.Sync.cachedList({ jenis: "youtube" }); } catch (e) { cached = null; }
+      const hasCache = !!(cached && cached.items && cached.items.length);
+      const showCached_ = () => {
+        allVideos = mapMediaLibraryItemsToVideos_(cached.items).reverse();
+        renderFilters();
+        renderList();
+      };
+      if (hasCache && !netDone && !allVideos.length) {
+        showCached_();
+        if (statusEl) statusEl.textContent = `📂 ${allVideos.length} video dari daftar tersimpan (${fmtSaved(cached.savedAt)}) — memperbarui dari Pustaka Media…`;
+      }
       try {
-        const items = await MediaLibrary.Sync.list({ jenis: "youtube" });
+        const items = await netP;
         allVideos = mapMediaLibraryItemsToVideos_(items).reverse();
         if (statusEl) statusEl.textContent = `✅ ${allVideos.length} video dimuat dari Pustaka Media (terakhir dimuat ${new Date().toLocaleTimeString("id-ID")}).`;
         renderFilters(); // BARU (11 Sep 2026) -- tombol kategori ikut kategori Sheet terbaru
         renderList();
       } catch (err) {
-        if (statusEl) statusEl.textContent = "❌ Gagal memuat dari Pustaka Media: " + (err && err.message ? err.message : String(err));
+        if (hasCache) {
+          if (!allVideos.length) showCached_(); // jaringan gagal CEPAT (offline) -> daftar tersimpan baru ditampilkan di sini
+          if (statusEl) statusEl.textContent = `📴 Tidak ada koneksi — menampilkan ${allVideos.length} video dari daftar tersimpan (${fmtSaved(cached.savedAt)}). Daftar bisa dilihat; video bisa diputar setelah online.`;
+        } else if (statusEl) {
+          statusEl.textContent = "❌ Gagal memuat dari Pustaka Media: " + (err && err.message ? err.message : String(err)) + " (belum ada daftar tersimpan — buka sekali saat online supaya daftarnya tersimpan untuk offline).";
+        }
       }
     }
 
@@ -8407,7 +8435,15 @@ const PresentationStudio = (() => {
     // langkah ini dikerjakan, tidak rusak/kosong.
     if (typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled() && MediaLibrary.canSeeSound()) {
       try {
-        const items = await MediaLibrary.Sync.list({ jenis: "sound" });
+        // BARU (3 Okt 2026) -- offline: pakai daftar efek suara tersimpan (tombol tampil,
+        // tapi bunyinya butuh internet). Online: daftar terbaru dari Pustaka Media.
+        let items;
+        try { items = await MediaLibrary.Sync.list({ jenis: "sound" }); }
+        catch (e) {
+          const c = await MediaLibrary.Sync.cachedList({ jenis: "sound" });
+          if (!c || !c.items) throw e;
+          items = c.items;
+        }
         items.forEach((item) => {
           const btn = document.createElement("button");
           btn.type = "button";
