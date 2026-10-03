@@ -4585,6 +4585,14 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
 }
 .ps-yt-volume-range { width: 84px; accent-color: var(--brass); }
 .ps-yt-volume-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 30px; text-align: right; }
+/* BARU (4 Okt 2026) -- slider kecepatan video YouTube, mirip slider volume di atas. */
+.ps-yt-speed-wrap {
+  display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: 999px; background: var(--ps-tab-bg); border: 1px solid var(--ps-col-border);
+  font-size: 13px;
+}
+.ps-yt-speed-range { width: 84px; accent-color: var(--brass); }
+.ps-yt-speed-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 38px; text-align: right; cursor: pointer; }
 /* Baris video Playlist (thumb + info + aksi) sudah flex row rapat --
    progress bar-nya dipaksa turun ke baris sendiri (flex-basis 100%)
    supaya tidak menabrak thumbnail/tombol yang sudah ada. */
