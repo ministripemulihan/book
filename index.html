@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261004a" />
+<link rel="stylesheet" href="css/style.css?v=20261004b" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1116,10 +1116,11 @@
           <div class="ps-btn-row" id="psCollectionThumbSizePresetRow">
             <button type="button" class="chip-btn small" data-thumb-size-preset="44">🔲 Kecil</button>
             <button type="button" class="chip-btn small" data-thumb-size-preset="176">🔳 Besar</button>
+            <button type="button" class="chip-btn small" data-thumb-size-preset="500">🟦 Maks 500</button>
           </div>
           <div class="ps-btn-row">
-            <input type="range" id="psCollectionThumbSizeSlider" min="32" max="220" step="4" value="44" style="flex:1;" />
-            <input type="number" id="psCollectionThumbSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="32" max="220" step="4" value="44" title="Ketik ukuran thumbnail manual (32-220px), lalu tekan Enter" />px
+            <input type="range" id="psCollectionThumbSizeSlider" min="32" max="500" step="4" value="44" style="flex:1;" />
+            <input type="number" id="psCollectionThumbSizeValue" class="ps-pen-size-value ps-pen-size-value-input" min="32" max="500" step="4" value="44" title="Ketik ukuran thumbnail manual (32-500px), lalu tekan Enter" />px
           </div>
           <!-- BARU (30 Sep 2026) keterangan warna tombol 🎧 Audio Latar + cara pakai -->
           <div class="ps-bg-legend" aria-label="Arti warna tombol Audio Latar">
@@ -2442,7 +2443,7 @@
             <span class="ps-yt-volume-wrap" id="psYtVolumeWrap" title="Volume video YouTube di Layar 2">
               <span aria-hidden="true">🔊</span>
               <input type="range" id="psYtVolumeRange" class="ps-yt-volume-range" min="0" max="100" step="1" value="70" title="Volume video YouTube di Layar 2 (bawaan 70%)" />
-              <span id="psYtVolumeLabel" class="ps-yt-volume-label">70%</span>
+              <input type="number" id="psYtVolumeValue" class="ps-yt-num-input" min="0" max="100" step="1" value="70" title="Ketik volume 0-100, lalu tekan Enter" /><span id="psYtVolumeLabel" class="ps-yt-volume-label">%</span>
             </span>
             <!-- BARU (4 Okt 2026, permintaan operator) -- slider KECEPATAN video
                  YouTube utama: 0,25x - 2x seperti YouTube, bawaan 1x (klik
@@ -2451,7 +2452,7 @@
             <span class="ps-yt-speed-wrap" id="psYtSpeedWrap" title="Kecepatan video YouTube di Layar 2 (0,25x - 2x, bawaan 1x)">
               <span aria-hidden="true">⏩</span>
               <input type="range" id="psYtSpeedRange" class="ps-yt-speed-range" min="0" max="7" step="1" value="3" title="Kecepatan video YouTube di Layar 2 (bawaan 1x)" />
-              <span id="psYtSpeedLabel" class="ps-yt-speed-label" title="Klik untuk kembali ke 1x">1x</span>
+              <input type="text" inputmode="decimal" id="psYtSpeedValue" class="ps-yt-num-input" value="1" maxlength="5" title="Ketik kecepatan 0,25 - 2 (kelipatan 0,25), lalu tekan Enter. Panah atas/bawah = naik/turun satu langkah" /><span id="psYtSpeedLabel" class="ps-yt-speed-label" title="Klik untuk kembali ke 1x">x</span>
             </span>
             <button type="button" id="psYtRepeatBtn" class="chip-btn small" title="Ulang: Mati -> Satu Video -> Semua (Playlist) -> Mati">🔁 Ulang: Mati</button>
           </div>
@@ -4147,8 +4148,8 @@
   <script src="js/media.js?v=20260915d"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260920d"></script>
-  <script src="js/kidung-ref.js?v=20260928b"></script> <!-- 28 Sep 2026: kode KidungRef K130/S130/KA13 -->
-  <script src="js/kidung-ui.js?v=20260911b"></script>
+  <script src="js/kidung-ref.js?v=20261004a"></script> <!-- 28 Sep 2026: kode KidungRef K130/S130/KA13 -->
+  <script src="js/kidung-ui.js?v=20261004a"></script>
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
@@ -4170,7 +4171,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261004a"></script>
+  <script src="js/presentation-studio.js?v=20261004b"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
