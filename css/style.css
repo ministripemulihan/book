@@ -4180,7 +4180,7 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
    sedikit ruang kosong kiri-kanan, TETAP tanpa isi terpotong. */
 .ps-verse-thumb {
   float: left; height: var(--ps-thumb-size, 44px); width: auto;
-  max-width: calc(var(--ps-thumb-size, 44px) * 1.8); margin: 0 8px 4px 0;
+  max-width: min(calc(var(--ps-thumb-size, 44px) * 1.8), 100%); margin: 0 8px 4px 0;
   object-fit: contain; border-radius: 6px; border: 1px solid var(--ps-card-border);
   background: #fff; transition: height .15s ease, max-width .15s ease;
 }
@@ -4584,7 +4584,14 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   font-size: 13px;
 }
 .ps-yt-volume-range { width: 84px; accent-color: var(--brass); }
-.ps-yt-volume-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 30px; text-align: right; }
+.ps-yt-volume-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 12px; text-align: left; }
+/* BARU (4 Okt 2026) -- kotak angka kecil untuk volume & kecepatan YouTube (bisa diketik). */
+.ps-yt-num-input {
+  width: 46px; padding: 2px 4px; font-size: 12px; font-weight: 700; text-align: right;
+  font-variant-numeric: tabular-nums; font-family: inherit; color: var(--ps-ink, #222);
+  border: 1px solid var(--ps-dropzone-border, #cbb894); border-radius: 6px; background: var(--ps-panel-bg, #fff);
+}
+.ps-yt-num-input::-webkit-inner-spin-button, .ps-yt-num-input::-webkit-outer-spin-button { opacity: .6; }
 /* BARU (4 Okt 2026) -- slider kecepatan video YouTube, mirip slider volume di atas. */
 .ps-yt-speed-wrap {
   display: flex; align-items: center; gap: 6px; padding: 4px 10px;
@@ -4592,7 +4599,7 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   font-size: 13px;
 }
 .ps-yt-speed-range { width: 84px; accent-color: var(--brass); }
-.ps-yt-speed-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 38px; text-align: right; cursor: pointer; }
+.ps-yt-speed-label { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ps-muted); min-width: 12px; text-align: left; cursor: pointer; }
 /* Baris video Playlist (thumb + info + aksi) sudah flex row rapat --
    progress bar-nya dipaksa turun ke baris sendiri (flex-basis 100%)
    supaya tidak menabrak thumbnail/tombol yang sudah ada. */
