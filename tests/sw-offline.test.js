@@ -58,7 +58,7 @@ function makeEnv(online, opts) {
   await E.install();
   const cacheName = Array.from(E.store.keys())[0];
   const C = E.store.get(cacheName);
-  expect("nama cache v47", /v49$/.test(cacheName), cacheName);
+  expect("nama cache v51", /v51$/.test(cacheName), cacheName);
   expect("skipWaiting dipanggil", E.self.skipped === true, null);
   expect("index.html tersimpan", C.has(SCOPE + "index.html"), Array.from(C.keys()).slice(0, 5));
   expect("present.html tersimpan", C.has(SCOPE + "present.html"), null);
@@ -110,7 +110,7 @@ function makeEnv(online, opts) {
   const warm = makeEnv({ value: true }, { hang: false });
   await warm.install();
   const hangFetch = makeEnv({ value: true }, { hang: true });
-  hangFetch.store.set("book-vp-shell-v49", warm.store.get(Array.from(warm.store.keys())[0]));
+  hangFetch.store.set("book-vp-shell-v50", warm.store.get(Array.from(warm.store.keys())[0]));
   const t1 = Date.now();
   const rh = await hangFetch.nav(SCOPE + "present.html");
   const dt = Date.now() - t1;
