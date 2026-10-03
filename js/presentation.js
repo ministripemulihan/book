@@ -899,6 +899,12 @@ const Presentation = (() => {
       // kolom waktu LIVE di js/presentation-studio.js (#psYtLiveBar,
       // wireYtControls()) bisa memperbaruinya -- pola sama persis dengan
       // "ps-camera-status" di atas.
+      // BARU (4 Okt 2026) -- kecepatan video YouTube di Layar 2 berubah sendiri
+      // (mis. kembali ke 1x di video baru), diteruskan ke slider di Studio.
+      if (data.type === "present_yt_rate") {
+        try { window.dispatchEvent(new CustomEvent("ps-yt-rate", { detail: { rate: data.rate } })); } catch (e) {}
+        return;
+      }
       if (data.type === "present_yt_progress") {
         try {
           window.dispatchEvent(new CustomEvent("ps-yt-progress", {

@@ -7382,6 +7382,7 @@ const PresentationStudio = (() => {
       captionsBtn.classList.toggle("active", ytCaptionsEnabled);
     }
     refreshCaptionsBtnUi_();
+    rawPost({ type: "yt_control", action: "cc", arg: ytCaptionsEnabled }); // 4 Okt 2026: Layar 2 tahu pilihan CC tersimpan sejak awal (video pertama pun benar)
     document.addEventListener("ps-yt-captions-changed", refreshCaptionsBtnUi_);
     if (captionsBtn) captionsBtn.addEventListener("click", () => toggleYtCaptions_());
     // ------------------------------------------------------------
@@ -7408,7 +7409,7 @@ const PresentationStudio = (() => {
     // cukup 1x tekan ▶️ Play saja, video langsung main DAN bersuara,
     // tanpa perlu 4 langkah manual lagi.
     let needsSoundUnlock = false;
-    window.markYtNeedsSoundUnlock = () => { needsSoundUnlock = true; };
+    window.markYtNeedsSoundUnlock = () => { needsSoundUnlock = true; if (typeof resetSpeedUi_ === "function") resetSpeedUi_(); }; // 4 Okt 2026: video baru = kecepatan 1x
     const REPEAT_KEY = "bible_app_yt_repeat_mode_v1";
     const REPEAT_LABELS = { off: "🔁 Ulang: Mati", one: "🔂 Ulang: Satu Video", all: "🔁 Ulang: Semua" };
     let repeatMode = localStorage.getItem(REPEAT_KEY) || "off";
@@ -7451,10 +7452,10 @@ const PresentationStudio = (() => {
         //   berpindah secara visual supaya tetap terlihat sinkron dengan
         //   Layar 2), jadi aman selalu diteruskan.
         const cmdMap = ytPreviewSoundMode
-          ? { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo" }
-          : { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", seek: "seekTo" };
+          ? { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", mute: "mute", unmute: "unMute", seek: "seekTo", rate: "setPlaybackRate" }
+          : { play: "playVideo", pause: "pauseVideo", stop: "stopVideo", seek: "seekTo", rate: "setPlaybackRate" };
         const cmd = cmdMap[action];
-        const args = action === "seek" ? [arg || 0, true] : [];
+        const args = action === "seek" ? [arg || 0, true] : action === "rate" ? [Number(arg) || 1] : [];
         if (cmd) previewFrame.contentWindow.postMessage(JSON.stringify({ event: "command", func: cmd, args }), "*");
       }
     }
@@ -7727,6 +7728,30 @@ const PresentationStudio = (() => {
         sendYtCommand("volume", ytVolume); // -> Layar 2 (present.html), action "volume" pada handler "yt_control"
       });
       rawPost({ type: "yt_control", action: "volume", arg: ytVolume }); // beri tahu Layar 2 volume tersimpan begitu Studio dibuka
+    }
+    // BARU (4 Okt 2026, permintaan operator) -- slider KECEPATAN video YouTube
+    // utama (#psYtSpeedRange), pilihan SAMA seperti YouTube: 0,25x 0,5x 0,75x
+    // 1x 1,25x 1,5x 1,75x 2x. BAWAAN 1x & kembali ke 1x tiap video baru.
+    // Klik tulisan kecepatannya = langsung kembali ke 1x.
+    const RATE_STEPS_ = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+    const speedRange = el("psYtSpeedRange");
+    const speedLabel = el("psYtSpeedLabel");
+    function applySpeedUi_(r) {
+      let idx = RATE_STEPS_.indexOf(Number(r));
+      if (idx < 0) idx = 3;
+      if (speedRange) speedRange.value = String(idx);
+      if (speedLabel) speedLabel.textContent = String(RATE_STEPS_[idx]).replace(".", ",") + "x";
+    }
+    function resetSpeedUi_() { applySpeedUi_(1); }
+    if (speedRange) {
+      applySpeedUi_(1);
+      speedRange.addEventListener("input", () => {
+        const r = RATE_STEPS_[parseInt(speedRange.value, 10)] || 1;
+        applySpeedUi_(r);
+        sendYtCommand("rate", r); // -> Layar 2 (present.html), action "rate" pada handler "yt_control"
+      });
+      if (speedLabel) speedLabel.addEventListener("click", () => { applySpeedUi_(1); sendYtCommand("rate", 1); });
+      window.addEventListener("ps-yt-rate", (e) => applySpeedUi_(e && e.detail ? e.detail.rate : 1)); // Layar 2 mereset sendiri di video baru
     }
     // Dipakai wireYoutubeTab()/wireYtPlaylistTab() supaya video baru yang
     // ditampilkan langsung ikut mode Ulang yang sedang aktif tanpa
