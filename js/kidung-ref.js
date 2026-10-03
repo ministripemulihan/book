@@ -82,9 +82,13 @@
   }
 
   // Apakah kolom `str` menunjuk ke kidung {buku, no}? (untuk pencarian dua arah)
+  // DIPERBARUI (4 Okt 2026): nama buku dibandingkan LONGGAR (Suplemen = Supplemen,
+  // Anak-anak = Anak anak, dst) & nomor boleh "051" / 51 / "51".
   function refersTo(str, buku, no) {
-    const key = normBuku_(buku).toLowerCase() + "|" + String(parseInt(no, 10));
-    return parse(str).some((t) => t.key === key);
+    const n = parseInt(no, 10);
+    if (!Number.isFinite(n)) return false;
+    const want = bukuLooseKey(normBuku_(buku));
+    return parse(str).some((t) => t.kind === "kidung" && t.no === String(n) && bukuLooseKey(t.buku) === want);
   }
 
   // Bentuk KANONIK untuk disimpan/dicari di backend: token kidung ditulis

@@ -1347,10 +1347,42 @@ function buildKidungMediaRefSection(meta) {
     grid.innerHTML = html;
   }
 
-  async function reload() {
+  // PERBAIKAN (4 Okt 2026, laporan operator: video yang di Sheet diketik "K51"
+  // tidak muncul di Kidung No. 51) -- AKAR MASALAH: pencocokan dulu dilakukan
+  // SERVER (Apps Script, ?kidungRef=Kidung|51) dan hanya mengenali kode singkat
+  // (K51/S1/T1/A1/KA1) kalau Apps Script sudah di-deploy ulang. Sekarang daftar
+  // lengkap diambil (dipakai bersama, disimpan 2 menit supaya geser kidung tidak
+  // mengunduh ulang) lalu dicocokkan DI BROWSER dengan KidungRef.refersTo() --
+  // sama persis dengan yang dipakai tab YouTube Studio, jadi K51, k 51, K051,
+  // Kidung|51 semuanya ketemu tanpa perlu deploy ulang Apps Script.
+  function kidungRefMatch_(it) {
+    const raw = String(it && it.kidungRef || "").trim();
+    if (!raw) return false;
+    if (window.KidungRef && typeof window.KidungRef.refersTo === "function") return window.KidungRef.refersTo(raw, meta.buku || "Kidung", meta.noKidung);
+    return raw.split(/[,;\n]+/).map((x) => x.trim()).indexOf(kidungRef) !== -1; // cadangan: format lama persis
+  }
+  async function loadAllMedia_(force) {
+    const now = Date.now();
+    const c = window.__kidungRefAllCache;
+    if (!force && c && c.items && now - c.t < 120000) return c.items;
+    try {
+      const items = await MediaLibrary.Sync.list({});
+      window.__kidungRefAllCache = { t: Date.now(), items };
+      return items;
+    } catch (err) {
+      // Offline / server gagal: pakai daftar tersimpan kalau ada (komputer).
+      let cached = null;
+      try { cached = MediaLibrary.Sync.cachedList ? await MediaLibrary.Sync.cachedList({}) : null; } catch (e) { /* abaikan */ }
+      if (cached && Array.isArray(cached.items)) { window.__kidungRefAllCache = { t: Date.now() - 100000, items: cached.items }; return cached.items; }
+      throw err;
+    }
+  }
+
+  async function reload(force) {
     renderGridState_('<p class="ml-loading">Memuat referensi media…</p>');
     try {
-      const items = await MediaLibrary.Sync.list({ kidungRef });
+      const all = await loadAllMedia_(force === true);
+      const items = all.filter(kidungRefMatch_);
       grid.innerHTML = "";
       if (!items.length) {
         const p = document.createElement("p");
@@ -1372,7 +1404,7 @@ function buildKidungMediaRefSection(meta) {
   // `onSaved` (BARU di js/media-library.js) me-refresh daftar kartu di
   // bagian ini begitu tambah/edit berhasil disimpan.
   addBtn.addEventListener("click", () => {
-    MediaLibrary.openAddForm({ jenis: "youtube", kidungRef, onSaved: reload });
+    MediaLibrary.openAddForm({ jenis: "youtube", kidungRef, onSaved: () => reload(true) });
   });
 
   reload();
