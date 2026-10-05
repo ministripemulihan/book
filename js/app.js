@@ -3090,6 +3090,7 @@ async function insertOutlineHeaders(wrap, bookNum, chapter, verses) {
       wrap.insertBefore(h, verseBlock);
     });
   });
+  if (typeof reapplyVerseJump_ === "function") reapplyVerseJump_(); // judul baru menggeser tata letak -> posisi ayat tujuan dikoreksi
 }
 
 // Tampilan beberapa kolom berdampingan (bahasa berbeda per kolom), untuk
@@ -3452,6 +3453,7 @@ function wireColumnPaneSync(wrap) {
     if (!body) return;
     body.addEventListener("scroll", () => {
       if (programmatic) return;
+      if (window._readerVerseJumpLock && Date.now() < window._readerVerseJumpLock) return; // lompat ke nomor ayat: tiap kolom sudah digulir ke ayatnya sendiri, jangan diratakan per persentase
       if (!syncInputs[i] || !syncInputs[i].checked) return; // kolom SUMBER harus Sync aktif juga -- kalau dimatikan, geserannya TIDAK menyeret kolom lain
       const range = body.scrollHeight - body.clientHeight;
       const frac = range > 0 ? body.scrollTop / range : 0;
@@ -3710,6 +3712,7 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
           if (!items || !items.length) return;
           mlSlot.appendChild(MediaLibrary.buildVerseRefSection(items, verses));
           mlSlot.hidden = false;
+          if (typeof reapplyVerseJump_ === "function") reapplyVerseJump_();
         }).catch(() => {});
       }
     }
@@ -3717,11 +3720,15 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
 
   window.scrollTo({ top: 0 });
   if (highlightVerse) {
-    setTimeout(() => {
-      const found = verses.find((v) => v.verse === highlightVerse);
-      const target = found && el("v-" + found.id);
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 60);
+    // PERBAIKAN (5 Okt 2026) -- lihat startVerseJump_() di bawah: dulu
+    // cuma 1x scrollIntoView() setelah 60 ms pada kotak PERTAMA saja,
+    // sehingga (a) tergeser lagi oleh judul Garis Besar/kotak media yang
+    // menyusul async, (b) kolom ke-2/3 tidak ikut ke ayat yang sama, dan
+    // (c) di mode "kolom bebas + Sync" kolom lain malah digeser per
+    // persentase. Sekarang tiap kolom/baris digulir ke ayat yang benar.
+    startVerseJump_(highlightVerse);
+  } else {
+    _verseJump = null;
   }
   initReadingProgressForChapter();
 
@@ -3859,6 +3866,115 @@ function renderVerseJumpBar(fullChapterVerses, verseMode) {
     bar.appendChild(btn);
   });
   bar.hidden = false;
+}
+
+// ------------------------------------------------------------
+// LOMPAT AYAT ANDAL (5 Okt 2026, laporan operator: "ketika tekan nomor
+// ayat tidak ke nomor yang dipilih" -- harus benar di 1/2/3 kolom &
+// 1/2/3 baris, semua mode: 1 kolom, grid sejajar, kolom bebas+Sync,
+// atas-bawah).
+//
+// Akar masalah lama:
+//  1. Digulir SEKALI saja (60 ms setelah render) -- padahal setelah itu
+//     tata letak masih bergeser: judul Garis Besar disisipkan async,
+//     kotak Pokok Kitab/Media terkait muncul belakangan, tinggi kotak
+//     kolom dihitung ulang (recalcReaderPanesHeight), dan tiap ayat
+//     masih animasi naik 10px. Hasilnya posisi akhir meleset.
+//  2. Cuma elemen "v-<id>" bahasa PERTAMA yang digulir. Di mode kolom
+//     bebas (tiap kolom kotak scroll sendiri) kolom 2/3 tidak ikut ke
+//     ayat itu -- malah diseret persentase oleh Sync.
+//
+// Perbaikan: tiap kolom/baris dicari lewat NOMOR AYAT-nya, digulir
+// ULANG beberapa kali sampai tata letak tenang (berhenti otomatis kalau
+// pengguna mulai menggulir sendiri), dan Sync ditahan sebentar supaya
+// tidak menimpa hasilnya.
+// ------------------------------------------------------------
+let _verseJump = null; // { verse, id } -- lompat yang sedang "dijaga"
+let _verseJumpSeq = 0;
+let _verseJumpCancelWired = false;
+
+function findVerseBlocksInReader_(verseNum) {
+  const wrap = el("readerVerses");
+  if (!wrap) return [];
+  const want = String(verseNum);
+  return Array.from(wrap.querySelectorAll(".verse-block")).filter((b) => {
+    const n = b.querySelector(".verse-num-btn");
+    return n && n.textContent.trim() === want;
+  });
+}
+
+function applyVerseJump_() {
+  const j = _verseJump;
+  if (!j) return;
+  const blocks = findVerseBlocksInReader_(j.verse);
+  if (!blocks.length) return;
+  // Tahan penyeretan Sync (lihat wireColumnPaneSync) supaya scroll yang
+  // kita atur di sini tidak "diratakan" per persentase oleh kolom lain.
+  window._readerVerseJumpLock = Date.now() + 600;
+
+  const pageBlocks = [];
+  const paneBlocks = [];
+  blocks.forEach((b) => {
+    const body = b.closest(".reader-col-pane-body");
+    if (body) paneBlocks.push({ b, body }); else pageBlocks.push(b);
+  });
+
+  if (paneBlocks.length) {
+    // Mode kolom bebas: gulir kotak scroll TIAP kolom ke ayatnya, dengan
+    // awal ayat di ketinggian SAMA di semua kolom (lebih enak dibaca
+    // berdampingan). Ayat yang lebih panjang dari kotak tetap diawali
+    // dari atas kotak.
+    const maxH = Math.max.apply(null, paneBlocks.map((x) => x.b.getBoundingClientRect().height));
+    const boxH = Math.min.apply(null, paneBlocks.map((x) => x.body.clientHeight));
+    const topOffset = Math.min(boxH * 0.25, Math.max(0, (boxH - maxH) / 2));
+    paneBlocks.forEach(({ b, body }) => {
+      const delta = (b.getBoundingClientRect().top - body.getBoundingClientRect().top) - topOffset;
+      if (Math.abs(delta) > 2) body.scrollTop += delta;
+    });
+  }
+
+  if (pageBlocks.length) {
+    // 1 kolom / grid sejajar / atas-bawah: gulir halaman. Yang diposisikan
+    // adalah SATU KELOMPOK (semua bahasa ayat ini, mis. 3 baris di mode
+    // atas-bawah) supaya seluruhnya tampak, bukan cuma baris pertama.
+    let gTop = Infinity, gBottom = -Infinity;
+    pageBlocks.forEach((b) => {
+      const r = b.getBoundingClientRect();
+      if (r.top < gTop) gTop = r.top;
+      if (r.bottom > gBottom) gBottom = r.bottom;
+    });
+    const header = document.querySelector(".app-header");
+    const headerH = header ? header.offsetHeight : 0;
+    const avail = Math.max(0, window.innerHeight - headerH);
+    const gap = Math.max(0, (avail - (gBottom - gTop)) / 2);
+    const delta = gTop - headerH - gap;
+    if (Math.abs(delta) > 2) window.scrollBy({ top: delta, left: 0, behavior: "auto" });
+  }
+}
+
+// Dipanggil oleh hal-hal yang menggeser tata letak SESUDAH render
+// (judul Garis Besar, kotak media, hitung ulang tinggi kolom).
+function reapplyVerseJump_() {
+  if (_verseJump) applyVerseJump_();
+}
+
+function startVerseJump_(verseNum) {
+  const id = ++_verseJumpSeq;
+  _verseJump = { verse: verseNum, id };
+  if (!_verseJumpCancelWired) {
+    _verseJumpCancelWired = true;
+    // Pengguna mulai menggulir/menyentuh sendiri -> jangan ditarik balik.
+    ["wheel", "touchstart", "mousedown", "keydown"].forEach((evt) => {
+      document.addEventListener(evt, () => { _verseJump = null; }, { capture: true, passive: true });
+    });
+  }
+  const run = () => {
+    if (_verseJump && _verseJump.id === id) applyVerseJump_();
+  };
+  requestAnimationFrame(run);
+  [60, 200, 450, 900, 1500, 2500].forEach((ms) => setTimeout(run, ms));
+  // Berhenti "menjaga" setelah tata letak pasti tenang.
+  setTimeout(() => { if (_verseJump && _verseJump.id === id) _verseJump = null; }, 3200);
 }
 
 // Dipakai baik oleh strip lompat ayat MAUPUN navigasi Ayat
