@@ -4417,7 +4417,7 @@ body.ps-scrollbars-hidden .ps-quick-menu-panel {
   background: rgba(216, 180, 92, 0.14); border: 1px solid rgba(216, 180, 92, 0.4);
   border-radius: 4px; padding: 1px 6px; margin-right: 6px;
 }
-.ps-version-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
+.ps-version-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; font-size: 12px; } /* v60: 10 versi, label PINYIN lebih panjang */
 .ps-version-grid label { display: flex; align-items: center; gap: 4px; }
 
 .ps-dropzone {
