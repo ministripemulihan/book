@@ -4735,11 +4735,20 @@ const PresentationStudio = (() => {
       return { ref, groups: outGroups, flatTexts, extra: notesExtra };
     }
 
+    // BARU (v65) -- versi yang dicentang tapi datanya BELUM ada di perangkat (mis. Pinyin belum terunduh)
+    // dulu diam-diam dilewati; sekarang diberi peringatan di pratinjau.
+    function missingVersionsWarning_() {
+      if (typeof verseIndex === "undefined" || !verseIndex || typeof bibleData === "undefined" || !bibleData.length) return "";
+      const miss = getCheckedVersions().filter((c) => !verseIndex[c]);
+      if (!miss.length) return "";
+      return `<p class="present-saved-empty" style="color:#b45309;">⚠️ Belum ada datanya di perangkat ini: ${escapeHtml(miss.map((c) => VERSION_LABELS[c] || c).join(", "))}. Buka menu ⋮ &gt; 📥 Bahasa yang Diunduh &amp; Disimpan &gt; ☑️ Centang semua, lalu 🔄 Sinkronkan ulang Alkitab.</p>`;
+    }
     function updatePreview() {
       if (!preview) return;
       const blocks = resolveRefBlocks();
-      if (!blocks.length) { preview.innerHTML = '<p class="present-saved-empty">Belum ada ayat cocok.</p>'; return; }
-      preview.innerHTML = blocks.map((b) => `<div class="ps-quick-preview-block"><b>${escapeHtml(b.refLabel)}</b>${b.versions.map((v) => `<div class="ps-quick-preview-vrow"><span class="ps-quick-preview-vtag">${escapeHtml(v.label)}</span>${escapeHtml(v.text)}</div>`).join("")}</div>`).join("");
+      const warn_ = missingVersionsWarning_();
+      if (!blocks.length) { preview.innerHTML = warn_ + '<p class="present-saved-empty">Belum ada ayat cocok.</p>'; return; }
+      preview.innerHTML = warn_ + blocks.map((b) => `<div class="ps-quick-preview-block"><b>${escapeHtml(b.refLabel)}</b>${b.versions.map((v) => `<div class="ps-quick-preview-vrow"><span class="ps-quick-preview-vtag">${escapeHtml(v.label)}</span>${escapeHtml(v.text)}</div>`).join("")}</div>`).join("");
     }
 
     if (input) {

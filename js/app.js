@@ -1382,8 +1382,37 @@ function wireBibleLangFilterUi() {
         return;
       }
       commitFilter_();
+      refreshLangHint_();
     });
   });
+
+  // BARU (v65, 15 Okt 2026) -- petunjuk bahasa yang BELUM dicentang / SUDAH dicentang tapi belum terunduh
+  // (mis. Mandarin Pinyin baru ditambahkan), + tombol "☑️ Centang semua".
+  const hintEl = el("bibleLangNewHint");
+  function labelOfCode_(code) { const f = CONFIG.LANGUAGES.find((l) => l.code === code); return f ? f.label : code; }
+  function refreshLangHint_() {
+    if (!hintEl) return;
+    const boxes = Array.from(wrap.querySelectorAll("input[type=checkbox]"));
+    const unchecked = boxes.filter((b) => !b.checked).map((b) => labelOfCode_(b.dataset.langCode));
+    const haveIdx = typeof verseIndex !== "undefined" && verseIndex;
+    const notDownloaded = haveIdx && bibleData && bibleData.length
+      ? boxes.filter((b) => b.checked && !verseIndex[b.dataset.langCode]).map((b) => labelOfCode_(b.dataset.langCode))
+      : [];
+    let msg = "";
+    if (unchecked.length) msg = "⚠️ Belum dicentang (TIDAK akan diunduh/disimpan): " + unchecked.join(", ") + ". Tekan ☑️ Centang semua, lalu 🔄 Sinkronkan ulang Alkitab.";
+    else if (notDownloaded.length) msg = "ℹ️ Sudah dicentang tapi belum ada di perangkat ini: " + notDownloaded.join(", ") + ". Jalankan 🔄 Sinkronkan ulang Alkitab (centang bagian Alkitab) supaya terunduh.";
+    hintEl.textContent = msg;
+    hintEl.hidden = !msg;
+  }
+  const allBtn = el("bibleLangCheckAllBtn");
+  if (allBtn) allBtn.addEventListener("click", () => {
+    wrap.querySelectorAll("input[type=checkbox]").forEach((b) => { b.checked = true; });
+    commitFilter_(); // semua tercentang -> disimpan sebagai array kosong (= semua bahasa, termasuk bahasa baru berikutnya)
+    refreshLangHint_();
+    const resyncBtn = el("resyncBtn");
+    if (resyncBtn && confirm("Semua bahasa dicentang. Sinkronkan ulang Alkitab sekarang supaya bahasa yang belum ada (mis. Pinyin) terunduh?")) resyncBtn.click();
+  });
+  refreshLangHint_();
 }
 
 // ------------------------------------------------------------
