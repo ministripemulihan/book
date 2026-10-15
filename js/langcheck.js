@@ -39,6 +39,8 @@ const LANG_CHECK_EXPECTED_FAMILY = {
   jawa: "jv",
   chs: "zh-trad",
   chssmp: "zh-simp",
+  // v60: chs_pinyin & chssmp_pinyin SENGAJA tidak didaftarkan -- pinyin ditulis huruf latin,
+  // pendeteksi bahasa akan salah menganggapnya Indonesia/Inggris (kode di luar daftar dilewati).
 };
 
 const LANG_CHECK_FAMILY_LABEL = {
