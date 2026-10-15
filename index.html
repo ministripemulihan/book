@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261015d" />
+<link rel="stylesheet" href="css/style.css?v=20261016a" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1892,6 +1892,8 @@
             <label><input type="checkbox" value="rveng" /> ENG-RCV</label>
             <label><input type="checkbox" value="chs" /> MDR</label>
             <label><input type="checkbox" value="chssmp" /> MDR-S</label>
+            <label><input type="checkbox" value="chs_pinyin" /> MDR-PINYIN</label>
+            <label><input type="checkbox" value="chssmp_pinyin" /> MDR-S-PINYIN</label>
             <label><input type="checkbox" value="kjv" /> KJV</label>
             <label><input type="checkbox" value="jawa" /> JAWA</label>
           </div>
@@ -4171,7 +4173,7 @@
        PALING AWAL karena dipakai layar Masuk (sebelum login), dan
        dipakai lagi oleh js/games/penciptaan.js di bawah. -->
   <script src="js/book-scene.js?v=20260928a"></script>
-  <script src="js/config.js?v=20260921c"></script>
+  <script src="js/config.js?v=20261016a"></script>
   <script src="js/yt-thumb-cache.js?v=20261003b"></script> <!-- 3 Okt 2026: thumbnail YouTube tersimpan untuk offline (komputer saja) -->
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260914b"></script>
@@ -4185,7 +4187,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20261015a"></script>
+  <script src="js/collections.js?v=20261016a"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -4198,7 +4200,7 @@
   <!-- BARU (21 Sep 2026) -- 🖍️ Penanda/Stabilo berkategori + ✏️ Edit Ayat oleh administrator. Additive: js/highlights.js tidak berubah. -->
   <script src="js/annotations.js?v=20260921b"></script>
   <script src="js/bible-edit.js?v=20260921b"></script>
-  <script src="js/media.js?v=20260915d"></script>
+  <script src="js/media.js?v=20261016a"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20260920d"></script>
   <script src="js/kidung-ref.js?v=20261004a"></script> <!-- 28 Sep 2026: kode KidungRef K130/S130/KA13 -->
@@ -4224,7 +4226,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261015d"></script>
+  <script src="js/presentation-studio.js?v=20261016a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4248,13 +4250,13 @@
   <script src="js/media-library.js?v=20261003b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20261015c"></script>
+  <script src="js/app.js?v=20261016a"></script>
   <script src="js/sync-checklist.js?v=20260930a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->
   <script src="js/aichat-riset.js?v=20260921a"></script>
   <script src="js/aichat.js?v=20260921a"></script>
-  <script src="js/langcheck.js?v=20260818b"></script>
+  <script src="js/langcheck.js?v=20261016a"></script>
   <script src="js/kidungversecheck.js?v=20260821a"></script>
   <!-- BARU (7 Sep 2026, permintaan operator) -- daftarkan Service Worker
        (sw.js) supaya aplikasi ini SENDIRI (HTML/CSS/JS/font) bisa
