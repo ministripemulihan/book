@@ -956,7 +956,7 @@ async function getEffectiveBibleSizeMb() {
   if (Number.isFinite(remoteVal) && remoteVal > 0) return remoteVal;
   const local = loadMeasuredBibleSizeMbLocal_();
   if (local) return local;
-  return (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 60;
+  return (typeof CONFIG !== "undefined" && CONFIG.BIBLE_DATA_APPROX_SIZE_MB) || 70;
 }
 
 const MEASURED_SIZE_KEY = "bible_app_measured_size_mb_v1";

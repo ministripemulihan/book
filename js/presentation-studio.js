@@ -4539,6 +4539,7 @@ const PresentationStudio = (() => {
   const VERSION_LABELS = {
     ind: "ITB", rvind: "IND-RCV", eng: "ENG", rveng: "ENG-RCV",
     chs: "MDR", chssmp: "MDR-S", kjv: "KJV", jawa: "JAWA",
+    chs_pinyin: "MDR-PINYIN", chssmp_pinyin: "MDR-S-PINYIN", // v60
   };
 
   // Pecah 1 baris ketik-cepat jadi daftar referensi tunggal, dengan

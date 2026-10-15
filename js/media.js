@@ -307,6 +307,8 @@ const MEDIA_LANG_SHEET_KEYS = {
   rveng: ["pb_inggris"],
   chs: ["pb_mandarin"],
   chssmp: ["pb_mandarin"],
+  chs_pinyin: ["pb_mandarin"], // v60: pinyin = Mandarin yang sama, audionya sama
+  chssmp_pinyin: ["pb_mandarin"],
 };
 
 // Susun ulang urutan sheet yang akan dicek: sheet yang cocok dengan
