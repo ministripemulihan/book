@@ -6712,6 +6712,10 @@
           const blocks = (g.texts || []).map((t) => `<div class="verse-version-block">${t.label ? `<span class="verse-version-tag">${esc_(t.label)}</span>` : ""}${esc_(t.text)}</div>`).join("");
           return `<div class="verse-group">${head}${blocks}</div>`;
         }).join("");
+        // v61: kalau tiap ayat sudah punya nama sendiri di atasnya, nama gabungan
+        // di paling atas disembunyikan (terkesan dobel). Tanpa nama per ayat,
+        // nama gabungan di paling atas tetap tampil seperti biasa.
+        if (data.groups.some((g) => g && g.ref)) { refEl.hidden = true; refEl.textContent = ""; }
       } else if (Array.isArray(data.texts) && data.texts.length) {
         // Beberapa versi/terjemahan sekaligus (checklist versi di Studio
         // Presentasi) -- tampil bertumpuk, tiap blok dengan label singkat
