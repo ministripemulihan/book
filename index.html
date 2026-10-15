@@ -651,6 +651,13 @@
         <div class="more-menu-section-title">📥 Bahasa yang Diunduh &amp; Disimpan</div>
         <p class="announcement-compose-hint" style="margin-top:0;">Centang bahasa yang MAU disimpan di perangkat ini. Kosongkan centang bahasa yang tidak dipakai supaya hemat ruang penyimpanan HP. (Catatan: ukuran UNDUHAN dari server tetap sama -- ini cuma mengatur apa yang disimpan setelah diunduh.) Kalau TIDAK ADA yang dicentang sama sekali, semua bahasa disimpan seperti biasa. Setelah mengubah pilihan, tekan "🔄 Sinkronkan ulang Alkitab" supaya berlaku.</p>
         <div id="bibleLangFilterList" class="more-menu-checkbox-list"></div>
+        <!-- BARU (v65, 15 Okt 2026, laporan operator: bahasa baru Mandarin Pinyin tidak ikut terunduh) --
+             daftar centang di atas tersimpan (bibleLangFilter); kalau pernah ada yang dikosongkan, bahasa BARU
+             (mis. chs_pinyin, chssmp_pinyin) tidak ikut tercentang & tidak disimpan. Tombol ini mencentang semuanya. -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+          <button type="button" id="bibleLangCheckAllBtn" class="chip-btn small">☑️ Centang semua</button>
+        </div>
+        <p id="bibleLangNewHint" class="announcement-compose-hint" style="margin-top:6px;" hidden></p>
       </div>
 
 
@@ -4226,7 +4233,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261016c"></script>
+  <script src="js/presentation-studio.js?v=20261016d"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4250,7 +4257,7 @@
   <script src="js/media-library.js?v=20261003b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20261016b"></script>
+  <script src="js/app.js?v=20261016c"></script>
   <script src="js/sync-checklist.js?v=20260930a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->

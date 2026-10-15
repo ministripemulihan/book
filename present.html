@@ -852,14 +852,14 @@
   }
   .verse-group .verse-version-block { margin-bottom: clamp(6px, 1vh, 14px); }
   /* BARU (v63, 15 Okt 2026, permintaan operator) -- NOMOR AYAT di dalam teks ayat gabungan
-     (mis. "17 Ketika ... 18 Yesus ...") tampil kecil di bawah baris (subscript) & berwarna
+     (mis. "17 Ketika ... 18 Yesus ...") tampil kecil di ATAS baris (superscript, v64) & berwarna
      beda dari tulisan: tema gelap = kuning, tema terang = biru tua (kontras, BUKAN sama
      dengan warna tulisan). Warna dari --p-vnum (diisi applyTheme()). */
   .vnum {
     font-family: "Inter", Arial, sans-serif;
     font-weight: 800;
     font-size: 0.58em;
-    vertical-align: sub;
+    vertical-align: super; /* v64: superscript (di atas baris), bukan subscript */
     line-height: 0;
     margin-right: 0.22em;
     color: var(--p-vnum, #ffd84a);
