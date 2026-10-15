@@ -357,11 +357,14 @@ const Presentation = (() => {
     sendToWindow(payload);
   }
 
-  function sendVerse(v, bookLabel) {
+  // v57 (15 Okt 2026): parameter `extra` OPSIONAL pada 3 pengirim ayat di bawah
+  // (mis. { notes: [...] } -- Notes ayat di Layar 2). Tidak diisi = payload
+  // PERSIS seperti sebelumnya.
+  function sendVerse(v, bookLabel, extra) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) openWindow();
     const ref = `${bookLabel || v.bookName || ""} ${v.chapter}:${v.verse}`.trim();
-    post({ type: "verse", ref, text: v.text });
+    post(Object.assign({ type: "verse", ref, text: v.text }, extra || {}));
     flashSendFeedback();
   }
 
@@ -371,10 +374,10 @@ const Presentation = (() => {
   // beberapa blok bertumpuk, masing-masing dengan label singkat versi
   // (mis. "ITB", "ENG-RCV") di depan teksnya, mirip 1 pasal berbahasa
   // ganda di aplikasi Alkitab pada umumnya.
-  function sendVerseMulti(ref, versions) {
+  function sendVerseMulti(ref, versions, extra) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) openWindow();
-    post({ type: "verse", ref, texts: versions });
+    post(Object.assign({ type: "verse", ref, texts: versions }, extra || {}));
     flashSendFeedback();
   }
 
@@ -386,10 +389,10 @@ const Presentation = (() => {
   // js/app.js) untuk item Kumpulan Ayat bertipe "verse" yang punya
   // `verseIds` (lebih dari 1 ayat digabung), TIDAK dibangun ulang dari
   // 1 objek v.bookName/chapter/verse tunggal seperti sendVerse().
-  function sendVerseCombined(ref, text) {
+  function sendVerseCombined(ref, text, extra) {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) openWindow();
-    post({ type: "verse", ref, text });
+    post(Object.assign({ type: "verse", ref, text }, extra || {}));
     flashSendFeedback();
   }
 

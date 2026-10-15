@@ -1943,6 +1943,18 @@ function initColumnsControl() {
   }
   sel2.addEventListener("change", saveLangsAndRerender);
   sel3.addEventListener("change", saveLangsAndRerender);
+
+  // BARU (v55) -- pilihan isi tiap kolom: "📖 Ayat" atau "📝 Notes".
+  const kindSels = [el("columnKind1"), el("columnKind2"), el("columnKind3")];
+  const savedKinds = settings.columnKinds || [];
+  kindSels.forEach((ks, i) => {
+    if (!ks) return;
+    ks.value = savedKinds[i] === "note" ? "note" : "verse";
+    ks.addEventListener("change", () => {
+      setSetting(currentUser, "columnKinds", kindSels.map((k) => (k && k.value === "note" ? "note" : "verse")));
+      rerenderIfReading();
+    });
+  });
 }
 
 function showLangUnavailable() {
@@ -2861,7 +2873,7 @@ function openHighlightPopup(anchorEl, block, v) {
 // dilompati sekaligus (bukan cuma kolom pertama) supaya konsisten
 // dgn ayat mana pun yang sedang dilihat operator.
 function scrollToVerseInReader_(chapter, verseNum) {
-  const btns = Array.from(document.querySelectorAll(".verse-num-btn")).filter(
+  const btns = Array.from(document.querySelectorAll(".verse-num-btn, .verse-num[data-verse-num]")).filter(
     (b) => b.textContent.trim() === String(verseNum)
   );
   if (!btns.length) return false;
@@ -3093,6 +3105,78 @@ async function insertOutlineHeaders(wrap, bookNum, chapter, verses) {
   if (typeof reapplyVerseJump_ === "function") reapplyVerseJump_(); // judul baru menggeser tata letak -> posisi ayat tujuan dikoreksi
 }
 
+// BARU (v55, 15 Okt 2026, permintaan operator) -- tiap kolom bisa berisi
+// "Ayat" (bawaan) atau "Notes" (catatan ayat itu, di bahasa kolom itu).
+// Contoh: Kolom 1 = Indonesia/Ayat, Kolom 2 = Inggris/Notes -> ayat
+// Indonesia di kiri, notes Inggris di kanan; atau Kolom 1 = Mandarin/Ayat,
+// Kolom 2 = Indonesia/Notes. Datanya sudah ada (tiap bahasa punya ayat +
+// notes sendiri, v.note), jadi ini cuma soal TAMPILAN. Tetap sejajar per
+// nomor ayat di ketiga arah (Sejajar/Bebas+Sync/Atas-bawah).
+function columnKindOf_(col) { return col && col.kind === "note" ? "note" : "verse"; }
+function columnHeadLabel_(col) {
+  if (!col || !col.lang) return "— pilih bahasa —";
+  return langLabelFor(col.lang) + (columnKindOf_(col) === "note" ? " — 📝 Notes" : "");
+}
+function buildColumnBlock_(col, v, idx, displayName) {
+  return columnKindOf_(col) === "note"
+    ? buildNoteColumnBlock(v, idx, displayName)
+    : buildVerseBlock(v, idx, displayName, col.verses);
+}
+// Blok Notes 1 ayat: nomor ayat (penanda sejajar) + isi catatan admin
+// (footnote berformat, nomor/huruf bisa ditekan seperti biasa) + catatan
+// pribadi pengguna kalau ada. Ayat tanpa notes tampil abu-abu "tidak ada".
+function buildNoteColumnBlock(v, idx, displayName) {
+  const block = document.createElement("div");
+  block.className = "verse-block verse-note-block";
+  block.id = "n-" + v.id;
+  block.style.animationDelay = Math.min(idx * 35, 700) + "ms";
+  if (highlightVerse && v.verse === highlightVerse) block.classList.add("highlight");
+
+  const num = document.createElement("span");
+  num.className = "verse-num";
+  num.dataset.verseNum = String(v.verse);
+  num.textContent = v.verse;
+  block.appendChild(num);
+
+  const body = document.createElement("div");
+  body.className = "verse-note-col-body";
+  const hasAdminNote = !!(v.note && v.note.trim());
+  const personal = (typeof getPersonalNote === "function" ? (getPersonalNote(currentUser, v.id) || "") : "").trim();
+  if (hasAdminNote) {
+    const adminText = document.createElement("div");
+    adminText.className = "note-modal-admin-text";
+    adminText.innerHTML = typeof buildFootnoteEntriesHtml === "function"
+      ? buildFootnoteEntriesHtml(v.note, v.bookNumber, v.chapter)
+      : linkifyOsisReferences(sanitizeNoteHtml(v.note), v.bookNumber, v.chapter);
+    adminText.addEventListener("click", (e) => {
+      const btn = e.target.closest(".note-verse-ref");
+      if (!btn) return;
+      e.stopPropagation();
+      toggleInlineVerseRefPreview(btn, v.lang);
+    });
+    body.appendChild(adminText);
+  }
+  if (personal) {
+    const pw = document.createElement("div");
+    pw.className = "verse-note-col-personal";
+    const pl = document.createElement("div");
+    pl.className = "note-modal-label";
+    pl.textContent = "🖊️ Catatan pribadi";
+    const pt = document.createElement("div");
+    pt.textContent = personal;
+    pt.style.whiteSpace = "pre-wrap";
+    pw.appendChild(pl);
+    pw.appendChild(pt);
+    body.appendChild(pw);
+  }
+  if (!hasAdminNote && !personal) {
+    body.classList.add("verse-note-col-empty");
+    body.textContent = "— tidak ada notes untuk ayat ini —";
+  }
+  block.appendChild(body);
+  return block;
+}
+
 // Tampilan beberapa kolom berdampingan (bahasa berbeda per kolom), untuk
 // membaca beberapa terjemahan sekaligus. Kolom 1 selalu memakai bahasa
 // aktif (langSelect); kolom 2 & 3 memakai bahasa yang dipilih di menu ⋮.
@@ -3135,12 +3219,13 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
     if (oldSyncBtn) oldSyncBtn.remove();
   }
 
-  const columns = [{ lang: currentLang, verses: primaryVerses }];
+  const kinds = getSetting(currentUser, "columnKinds") || [];
+  const columns = [{ lang: currentLang, verses: primaryVerses, kind: kinds[0] === "note" ? "note" : "verse" }];
   for (let i = 0; i < columnsCount - 1; i++) {
     const lang = extraLangs[i];
     let verses = lang ? getChapterVerses(lang, bookNum, chapter) : [];
     if (singleVerseNum) verses = verses.filter((v) => v.verse === singleVerseNum);
-    columns.push({ lang, verses });
+    columns.push({ lang, verses, kind: kinds[i + 1] === "note" ? "note" : "verse" });
   }
 
   // BARU (6 Sep 2026, permintaan operator) -- SEKARANG ADA 3 PILIHAN
@@ -3191,7 +3276,7 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
   columns.forEach((col) => {
     const head = document.createElement("div");
     head.className = "reader-column-head grid-head";
-    head.textContent = col.lang ? langLabelFor(col.lang) : "— pilih bahasa —";
+    head.textContent = columnHeadLabel_(col);
     wrap.appendChild(head);
   });
 
@@ -3218,7 +3303,7 @@ function renderColumnsGridAligned(wrap, columns, displayName, columnsCount) {
       cell.className = "reader-grid-cell";
       const v = col.verses.find((vv) => vv.verse === vnum);
       if (v) {
-        cell.appendChild(buildVerseBlock(v, vnum - 1, displayName, col.verses));
+        cell.appendChild(buildColumnBlock_(col, v, vnum - 1, displayName));
       } else {
         cell.classList.add("reader-grid-cell-empty");
       }
@@ -3311,7 +3396,7 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
     head.className = "reader-col-pane-head";
     const title = document.createElement("span");
     title.className = "reader-col-pane-title";
-    title.textContent = col.lang ? langLabelFor(col.lang) : "— pilih bahasa —";
+    title.textContent = columnHeadLabel_(col);
     head.appendChild(title);
     // Toggle "🔗 Sync" -- pola/komponen SAMA seperti toggle lain di app
     // ini (.toggle-switch/.toggle-slider, lihat css/style.css), dipakai
@@ -3367,7 +3452,7 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
       empty.textContent = "Pasal ini belum tersedia.";
       body.appendChild(empty);
     } else {
-      col.verses.forEach((v, idx) => body.appendChild(buildVerseBlock(v, idx, displayName, col.verses)));
+      col.verses.forEach((v, idx) => body.appendChild(buildColumnBlock_(col, v, idx, displayName)));
     }
     pane.appendChild(body);
     wrap.appendChild(pane);
@@ -3438,6 +3523,47 @@ function wireColumnPaneFullscreenEsc() {
   });
 }
 
+// BARU (v54, 15 Okt 2026, laporan operator: "kalau ayatnya sudah banyak
+// & masuk ke nomor lebih dari 1 (mis. ayat 9, 19) kolom Inggris & Indonesia
+// tidak sejajar") -- penyebabnya: Sync antar-kolom dulu menyamakan posisi
+// per PERSENTASE gulir, padahal tinggi tiap ayat beda di tiap bahasa
+// (Inggris biasanya lebih panjang), jadi makin ke bawah makin meleset.
+// Dua fungsi di bawah dipakai wireColumnPaneSync(): yang pertama mencatat
+// "ayat nomor berapa yang sedang di tepi atas kolom ini + sudah berapa
+// bagian dari ayat itu terlewati", yang kedua menggulir kolom lain ke
+// ayat bernomor SAMA di posisi relatif yang sama.
+function paneVerseNum_(block) {
+  const n = block && block.querySelector ? block.querySelector(".verse-num-btn, .verse-num[data-verse-num]") : null;
+  return n ? n.textContent.trim() : "";
+}
+function paneVerseAnchor_(body) {
+  const blocks = body.querySelectorAll(".verse-block");
+  if (!blocks.length) return null;
+  const topY = body.getBoundingClientRect().top;
+  for (let k = 0; k < blocks.length; k++) {
+    const r = blocks[k].getBoundingClientRect();
+    if (r.bottom > topY + 1) {
+      const num = paneVerseNum_(blocks[k]);
+      if (!num) return null;
+      const h = Math.max(1, r.height);
+      return { num, frac: Math.max(0, Math.min(1, (topY - r.top) / h)) };
+    }
+  }
+  return null;
+}
+function alignPaneToVerseAnchor_(body, anchor) {
+  const blocks = body.querySelectorAll(".verse-block");
+  let target = null;
+  for (let k = 0; k < blocks.length; k++) {
+    if (paneVerseNum_(blocks[k]) === anchor.num) { target = blocks[k]; break; }
+  }
+  if (!target) return false;
+  const r = target.getBoundingClientRect();
+  const delta = (r.top - body.getBoundingClientRect().top) + anchor.frac * r.height;
+  if (Math.abs(delta) > 0.5) body.scrollTop += delta;
+  return true;
+}
+
 // Menyambungkan event scroll antar-panel (lihat catatan panjang di
 // renderColumnsIndependentPanes() di atas untuk cara kerjanya). Dipasang
 // ULANG setiap render (tiap pindah pasal/ayat, kolom lama dibuang total
@@ -3455,12 +3581,21 @@ function wireColumnPaneSync(wrap) {
       if (programmatic) return;
       if (window._readerVerseJumpLock && Date.now() < window._readerVerseJumpLock) return; // lompat ke nomor ayat: tiap kolom sudah digulir ke ayatnya sendiri, jangan diratakan per persentase
       if (!syncInputs[i] || !syncInputs[i].checked) return; // kolom SUMBER harus Sync aktif juga -- kalau dimatikan, geserannya TIDAK menyeret kolom lain
+      if (Date.now() - (body._syncSetAt || 0) < 150) return; // scroll ini akibat penyejajaran kita sendiri (v54), bukan geseran jari -- jangan dipantulkan balik
       const range = body.scrollHeight - body.clientHeight;
       const frac = range > 0 ? body.scrollTop / range : 0;
+      // BARU (v54, 15 Okt 2026) -- sejajar PER NOMOR AYAT: cari ayat yang
+      // sedang berada di tepi atas kolom sumber (+ seberapa jauh sudah
+      // terbaca di dalam ayat itu), lalu kolom lain digulir ke ayat YANG
+      // SAMA. Persentase lama hanya dipakai kalau kolom tujuan tidak
+      // punya ayat itu (mis. ayat tidak ada di bahasa tersebut).
+      const anchor = paneVerseAnchor_(body);
       programmatic = true;
       bodies.forEach((otherBody, j) => {
         if (j === i || !otherBody) return;
         if (!syncInputs[j] || !syncInputs[j].checked) return; // kolom TUJUAN juga harus Sync aktif -- kalau dimatikan, biarkan posisinya, jangan diseret
+        otherBody._syncSetAt = Date.now();
+        if (anchor && alignPaneToVerseAnchor_(otherBody, anchor)) return;
         const otherRange = otherBody.scrollHeight - otherBody.clientHeight;
         otherBody.scrollTop = otherRange > 0 ? frac * otherRange : 0;
       });
@@ -3504,10 +3639,10 @@ function renderColumnsStacked(wrap, columns, displayName) {
     const langsWithVerse = columns.filter((col) => col.verses.some((vv) => vv.verse === vnum));
     langsWithVerse.forEach((col, colIdxInGroup) => {
       const v = col.verses.find((vv) => vv.verse === vnum);
-      const block = buildVerseBlock(v, groupIdx, displayName, col.verses);
+      const block = buildColumnBlock_(col, v, groupIdx, displayName);
       const langTag = document.createElement("span");
       langTag.className = "reader-stacked-lang-tag";
-      langTag.textContent = col.lang ? langLabelFor(col.lang) : "?";
+      langTag.textContent = col.lang ? columnHeadLabel_(col) : "?";
       block.insertBefore(langTag, block.firstChild);
       // Garis pemisah SETELAH baris bahasa TERAKHIR dalam kelompok ayat
       // ini (bukan setelah tiap baris), supaya kelompok per-ayat tetap
@@ -3898,7 +4033,7 @@ function findVerseBlocksInReader_(verseNum) {
   if (!wrap) return [];
   const want = String(verseNum);
   return Array.from(wrap.querySelectorAll(".verse-block")).filter((b) => {
-    const n = b.querySelector(".verse-num-btn");
+    const n = b.querySelector(".verse-num-btn, .verse-num[data-verse-num]");
     return n && n.textContent.trim() === want;
   });
 }
@@ -6197,6 +6332,53 @@ function combineVerseGroupForSlide(verseIds) {
   return { ref: refParts.join("; "), text: textParts.join("\n\n") };
 }
 
+// BARU (v56, 15 Okt 2026) -- item ayat MULTI-BAHASA di Kumpulan Ayat
+// (it.langs = kode bahasa >1, disimpan lewat tombol "➕ Daftar" di Studio,
+// lihat addVerseGroupToCollection() di js/collections.js). Ayat tiap bahasa
+// dicari ulang dari ayat bahasa pertama (kitab+pasal+nomor ayat), jadi
+// SELALU ayat yang sama di semua bahasa. Balikan null kalau bukan item
+// multi-bahasa / ayatnya tidak ditemukan -> pemanggil jatuh ke jalur lama.
+// Balikan: { ref, groups:[{ref, texts:[{code,label,text}]}], flatTexts, plainText }
+// Juga dipakai item gabungan 1 BAHASA yang minta "nama ayat di atas tiap
+// ayat" (it.verseIds >1 + it.eachRef === true): langs = [bahasa ayat itu],
+// label bahasa dikosongkan (tidak ada tag IND/ENG kalau cuma 1 bahasa).
+function isMultiLangVerseItem_(it) {
+  return !!(it && it.type === "verse" && Array.isArray(it.langs) && it.langs.length > 1);
+}
+function isStructuredVerseItem_(it) {
+  return isMultiLangVerseItem_(it) || !!(it && it.type === "verse" && it.eachRef === true && it.verseIds && it.verseIds.length > 1);
+}
+function resolveMultiLangVerseItem_(it) {
+  if (!isStructuredVerseItem_(it)) return null;
+  const ids = it.verseIds && it.verseIds.length ? it.verseIds : [it.verseId];
+  const base = ids.map((id) => verseById[id]).filter(Boolean);
+  if (!base.length) return null;
+  const multi = isMultiLangVerseItem_(it);
+  const langs = multi ? it.langs : [base[0].lang];
+  const labels = (typeof BIBLE_VERSION_SHORT_LABELS !== "undefined") ? BIBLE_VERSION_SHORT_LABELS : {};
+  const labelOf = (code) => (multi ? (labels[code] || String(code).toUpperCase()) : "");
+  const eachRef = it.eachRef !== false && base.length > 1; // 1 ayat saja: nama ayat cukup di atas
+  const groups = [];
+  base.forEach((v) => {
+    const texts = [];
+    langs.forEach((code) => {
+      const hit = (getChapterVerses(code, v.bookNumber, v.chapter) || []).find((x) => x.verse === v.verse);
+      if (hit) texts.push({ code, label: labelOf(code), text: hit.text, _n: v.verse });
+    });
+    if (texts.length) groups.push({ ref: eachRef ? `${v.bookName} ${v.chapter}:${v.verse}` : "", texts });
+  });
+  if (!groups.length) return null;
+  const ref = combineVerseGroupForSlide(base.map((v) => v.id)).ref;
+  const single = groups.length === 1;
+  const flatTexts = langs.map((code) => {
+    const parts = groups.map((g) => { const t = g.texts.find((x) => x.code === code); return t ? (single ? t.text : `${t._n} ${t.text}`) : ""; }).filter(Boolean);
+    return parts.length ? { code, label: labelOf(code), text: parts.join(" ") } : null;
+  }).filter(Boolean);
+  groups.forEach((g) => g.texts.forEach((t) => { delete t._n; }));
+  const plainText = groups.map((g) => (g.ref ? g.ref + "\n" : "") + g.texts.map((t) => (t.label ? `[${t.label}] ` : "") + t.text).join("\n")).join("\n\n");
+  return { ref, groups, flatTexts, plainText };
+}
+
 function collectionItemRef(it) {
   if (it.type === "verse") {
     // BARU (18 Sep 2026) -- it.verseIds (>1 ayat digabung 1 slide),
@@ -6269,6 +6451,9 @@ function collectionItemRef(it) {
 // lihat js/presentation-studio.js untuk versi Studio 2 Layarnya).
 function collectionItemBodyText(it) {
   if (it.type === "verse") {
+    // BARU (v56) -- item multi-bahasa: tampilkan semua bahasa (IND lalu ENG dst) per ayat.
+    const ml = resolveMultiLangVerseItem_(it);
+    if (ml) return ml.plainText;
     // BARU (18 Sep 2026) -- lihat catatan combineVerseGroupForSlide() di atas.
     if (it.verseIds && it.verseIds.length > 1) return combineVerseGroupForSlide(it.verseIds).text;
     const v = verseById[it.verseId];

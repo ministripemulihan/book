@@ -687,6 +687,16 @@ const PresentationStudio = (() => {
     }
     if (payload.type === "verse" || payload.type === "text") {
       const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
+      if (payload.type === "verse" && Array.isArray(payload.groups) && payload.groups.length) {
+        // v54 -- slide gabungan multi-bahasa: tiap ayat berpasangan dengan terjemahannya.
+        const groupsHtml = payload.groups.map((g) => {
+          const head = g.ref ? `<div class="present-preview-ref" style="font-size:0.8em;">${escapeHtml(g.ref)}</div>` : "";
+          const rows = (g.texts || []).map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${escapeHtml(t.text || "")}</div>`).join("");
+          return `<div class="present-preview-group">${head}${rows}</div>`;
+        }).join("");
+        box.innerHTML = `${refHtml}${groupsHtml}`;
+        return;
+      }
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
         const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${escapeHtml(t.text || "")}</div>`).join("");
         box.innerHTML = `${refHtml}${versionsHtml}`;
@@ -1311,7 +1321,7 @@ const PresentationStudio = (() => {
   // BARU (12 Sep 2026 v8, laporan operator "thumbnail kok kecil banget") --
   // "🖼️ Ukuran Thumbnail" di atas daftar Kumpulan Ayat: 2 tombol preset
   // cepat (44px "Kecil" bawaan / 176px "Besar", persis 4x lipat) + 1
-  // slider manual (32-220px) untuk operator yang mau ukuran di antaranya.
+  // slider manual (32-500px) untuk operator yang mau ukuran di antaranya.
   // Diterapkan lewat 1 variabel CSS `--ps-thumb-size` di :root (dibaca
   // .ps-verse-thumb, lihat css/style.css) -- SATU tempat ini cukup untuk
   // semua thumbnail yang sudah ada di DOM sekaligus, TANPA perlu
@@ -1321,7 +1331,7 @@ const PresentationStudio = (() => {
   const COLLECTION_THUMB_SIZE_KEY = "ps_collection_thumb_size_v1";
   function getCollectionThumbSizePx_() {
     const v = parseInt(localStorage.getItem(COLLECTION_THUMB_SIZE_KEY), 10);
-    return Number.isFinite(v) && v >= 32 && v <= 220 ? v : 44;
+    return Number.isFinite(v) && v >= 32 && v <= 500 ? v : 44;
   }
   function applyCollectionThumbSizePx_(px) {
     document.documentElement.style.setProperty("--ps-thumb-size", px + "px");
@@ -1339,7 +1349,7 @@ const PresentationStudio = (() => {
     }
     refreshPresetActive(initialPx);
     function setSize(px) {
-      px = Math.max(32, Math.min(220, Math.round(px)));
+      px = Math.max(32, Math.min(500, Math.round(px)));
       localStorage.setItem(COLLECTION_THUMB_SIZE_KEY, String(px));
       applyCollectionThumbSizePx_(px);
       if (slider) slider.value = px;
@@ -1659,6 +1669,61 @@ const PresentationStudio = (() => {
     };
   }
 
+  // ------------------------------------------------------------
+  // v57 (15 Okt 2026, permintaan operator) -- NOTES AYAT di Layar 2.
+  // Kotak centang + pilihan bahasa notes (Indonesia / Inggris) ada di tab
+  // Alkitab (#psQuickShowNotes, #psQuickNotesLang). Kalau aktif, tiap kali
+  // ayat ditayangkan (Tampilkan, atau item ayat dari Kumpulan Ayat / panah),
+  // notes ayat itu (kolom Note di Sheet, bahasa pilihan) ikut dikirim di
+  // payload `notes` dan ditampilkan present.html di bawah ayat. Bahasa notes
+  // BEBAS dari bahasa ayat. Indonesia: Recovery dulu, lalu TB; Inggris:
+  // Recovery dulu, lalu ENG/KJV -- dipakai versi pertama yang punya notes.
+  // Tidak aktif = payload persis seperti sebelumnya.
+  // ------------------------------------------------------------
+  const NOTES_PREF_KEY = "ps_layar2_notes_v1";
+  const NOTES_LANG_CODES = { ind: ["rvind", "ind"], eng: ["rveng", "eng", "kjv"] };
+  const NOTES_MAX_CHARS = 800; // batas per ayat supaya tidak membanjiri layar
+  function notesPrefs_() {
+    const on = el("psQuickShowNotes"), sel = el("psQuickNotesLang");
+    return { on: !!(on && on.checked), lang: sel && sel.value === "eng" ? "eng" : "ind" };
+  }
+  function noteHtmlToPlain_(html) {
+    if (!html) return "";
+    const h = String(html).replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|li)>/gi, "\n");
+    let t;
+    try { t = new DOMParser().parseFromString(h, "text/html").body.textContent || ""; }
+    catch (e) { t = h.replace(/<[^>]*>/g, ""); }
+    return t.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  // verses: [{ bookNum|bookNumber, chapter, verse, bookName }]
+  // Balikan: {} (nonaktif / tidak ada notes) atau { notes:[{ref,text}], notesLang }
+  function buildVerseNotesExtra_(verses) {
+    const pf = notesPrefs_();
+    if (!pf.on || typeof getChapterVerses !== "function") return {};
+    const seen = {}, notes = [];
+    (verses || []).forEach((v) => {
+      if (!v) return;
+      const bn = v.bookNum != null ? v.bookNum : v.bookNumber;
+      const key = bn + ":" + v.chapter + ":" + v.verse;
+      if (seen[key]) return;
+      seen[key] = 1;
+      for (const code of NOTES_LANG_CODES[pf.lang]) {
+        const hit = (getChapterVerses(code, bn, v.chapter) || []).find((x) => x.verse === v.verse && x.note && String(x.note).trim());
+        if (!hit) continue;
+        let text = noteHtmlToPlain_(hit.note);
+        if (!text) continue;
+        if (text.length > NOTES_MAX_CHARS) text = text.slice(0, NOTES_MAX_CHARS).replace(/\s+\S*$/, "") + " …";
+        notes.push({ ref: `${hit.bookName || v.bookName || ""} ${v.chapter}:${v.verse}`.trim(), text });
+        break;
+      }
+    });
+    return notes.length ? { notes, notesLang: pf.lang } : {};
+  }
+  function versesFromIds_(ids) {
+    if (typeof verseById === "undefined") return [];
+    return (ids || []).map((id) => verseById[id]).filter(Boolean);
+  }
+
   // Kirim 1 item generik ke Layar 2 SEKARANG JUGA (live langsung, TIDAK
   // lewat antrean "Berikutnya" -- lihat stageOrSend() di atas, yang
   // TETAP dipakai apa adanya oleh Ayat Cepat/File/YouTube, tidak
@@ -1679,7 +1744,22 @@ const PresentationStudio = (() => {
     // langsung berhenti tanpa efek apa pun -- perilaku LAMA (audio latar
     // manual lewat tombol 🎧/▶ Play) sama sekali tidak berubah.
     autoplayBgAudioIfEnabled_(it);
-    if (it.type === "verse") {
+    if (it.type === "verse" && typeof resolveMultiLangVerseItem_ === "function" && resolveMultiLangVerseItem_(it)) {
+      // BARU (v56) -- item ayat MULTI-BAHASA dari "➕ Daftar": 1 ayat = semua
+      // bahasa bertumpuk (sama seperti "Tampilkan" 1 ayat); >1 ayat = tiap ayat
+      // berpasangan dengan terjemahannya (groups, sama seperti slide gabungan v54).
+      const ml = resolveMultiLangVerseItem_(it);
+      let payload;
+      if (ml.groups.length === 1) {
+        payload = { type: "verse", ref: ml.ref, texts: ml.groups[0].texts.map((t) => ({ code: t.code, label: t.label, text: t.text })) };
+      } else {
+        payload = { type: "verse", ref: ml.ref, texts: ml.flatTexts, groups: ml.groups };
+      }
+      Object.assign(payload, buildVerseNotesExtra_(versesFromIds_(it.verseIds && it.verseIds.length ? it.verseIds : [it.verseId]))); // v57
+      if (Presentation.postRaw) Presentation.postRaw(payload);
+      renderStudioPreview(payload);
+      clearMonitorVideo_();
+    } else if (it.type === "verse") {
       // BARU (18 Sep 2026, permintaan operator "gabung beberapa ayat jadi
       // 1 slide") -- it.verseIds (>1 id) = beberapa ayat digabung 1 slide,
       // lihat combineVerseGroupForSlide() (js/app.js) & UI pemilihnya
@@ -1688,12 +1768,12 @@ const PresentationStudio = (() => {
       // apa adanya -- tidak ada yang berubah untuk kumpulan ayat lama.
       if (it.verseIds && it.verseIds.length > 1 && typeof combineVerseGroupForSlide === "function") {
         const combined = combineVerseGroupForSlide(it.verseIds);
-        if (Presentation.sendVerseCombined) Presentation.sendVerseCombined(combined.ref, combined.text);
+        if (Presentation.sendVerseCombined) Presentation.sendVerseCombined(combined.ref, combined.text, buildVerseNotesExtra_(versesFromIds_(it.verseIds))); // v57: + notes
         renderStudioPreview({ type: "verse", ref: combined.ref, texts: [{ label: "", text: combined.text }] });
         clearMonitorVideo_();
       } else {
         const v = typeof verseById !== "undefined" ? verseById[it.verseId] : null;
-        if (v) Presentation.sendVerse(v, v.bookName);
+        if (v) Presentation.sendVerse(v, v.bookName, buildVerseNotesExtra_([v])); // v57: + notes
         renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? v.text : "" }] });
         clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
       }
@@ -4507,6 +4587,23 @@ const PresentationStudio = (() => {
     const input = el("psQuickRef");
     const preview = el("psQuickPreview");
 
+    // v57 -- pilihan Notes di Layar 2: ingat per perangkat (localStorage).
+    (function wireNotesPrefs_() {
+      const cb = el("psQuickShowNotes"), sel = el("psQuickNotesLang");
+      if (!cb || !sel) return;
+      try {
+        const saved = JSON.parse(localStorage.getItem(NOTES_PREF_KEY) || "null");
+        if (saved) { cb.checked = !!saved.on; if (saved.lang === "eng" || saved.lang === "ind") sel.value = saved.lang; }
+      } catch (e) { /* abaikan */ }
+      const sync = () => {
+        sel.disabled = !cb.checked;
+        try { localStorage.setItem(NOTES_PREF_KEY, JSON.stringify({ on: cb.checked, lang: sel.value })); } catch (e) { /* abaikan */ }
+      };
+      cb.addEventListener("change", sync);
+      sel.addEventListener("change", sync);
+      sel.disabled = !cb.checked;
+    })();
+
     // Versi mana saja yang dicentang di grid; kalau tidak ada satupun
     // dicentang, jatuh balik ke bahasa yang sedang aktif di aplikasi
     // utama supaya kotak Tampilkan tidak pernah kosong tanpa alasan.
@@ -4571,6 +4668,61 @@ const PresentationStudio = (() => {
       return groups;
     }
 
+    // BARU (v54, 15 Okt 2026) -- bangun 1 slide gabungan MULTI-BAHASA dari
+    // hasil resolveRefBlocks(). Ayat-ayat (dari semua blok) dikelompokkan
+    // `groupSize` per slide (kelompok PERTAMA yang ditayangkan, sama seperti
+    // perilaku "Tampilkan" lama). Tiap ayat = 1 kelompok berisi 1 baris per
+    // versi tercentang, urutan versi SAMA di tiap ayat -- jadi Wahyu 2:5 IND
+    // lalu Wahyu 2:5 ENG, bukan semua IND dulu baru semua ENG.
+    // Balikan: { ref, groups:[{ref?, texts:[{label,text}]}], flatTexts }
+    // (flatTexts = cadangan per-bahasa untuk pratinjau/Layar 2 versi lama).
+    function buildMultiLangGroupSlide_(blocks, groupSize) {
+      const versions = getCheckedVersions();
+      const flat = [];
+      blocks.forEach((b) => {
+        const first = b.versions[0];
+        if (!first) return;
+        first.verses.forEach((v) => flat.push({ bookNum: v.bookNumber, chapter: v.chapter, verse: v.verse, id: v.id, bookName: v.bookName }));
+      });
+      if (!flat.length) return null;
+      const size = groupSize === Infinity ? flat.length : groupSize;
+      const chosen = flat.slice(0, size);
+      const eachRef = !el("psQuickEachRef") || !!el("psQuickEachRef").checked;
+      const groups = [];
+      chosen.forEach((v) => {
+        const texts = [];
+        versions.forEach((code) => {
+          const list = getChapterVerses(code, v.bookNum, v.chapter) || [];
+          const hit = list.find((x) => x.verse === v.verse);
+          if (hit) texts.push({ code, label: VERSION_LABELS[code] || code.toUpperCase(), text: hit.text });
+        });
+        if (!texts.length) return;
+        groups.push({ ref: eachRef ? `${v.bookName} ${v.chapter}:${v.verse}` : "", texts, _v: v });
+      });
+      if (!groups.length) return null;
+      // Nama gabungan di paling atas: pakai pola yang sama dengan combineVerseGroupForSlide()
+      // (rentang "1-3" kalau berurutan 1 kitab+pasal; selain itu dipisah ";").
+      const refGroups = [];
+      groups.forEach((g) => {
+        const v = g._v;
+        const last = refGroups[refGroups.length - 1];
+        if (last && last.bookName === v.bookName && last.chapter === v.chapter) last.nums.push(v.verse);
+        else refGroups.push({ bookName: v.bookName, chapter: v.chapter, nums: [v.verse] });
+      });
+      const ref = refGroups.map((g) => {
+        const lo = g.nums[0], hi = g.nums[g.nums.length - 1];
+        return `${g.bookName} ${g.chapter}:${lo === hi ? lo : lo + "-" + hi}`;
+      }).join("; ");
+      // Cadangan datar per-bahasa (tanpa struktur kelompok).
+      const flatTexts = versions.map((code) => {
+        const parts = groups.map((g) => { const t = g.texts.find((x) => x.code === code); return t ? `${g._v.verse} ${t.text}` : ""; }).filter(Boolean);
+        return parts.length ? { code, label: VERSION_LABELS[code] || code.toUpperCase(), text: parts.join(" ") } : null;
+      }).filter(Boolean);
+      const notesExtra = buildVerseNotesExtra_(groups.map((g) => g._v)); // v57
+      groups.forEach((g) => { delete g._v; });
+      return { ref, groups, flatTexts, extra: notesExtra };
+    }
+
     function updatePreview() {
       if (!preview) return;
       const blocks = resolveRefBlocks();
@@ -4597,13 +4749,48 @@ const PresentationStudio = (() => {
         // seperti perilaku lama, lihat catatan di bawah). Versi Alkitab:
         // dibatasi ke versi PERTAMA tercentang saat menggabung (>1 versi
         // sekaligus + >1 ayat sekaligus jadi terlalu padat di 1 slide).
+        // BARU (v54) -- multi-bahasa dalam 1 slide gabungan: dipakai kalau
+        // operator memilih "Semua versi tercentang dalam 1 slide" DAN ada
+        // >1 versi tercentang. Pilihan lain jatuh ke perilaku lama (di bawah).
+        const langModeSel = el("psQuickLangMode");
+        const wantMulti = !!(langModeSel && langModeSel.value === "multi") && getCheckedVersions().length > 1;
+        if (wantMulti && blocks.length > 1 && groupSize > 1) {
+          const slideInfo = buildMultiLangGroupSlide_(blocks, groupSize);
+          if (slideInfo) {
+            const doSendM = () => {
+              if (typeof Presentation !== "undefined" && Presentation.postRaw) {
+                Presentation.postRaw(Object.assign({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: slideInfo.groups }, slideInfo.extra || {}));
+              }
+              renderStudioPreview({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: slideInfo.groups });
+              clearMonitorVideo_();
+            };
+            if (isDualLive()) stageNext(slideInfo.ref, slideInfo.flatTexts.map((t) => "[" + t.label + "] " + t.text).join("  "), doSendM);
+            else doSendM();
+            return;
+          }
+        }
         if (blocks.length > 1 && groupSize > 1 && typeof combineVerseGroupForSlide === "function") {
           const groups = groupBlocksVerseIds(blocks, groupSize);
           const firstGroupIds = groups[0] || [];
+          // BARU (v56) -- gabungan 1 bahasa + "nama ayat di atas tiap ayat" (kotak centang aktif).
+          if (firstGroupIds.length > 1 && (!el("psQuickEachRef") || el("psQuickEachRef").checked) && typeof resolveMultiLangVerseItem_ === "function") {
+            const ml = resolveMultiLangVerseItem_({ type: "verse", verseId: firstGroupIds[0], verseIds: firstGroupIds, eachRef: true });
+            if (ml) {
+              const payloadG = Object.assign({ type: "verse", ref: ml.ref, texts: ml.flatTexts, groups: ml.groups }, buildVerseNotesExtra_(versesFromIds_(firstGroupIds))); // v57
+              const doSendG = () => {
+                if (typeof Presentation !== "undefined" && Presentation.postRaw) Presentation.postRaw(payloadG);
+                renderStudioPreview(payloadG);
+                clearMonitorVideo_();
+              };
+              if (isDualLive()) stageNext(ml.ref, ml.groups.map((g) => (g.ref ? g.ref + " " : "") + g.texts.map((t) => t.text).join(" ")).join("  "), doSendG);
+              else doSendG();
+              return;
+            }
+          }
           const combined = combineVerseGroupForSlide(firstGroupIds);
           const doSend = () => {
             if (typeof Presentation !== "undefined" && Presentation.sendVerseCombined) {
-              Presentation.sendVerseCombined(combined.ref, combined.text);
+              Presentation.sendVerseCombined(combined.ref, combined.text, buildVerseNotesExtra_(versesFromIds_(firstGroupIds))); // v57: + notes
             }
             renderStudioPreview({ type: "verse", ref: combined.ref, texts: [{ label: "", text: combined.text }] });
             clearMonitorVideo_();
@@ -4625,7 +4812,7 @@ const PresentationStudio = (() => {
         // benar didorong live (bukan cuma saat diketik/diantre).
         const doSend = () => {
           if (typeof Presentation !== "undefined" && Presentation.sendVerseMulti) {
-            Presentation.sendVerseMulti(first.refLabel, first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text })));
+            Presentation.sendVerseMulti(first.refLabel, first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text })), buildVerseNotesExtra_(first.versions[0] ? first.versions[0].verses : [])); // v57: + notes
           }
           renderStudioPreview({ type: "verse", ref: first.refLabel, texts: first.versions });
           clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
@@ -4640,6 +4827,10 @@ const PresentationStudio = (() => {
         // Kumpulan Ayat tersimpan per-ayat 1 bahasa (format lama) --
         // dipakai versi PERTAMA yang tercentang supaya format
         // penyimpanan yang sudah ada tidak berubah.
+        // BARU (v56) -- kalau pilihan "Semua versi tercentang dalam 1 slide
+        // (multi-bahasa)" aktif DAN >1 versi dicentang, item disimpan DENGAN
+        // daftar bahasanya (it.langs, lihat addVerseGroupToCollection()) --
+        // ayat di tiap bahasa dicari lagi saat ditayangkan.
         const blocks = resolveRefBlocks();
         if (!blocks.length || typeof addVerseToCollection !== "function") return;
         const verses = [];
@@ -4649,6 +4840,11 @@ const PresentationStudio = (() => {
         const username = typeof currentUser !== "undefined" ? currentUser : null;
         const name = (sel && sel.value && loadCollections(username)[sel.value]) ? loadCollections(username)[sel.value].name : await promptCollectionName(username);
         if (!name) return;
+        const langModeSel = el("psQuickLangMode");
+        const checkedCodes = getCheckedVersions();
+        const multiOpts = (langModeSel && langModeSel.value === "multi" && checkedCodes.length > 1)
+          ? { langs: checkedCodes.slice(), eachRef: !el("psQuickEachRef") || !!el("psQuickEachRef").checked }
+          : null;
         // BARU (18 Sep 2026, permintaan operator) -- "Kalau lebih dari 1
         // ayat, gabung jadi": groupSize 1 (bawaan) = perilaku LAMA persis
         // (1 ayat = 1 item/slide, addVerseToCollection() seperti sebelum
@@ -4657,10 +4853,16 @@ const PresentationStudio = (() => {
         // kalau sisa ayat terakhir kurang dari N, tetap digabung apa
         // adanya (mis. 5 ayat, gabung 2 -> 2+2+1, BUKAN dibuang).
         const groupSize = getQuickGroupSize();
-        if (groupSize > 1 && verses.length > 1 && typeof addVerseGroupToCollection === "function") {
+        if (multiOpts) {
+          // multi-bahasa: groupSize 1 -> 1 item per ayat (tiap item tampil semua bahasa)
+          const gSize = groupSize === Infinity ? verses.length : Math.max(1, groupSize);
+          for (let i = 0; i < verses.length; i += gSize) {
+            addVerseGroupToCollection(username, name, verses.slice(i, i + gSize).map((v) => v.id), multiOpts);
+          }
+        } else if (groupSize > 1 && verses.length > 1 && typeof addVerseGroupToCollection === "function") {
           const gSize = groupSize === Infinity ? verses.length : groupSize;
           for (let i = 0; i < verses.length; i += gSize) {
-            addVerseGroupToCollection(username, name, verses.slice(i, i + gSize).map((v) => v.id));
+            addVerseGroupToCollection(username, name, verses.slice(i, i + gSize).map((v) => v.id), { eachRef: !el("psQuickEachRef") || !!el("psQuickEachRef").checked });
           }
         } else {
           verses.forEach((v) => addVerseToCollection(username, name, v.id));
@@ -7715,9 +7917,10 @@ const PresentationStudio = (() => {
     const volumeLabel = el("psYtVolumeLabel");
     let ytVolume = parseInt(localStorage.getItem(VOLUME_KEY), 10);
     if (isNaN(ytVolume) || ytVolume < 0 || ytVolume > 100) ytVolume = 70;
+    const volumeInput = el("psYtVolumeValue"); // BARU (4 Okt 2026): kotak angka, volume bisa diketik
     function applyVolumeUi_() {
       if (volumeRange) volumeRange.value = String(ytVolume);
-      if (volumeLabel) volumeLabel.textContent = ytVolume + "%";
+      if (volumeInput && document.activeElement !== volumeInput) volumeInput.value = String(ytVolume);
     }
     if (volumeRange) {
       applyVolumeUi_();
@@ -7729,6 +7932,21 @@ const PresentationStudio = (() => {
       });
       rawPost({ type: "yt_control", action: "volume", arg: ytVolume }); // beri tahu Layar 2 volume tersimpan begitu Studio dibuka
     }
+    if (volumeInput) {
+      volumeInput.value = String(ytVolume);
+      const commitVolume_ = () => {
+        const rawVol = String(volumeInput.value).replace(",", ".").trim();
+        let v = rawVol === "" ? NaN : Math.round(Number(rawVol)); // kosong/huruf -> pakai nilai terakhir (bukan 0 = mute)
+        if (!Number.isFinite(v)) v = ytVolume;
+        ytVolume = Math.max(0, Math.min(100, v));
+        volumeInput.value = String(ytVolume);
+        if (volumeRange) volumeRange.value = String(ytVolume);
+        localStorage.setItem(VOLUME_KEY, String(ytVolume));
+        sendYtCommand("volume", ytVolume);
+      };
+      volumeInput.addEventListener("change", commitVolume_);
+      volumeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); volumeInput.blur(); } });
+    }
     // BARU (4 Okt 2026, permintaan operator) -- slider KECEPATAN video YouTube
     // utama (#psYtSpeedRange), pilihan SAMA seperti YouTube: 0,25x 0,5x 0,75x
     // 1x 1,25x 1,5x 1,75x 2x. BAWAAN 1x & kembali ke 1x tiap video baru.
@@ -7736,11 +7954,17 @@ const PresentationStudio = (() => {
     const RATE_STEPS_ = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
     const speedRange = el("psYtSpeedRange");
     const speedLabel = el("psYtSpeedLabel");
+    const speedInput = el("psYtSpeedValue"); // BARU (4 Okt 2026): kotak angka, kecepatan bisa diketik
+    function nearestRateIdx_(r) { // angka bebas -> langkah terdekat (0,25 / 0,5 / ... / 2) -- YouTube hanya mengenal langkah ini
+      let best = 3, bd = Infinity;
+      RATE_STEPS_.forEach((v, i) => { const d = Math.abs(v - r); if (d < bd) { bd = d; best = i; } });
+      return best;
+    }
     function applySpeedUi_(r) {
       let idx = RATE_STEPS_.indexOf(Number(r));
       if (idx < 0) idx = 3;
       if (speedRange) speedRange.value = String(idx);
-      if (speedLabel) speedLabel.textContent = String(RATE_STEPS_[idx]).replace(".", ",") + "x";
+      if (speedInput && document.activeElement !== speedInput) speedInput.value = String(RATE_STEPS_[idx]).replace(".", ",");
     }
     function resetSpeedUi_() { applySpeedUi_(1); }
     if (speedRange) {
@@ -7751,6 +7975,27 @@ const PresentationStudio = (() => {
         sendYtCommand("rate", r); // -> Layar 2 (present.html), action "rate" pada handler "yt_control"
       });
       if (speedLabel) speedLabel.addEventListener("click", () => { applySpeedUi_(1); sendYtCommand("rate", 1); });
+      if (speedInput) {
+        speedInput.value = "1";
+        const commitSpeed_ = (stepDelta) => {
+          let idx;
+          if (typeof stepDelta === "number") idx = Math.max(0, Math.min(RATE_STEPS_.length - 1, (parseInt(speedRange.value, 10) || 3) + stepDelta));
+          else {
+            const n = parseFloat(String(speedInput.value).replace(",", "."));
+            idx = Number.isFinite(n) ? nearestRateIdx_(Math.max(0.25, Math.min(2, n))) : (parseInt(speedRange.value, 10) || 3);
+          }
+          const r = RATE_STEPS_[idx];
+          speedInput.value = String(r).replace(".", ",");
+          applySpeedUi_(r);
+          sendYtCommand("rate", r);
+        };
+        speedInput.addEventListener("change", () => commitSpeed_());
+        speedInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); speedInput.blur(); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); commitSpeed_(1); }
+          else if (e.key === "ArrowDown") { e.preventDefault(); commitSpeed_(-1); }
+        });
+      }
       window.addEventListener("ps-yt-rate", (e) => applySpeedUi_(e && e.detail ? e.detail.rate : 1)); // Layar 2 mereset sendiri di video baru
     }
     // Dipakai wireYoutubeTab()/wireYtPlaylistTab() supaya video baru yang
@@ -11721,7 +11966,7 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
+  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -11732,6 +11977,25 @@ const PresentationStudio = (() => {
     const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     return luma > 170 ? "#8a6d00" : "#ffd84a";
+  }
+
+  // BARU (v54) -- 24 warna pilihan untuk tulisan nama kitab di Layar 2.
+  const REF_COLORS_ = [
+    ["#ffd84a", "Kuning"], ["#f5b301", "Emas Terang"], ["#ff9f1c", "Oranye"], ["#ff6b35", "Oranye Tua"],
+    ["#ff4d4d", "Merah"], ["#e63946", "Merah Tua"], ["#ff7aa8", "Merah Muda"], ["#ff4fa3", "Pink"],
+    ["#d96bff", "Ungu Muda"], ["#a66bff", "Ungu"], ["#7c83ff", "Biru Keunguan"], ["#4d7cff", "Biru"],
+    ["#1d4ed8", "Biru Tua"], ["#4fc3f7", "Biru Muda"], ["#22d3ee", "Cyan"], ["#2dd4bf", "Tosca"],
+    ["#34d399", "Hijau Mint"], ["#4ade80", "Hijau Muda"], ["#22a559", "Hijau"], ["#a3e635", "Hijau Lemon"],
+    ["#ffffff", "Putih"], ["#d1d5db", "Abu Terang"], ["#a8825a", "Cokelat Muda"], ["#111111", "Hitam"]
+  ];
+  function markRefColorActive_(color) {
+    const grid = el("psRefColorGrid");
+    if (!grid) return;
+    grid.querySelectorAll(".ps-ref-color-swatch").forEach((b) => {
+      const on = (b.dataset.refColor || "") === (color || "");
+      b.style.outline = on ? "3px solid var(--ps-accent, #2f5ad6)" : "none";
+      b.style.outlineOffset = "1px";
+    });
   }
 
   // Selain dikirim ke Layar 2, font & warna tema juga diterapkan ke
@@ -11746,6 +12010,9 @@ const PresentationStudio = (() => {
     wrap.style.setProperty("--ps-preview-bg", bg);
     wrap.style.setProperty("--ps-preview-ink", theme.ink || DEFAULT_STAGE_THEME.ink);
     wrap.style.setProperty("--ps-preview-koor", koorColorForBg(bg));
+    // v54 -- warna nama kitab di pratinjau mengikuti pilihan (kosong = bawaan).
+    if (theme.refColor) { wrap.style.setProperty("--ps-preview-refcolor", theme.refColor); wrap.setAttribute("data-refcolor", "1"); }
+    else { wrap.style.removeProperty("--ps-preview-refcolor"); wrap.removeAttribute("data-refcolor"); }
     const box = el("psPreviewBox");
     if (box) box.style.fontFamily = theme.font || DEFAULT_STAGE_THEME.font;
   }
@@ -11773,6 +12040,10 @@ const PresentationStudio = (() => {
     if (el("psKoorLabelScale")) el("psKoorLabelScale").value = String(Math.round((theme.koorLabelScale || 1.6) * 100));
     if (el("psKoorLabelScaleValue")) el("psKoorLabelScaleValue").value = Math.round((theme.koorLabelScale || 1.6) * 100);
     if (el("psKidungNoColor")) el("psKidungNoColor").checked = theme.kidungNoColor !== false;
+    // BARU (v54) -- pulihkan ukuran & warna tulisan nama kitab (Layar 2).
+    if (el("psRefScale")) el("psRefScale").value = String(Math.round((theme.refScale || 1.5) * 100));
+    if (el("psRefScaleValue")) el("psRefScaleValue").value = Math.round((theme.refScale || 1.5) * 100);
+    markRefColorActive_(theme.refColor || "");
     // BARU (6 Sep 2026) -- pulihkan slider "Ukuran Timer/Stopwatch" saat
     // panel Studio dibuka ulang/dimuat ulang, pola sama seperti
     // psContentScale di atas.
@@ -11888,7 +12159,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
   }
 
   function saveAndSendTheme(partial) {
@@ -11912,7 +12183,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -12101,6 +12372,47 @@ const PresentationStudio = (() => {
       if (el("psKidungNoColor")) el("psKidungNoColor").addEventListener("change", () => saveAndSendTheme({ kidungNoColor: !!el("psKidungNoColor").checked }));
     }
     wireKidungLook();
+
+    // BARU (v54, 15 Okt 2026, permintaan operator) -- ukuran & warna tulisan
+    // NAMA KITAB (mis. "Wahyu 2:5") di Layar 2. Warna: 24 pilihan + "Bawaan"
+    // (emas seperti sebelumnya) + pemilih warna bebas. Dikirim lewat tema
+    // (refScale/refColor) -- lihat applyTheme() & #ref.ref-verse di present.html.
+    function wireRefLook() {
+      function applyRefScale() {
+        const pct = Number(el("psRefScale").value);
+        if (el("psRefScaleValue")) el("psRefScaleValue").value = pct;
+        saveAndSendTheme({ refScale: pct / 100 });
+      }
+      if (el("psRefScale")) el("psRefScale").addEventListener("input", applyRefScale);
+      if (el("psRefScaleDec")) el("psRefScaleDec").addEventListener("click", () => { el("psRefScale").value = Math.max(80, Number(el("psRefScale").value) - 10); applyRefScale(); });
+      if (el("psRefScaleInc")) el("psRefScaleInc").addEventListener("click", () => { el("psRefScale").value = Math.min(400, Number(el("psRefScale").value) + 10); applyRefScale(); });
+      wireManualValueInput("psRefScaleValue", "psRefScale");
+      const grid = el("psRefColorGrid");
+      if (grid && !grid.childElementCount) {
+        const mk = (color, name) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "ps-ref-color-swatch";
+          b.dataset.refColor = color;
+          b.title = name;
+          b.setAttribute("aria-label", "Warna nama kitab: " + name);
+          b.style.cssText = "width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #8886;cursor:pointer;padding:0;" + (color ? "background:" + color + ";" : "background:linear-gradient(135deg,#c9a227 50%,#e8d28a 50%);");
+          b.addEventListener("click", () => {
+            markRefColorActive_(color);
+            saveAndSendTheme({ refColor: color });
+          });
+          return b;
+        };
+        grid.appendChild(mk("", "Bawaan (emas)"));
+        REF_COLORS_.forEach((c) => grid.appendChild(mk(c[0], c[1])));
+      }
+      if (el("psRefColorCustom")) el("psRefColorCustom").addEventListener("input", () => {
+        const c = el("psRefColorCustom").value;
+        markRefColorActive_(c);
+        saveAndSendTheme({ refColor: c });
+      });
+    }
+    wireRefLook();
 
     // BARU (28 Agu 2026) -- "Ukuran Konten": lebar kotak teks/jarak
     // tepi di Layar 2 (lihat --p-content-scale di present.html) --

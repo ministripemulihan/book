@@ -251,8 +251,9 @@ function addItemToCollection(username, name, item) {
   // ayat pertamanya (verseId) kebetulan sama dengan item lain, supaya
   // operator tetap bisa menyusun ulang gabungan yang berbeda tanpa
   // ada yang diam-diam gagal ditambahkan.
-  const isDupVerse = item.type === "verse" && !item.verseIds
-    && col.items.some((it) => it.type === "verse" && !it.verseIds && it.verseId === item.verseId);
+  // v56 -- item multi-bahasa (`langs`) juga TIDAK dianggap duplikat ayat tunggal biasa (dan sebaliknya).
+  const isDupVerse = item.type === "verse" && !item.verseIds && !item.langs
+    && col.items.some((it) => it.type === "verse" && !it.verseIds && !it.langs && it.verseId === item.verseId);
   if (!isDupVerse) col.items.push(item);
   _migrateCollection(col); // hitung ulang verseIds turunan
   col.updatedAt = new Date().toISOString();
@@ -308,11 +309,34 @@ function addVerseToCollection(username, name, verseId) {
 // combineVerseGroupForSlide() (js/app.js). Array 1 elemen otomatis sama
 // persis dengan addVerseToCollection() biasa (verseIds tidak disertakan
 // sama sekali kalau cuma 1, supaya item tetap format LAMA).
-function addVerseGroupToCollection(username, name, verseIds) {
+//
+// BARU (v56, 15 Okt 2026, permintaan operator "➕ Daftar juga multi-bahasa")
+// -- `opts` (opsional): { langs: ["rvind","rveng",...], eachRef: bool }.
+// Kalau `langs` berisi >1 kode bahasa, item disimpan DENGAN daftar bahasa itu
+// (`it.langs`, urutan = urutan tampil di slide) + `it.eachRef` (tulis nama
+// ayat di atas tiap ayat). verseId/verseIds TETAP diisi dari bahasa PERTAMA
+// (id ayat bahasa itu) supaya kode lama (dedup, hapus, pindah, hitung)
+// tetap jalan; ayat bahasa lain dicari lagi lewat kitab+pasal+nomor ayat
+// saat ditampilkan (lihat resolveMultiLangVerseItem_() di js/app.js).
+// Tanpa `opts` / `langs` <2 = perilaku LAMA persis (1 bahasa). Item ikut
+// tersinkron apa adanya lewat kolom ItemsJson -- Apps Script tidak diubah.
+const BIBLE_VERSION_SHORT_LABELS = {
+  ind: "ITB", rvind: "IND-RCV", eng: "ENG", rveng: "ENG-RCV",
+  chs: "MDR", chssmp: "MDR-S", kjv: "KJV", jawa: "JAWA",
+};
+function addVerseGroupToCollection(username, name, verseIds, opts) {
   const ids = (verseIds || []).filter(Boolean);
   if (!ids.length) return null;
+  const langs = opts && Array.isArray(opts.langs) ? opts.langs.filter(Boolean) : [];
+  if (langs.length > 1) {
+    const item = { type: "verse", verseId: ids[0], langs: langs.slice(), eachRef: !(opts && opts.eachRef === false) };
+    if (ids.length > 1) item.verseIds = ids.slice();
+    return addItemToCollection(username, name, item);
+  }
   if (ids.length === 1) return addVerseToCollection(username, name, ids[0]);
-  return addItemToCollection(username, name, { type: "verse", verseId: ids[0], verseIds: ids.slice() });
+  const gItem = { type: "verse", verseId: ids[0], verseIds: ids.slice() };
+  if (opts && opts.eachRef === true) gItem.eachRef = true; // v56: gabungan 1 bahasa + nama ayat di atas tiap ayat
+  return addItemToCollection(username, name, gItem);
 }
 
 function addTextToCollection(username, name, text) {
