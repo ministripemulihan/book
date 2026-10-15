@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261016a" />
+<link rel="stylesheet" href="css/style.css?v=20261016g" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -565,6 +565,14 @@
         <span>🔵 Warna biru pada tanda catatan kaki + kata setelahnya (mis. "1a" pada "daftar")</span>
         <span class="toggle-switch">
           <input type="checkbox" id="footnoteAccentToggle" checked />
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+
+      <label class="more-menu-toggle" for="strongToggle">
+        <span>🔢 Tampilkan nomor Strong di Alkitab KJV (mis. God<sup>H430</sup>) &mdash; berlaku juga di Studio Presentasi &amp; Layar 2. Ketik <b>H3117</b> di kotak cari untuk mencari nomornya.</span>
+        <span class="toggle-switch">
+          <input type="checkbox" id="strongToggle" checked />
           <span class="toggle-slider"></span>
         </span>
       </label>
@@ -4185,8 +4193,8 @@
   <script src="js/guest.js?v=20260818b"></script>
   <script src="js/books.js?v=20260914b"></script>
   <script src="js/book-suggest.js?v=20260914c"></script>
-  <script src="js/footnotes.js?v=20260826e"></script>
-  <script src="js/csv.js?v=20261016a"></script>
+  <script src="js/footnotes.js?v=20261016g"></script>
+  <script src="js/csv.js?v=20261016g"></script>
   <script src="js/db.js?v=20260921c"></script>
   <script src="js/sync.js?v=20260906a"></script>
   <!-- Sebelumnya HILANG dari index.html (filenya sendiri juga tidak ada di
@@ -4223,7 +4231,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
   <script src="js/ink-engine.js?v=20260926b"></script>
-  <script src="js/presentation.js?v=20261015b"></script>
+  <script src="js/presentation.js?v=20261016g"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
@@ -4233,7 +4241,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261016d"></script>
+  <script src="js/presentation-studio.js?v=20261016g"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4257,7 +4265,7 @@
   <script src="js/media-library.js?v=20261003b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20261016e"></script>
+  <script src="js/app.js?v=20261016g"></script>
   <script src="js/sync-checklist.js?v=20261016a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->

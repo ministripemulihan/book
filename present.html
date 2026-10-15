@@ -865,6 +865,18 @@
     color: var(--p-vnum, #ffd84a);
     text-shadow: none;
   }
+  /* v69 -- nomor Strong KJV (H430 dst) di atas baris, warna dari --p-strong (diisi applyTheme()). */
+  .vstrong {
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.5em;
+    vertical-align: super;
+    line-height: 0;
+    margin: 0 0.14em 0 0.06em;
+    color: var(--p-strong, #5ce1e6);
+    text-shadow: none;
+    white-space: nowrap;
+  }
   #text {
     font-weight: var(--p-font-weight, 400);
     font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
@@ -5981,7 +5993,7 @@
   // Dikenali dari URUTAN: paragraf diawali angka N, lalu N+1, N+2, ... (lompatan kecil boleh kalau
   // didahului tanda akhir kalimat). Angka biasa di dalam teks (mis. "3 kali") tidak ikut terbungkus.
   // Teks 1 ayat tanpa nomor tidak berubah. Balikan: HTML yang sudah di-escape.
-  function verseNumHtml_(raw) {
+  function verseNumHtmlBase_(raw) {
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     raw = String(raw == null ? "" : raw);
     const parse = (p) => {
@@ -6013,6 +6025,22 @@
       });
       return out + esc(p.slice(last));
     }).join("");
+  }
+  // BARU (v69) -- nomor Strong KJV (penanda U+0002 dari Studio, mis. "God\u0002H430\u0002") jadi
+  // <sup class="vstrong"> berwarna kontras (lihat strongColorForBg). Teks tanpa penanda tidak berubah.
+  function verseNumHtml_(raw) {
+    const html = verseNumHtmlBase_(raw);
+    if (html.indexOf("\u0002") === -1) return html;
+    return html.replace(/\u0002([^\u0002]*)\u0002/g, '<sup class="vstrong">$1</sup>');
+  }
+  // v69 -- warna nomor Strong: latar gelap = cyan (beda dari tulisan putih & nomor ayat kuning);
+  // latar terang = oranye bata tua (beda dari tulisan gelap & nomor ayat biru).
+  function strongColorForBg(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "#5ce1e6";
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luma > 170 ? "#b83a08" : "#5ce1e6";
   }
   // BARU (12 Sep 2026 v3, laporan operator "tema Putih jadi abu-abu") --
   // pakai luma yang sama seperti koorColorForBg() di atas untuk
@@ -6249,6 +6277,7 @@
       root.setProperty("--p-bg", theme.bgColor);
       root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
       root.setProperty("--p-vnum", vnumColorForBg(theme.bgColor)); // v63: warna nomor ayat
+      root.setProperty("--p-strong", strongColorForBg(theme.bgColor)); // v69: warna nomor Strong KJV
       // BARU (12 Sep 2026 v3) -- lihat catatan panjang vignetteForBg() di atas.
       root.setProperty("--p-vignette", vignetteForBg(theme.bgColor));
     }
