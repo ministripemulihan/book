@@ -922,6 +922,7 @@
     text-shadow: none;
     opacity: 0.92;
   }
+  .verse-notes.verse-notes-only { margin-top: 0; padding-top: 0; border-top: 0; opacity: 1; font-size: calc(clamp(20px, 2.8vw, 42px) * var(--p-scale)); }
   .verse-notes-title {
     font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--p-accent); font-size: 0.7em; margin-bottom: 0.3em; text-align: center;
@@ -6731,6 +6732,8 @@
         wrapN.className = "verse-notes";
         wrapN.innerHTML = `<div class="verse-notes-title">📝 ${data.notesLang === "eng" ? "Notes" : "Catatan"}</div>` + data.notes.map((n) =>
           `<div class="verse-note-item">${n.ref && data.notes.length > 1 ? `<span class="verse-note-ref">${escN_(n.ref)}</span>` : ""}${escN_(n.text)}</div>`).join("");
+        // v59: "Notes saja" -- teks ayat dibuang, hanya nama ayat (#ref) + notes yang tampil.
+        if (data.notesOnly) { textEl.innerHTML = ""; wrapN.classList.add("verse-notes-only"); }
         textEl.appendChild(wrapN);
       }
     } else if (kind === "text") {
