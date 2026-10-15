@@ -5426,3 +5426,33 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .columns-lang-row > label { flex: 0 0 52px; }
 .columns-lang-row .columns-kind-select { flex: 1 1 100%; width: 100%; max-width: none; margin-left: 60px; box-sizing: border-box; }
 .columns-lang-row .columns-kind-select { width: calc(100% - 60px); }
+
+/* ------------------------------------------------------------
+   NOMOR STRONG KJV (v69) -- <sup class="strong-tag"> di teks ayat (lihat js/footnotes.js).
+   Warna SENGAJA beda dari tulisan ayat & tetap jelas di tema terang maupun gelap:
+   terang = oranye bata tua; gelap = oranye muda; hitam-kuning = cyan; merah tua = biru muda.
+   Dimatikan lewat menu ⋮ (class "strong-off" di <body>).
+   ------------------------------------------------------------ */
+:root { --strong-color: #B83A08; --strong-hit-bg: rgba(184, 58, 8, .16); }
+html.theme-3, html.theme-5, html.theme-7, html.theme-10 { --strong-color: #FFB066; --strong-hit-bg: rgba(255, 176, 102, .22); }
+html.theme-12 { --strong-color: #5CE1E6; --strong-hit-bg: rgba(92, 225, 230, .22); }
+html.theme-15 { --strong-color: #8FE9FF; --strong-hit-bg: rgba(143, 233, 255, .22); }
+.strong-tag {
+  cursor: pointer;
+  font-family: var(--font-ui, Arial, sans-serif);
+  font-size: 0.6em;
+  font-weight: 700;
+  letter-spacing: 0;
+  vertical-align: super;
+  line-height: 0;
+  margin: 0 2px 0 1px;
+  color: var(--strong-color);
+  user-select: none;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+.strong-tag:hover { text-decoration: underline; }
+.strong-tag.strong-hit { background: var(--strong-hit-bg); border-radius: 3px; padding: 1px 3px; font-size: 0.7em; text-decoration: underline; }
+body.strong-off .strong-tag { display: none; }
+/* ayat yang diberi warna highlight pastel memaksa tulisan gelap -> nomor pakai oranye tua agar tetap terbaca di tema gelap */
+.verse-block[class*="hl-"] .strong-tag { color: #A23205; }
