@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261004b" />
+<link rel="stylesheet" href="css/style.css?v=20261015c" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -463,14 +463,17 @@
         <div id="columnLangRow1" class="columns-lang-row">
           <label for="columnLang1">Kolom 1:</label>
           <select id="columnLang1" class="columns-lang-select"></select>
+          <select id="columnKind1" class="columns-lang-select columns-kind-select" title="Isi kolom ini: ayat atau notes (catatan) ayat"><option value="verse">📖 Ayat</option><option value="note">📝 Notes</option></select>
         </div>
         <div id="columnLangRow2" class="columns-lang-row" hidden>
           <label for="columnLang2">Kolom 2:</label>
           <select id="columnLang2" class="columns-lang-select"></select>
+          <select id="columnKind2" class="columns-lang-select columns-kind-select" title="Isi kolom ini: ayat atau notes (catatan) ayat"><option value="verse">📖 Ayat</option><option value="note">📝 Notes</option></select>
         </div>
         <div id="columnLangRow3" class="columns-lang-row" hidden>
           <label for="columnLang3">Kolom 3:</label>
           <select id="columnLang3" class="columns-lang-select"></select>
+          <select id="columnKind3" class="columns-lang-select columns-kind-select" title="Isi kolom ini: ayat atau notes (catatan) ayat"><option value="verse">📖 Ayat</option><option value="note">📝 Notes</option></select>
         </div>
         <div id="columnDirectionRow" class="columns-lang-row" hidden>
           <label>Arah:</label>
@@ -1912,6 +1915,36 @@
               <option value="all">Semua jadi 1 slide</option>
             </select>
           </div>
+          <!-- BARU (v54, 15 Okt 2026, permintaan operator) -- kalau >1 versi
+               dicentang DAN >1 ayat digabung: pilih tampil 1 versi saja
+               (seperti biasa) atau SEMUA versi tercentang dalam 1 slide,
+               tiap ayat berpasangan dengan terjemahannya. "Nama ayat di tiap
+               ayat" menaruh nama ayat (mis. Wahyu 2:5) di atas setiap blok,
+               selain nama gabungan di paling atas. Berlaku untuk
+               "▶️ Tampilkan" DAN "➕ Daftar" (v56: item tersimpan membawa daftar bahasanya). -->
+          <div class="ps-field-label">Kalau lebih dari 1 versi dicentang</div>
+          <div class="ps-btn-row">
+            <select id="psQuickLangMode" class="columns-lang-select">
+              <option value="first" selected>Hanya versi pertama (1 bahasa / slide, biasa)</option>
+              <option value="multi">Semua versi tercentang dalam 1 slide (multi-bahasa)</option>
+            </select>
+          </div>
+          <label class="ps-checkbox-row" style="display:flex; gap:6px; align-items:center; margin:6px 0; font-size:13px;">
+            <input type="checkbox" id="psQuickEachRef" checked style="margin:0;" />
+            Tulis nama ayat di atas tiap ayat (selain nama gabungan di paling atas)
+          </label>
+          <!-- BARU (v57, 15 Okt 2026, permintaan operator) -- Notes ayat ikut
+               tampil di Layar 2 (di bawah ayat), bahasa notes dipilih sendiri,
+               BEBAS dari bahasa ayat (mis. ayat Mandarin + notes Indonesia).
+               Berlaku saat ayat BERIKUTNYA ditayangkan (Tampilkan / Kumpulan Ayat). -->
+          <label class="ps-checkbox-row" style="display:flex; gap:6px; align-items:center; margin:6px 0; font-size:13px; flex-wrap:wrap;">
+            <input type="checkbox" id="psQuickShowNotes" style="margin:0;" />
+            📝 Tampilkan Notes ayat di Layar 2, bahasa notes:
+            <select id="psQuickNotesLang" class="columns-lang-select" disabled>
+              <option value="ind" selected>Indonesia</option>
+              <option value="eng">Inggris</option>
+            </select>
+          </label>
           <div class="ps-btn-row">
             <button type="button" id="psQuickShowBtn" class="chip-btn primary">▶️ Tampilkan</button>
             <button type="button" id="psQuickAddBtn" class="chip-btn small">➕ Daftar</button>
@@ -2862,6 +2895,22 @@
             <input type="checkbox" id="psKidungNoColor" checked style="margin:0;" />
             Nomor bait berwarna (sama dengan warna "KOOR") supaya jelas sudah ganti bait
           </label>
+          <!-- BARU (v54, 15 Okt 2026, permintaan operator) -- ukuran & warna
+               tulisan NAMA KITAB (mis. "Wahyu 2:5") di Layar 2. Lihat
+               wireRefLook() (js/presentation-studio.js) & #ref.ref-verse
+               (present.html). -->
+          <div class="ps-field-label">📖 Ukuran Tulisan Nama Kitab (Layar 2)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psRefScaleDec" class="chip-btn small" title="Kecilkan nama kitab">A-</button>
+            <input type="range" id="psRefScale" min="80" max="400" value="150" style="flex:1;" />
+            <button type="button" id="psRefScaleInc" class="chip-btn small" title="Besarkan nama kitab">A+</button>
+            <input type="number" id="psRefScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="80" max="400" step="1" value="150" title="Ketik angka ukuran nama kitab (80-400), lalu tekan Enter" />%
+          </div>
+          <div class="ps-field-label">🎨 Warna Tulisan Nama Kitab</div>
+          <div id="psRefColorGrid" style="display:flex; flex-wrap:wrap; gap:6px; margin:4px 0;"></div>
+          <div class="ps-btn-row">
+            <label style="display:flex; gap:6px; align-items:center; font-size:13px;">Warna bebas: <input type="color" id="psRefColorCustom" value="#ffd84a" style="width:38px; height:28px; padding:0; border:none; background:none;" /></label>
+          </div>
           <div class="ps-pointer-hint">Satu pengaturan jarak untuk semuanya: bait 1 → Koor → bait 2 → dst memakai jarak yang sama. Geser ke kiri untuk merapatkan.</div>
           <!-- BARU (12 Sep 2026, permintaan operator "apa bisa saat pdf di
                upload hasil tampilnya bisa di pilih, apa mau orisinil ...
@@ -4132,7 +4181,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20260920d"></script>
+  <script src="js/collections.js?v=20261015a"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -4161,7 +4210,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
   <script src="js/ink-engine.js?v=20260926b"></script>
-  <script src="js/presentation.js?v=20261004a"></script>
+  <script src="js/presentation.js?v=20261015b"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
@@ -4171,7 +4220,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261004b"></script>
+  <script src="js/presentation-studio.js?v=20261015c"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4195,7 +4244,7 @@
   <script src="js/media-library.js?v=20261003b"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/app.js?v=20261005a"></script>
+  <script src="js/app.js?v=20261015c"></script>
   <script src="js/sync-checklist.js?v=20260930a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->

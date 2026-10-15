@@ -824,6 +824,33 @@
     margin-bottom: clamp(14px, 2.4vh, 34px);
     text-shadow: var(--p-outline-shadow, none);
   }
+  /* BARU (v54, 15 Okt 2026, permintaan operator: "tulisan nama kitab
+     terlalu kecil, minta diperbesar" + "pilihan ganti warna nama kitab,
+     24 warna") -- HANYA untuk tayangan ayat (kelas .ref-verse dipasang
+     showMain()). Ukuran: --p-ref-scale (slider di Studio, bawaan 1.5x).
+     Warna: --p-ref-color (kosong = warna emas/aksen bawaan seperti
+     sebelumnya). Judul kidung (#ref tanpa kelas ini) TIDAK berubah. */
+  #ref.ref-verse {
+    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale) * var(--p-ref-scale, 1.5));
+    color: var(--p-ref-color, var(--p-cam-ink, var(--p-accent)));
+  }
+  /* Slide gabungan beberapa ayat: tiap ayat punya blok sendiri, dengan
+     nama ayatnya (mis. "Wahyu 2:5") di atasnya -- selain nama gabungan
+     yang tetap di bagian paling atas (#ref). */
+  .verse-group { display: block; margin: 0 auto clamp(14px, 2.2vh, 26px); }
+  .verse-group:last-child { margin-bottom: 0; }
+  .verse-group-ref {
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--p-ref-color, var(--p-accent));
+    font-size: calc(clamp(14px, 1.9vw, 24px) * var(--p-scale) * var(--p-ref-scale, 1.5) * 0.85);
+    margin-bottom: clamp(4px, 0.8vh, 10px);
+    text-shadow: var(--p-outline-shadow, none);
+  }
+  .verse-group .verse-version-block { margin-bottom: clamp(6px, 1vh, 14px); }
   #text {
     font-weight: var(--p-font-weight, 400);
     font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
@@ -880,6 +907,28 @@
     vertical-align: middle;
     transform: translateY(-0.15em);
   }
+  /* v57 -- Notes ayat di bawah ayat (Studio > Alkitab > "Tampilkan Notes ayat di Layar 2") */
+  .verse-notes {
+    display: block;
+    margin: clamp(14px, 2.4vh, 30px) auto 0;
+    padding-top: clamp(8px, 1.4vh, 16px);
+    border-top: 1px solid color-mix(in srgb, var(--p-accent) 45%, transparent);
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 400;
+    text-align: left;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    font-size: calc(clamp(15px, 1.9vw, 28px) * var(--p-scale));
+    text-shadow: none;
+    opacity: 0.92;
+  }
+  .verse-notes-title {
+    font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--p-accent); font-size: 0.7em; margin-bottom: 0.3em; text-align: center;
+  }
+  .verse-note-item { display: block; margin-bottom: 0.5em; }
+  .verse-note-item:last-child { margin-bottom: 0; }
+  .verse-note-ref { font-weight: 700; color: var(--p-accent); margin-right: 0.45em; }
   #stage.fade-in #text, #stage.fade-in #ref { animation: fadeUp .5s ease both; }
   /* Slide Kidung (Presentation.sendKidung()) -- bait polos memakai warna
      tulisan tema biasa (var(--p-ink)), label "Koor:" DISOROT kuning
@@ -6156,6 +6205,12 @@
     if (typeof theme.kidungGap === "number") root.setProperty("--p-kidung-gap", theme.kidungGap);
     if (typeof theme.koorLabelScale === "number") root.setProperty("--p-koor-label-scale", theme.koorLabelScale);
     if (typeof theme.kidungNoColor === "boolean") root.setProperty("--p-kidung-no", theme.kidungNoColor ? "var(--p-koor, #ffd84a)" : "currentColor");
+    // BARU (v54) -- ukuran & warna tulisan nama kitab/ayat (lihat #ref.ref-verse).
+    if (typeof theme.refScale === "number" && theme.refScale > 0) root.setProperty("--p-ref-scale", theme.refScale);
+    if (typeof theme.refColor === "string") {
+      if (theme.refColor) root.setProperty("--p-ref-color", theme.refColor);
+      else root.removeProperty("--p-ref-color");
+    }
     // BARU (4 Sep 2026) -- toggle "Tebal" (Bold): beda dari properti lain
     // di atas (yang pakai `if (theme.x)`, dilewati kalau falsy/kosong),
     // ini BOOLEAN -- harus dicek `typeof ... === "boolean"` supaya nilai
@@ -6636,6 +6691,7 @@
     // tayangan lain supaya tidak ada sisa baris kecil kidung sebelumnya
     // nyangkut saat berpindah ke ayat/teks/dst.
     if (kind !== "kidung") { refSubEl.hidden = true; refSubEl.textContent = ""; }
+    refEl.classList.toggle("ref-verse", kind === "verse"); // v54: ukuran & warna nama kitab khusus ayat
     // Reset rata teks ke default (tengah) tiap ganti jenis tayangan --
     // cuma kind "text" (Pengumuman/Teks Cepat) yang boleh menimpanya lagi
     // di bawah lewat data.align, supaya rata kiri/kanan pengumuman lama
@@ -6644,7 +6700,18 @@
     if (kind === "verse") {
       refEl.hidden = false;
       refEl.textContent = data.ref || "";
-      if (Array.isArray(data.texts) && data.texts.length) {
+      if (Array.isArray(data.groups) && data.groups.length) {
+        // BARU (v54) -- slide gabungan beberapa ayat, multi-bahasa & nama
+        // ayat per blok: tiap kelompok = 1 ayat (atau rentang), berisi
+        // blok-blok bahasa BERURUTAN SAMA (mis. IND lalu ENG) supaya
+        // ayat yang sama selalu berdampingan/bertumpuk dengan terjemahannya.
+        const esc_ = (x) => String(x == null ? "" : x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        textEl.innerHTML = data.groups.map((g) => {
+          const head = g.ref ? `<div class="verse-group-ref">${esc_(g.ref)}</div>` : "";
+          const blocks = (g.texts || []).map((t) => `<div class="verse-version-block">${t.label ? `<span class="verse-version-tag">${esc_(t.label)}</span>` : ""}${esc_(t.text)}</div>`).join("");
+          return `<div class="verse-group">${head}${blocks}</div>`;
+        }).join("");
+      } else if (Array.isArray(data.texts) && data.texts.length) {
         // Beberapa versi/terjemahan sekaligus (checklist versi di Studio
         // Presentasi) -- tampil bertumpuk, tiap blok dengan label singkat
         // versinya (mis. "ITB", "ENG-RCV") di depan teksnya.
@@ -6655,6 +6722,16 @@
         }).join("");
       } else {
         textEl.textContent = data.text || "";
+      }
+      // v57 (15 Okt 2026) -- NOTES ayat (dipilih di Studio > Alkitab): blok kecil
+      // di bawah ayat. Teks sudah polos (bukan HTML) -> di-escape di sini.
+      if (Array.isArray(data.notes) && data.notes.length) {
+        const escN_ = (x) => String(x == null ? "" : x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const wrapN = document.createElement("div");
+        wrapN.className = "verse-notes";
+        wrapN.innerHTML = `<div class="verse-notes-title">📝 ${data.notesLang === "eng" ? "Notes" : "Catatan"}</div>` + data.notes.map((n) =>
+          `<div class="verse-note-item">${n.ref && data.notes.length > 1 ? `<span class="verse-note-ref">${escN_(n.ref)}</span>` : ""}${escN_(n.text)}</div>`).join("");
+        textEl.appendChild(wrapN);
       }
     } else if (kind === "text") {
       refEl.hidden = true; refEl.textContent = "";
