@@ -35,7 +35,8 @@ const CONFIG = {
   // yang perlu diketik manual oleh administrator. Lihat
   // saveMeasuredBibleSizeMb_() & getEffectiveBibleSizeMb() di js/app.js,
   // dan updateMeasuredBibleSizeMb_() di apps-script/Code.gs.
-  BIBLE_DATA_APPROX_SIZE_MB: 55,
+  // v60 (15 Okt 2026): naik 55 -> 70 karena sheet Alkitab sekarang 10 kode bahasa (tambah chs_pinyin & chssmp_pinyin), CSV ~64 MB.
+  BIBLE_DATA_APPROX_SIZE_MB: 70,
 
   // ----------------------------------------------------------
   // 2) SUMBER DATA PENGGUNA — Google Sheet #2 (BERBEDA dari sheet Alkitab)
@@ -167,6 +168,9 @@ const CONFIG = {
     { code: "rveng", label: "Inggris (Recovery)" },
     { code: "chs", label: "Mandarin (中文)" },
     { code: "chssmp", label: "Mandarin Sederhana (简体中文)" },
+    // BARU (v60, 15 Okt 2026): dua versi PINYIN (huruf latin cara baca Mandarin). Kode HARUS sama persis dengan kolom Bahasa di Sheet.
+    { code: "chs_pinyin", label: "Mandarin Pinyin (拼音)" },
+    { code: "chssmp_pinyin", label: "Mandarin Sederhana Pinyin (简体拼音)" },
     { code: "jawa", label: "Jawa (Perjanjian Baru)" },
   ],
   DEFAULT_LANGUAGE: "ind",

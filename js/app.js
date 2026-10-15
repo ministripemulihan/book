@@ -746,6 +746,29 @@ async function showBibleSyncPrompt(opts) {
     `🔊 <strong>Efek Suara</strong> "Efek Panggung" (${mp3Count} file MP3) — ~1,1 MB`
   );
 
+  // v67 -- ☑️ Centang semua: baris centang di paling atas daftar (Alkitab + Kidung + Efek Suara; yang tidak tersedia di
+  // perangkat/akun ini dilewati). Ikut bergerak kalau centang di bawahnya diubah satu-satu (setengah tercentang = sebagian).
+  const allRow = document.createElement("label");
+  allRow.className = "more-menu-checkbox-row dlpick-all-row";
+  allRow.style.cssText = "border-bottom:1px solid var(--rule, #ddd); padding-bottom:8px; margin-bottom:6px; font-weight:700;";
+  allRow.innerHTML = '<input type="checkbox" id="dlPickAll" /> <span>☑️ Centang semua <small style="font-weight:400;">(Alkitab, Kidung, Efek Suara)</small></span>';
+  checkList.insertBefore(allRow, checkList.firstChild);
+  const allBox = allRow.querySelector("input");
+  const pickBoxes_ = () => [bibleBox, kidungAvailable ? kidungBox : null, hasMp3Effects ? soundsBox : null].filter(Boolean);
+  function syncAllBox_() {
+    const bx = pickBoxes_();
+    const n = bx.filter((b) => b.checked).length;
+    allBox.checked = bx.length > 0 && n === bx.length;
+    allBox.indeterminate = n > 0 && n < bx.length;
+  }
+  allBox.addEventListener("change", () => {
+    pickBoxes_().forEach((b) => { b.checked = allBox.checked; });
+    syncAllBox_();
+    refreshPickTotal_();
+  });
+  [bibleBox, kidungBox, soundsBox].forEach((cb) => cb.addEventListener("change", syncAllBox_));
+  syncAllBox_();
+
   // Tombol cepat: sekali tekan langsung mengatur ketiga centang di atas.
   [
     { key: "all", label: "✅ Semua", set: { bible: true, kidung: kidungAvailable, sounds: hasMp3Effects } },
@@ -762,6 +785,7 @@ async function showBibleSyncPrompt(opts) {
       bibleBox.checked = !!opt.set.bible;
       kidungBox.checked = !!opt.set.kidung && kidungAvailable;
       soundsBox.checked = !!opt.set.sounds && hasMp3Effects;
+      syncAllBox_();
       refreshPickTotal_();
     });
     quickRow.appendChild(b);
@@ -1753,7 +1777,15 @@ function applyGuestModeUi() {
 function buildIndexes() {
   verseIndex = {};
   verseById = {};
+  // v66 -- data lama di perangkat yang kodenya beda tulisan (mis. "CHS_PINYIN") disamakan ke kode di config
+  // (lihat canonicalLangCode_() di js/csv.js), tanpa perlu unduh ulang. Hanya kode yang BELUM dikenal config yang dicek.
+  const knownLangs_ = new Set(CONFIG.LANGUAGES.map((l) => l.code));
+  const langFix_ = {};
   bibleData.forEach((v) => {
+    if (!knownLangs_.has(v.lang) && typeof canonicalLangCode_ === "function") {
+      if (!(v.lang in langFix_)) langFix_[v.lang] = canonicalLangCode_(v.lang);
+      if (langFix_[v.lang] !== v.lang) v.lang = langFix_[v.lang];
+    }
     if (!verseIndex[v.lang]) verseIndex[v.lang] = {};
     if (!verseIndex[v.lang][v.bookNumber]) verseIndex[v.lang][v.bookNumber] = {};
     if (!verseIndex[v.lang][v.bookNumber][v.chapter]) verseIndex[v.lang][v.bookNumber][v.chapter] = [];
@@ -1852,15 +1884,23 @@ function initLanguageSelector() {
 
   const sel = el("langSelect");
   sel.innerHTML = "";
-  (available.length ? available : CONFIG.LANGUAGES).forEach((l) => {
+  languageChoices_().forEach((l) => {
     const opt = document.createElement("option");
     opt.value = l.code;
-    opt.textContent = l.label;
+    opt.textContent = languageOptionLabel_(l);
     sel.appendChild(opt);
   });
   sel.value = currentLang;
 
   sel.addEventListener("change", () => {
+    if (!verseIndex[sel.value]) {
+      // bahasa terdaftar tapi datanya belum diunduh: jangan ganti, kembalikan pilihan & tawarkan unduh
+      const wanted = sel.value;
+      sel.value = currentLang;
+      if (el("columnLang1")) el("columnLang1").value = currentLang;
+      offerDownloadForLang_(wanted);
+      return;
+    }
     currentLang = sel.value;
     localStorage.setItem(langKey, currentLang);
     if (el("columnLang1")) el("columnLang1").value = currentLang;
@@ -1877,12 +1917,39 @@ function initLanguageSelector() {
   });
 }
 
+// v66 -- daftar pilihan bahasa untuk pemilih (header & Kolom 1/2/3): SEMUA bahasa di CONFIG.LANGUAGES
+// (termasuk yang datanya belum diunduh, diberi keterangan), ditambah kode asing yang ada di data tapi
+// belum terdaftar di config. Dulu hanya yang datanya sudah ada, jadi bahasa baru (mis. Pinyin)
+// tidak kelihatan sama sekali sebelum diunduh.
+function languageChoices_() {
+  const out = CONFIG.LANGUAGES.map((l) => ({ code: l.code, label: l.label, hasData: !!verseIndex[l.code] }));
+  Object.keys(verseIndex || {}).forEach((code) => {
+    if (!out.some((o) => o.code === code)) out.push({ code, label: String(code).toUpperCase(), hasData: true });
+  });
+  return out;
+}
+function languageOptionLabel_(c) { return c.hasData ? c.label : c.label + " — belum diunduh"; }
+// Dipakai saat operator memilih bahasa yang datanya belum ada di perangkat: tawarkan sinkron.
+function offerDownloadForLang_(code) {
+  const l = CONFIG.LANGUAGES.find((x) => x.code === code);
+  const name = l ? l.label : code;
+  const filter = typeof getSetting === "function" ? (getSetting(currentUser, "bibleLangFilter") || []) : [];
+  const blocked = filter.length && filter.indexOf(code) === -1;
+  const msg = blocked
+    ? `${name} belum diunduh karena belum dicentang di menu ⋮ > 📥 Bahasa yang Diunduh & Disimpan.\n\nCentang di sana (atau ☑️ Centang semua), lalu 🔄 Sinkronkan ulang Alkitab.`
+    : `${name} belum ada datanya di perangkat ini.\n\nSinkronkan ulang Alkitab sekarang supaya terunduh? (butuh internet; pakai Wi-Fi)`;
+  if (blocked) { alert(msg); return; }
+  const btn = el("resyncBtn");
+  if (btn && confirm(msg)) btn.click();
+}
+
 // ------------------------------------------------------------
 // 4b) TAMPILAN KOLOM (1/2/3 bahasa berdampingan) — menu ⋮
 // ------------------------------------------------------------
 function initColumnsControl() {
   const available = CONFIG.LANGUAGES.filter((l) => verseIndex[l.code]);
-  const langOptionsHtml = available.map((l) => `<option value="${l.code}">${l.label}</option>`).join("");
+  const allChoices = languageChoices_();
+  const langOptionsHtml = allChoices.map((l) => `<option value="${l.code}">${languageOptionLabel_(l)}</option>`).join("");
 
   const sel1 = el("columnLang1");
   const sel2 = el("columnLang2");
@@ -1903,9 +1970,9 @@ function initColumnsControl() {
     el("langSelect").dispatchEvent(new Event("change"));
   });
 
-  if (savedLangs[0] && available.some((l) => l.code === savedLangs[0])) sel2.value = savedLangs[0];
+  if (savedLangs[0] && allChoices.some((l) => l.code === savedLangs[0])) sel2.value = savedLangs[0];
   else if (available[1]) sel2.value = available[1].code;
-  if (savedLangs[1] && available.some((l) => l.code === savedLangs[1])) sel3.value = savedLangs[1];
+  if (savedLangs[1] && allChoices.some((l) => l.code === savedLangs[1])) sel3.value = savedLangs[1];
   else if (available[2]) sel3.value = available[2].code;
 
   // PENTING: tombol jumlah kolom ("1/2/3 Kolom") dan tombol arah
@@ -1966,9 +2033,12 @@ function initColumnsControl() {
     });
   });
 
-  function saveLangsAndRerender() {
+  function saveLangsAndRerender(ev) {
     setSetting(currentUser, "columnLangs", [sel2.value, sel3.value]);
     rerenderIfReading();
+    // v66: bahasa terdaftar tapi belum diunduh -> pilihan tetap disimpan (kolom tampil kosong + keterangan), tawarkan unduh
+    const code = ev && ev.target ? ev.target.value : "";
+    if (code && !verseIndex[code]) offerDownloadForLang_(code);
   }
   sel2.addEventListener("change", saveLangsAndRerender);
   sel3.addEventListener("change", saveLangsAndRerender);
@@ -3144,7 +3214,7 @@ async function insertOutlineHeaders(wrap, bookNum, chapter, verses) {
 function columnKindOf_(col) { return col && col.kind === "note" ? "note" : "verse"; }
 function columnHeadLabel_(col) {
   if (!col || !col.lang) return "— pilih bahasa —";
-  return langLabelFor(col.lang) + (columnKindOf_(col) === "note" ? " — 📝 Notes" : "");
+  return langLabelFor(col.lang) + (columnKindOf_(col) === "note" ? " — 📝 Notes" : "") + (verseIndex[col.lang] ? "" : " — belum diunduh");
 }
 function buildColumnBlock_(col, v, idx, displayName) {
   return columnKindOf_(col) === "note"

@@ -136,6 +136,15 @@
     intro.textContent = "Aplikasi memeriksa dulu mana yang ada pembaruan. Centang bagian yang mau disinkronkan.";
     box.appendChild(intro);
 
+    // v67 -- ☑️ Centang semua (Alkitab, Kidung, Kidung Anak, Daftar pengguna, Efek Suara) -- 1 ketukan untuk memilih/mengosongkan semuanya.
+    const allRow = document.createElement("label");
+    allRow.className = "more-menu-checkbox-row sync-all-row";
+    allRow.style.cssText = "border-bottom:1px solid var(--rule, #ddd); padding-bottom:8px; margin-bottom:6px; font-weight:700;";
+    allRow.innerHTML = '<input type="checkbox" id="syncCheckAll" /> <span>☑️ Centang semua <small style="font-weight:400;">(semua bagian di bawah, termasuk Alkitab, Kidung & Efek Suara)</small></span>';
+    box.appendChild(allRow);
+    const allCb = allRow.querySelector("input");
+    allCb.disabled = true;
+
     const list = document.createElement("div");
     list.className = "more-menu-checkbox-list";
     box.appendChild(list);
@@ -189,10 +198,16 @@
 
     function refreshGo_() {
       const n = rows.filter((r) => r.cb.checked).length;
+      allCb.checked = rows.length > 0 && n === rows.length;
+      allCb.indeterminate = n > 0 && n < rows.length;
       go.disabled = n === 0;
       go.textContent = n === 0 ? "Belum ada yang dipilih" : "🔄 Sinkronkan (" + n + " bagian)";
     }
     rows.forEach((r) => r.cb.addEventListener("change", refreshGo_));
+    allCb.addEventListener("change", () => {
+      rows.forEach((r) => { if (!r.cb.disabled) r.cb.checked = allCb.checked; });
+      refreshGo_();
+    });
 
     // Cek semua bagian secara paralel.
     await Promise.all(rows.map(async (r) => {
@@ -206,6 +221,7 @@
       }
       r.cb.disabled = false;
     }));
+    allCb.disabled = false;
     refreshGo_();
     if (!rows.some((r) => r.cb.checked)) intro.textContent = "✅ Tidak terdeteksi pembaruan pada bagian yang bisa dicek. Kamu tetap bisa mencentang bagian mana pun untuk disinkronkan paksa.";
 

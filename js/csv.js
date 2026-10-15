@@ -214,6 +214,27 @@ function cleanVerseText(t) {
 // Mengubah baris CSV mentah menjadi objek ayat yang rapi.
 // Mendukung variasi nama kolom: "verse id"/"verse_id", "book name", dst.
 // Mendukung banyak bahasa sekaligus lewat kolom "Bahasa" (mis. ind, kjv, eng, chs, jawa, rvind, rveng, chssmp).
+// v66 (15 Okt 2026) -- kode bahasa dari kolom "Bahasa" Sheet dicocokkan LONGGAR ke kode di CONFIG.LANGUAGES:
+// huruf besar/kecil & tanda baca diabaikan (mis. "CHS_PINYIN", "chs-pinyin", "chspinyin" -> "chs_pinyin"), plus
+// beberapa nama lain untuk Pinyin ("MDR-PINYIN", "Mandarin Pinyin", "MDR-S-PINYIN"). Kode yang SUDAH persis sama
+// dengan config TIDAK diubah (perilaku lama); kode asing dibiarkan apa adanya (tetap muncul di pemilih sebagai kode).
+const LANG_CODE_ALIASES_ = {
+  mdrpinyin: "chs_pinyin", mandarinpinyin: "chs_pinyin", chinesepinyin: "chs_pinyin", pinyin: "chs_pinyin",
+  mdrspinyin: "chssmp_pinyin", mdrsmppinyin: "chssmp_pinyin", mandarinsederhanapinyin: "chssmp_pinyin", chssmppinyin: "chssmp_pinyin",
+};
+function canonicalLangCode_(raw) {
+  const r = String(raw == null ? "" : raw).trim();
+  if (!r || typeof CONFIG === "undefined" || !CONFIG || !Array.isArray(CONFIG.LANGUAGES)) return r;
+  if (CONFIG.LANGUAGES.some((l) => l.code === r)) return r;
+  const key = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const k = key(r);
+  const hit = CONFIG.LANGUAGES.find((l) => key(l.code) === k);
+  if (hit) return hit.code;
+  const alias = LANG_CODE_ALIASES_[k];
+  if (alias && CONFIG.LANGUAGES.some((l) => l.code === alias)) return alias;
+  return r;
+}
+
 function normalizeVerseRecord(rec) {
   const get = (...keys) => {
     for (const k of keys) {
@@ -221,7 +242,7 @@ function normalizeVerseRecord(rec) {
     }
     return "";
   };
-  const lang = (get("bahasa", "language", "lang") || "ind").trim();
+  const lang = canonicalLangCode_((get("bahasa", "language", "lang") || "ind").trim());
   const verseId = get("verse id", "verse_id", "verseid", "id");
   return {
     id: lang + "_" + verseId, // kunci unik: bahasa + verse id (verse id bisa berulang antar bahasa)
