@@ -6348,6 +6348,38 @@ function isMultiLangVerseItem_(it) {
 function isStructuredVerseItem_(it) {
   return isMultiLangVerseItem_(it) || !!(it && it.type === "verse" && it.eachRef === true && it.verseIds && it.verseIds.length > 1);
 }
+// BARU (v62, 15 Okt 2026, permintaan operator: "bukan nama ayat per ayat, tapi digabung
+// Matius 28:18-20 jadi satu saja supaya tidak ribet") -- gabungkan ayat-ayat BERURUTAN dari
+// kitab+pasal yang sama jadi SATU blok bernama rentang ("Matius 28:19-20"). Di dalam blok,
+// tiap bahasa memuat ayat-ayatnya berurutan (diberi nomor kalau >1 ayat). Dipakai Studio
+// (buildMultiLangGroupSlide_) & resolveMultiLangVerseItem_ di bawah.
+// `groups`: [{ texts:[{code,label,text}], _bk, _ch, _vs, _bn }] (1 elemen = 1 ayat, urutan tampil).
+// Balikan: [{ ref, texts:[{code,label,text}] }] -- ref = "Kitab pasal:ayat" / "Kitab pasal:awal-akhir".
+function mergeSlideGroupsByRange_(groups) {
+  const merged = [];
+  groups.forEach((g) => {
+    const last = merged[merged.length - 1];
+    if (last && last.bk === g._bk && last.ch === g._ch) last.items.push(g);
+    else merged.push({ bk: g._bk, ch: g._ch, bn: g._bn, items: [g] });
+  });
+  return merged.map((m) => {
+    const lo = m.items[0]._vs, hi = m.items[m.items.length - 1]._vs;
+    const many = m.items.length > 1;
+    const codes = [];
+    m.items.forEach((it) => it.texts.forEach((t) => { if (codes.indexOf(t.code) < 0) codes.push(t.code); }));
+    const texts = codes.map((code) => {
+      let label = "";
+      const parts = [];
+      m.items.forEach((it) => {
+        const t = it.texts.find((x) => x.code === code);
+        if (t) { label = t.label; parts.push(many ? `${it._vs} ${t.text}` : t.text); }
+      });
+      return { code, label, text: parts.join(" ") };
+    });
+    return { ref: `${m.bn} ${m.ch}:${lo === hi ? lo : lo + "-" + hi}`, texts };
+  });
+}
+
 function resolveMultiLangVerseItem_(it) {
   if (!isStructuredVerseItem_(it)) return null;
   const ids = it.verseIds && it.verseIds.length ? it.verseIds : [it.verseId];
@@ -6365,7 +6397,7 @@ function resolveMultiLangVerseItem_(it) {
       const hit = (getChapterVerses(code, v.bookNumber, v.chapter) || []).find((x) => x.verse === v.verse);
       if (hit) texts.push({ code, label: labelOf(code), text: hit.text, _n: v.verse });
     });
-    if (texts.length) groups.push({ ref: eachRef ? `${v.bookName} ${v.chapter}:${v.verse}` : "", texts });
+    if (texts.length) groups.push({ ref: eachRef ? `${v.bookName} ${v.chapter}:${v.verse}` : "", texts, _bk: v.bookNumber, _ch: v.chapter, _vs: v.verse, _bn: v.bookName });
   });
   if (!groups.length) return null;
   const ref = combineVerseGroupForSlide(base.map((v) => v.id)).ref;
@@ -6375,6 +6407,14 @@ function resolveMultiLangVerseItem_(it) {
     return parts.length ? { code, label: labelOf(code), text: parts.join(" ") } : null;
   }).filter(Boolean);
   groups.forEach((g) => g.texts.forEach((t) => { delete t._n; }));
+  // v62: nama di atas blok = rentang gabungan (Matius 28:19-20), bukan per ayat.
+  if (eachRef) {
+    const mergedGroups = mergeSlideGroupsByRange_(groups.map((g) => ({ texts: g.texts, _bk: g._bk, _ch: g._ch, _vs: g._vs, _bn: g._bn })));
+    groups.length = 0;
+    mergedGroups.forEach((g) => groups.push(g));
+  } else {
+    groups.forEach((g) => { delete g._bk; delete g._ch; delete g._vs; delete g._bn; });
+  }
   const plainText = groups.map((g) => (g.ref ? g.ref + "\n" : "") + g.texts.map((t) => (t.label ? `[${t.label}] ` : "") + t.text).join("\n")).join("\n\n");
   return { ref, groups, flatTexts, plainText };
 }

@@ -694,7 +694,8 @@ const PresentationStudio = (() => {
           const rows = (g.texts || []).map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${escapeHtml(t.text || "")}</div>`).join("");
           return `<div class="present-preview-group">${head}${rows}</div>`;
         }).join("");
-        box.innerHTML = `${refHtml}${groupsHtml}`;
+        const hasGroupHeads = payload.groups.some((g) => g && g.ref); // v61: nama gabungan disembunyikan kalau tiap ayat punya nama sendiri
+        box.innerHTML = `${hasGroupHeads ? "" : refHtml}${groupsHtml}`;
         return;
       }
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
@@ -4723,8 +4724,15 @@ const PresentationStudio = (() => {
         return parts.length ? { code, label: VERSION_LABELS[code] || code.toUpperCase(), text: parts.join(" ") } : null;
       }).filter(Boolean);
       const notesExtra = buildVerseNotesExtra_(groups.map((g) => g._v)); // v57
-      groups.forEach((g) => { delete g._v; });
-      return { ref, groups, flatTexts, extra: notesExtra };
+      // v62: nama di atas blok = rentang gabungan (mis. "Matius 28:19-20"), bukan per ayat.
+      // Tanpa centang nama ayat: tetap per ayat berpasangan tanpa nama (perilaku lama).
+      let outGroups = groups;
+      if (eachRef && typeof mergeSlideGroupsByRange_ === "function") {
+        outGroups = mergeSlideGroupsByRange_(groups.map((g) => ({ texts: g.texts, _bk: g._v.bookNum, _ch: g._v.chapter, _vs: g._v.verse, _bn: g._v.bookName })));
+      } else {
+        groups.forEach((g) => { delete g._v; });
+      }
+      return { ref, groups: outGroups, flatTexts, extra: notesExtra };
     }
 
     function updatePreview() {
