@@ -1684,8 +1684,8 @@ const PresentationStudio = (() => {
   const NOTES_LANG_CODES = { ind: ["rvind", "ind"], eng: ["rveng", "eng", "kjv"] };
   const NOTES_MAX_CHARS = 800; // batas per ayat supaya tidak membanjiri layar
   function notesPrefs_() {
-    const on = el("psQuickShowNotes"), sel = el("psQuickNotesLang");
-    return { on: !!(on && on.checked), lang: sel && sel.value === "eng" ? "eng" : "ind" };
+    const on = el("psQuickShowNotes"), sel = el("psQuickNotesLang"), only = el("psQuickNotesOnly");
+    return { on: !!(on && on.checked), lang: sel && sel.value === "eng" ? "eng" : "ind", only: !!(only && only.checked) };
   }
   function noteHtmlToPlain_(html) {
     if (!html) return "";
@@ -1717,7 +1717,7 @@ const PresentationStudio = (() => {
         break;
       }
     });
-    return notes.length ? { notes, notesLang: pf.lang } : {};
+    return notes.length ? (pf.only ? { notes, notesLang: pf.lang, notesOnly: true } : { notes, notesLang: pf.lang }) : {};
   }
   function versesFromIds_(ids) {
     if (typeof verseById === "undefined") return [];
@@ -4589,19 +4589,22 @@ const PresentationStudio = (() => {
 
     // v57 -- pilihan Notes di Layar 2: ingat per perangkat (localStorage).
     (function wireNotesPrefs_() {
-      const cb = el("psQuickShowNotes"), sel = el("psQuickNotesLang");
+      const cb = el("psQuickShowNotes"), sel = el("psQuickNotesLang"), only = el("psQuickNotesOnly");
       if (!cb || !sel) return;
       try {
         const saved = JSON.parse(localStorage.getItem(NOTES_PREF_KEY) || "null");
-        if (saved) { cb.checked = !!saved.on; if (saved.lang === "eng" || saved.lang === "ind") sel.value = saved.lang; }
+        if (saved) { cb.checked = !!saved.on; if (saved.lang === "eng" || saved.lang === "ind") sel.value = saved.lang; if (only) only.checked = !!saved.only; }
       } catch (e) { /* abaikan */ }
       const sync = () => {
         sel.disabled = !cb.checked;
-        try { localStorage.setItem(NOTES_PREF_KEY, JSON.stringify({ on: cb.checked, lang: sel.value })); } catch (e) { /* abaikan */ }
+        if (only) only.disabled = !cb.checked;
+        try { localStorage.setItem(NOTES_PREF_KEY, JSON.stringify({ on: cb.checked, lang: sel.value, only: !!(only && only.checked) })); } catch (e) { /* abaikan */ }
       };
       cb.addEventListener("change", sync);
       sel.addEventListener("change", sync);
+      if (only) only.addEventListener("change", sync);
       sel.disabled = !cb.checked;
+      if (only) only.disabled = !cb.checked;
     })();
 
     // Versi mana saja yang dicentang di grid; kalau tidak ada satupun
