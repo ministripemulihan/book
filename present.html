@@ -851,6 +851,20 @@
     text-shadow: var(--p-outline-shadow, none);
   }
   .verse-group .verse-version-block { margin-bottom: clamp(6px, 1vh, 14px); }
+  /* BARU (v63, 15 Okt 2026, permintaan operator) -- NOMOR AYAT di dalam teks ayat gabungan
+     (mis. "17 Ketika ... 18 Yesus ...") tampil kecil di bawah baris (subscript) & berwarna
+     beda dari tulisan: tema gelap = kuning, tema terang = biru tua (kontras, BUKAN sama
+     dengan warna tulisan). Warna dari --p-vnum (diisi applyTheme()). */
+  .vnum {
+    font-family: "Inter", Arial, sans-serif;
+    font-weight: 800;
+    font-size: 0.58em;
+    vertical-align: sub;
+    line-height: 0;
+    margin-right: 0.22em;
+    color: var(--p-vnum, #ffd84a);
+    text-shadow: none;
+  }
   #text {
     font-weight: var(--p-font-weight, 400);
     font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
@@ -5954,6 +5968,52 @@
     const luma = 0.299 * r + 0.587 * g + 0.114 * b; // 0 (gelap) - 255 (terang)
     return luma > 170 ? "#8a6d00" : "#ffd84a";
   }
+  // BARU (v63) -- warna NOMOR AYAT (.vnum): latar gelap = kuning terang (seperti highlight);
+  // latar terang (Terang/Putih/Krem/Sepia) = biru tua yang kontras & JELAS beda dari tulisan.
+  function vnumColorForBg(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "#ffd84a";
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luma > 170 ? "#1d4ed8" : "#ffd84a";
+  }
+  // BARU (v63) -- kenali nomor ayat di dalam teks ayat gabungan lalu bungkus <span class="vnum">.
+  // Dikenali dari URUTAN: paragraf diawali angka N, lalu N+1, N+2, ... (lompatan kecil boleh kalau
+  // didahului tanda akhir kalimat). Angka biasa di dalam teks (mis. "3 kali") tidak ikut terbungkus.
+  // Teks 1 ayat tanpa nomor tidak berubah. Balikan: HTML yang sudah di-escape.
+  function verseNumHtml_(raw) {
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    raw = String(raw == null ? "" : raw);
+    const parse = (p) => {
+      const res = [];
+      const re = /(^|\s)(\d{1,3})(?=\s)/g;
+      let m, expected = null;
+      while ((m = re.exec(p))) {
+        const n = parseInt(m[2], 10);
+        const pos = m.index + m[1].length;
+        if (expected === null) {
+          if (pos !== 0) return [];
+          res.push({ pos, len: m[2].length }); expected = n + 1; continue;
+        }
+        const prev = m[1] ? p.charAt(m.index - 1) : "";
+        if (n === expected || (n > expected && n <= expected + 5 && /[.!?"”’;:)»…]/.test(prev))) {
+          res.push({ pos, len: m[2].length }); expected = n + 1;
+        }
+      }
+      return res;
+    };
+    const paras = raw.split(/(\n\n)/);
+    const marks = paras.map(parse);
+    if (!marks.some((x) => x.length >= 2)) return esc(raw); // bukan teks gabungan bernomor
+    return paras.map((p, i) => {
+      let out = "", last = 0;
+      marks[i].forEach((mk) => {
+        out += esc(p.slice(last, mk.pos)) + '<span class="vnum">' + esc(p.slice(mk.pos, mk.pos + mk.len)) + "</span>";
+        last = mk.pos + mk.len;
+      });
+      return out + esc(p.slice(last));
+    }).join("");
+  }
   // BARU (12 Sep 2026 v3, laporan operator "tema Putih jadi abu-abu") --
   // pakai luma yang sama seperti koorColorForBg() di atas untuk
   // menentukan seberapa gelap vignette tepi layar (lihat catatan
@@ -6188,6 +6248,7 @@
     if (theme.bgColor) {
       root.setProperty("--p-bg", theme.bgColor);
       root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
+      root.setProperty("--p-vnum", vnumColorForBg(theme.bgColor)); // v63: warna nomor ayat
       // BARU (12 Sep 2026 v3) -- lihat catatan panjang vignetteForBg() di atas.
       root.setProperty("--p-vignette", vignetteForBg(theme.bgColor));
     }
@@ -6709,7 +6770,7 @@
         const esc_ = (x) => String(x == null ? "" : x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
         textEl.innerHTML = data.groups.map((g) => {
           const head = g.ref ? `<div class="verse-group-ref">${esc_(g.ref)}</div>` : "";
-          const blocks = (g.texts || []).map((t) => `<div class="verse-version-block">${t.label ? `<span class="verse-version-tag">${esc_(t.label)}</span>` : ""}${esc_(t.text)}</div>`).join("");
+          const blocks = (g.texts || []).map((t) => `<div class="verse-version-block">${t.label ? `<span class="verse-version-tag">${esc_(t.label)}</span>` : ""}${verseNumHtml_(t.text)}</div>`).join("");
           return `<div class="verse-group">${head}${blocks}</div>`;
         }).join("");
         // v61: kalau tiap ayat sudah punya nama sendiri di atasnya, nama gabungan
@@ -6722,11 +6783,11 @@
         // versinya (mis. "ITB", "ENG-RCV") di depan teksnya.
         textEl.innerHTML = data.texts.map((t) => {
           const label = (t.label || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-          const body = (t.text || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+          const body = verseNumHtml_(t.text || ""); // v63: nomor ayat subscript berwarna
           return `<div class="verse-version-block"><span class="verse-version-tag">${label}</span>${body}</div>`;
         }).join("");
       } else {
-        textEl.textContent = data.text || "";
+        textEl.innerHTML = verseNumHtml_(data.text || ""); // v63: nomor ayat subscript berwarna (teks 1 ayat tanpa nomor tidak berubah)
       }
       // v57 (15 Okt 2026) -- NOTES ayat (dipilih di Studio > Alkitab): blok kecil
       // di bawah ayat. Teks sudah polos (bukan HTML) -> di-escape di sini.
