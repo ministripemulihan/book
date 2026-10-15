@@ -364,7 +364,7 @@ const Presentation = (() => {
     if (!isTwoScreenMode()) return;
     if (!winRef || winRef.closed) openWindow();
     const ref = `${bookLabel || v.bookName || ""} ${v.chapter}:${v.verse}`.trim();
-    post(Object.assign({ type: "verse", ref, text: v.text }, extra || {}));
+    post(Object.assign({ type: "verse", ref, text: (typeof verseDisplayText === "function" ? verseDisplayText(v) : v.text) }, extra || {})); // v69: + nomor Strong KJV
     flashSendFeedback();
   }
 

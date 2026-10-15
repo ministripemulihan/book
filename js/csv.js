@@ -262,6 +262,9 @@ function normalizeVerseRecord(rec) {
     markedText: typeof extractFootnoteMarkedText === "function"
       ? extractFootnoteMarkedText(get("text", "teks", "isi"))
       : undefined,
+    // v69 -- nomor Strong KJV ({H430}, {(H8804)}) disimpan terpisah sebagai penanda (lihat js/footnotes.js);
+    // "text" di atas tetap bersih. undefined untuk ayat tanpa nomor Strong.
+    strongText: typeof extractStrongText === "function" ? extractStrongText(get("text", "teks", "isi")) : undefined,
     note: cleanVerseText(get("note", "catatan")),
   };
 }

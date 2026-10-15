@@ -3054,7 +3054,17 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   // catatan kaki ("1a", "2", "3b" dst) sebagai elemen <sup> yang bisa
   // ditekan. Bahasa yang tidak punya tanda ini (markedText kosong/tanpa
   // penanda) tampil PERSIS seperti sebelumnya (teks polos v.text).
-  if (typeof renderVerseTextWithFootnotes === "function" && v.markedText) {
+  // v69 -- ayat KJV yang punya nomor Strong ({H430}) ditampilkan dengan nomornya
+  // (superskrip berwarna, bisa ditekan untuk mencari). Bisa dimatikan di menu ⋮.
+  if (v.strongText && typeof renderVerseTextWithStrong === "function" && typeof strongEnabled_ === "function" && strongEnabled_()) {
+    renderVerseTextWithStrong(textWrap, v.strongText);
+    textWrap.addEventListener("click", (e) => {
+      const sup = e.target.closest && e.target.closest(".strong-tag");
+      if (!sup) return;
+      e.stopPropagation();
+      searchStrongNumber_(sup.dataset.strong);
+    });
+  } else if (typeof renderVerseTextWithFootnotes === "function" && v.markedText) {
     renderVerseTextWithFootnotes(textWrap, v.markedText);
   } else {
     textWrap.textContent = v.text;
@@ -3558,6 +3568,9 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
   });
 
   wireColumnPaneSync(wrap);
+  // BARU (v68) -- ratakan tinggi ayat bernomor sama antar kolom (lihat
+  // equalizePaneVerseHeights_()), supaya SETIAP ayat sejajar, bukan cuma yang di tepi atas.
+  wireColumnPaneEqualHeights_(wrap);
 
   // DIHAPUS (8 Sep 2026, permintaan operator: "A+, A-, sinkron semua itu
   // buat apa? dibuang aja") -- tombol "🔗 Sinkron Semua Kolom" (dulu
@@ -3700,6 +3713,88 @@ function wireColumnPaneSync(wrap) {
       });
       programmatic = false;
     });
+  });
+}
+
+// BARU (v68, 15 Okt 2026, laporan operator: "3 kolom, setiap ayat bisa
+// sejajar -- Matius 1:7 tidak sama sejajar, jadi bacanya kurang enak").
+// AKAR MASALAH: di mode "Bebas + Sync" tiap kolom adalah kotak gulir sendiri
+// & tiap ayat setinggi isinya sendiri (Mandarin pendek, Pinyin panjang), jadi
+// Sync v54 hanya bisa menyamakan ayat di TEPI ATAS -- ayat di bawahnya tetap
+// meleset. SOLUSI: tinggi tiap ayat bernomor sama dipaksa sama di semua kolom
+// (min-height = ayat tertinggi di antara kolom), jadi ayat 7 kiri-tengah-kanan
+// mulai & berakhir di garis yang sama, ayat 8 juga, dst -- seperti tabel,
+// tapi tiap kolom tetap punya kotak gulir + toggle Sync sendiri. Berlaku untuk
+// 2 MAUPUN 3 kolom, kolom Ayat maupun Notes.
+function equalizePaneVerseHeights_(wrap) {
+  if (!wrap || !wrap.isConnected) return;
+  const bodies = Array.from(wrap.querySelectorAll(".reader-col-pane-body"));
+  const maps = bodies.map((b) => {
+    const m = new Map();
+    b.querySelectorAll(".verse-block").forEach((bl) => {
+      const n = paneVerseNum_(bl);
+      if (n && !m.has(n)) m.set(n, bl);
+    });
+    return m;
+  });
+  // Catat ayat di tepi atas kolom yang sudah tergulir, supaya posisi baca tidak loncat.
+  const scrolled = bodies.find((b) => b.scrollTop > 0);
+  const anchor = scrolled ? paneVerseAnchor_(scrolled) : null;
+  maps.forEach((m) => m.forEach((bl) => { bl.style.minHeight = ""; }));
+  // Layar penuh 1 kolom (tombol ⤢) = alur normal, tidak perlu diratakan.
+  if (bodies.length < 2 || wrap.querySelector(".reader-col-pane.pane-fullscreen")) return;
+  const nums = new Set();
+  maps.forEach((m) => m.forEach((_, n) => nums.add(n)));
+  const heights = new Map();
+  nums.forEach((n) => {
+    let max = 0;
+    maps.forEach((m) => { const bl = m.get(n); if (bl) max = Math.max(max, bl.getBoundingClientRect().height); });
+    heights.set(n, Math.ceil(max));
+  });
+  heights.forEach((h, n) => {
+    maps.forEach((m) => { const bl = m.get(n); if (bl && h > 0) bl.style.minHeight = h + "px"; });
+  });
+  if (anchor) {
+    bodies.forEach((b) => {
+      b._syncSetAt = Date.now(); // jangan dianggap geseran jari oleh wireColumnPaneSync
+      alignPaneToVerseAnchor_(b, anchor);
+    });
+  }
+}
+let _paneEqGlobalWired = false;
+let _paneEqTimer = null;
+function scheduleEqualizePanes_() {
+  clearTimeout(_paneEqTimer);
+  _paneEqTimer = setTimeout(() => {
+    const w = document.querySelector(".reader-columns.reader-columns-panes");
+    if (w) equalizePaneVerseHeights_(w);
+  }, 260); // > 150 ms: teks ayat punya transisi font-size .15 s (css/style.css), ukur setelah selesai
+}
+function wireColumnPaneEqualHeights_(wrap) {
+  equalizePaneVerseHeights_(wrap);
+  // Ukur ulang setelah font/animasi/catatan selesai dimuat (tinggi bisa berubah).
+  [150, 600, 1500].forEach((ms) => setTimeout(() => { if (wrap.isConnected) equalizePaneVerseHeights_(wrap); }, ms));
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (wrap.isConnected) equalizePaneVerseHeights_(wrap); });
+  // Isi kolom berubah (catatan dimuat, rujukan ayat dibuka di dalam notes).
+  if (typeof MutationObserver === "function") {
+    wrap.querySelectorAll(".reader-col-pane-body").forEach((b) => {
+      new MutationObserver(() => scheduleEqualizePanes_()).observe(b, { childList: true, subtree: true, characterData: true });
+    });
+  }
+  wrap.addEventListener("transitionend", (e) => { if (e.propertyName === "font-size") scheduleEqualizePanes_(); });
+  if (_paneEqGlobalWired) return;
+  _paneEqGlobalWired = true;
+  window.addEventListener("resize", scheduleEqualizePanes_);
+  window.addEventListener("orientationchange", scheduleEqualizePanes_);
+  // A-/A+, jenis huruf, dst. mengubah style/class di <html>/<body>.
+  if (typeof MutationObserver === "function") {
+    const mo = new MutationObserver(scheduleEqualizePanes_);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] });
+    if (document.body) mo.observe(document.body, { attributes: true, attributeFilter: ["style", "class"] });
+  }
+  // Buka/tutup layar penuh 1 kolom.
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.closest && e.target.closest(".reader-col-pane-expand-btn")) scheduleEqualizePanes_();
   });
 }
 
@@ -4384,6 +4479,18 @@ function runKeywordSearch(query, lang, scope, testament, mode) {
   const useTestament = testament || "__all__";
   const cap = mode === "max" ? SEARCH_CAP_MAX : SEARCH_CAP_NORMAL;
 
+  // v69 -- kueri nomor Strong (H3117, {H3117}, (H8802), {(H8802)}): cari di SEMUA ayat yang punya
+  // nomor Strong (KJV), tidak peduli bahasa yang sedang dipilih -- hanya KJV yang memuatnya.
+  const strongId = typeof parseStrongQuery === "function" ? parseStrongQuery(query) : null;
+  if (strongId) {
+    let pool = bibleData.filter((v) => v.strongText);
+    if (useTestament === "PL" || useTestament === "PB") {
+      pool = pool.filter((v) => { const book = BOOKS.find((b) => b.num === v.bookNumber); return book && book.testament === useTestament; });
+    }
+    const verseResults = pool.filter((v) => verseHasStrong(v, strongId)).slice(0, cap);
+    return { verseResults, noteResults: [], cap, strongId };
+  }
+
   function filteredPool() {
     let pool = useLang === "__all__" ? bibleData : bibleData.filter((v) => v.lang === useLang);
     if (useTestament === "PL" || useTestament === "PB") {
@@ -4545,11 +4652,24 @@ function handleMultiReferenceSearch(query) {
 
 // `isOptionChange` = true kalau dipanggil ulang gara-gara opsi bahasa/cakupan
 // diubah (supaya tidak dianggap query referensi/multi-referensi baru lagi).
+// v69 -- hasil pencarian nomor Strong: teks KJV lengkap dengan nomornya; nomor yang dicari disorot.
+function strongResultHtml_(v, strongId) {
+  const html = strongTextToHtml(v.strongText);
+  return html.replace(/<sup class="strong-tag" data-strong="([HG]\d+)">/g, (m, id) => (id === strongId ? '<sup class="strong-tag strong-hit" data-strong="' + id + '">' : m));
+}
+// Tekan nomor Strong di teks ayat -> isi kotak cari & tampilkan semua ayat yang memuatnya.
+function searchStrongNumber_(id) {
+  if (!id) return;
+  const inp = el("searchInput");
+  if (inp) inp.value = id;
+  handleSearch(id);
+}
 function handleSearch(rawQuery, isOptionChange) {
   const query = rawQuery.trim();
   if (!query) return;
 
-  if (!isOptionChange) {
+  const isStrongQuery_ = typeof parseStrongQuery === "function" && !!parseStrongQuery(query); // v69: "H3117" bukan referensi kitab
+  if (!isOptionChange && !isStrongQuery_) {
     if (handleMultiReferenceSearch(query)) return;
 
     const ref = parseReference(query);
@@ -4572,7 +4692,7 @@ function handleSearch(rawQuery, isOptionChange) {
   const scope = (scopeSel && scopeSel.value) || "verse";
   const testament = (testamentSel && testamentSel.value) || "__all__";
 
-  const { verseResults, noteResults, cap } = runKeywordSearch(query, lang, scope, testament, searchResultMode);
+  const { verseResults, noteResults, cap, strongId } = runKeywordSearch(query, lang, scope, testament, searchResultMode);
   const total = verseResults.length + noteResults.length;
 
   hideAllPanels();
@@ -4589,14 +4709,16 @@ function handleSearch(rawQuery, isOptionChange) {
   const cappedNote = isCapped ? "+" : "";
   // Jumlah kata PERSIS "query" muncul, dijumlahkan dari semua ayat + catatan
   // yang ketemu (satu ayat/catatan bisa mengandung kata itu lebih dari sekali).
-  const exactWordCount =
-    verseResults.reduce((sum, v) => sum + countExactOccurrences(v.text, query), 0) +
-    noteResults.reduce((sum, n) => sum + countExactOccurrences(n.note, query), 0);
+  const exactWordCount = strongId
+    ? verseResults.reduce((sum, v) => sum + (v.strongText.match(new RegExp("\u0002\\(?" + strongId + "\\)?\u0002", "g")) || []).length, 0)
+    : verseResults.reduce((sum, v) => sum + countExactOccurrences(v.text, query), 0) +
+      noteResults.reduce((sum, n) => sum + countExactOccurrences(n.note, query), 0);
   const modeHint = isCapped && searchResultMode === "normal"
     ? ` — tekan tombol ⚡ Maks di atas untuk melihat semua hasil (bisa lebih lambat)`
     : "";
-  el("searchResultsTitle").textContent =
-    `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
+  el("searchResultsTitle").textContent = strongId
+    ? `Nomor Strong ${strongId} — ${total}${cappedNote} ayat ditemukan · muncul ${exactWordCount}${cappedNote} kali (KJV)` + modeHint
+    : `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
     (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan kaki)` : "") +
     ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali` + modeHint;
   const list = el("searchResultsList");
@@ -4618,7 +4740,7 @@ function handleSearch(rawQuery, isOptionChange) {
     btn.className = "result-item";
     btn.innerHTML = `
       <div class="result-ref">${v.bookName || (book ? book.name : "")} ${v.chapter}:${v.verse}${langLabel}</div>
-      <div class="result-text">${highlightAllMatches(v.text, query)}</div>
+      <div class="result-text">${strongId ? strongResultHtml_(v, strongId) : highlightAllMatches(v.text, query)}</div>
     `;
     btn.addEventListener("click", () => {
       currentLang = v.lang;
@@ -6409,7 +6531,7 @@ function combineVerseGroupForSlide(verseIds) {
   if (!verses.length) return { ref: "", text: "(ayat tidak ditemukan di bahasa saat ini)" };
   if (verses.length === 1) {
     const v = verses[0];
-    return { ref: `${v.bookName} ${v.chapter}:${v.verse}`, text: v.text };
+    return { ref: `${v.bookName} ${v.chapter}:${v.verse}`, text: (typeof verseDisplayText === "function" ? verseDisplayText(v) : v.text) };
   }
   // Kelompokkan berurutan per kitab+pasal (TANPA mengurutkan ulang --
   // urutan yang operator ketik/susun sendiri di Kumpulan Ayat tetap
@@ -6427,7 +6549,7 @@ function combineVerseGroupForSlide(verseIds) {
     const range = lo === hi ? `${lo}` : `${lo}-${hi}`;
     return `${g.bookName} ${g.chapter}:${range}`;
   });
-  const textParts = groups.map((g) => g.verses.map((v) => `${v.verse} ${v.text}`).join(" "));
+  const textParts = groups.map((g) => g.verses.map((v) => `${v.verse} ${(typeof verseDisplayText === "function" ? verseDisplayText(v) : v.text)}`).join(" "));
   return { ref: refParts.join("; "), text: textParts.join("\n\n") };
 }
 
@@ -6494,7 +6616,7 @@ function resolveMultiLangVerseItem_(it) {
     const texts = [];
     langs.forEach((code) => {
       const hit = (getChapterVerses(code, v.bookNumber, v.chapter) || []).find((x) => x.verse === v.verse);
-      if (hit) texts.push({ code, label: labelOf(code), text: hit.text, _n: v.verse });
+      if (hit) texts.push({ code, label: labelOf(code), text: (typeof verseDisplayText === "function" ? verseDisplayText(hit) : hit.text), _n: v.verse });
     });
     if (texts.length) groups.push({ ref: eachRef ? `${v.bookName} ${v.chapter}:${v.verse}` : "", texts, _bk: v.bookNumber, _ch: v.chapter, _vs: v.verse, _bn: v.bookName });
   });
@@ -6514,7 +6636,7 @@ function resolveMultiLangVerseItem_(it) {
   } else {
     groups.forEach((g) => { delete g._bk; delete g._ch; delete g._vs; delete g._bn; });
   }
-  const plainText = groups.map((g) => (g.ref ? g.ref + "\n" : "") + g.texts.map((t) => (t.label ? `[${t.label}] ` : "") + t.text).join("\n")).join("\n\n");
+  const plainText = groups.map((g) => (g.ref ? g.ref + "\n" : "") + g.texts.map((t) => (t.label ? `[${t.label}] ` : "") + (typeof stripStrongMarkers === "function" ? stripStrongMarkers(t.text) : t.text)).join("\n")).join("\n\n");
   return { ref, groups, flatTexts, plainText };
 }
 
@@ -10567,6 +10689,12 @@ function initFootnoteAccentControl() {
   const enabled = isFootnoteAccentBlueEnabled();
   if (el("footnoteAccentToggle")) el("footnoteAccentToggle").checked = enabled;
   applyFootnoteAccentSetting(enabled);
+  // v69 -- nomor Strong KJV (pengaturan perangkat, lihat strongEnabled_() di js/footnotes.js)
+  if (typeof strongEnabled_ === "function") {
+    const on = strongEnabled_();
+    if (el("strongToggle")) el("strongToggle").checked = on;
+    document.body.classList.toggle("strong-off", !on);
+  }
 }
 
 // Header di HP bisa melipat jadi 2-3 baris (lihat @media 640px di CSS)
@@ -10862,6 +10990,13 @@ function initUIEvents() {
     setSetting(currentUser, "readingProgressAnimation", e.target.checked);
     resetReadingProgressFlags(); // supaya tidak langsung "nembak" toast kalau baru dinyalakan lagi
   });
+  if (el("strongToggle")) {
+    el("strongToggle").addEventListener("change", (e) => {
+      if (typeof setStrongEnabled_ === "function") setStrongEnabled_(e.target.checked);
+      // gambar ulang pasal yang sedang dibuka supaya nomor langsung muncul/hilang
+      if (currentBookNum && currentChapter) renderChapter(currentBookNum, currentChapter, highlightVerse);
+    });
+  }
   if (el("footnoteAccentToggle")) {
     el("footnoteAccentToggle").addEventListener("change", (e) => {
       setSetting(currentUser, "footnoteAccentBlue", e.target.checked);

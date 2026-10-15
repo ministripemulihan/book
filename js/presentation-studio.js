@@ -691,7 +691,7 @@ const PresentationStudio = (() => {
         // v54 -- slide gabungan multi-bahasa: tiap ayat berpasangan dengan terjemahannya.
         const groupsHtml = payload.groups.map((g) => {
           const head = g.ref ? `<div class="present-preview-ref" style="font-size:0.8em;">${escapeHtml(g.ref)}</div>` : "";
-          const rows = (g.texts || []).map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${escapeHtml(t.text || "")}</div>`).join("");
+          const rows = (g.texts || []).map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${strongTextToHtml(t.text || "")}</div>`).join("");
           return `<div class="present-preview-group">${head}${rows}</div>`;
         }).join("");
         const hasGroupHeads = payload.groups.some((g) => g && g.ref); // v61: nama gabungan disembunyikan kalau tiap ayat punya nama sendiri
@@ -699,11 +699,11 @@ const PresentationStudio = (() => {
         return;
       }
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
-        const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${escapeHtml(t.text || "")}</div>`).join("");
+        const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${strongTextToHtml(t.text || "")}</div>`).join("");
         box.innerHTML = `${refHtml}${versionsHtml}`;
         return;
       }
-      box.innerHTML = `${refHtml}<div class="present-preview-text">${escapeHtml(payload.text || "")}</div>`;
+      box.innerHTML = `${refHtml}<div class="present-preview-text">${payload.type === "verse" ? strongTextToHtml(payload.text || "") : escapeHtml(payload.text || "")}</div>`;
       return;
     }
     if (payload.type === "kidung") {
@@ -792,7 +792,7 @@ const PresentationStudio = (() => {
   }
 
   function stageNext(ref, text, sendFn) {
-    nextItem = { ref, text, send: sendFn };
+    nextItem = { ref, text: (typeof stripStrongMarkers === "function" ? stripStrongMarkers(text) : text), send: sendFn };
     renderNextPreview();
   }
 
@@ -1775,7 +1775,7 @@ const PresentationStudio = (() => {
       } else {
         const v = typeof verseById !== "undefined" ? verseById[it.verseId] : null;
         if (v) Presentation.sendVerse(v, v.bookName, buildVerseNotesExtra_([v])); // v57: + notes
-        renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? v.text : "" }] });
+        renderStudioPreview({ type: "verse", ref: genericItemRefText(it), texts: [{ label: "", text: v ? (typeof verseDisplayText === "function" ? verseDisplayText(v) : v.text) : "" }] });
         clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
       }
     } else if (it.type === "text") {
@@ -4638,7 +4638,7 @@ const PresentationStudio = (() => {
           if (!verses.length) return;
           const matched = ref.verseStart ? verses.filter((v) => v.verse >= vStart && v.verse <= vEnd) : verses;
           if (!matched.length) return;
-          const text = matched.map((v) => (matched.length > 1 ? `${v.verse} ${v.text}` : v.text)).join(" ");
+          const text = matched.map((v) => (matched.length > 1 ? `${v.verse} ${(typeof verseDisplayText === "function" ? verseDisplayText(v) : v.text)}` : (typeof verseDisplayText === "function" ? verseDisplayText(v) : v.text))).join(" "); // v69: + nomor Strong KJV
           versionBlocks.push({ code, label: VERSION_LABELS[code] || code.toUpperCase(), text, verses: matched });
         });
         if (!versionBlocks.length) return;
@@ -4699,7 +4699,7 @@ const PresentationStudio = (() => {
         versions.forEach((code) => {
           const list = getChapterVerses(code, v.bookNum, v.chapter) || [];
           const hit = list.find((x) => x.verse === v.verse);
-          if (hit) texts.push({ code, label: VERSION_LABELS[code] || code.toUpperCase(), text: hit.text });
+          if (hit) texts.push({ code, label: VERSION_LABELS[code] || code.toUpperCase(), text: (typeof verseDisplayText === "function" ? verseDisplayText(hit) : hit.text) });
         });
         if (!texts.length) return;
         groups.push({ ref: eachRef ? `${v.bookName} ${v.chapter}:${v.verse}` : "", texts, _v: v });
@@ -4748,7 +4748,7 @@ const PresentationStudio = (() => {
       const blocks = resolveRefBlocks();
       const warn_ = missingVersionsWarning_();
       if (!blocks.length) { preview.innerHTML = warn_ + '<p class="present-saved-empty">Belum ada ayat cocok.</p>'; return; }
-      preview.innerHTML = warn_ + blocks.map((b) => `<div class="ps-quick-preview-block"><b>${escapeHtml(b.refLabel)}</b>${b.versions.map((v) => `<div class="ps-quick-preview-vrow"><span class="ps-quick-preview-vtag">${escapeHtml(v.label)}</span>${escapeHtml(v.text)}</div>`).join("")}</div>`).join("");
+      preview.innerHTML = warn_ + blocks.map((b) => `<div class="ps-quick-preview-block"><b>${escapeHtml(b.refLabel)}</b>${b.versions.map((v) => `<div class="ps-quick-preview-vrow"><span class="ps-quick-preview-vtag">${escapeHtml(v.label)}</span>${strongTextToHtml(v.text)}</div>`).join("")}</div>`).join("");
     }
 
     if (input) {
@@ -4838,7 +4838,7 @@ const PresentationStudio = (() => {
           renderStudioPreview({ type: "verse", ref: first.refLabel, texts: first.versions });
           clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
         };
-        const previewText = first.versions.map((v) => `[${v.label}] ${v.text}`).join("  ");
+        const previewText = first.versions.map((v) => `[${v.label}] ${stripStrongMarkers(v.text)}`).join("  ");
         if (isDualLive()) stageNext(first.refLabel, previewText, doSend);
         else doSend();
       });

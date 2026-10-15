@@ -278,3 +278,82 @@ function setupFootnoteMarkerHandlers(textWrap, v, block, notePanel) {
   };
   new MutationObserver(syncWithPanelVisibility).observe(notePanel, { attributes: true, attributeFilter: ["hidden"] });
 }
+
+// ============================================================
+//  NOMOR STRONG (KJV) -- v69, 15 Okt 2026
+// ------------------------------------------------------------
+//  Teks KJV di Sheet memuat nomor Strong menempel di kata, mis.
+//    "In the beginning{H7225} God{H430} created{H1254}{(H8804)}"
+//  {H430} = nomor Strong, {(H8804)} = kode bentuk kata kerja (tense).
+//  Dulu cleanVerseText() (js/csv.js) membuang semuanya, jadi nomor
+//  tidak pernah tampil & tidak bisa dicari. Sekarang v.text TETAP
+//  bersih (salin/TTS/pencarian kata biasa tidak berubah), tapi
+//  v.strongText menyimpan teks yang sama dengan nomornya sebagai
+//  PENANDA (diapit U+0002) -- hanya dibuat untuk ayat yang memang
+//  punya nomor. Tampilan: superskrip berwarna (lihat .strong-tag di
+//  css/style.css), bisa ditekan untuk mencari nomor itu di seluruh Alkitab.
+// ============================================================
+const STRONG_TAG_RE_ = /\{(\(?[HG]\d+\)?)\}/g;
+
+// Dipanggil dari normalizeVerseRecord() (js/csv.js). Balikan undefined
+// kalau ayat tidak punya nomor Strong (hemat ruang simpan).
+function extractStrongText(t) {
+  if (!t || t.indexOf("{") === -1) return undefined;
+  STRONG_TAG_RE_.lastIndex = 0;
+  if (!STRONG_TAG_RE_.test(t)) return undefined;
+  STRONG_TAG_RE_.lastIndex = 0;
+  return t
+    .replace(/<FR>\s*<sup>[^<]*<\/sup>\s*<Fr>/gi, " ")
+    .replace(/<\/?(FR|Fr|sup)>/gi, " ")
+    .replace(STRONG_TAG_RE_, (m, n) => "\u0002" + n + "\u0002")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+// Tampilkan nomor Strong? Pengaturan perangkat (bukan per akun) supaya
+// Layar 2 / Studio ikut. Bawaan: aktif.
+function strongEnabled_() {
+  try { return localStorage.getItem("book_showStrong") !== "0"; } catch (e) { return true; }
+}
+function setStrongEnabled_(on) {
+  try { localStorage.setItem("book_showStrong", on ? "1" : "0"); } catch (e) { /* abaikan */ }
+  if (typeof document !== "undefined" && document.body) document.body.classList.toggle("strong-off", !on);
+}
+// Teks ayat untuk DITAYANGKAN (Studio/Layar 2): memuat penanda Strong
+// kalau pengaturan aktif & ayatnya punya; selain itu teks bersih biasa.
+function verseDisplayText(v) {
+  if (!v) return "";
+  return (strongEnabled_() && v.strongText) ? v.strongText : (v.text || "");
+}
+function stripStrongMarkers(t) {
+  return String(t == null ? "" : t).replace(/\u0002[^\u0002]*\u0002/g, "");
+}
+// Teks berpenanda -> HTML aman (di-escape) dengan <sup class="strong-tag">.
+function strongTextToHtml(t) {
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const raw = String(t == null ? "" : t);
+  if (raw.indexOf("\u0002") === -1) return esc(raw);
+  return raw.split("\u0002").map((part, i) => {
+    if (i % 2 === 0) return esc(part);
+    const num = (part.match(/[HG]\d+/) || [""])[0];
+    return '<sup class="strong-tag" data-strong="' + esc(num) + '">' + esc(part) + "</sup>";
+  }).join("");
+}
+// Isi <div class="verse-text-wrap"> di layar baca; tanda ditekan = cari nomornya.
+function renderVerseTextWithStrong(wrap, strongText) {
+  wrap.innerHTML = strongTextToHtml(strongText);
+  wrap.querySelectorAll(".strong-tag").forEach((sup) => {
+    sup.setAttribute("role", "button");
+    sup.tabIndex = 0;
+    sup.title = "Tekan untuk mencari " + sup.dataset.strong + " di seluruh Alkitab";
+  });
+}
+// Kenali kueri pencarian nomor Strong: H3117, {H3117}, (H8802), {(H8802)}, g5590.
+function parseStrongQuery(q) {
+  const m = String(q || "").trim().match(/^[\s{(]*([HGhg])\s?(\d{1,5})[\s)}]*$/);
+  return m ? m[1].toUpperCase() + String(parseInt(m[2], 10)) : null;
+}
+function verseHasStrong(v, id) {
+  if (!v || !v.strongText) return false;
+  return new RegExp("\u0002\\(?" + id + "\\)?\u0002").test(v.strongText);
+}
