@@ -877,6 +877,8 @@
     text-shadow: none;
     white-space: nowrap;
   }
+  /* v70 -- kode kata kerja "(H8802)" beda warna dari nomor Strong "H430" */
+  .vstrong.vtense { color: var(--p-tense, #ff9cf0); }
   #text {
     font-weight: var(--p-font-weight, 400);
     font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
@@ -6031,7 +6033,7 @@
   function verseNumHtml_(raw) {
     const html = verseNumHtmlBase_(raw);
     if (html.indexOf("\u0002") === -1) return html;
-    return html.replace(/\u0002([^\u0002]*)\u0002/g, '<sup class="vstrong">$1</sup>');
+    return html.replace(/\u0002([^\u0002]*)\u0002/g, (m, t) => '<sup class="vstrong' + (t.charAt(0) === "(" ? " vtense" : "") + '">' + t + '</sup>');
   }
   // v69 -- warna nomor Strong: latar gelap = cyan (beda dari tulisan putih & nomor ayat kuning);
   // latar terang = oranye bata tua (beda dari tulisan gelap & nomor ayat biru).
@@ -6041,6 +6043,13 @@
     const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     return luma > 170 ? "#b83a08" : "#5ce1e6";
+  }
+  // v70 -- warna kode kata kerja "(H8802)": latar gelap = pink muda, latar terang = ungu tua (beda dari nomor Strong).
+  function tenseColorForBg(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "#ff9cf0";
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 170 ? "#5b3fb5" : "#ff9cf0";
   }
   // BARU (12 Sep 2026 v3, laporan operator "tema Putih jadi abu-abu") --
   // pakai luma yang sama seperti koorColorForBg() di atas untuk
@@ -6278,6 +6287,7 @@
       root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
       root.setProperty("--p-vnum", vnumColorForBg(theme.bgColor)); // v63: warna nomor ayat
       root.setProperty("--p-strong", strongColorForBg(theme.bgColor)); // v69: warna nomor Strong KJV
+      root.setProperty("--p-tense", tenseColorForBg(theme.bgColor)); // v70: warna kode kata kerja (H8802)
       // BARU (12 Sep 2026 v3) -- lihat catatan panjang vignetteForBg() di atas.
       root.setProperty("--p-vignette", vignetteForBg(theme.bgColor));
     }
