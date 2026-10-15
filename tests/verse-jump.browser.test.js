@@ -14,7 +14,9 @@ function between(startMarker, endMarker) {
   return src.slice(a, b);
 }
 const jumpSrc = between("let _verseJump = null;", "// Dipakai baik oleh strip lompat ayat");
+const helperStart = src.indexOf("function paneVerseNum_(block) {");
 const syncStart = src.indexOf("function wireColumnPaneSync(wrap) {");
+const helperSrc = src.slice(helperStart, syncStart); // v54: penyejajaran Sync per nomor ayat
 const syncSrc = src.slice(syncStart, src.indexOf("\n}\n", syncStart) + 3);
 
 const harness = `<!doctype html><html><head><meta charset="utf-8">
@@ -25,6 +27,7 @@ const harness = `<!doctype html><html><head><meta charset="utf-8">
 const el = (id) => document.getElementById(id);
 function wireColumnPaneFullscreenEsc() {}
 ${jumpSrc}
+${helperSrc}
 ${syncSrc}
 const LANGS = 3, N = 40;
 function textFor(lang, v) { const rep = [1, 3, 6][lang] * (1 + (v % 4)); return ("Ayat " + v + " bahasa " + lang + " ").concat("kata ".repeat(rep * 6)); }
@@ -106,6 +109,22 @@ function expect(name, cond, extra) { console.log((cond ? "PASS" : "FAIL") + " - 
   await page.waitForTimeout(900);
   const aligned = await page.evaluate(() => Array.from(document.querySelectorAll(".reader-col-pane-body")).map((body) => { const b = Array.from(body.querySelectorAll(".verse-block")).find((x) => x.querySelector(".verse-num-btn").textContent === "30"); return b.getBoundingClientRect().top - body.getBoundingClientRect().top; }));
   expect("panes 3x -> awal ayat 30 sejajar di ketiga kolom (selisih <= 6px)", Math.max(...aligned) - Math.min(...aligned) <= 6, aligned);
+  // v54 -- Sync kolom bebas harus sejajar PER NOMOR AYAT walau tinggi ayat beda tiap bahasa
+  // (laporan operator: ayat 19 Indonesia & Inggris tidak sejajar).
+  for (const cols of [2, 3]) {
+    await page.evaluate((c) => { render("panes", c); window._readerVerseJumpLock = 0; _verseJump = null; }, cols); // buang sisa penahan lompat dari uji sebelumnya
+    await page.waitForTimeout(100);
+    for (const y of [900, 2100, 3300]) {
+      await page.evaluate((yy) => { document.querySelectorAll(".reader-col-pane-body")[0].scrollTop = yy; }, y);
+      await page.waitForTimeout(400);
+      const res = await page.evaluate(() => {
+        const bodies = Array.from(document.querySelectorAll(".reader-col-pane-body"));
+        const topNum = (body) => { const t = body.getBoundingClientRect().top; const b = Array.from(body.querySelectorAll(".verse-block")).find((x) => x.getBoundingClientRect().bottom > t + 1); return b ? Number(b.querySelector(".verse-num-btn").textContent) : -1; };
+        return bodies.map(topNum);
+      });
+      expect(`panes ${cols}x scroll ${y} -> semua kolom di ayat yang sama`, res.every((n) => n === res[0]), res);
+    }
+  }
   await browser.close();
   fs.unlinkSync(hp);
   console.log(ok ? "SEMUA LULUS" : "ADA YANG GAGAL");

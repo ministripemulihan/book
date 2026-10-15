@@ -1,0 +1,26 @@
+// Uji pencocokan longgar kode bahasa (v66): canonicalLangCode_() di js/csv.js + daftar pilihan bahasa di js/app.js
+"use strict";
+const fs = require("fs"), path = require("path"), vm = require("vm");
+const root = path.join(__dirname, "..");
+const csv = fs.readFileSync(path.join(root, "js/csv.js"), "utf8");
+const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
+const cut = (src, a, b) => { const i = src.indexOf(a), j = src.indexOf(b, i); if (i < 0 || j < 0) throw new Error("penanda tidak ketemu: " + a); return src.slice(i, j); };
+const cfg = fs.readFileSync(path.join(root, "js/config.js"), "utf8");
+const langs = eval("(" + cut(cfg, "LANGUAGES: [", "DEFAULT_LANGUAGE").replace("LANGUAGES:", "").replace(/,\s*$/, "") + ")");
+let ok = true;
+const expect = (n, c, x) => { console.log((c ? "PASS" : "FAIL") + " - " + n + (c ? "" : " :: " + JSON.stringify(x))); if (!c) ok = false; };
+const ctx = { CONFIG: { LANGUAGES: langs }, verseIndex: { ind: {}, rvind: {}, ZZ_BARU: {} } };
+vm.createContext(ctx);
+vm.runInContext(cut(csv, "const LANG_CODE_ALIASES_", "function normalizeVerseRecord") + "\n" + cut(app, "function languageChoices_() {", "// Dipakai saat operator memilih"), ctx);
+const c = (x) => ctx.canonicalLangCode_(x);
+expect("kode persis tidak diubah", c("chs_pinyin") === "chs_pinyin" && c("rvind") === "rvind" && c("ind") === "ind", 0);
+expect("huruf besar/tanda baca diabaikan", c("CHS_PINYIN") === "chs_pinyin" && c("chs-pinyin") === "chs_pinyin" && c("chspinyin") === "chs_pinyin" && c("CHSSMP-Pinyin") === "chssmp_pinyin", 0);
+expect("nama lain Pinyin", c("MDR-PINYIN") === "chs_pinyin" && c("MDR-S-PINYIN") === "chssmp_pinyin" && c("Mandarin Pinyin") === "chs_pinyin", 0);
+expect("bahasa biasa beda huruf besar (RVIND) -> rvind", c("RVIND") === "rvind", c("RVIND"));
+expect("kode asing dibiarkan", c("xyz") === "xyz" && c("mdr") === "mdr", 0);
+const ch = ctx.languageChoices_();
+expect("semua 10 bahasa config ada di pilihan", langs.every((l) => ch.some((o) => o.code === l.code)), ch.map((o) => o.code));
+expect("pinyin ada walau datanya belum diunduh, ditandai", ch.find((o) => o.code === "chs_pinyin") && ch.find((o) => o.code === "chs_pinyin").hasData === false && /belum diunduh/.test(ctx.languageOptionLabel_(ch.find((o) => o.code === "chs_pinyin"))), 0);
+expect("bahasa yang sudah ada datanya tanpa keterangan", ctx.languageOptionLabel_(ch.find((o) => o.code === "ind")) === "Indonesia (TB)", 0);
+expect("kode asing yang ada di data ikut muncul", ch.some((o) => o.code === "ZZ_BARU" && o.hasData), 0);
+console.log(ok ? "SEMUA LULUS" : "ADA YANG GAGAL"); process.exit(ok ? 0 : 1);
