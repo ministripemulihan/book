@@ -5417,3 +5417,12 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .verse-note-col-body { flex: 1 1 0; min-width: 0; font-size: 0.92em; line-height: 1.55; overflow-wrap: anywhere; }
 .verse-note-col-body.verse-note-col-empty { color: var(--ink-soft); font-style: italic; opacity: .7; }
 .verse-note-col-personal { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--rule); }
+
+/* v58 (15 Okt 2026) -- pilihan "📖 Ayat / 📝 Notes" di menu ⋮ > Tampilan kolom sempat TERPOTONG di sisi kanan
+   panel (select bahasa melebar sesuai teks terpanjangnya sehingga mendorong select Ayat/Notes keluar panel).
+   Sekarang select bahasa boleh mengecil, dan pilihan Ayat/Notes turun ke baris sendiri di bawahnya. */
+.columns-lang-row { flex-wrap: wrap; }
+.columns-lang-row .columns-lang-select { min-width: 0; }
+.columns-lang-row > label { flex: 0 0 52px; }
+.columns-lang-row .columns-kind-select { flex: 1 1 100%; width: 100%; max-width: none; margin-left: 60px; box-sizing: border-box; }
+.columns-lang-row .columns-kind-select { width: calc(100% - 60px); }
