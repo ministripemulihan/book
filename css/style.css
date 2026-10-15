@@ -5403,3 +5403,17 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 .ml-player-overlay.ml-player-full .ml-player-header { background: rgba(0,0,0,.75); color: #fff; border-bottom: 0; flex: 0 0 auto; }
 .ml-player-overlay.ml-player-full .ml-player-body { aspect-ratio: auto; flex: 1 1 auto; min-height: 0; }
 .ml-player-overlay.ml-player-full .ml-player-hint { display: none; }
+
+/* v54 (15 Okt 2026) -- warna nama kitab di pratinjau Studio mengikuti pilihan
+   "Warna Tulisan Nama Kitab" (hanya aktif kalau operator memilih warna). */
+.ps-preview-box-wrap[data-refcolor] .present-preview-ref { color: var(--ps-preview-refcolor) !important; }
+#psPreviewBoxWrap[data-refcolor] .present-preview-ref { color: var(--ps-preview-refcolor) !important; }
+.present-preview-group { margin-bottom: 8px; }
+
+
+/* v55 (15 Okt 2026) -- kolom "Notes" di samping kolom Ayat (lihat buildNoteColumnBlock() di js/app.js) */
+.columns-lang-row .columns-kind-select { flex: 0 0 auto; width: auto; max-width: 120px; }
+.verse-note-block { align-items: flex-start; }
+.verse-note-col-body { flex: 1 1 0; min-width: 0; font-size: 0.92em; line-height: 1.55; overflow-wrap: anywhere; }
+.verse-note-col-body.verse-note-col-empty { color: var(--ink-soft); font-style: italic; opacity: .7; }
+.verse-note-col-personal { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--rule); }
