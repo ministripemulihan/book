@@ -4456,6 +4456,57 @@ let searchResultMode = "normal";
 const SEARCH_CAP_NORMAL = 1000;
 const SEARCH_CAP_MAX = 100000;
 
+// ==== FILTER KITAB PENCARIAN (v70) ====
+// Pilihan "Kitab:" di pencarian dulu hanya 3 (Semua / PL / PB). Sekarang juga ada KELOMPOK kitab (Taurat, Injil,
+// Nabi Kecil, Jantung Alkitab, dst), SATU kitab saja, dan "Pilih kitab sendiri" (centang bebas, tersimpan di perangkat).
+// Nilai pilihan: "__all__" | "PL" | "PB" | "grp:<kunci>" | "book:<nomor>" | "custom".
+const _bookRange_ = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+const SEARCH_BOOK_GROUPS = [
+  { key: "taurat", label: "Taurat (Kejadian–Ulangan)", nums: _bookRange_(1, 5) },
+  { key: "sejarahPL", label: "Kitab Sejarah PL (Yosua–Ester)", nums: _bookRange_(6, 17) },
+  { key: "puisi", label: "Kitab Puisi/Hikmat (Ayub–Kidung Agung)", nums: _bookRange_(18, 22) },
+  { key: "nabiBesar", label: "Nabi Besar (Yesaya–Daniel)", nums: _bookRange_(23, 27) },
+  { key: "nabiKecil", label: "Nabi Kecil (Hosea–Maleakhi)", nums: _bookRange_(28, 39) },
+  { key: "injil", label: "Injil (Matius, Markus, Lukas, Yohanes)", nums: _bookRange_(40, 43) },
+  { key: "paulus", label: "Surat-surat Paulus (Roma–Filemon)", nums: _bookRange_(45, 57) },
+  { key: "jantung", label: "Jantung Alkitab (Galatia, Efesus, Filipi, Kolose)", nums: _bookRange_(48, 51) },
+  { key: "umum", label: "Surat-surat Umum (Ibrani–Yudas)", nums: _bookRange_(58, 65) },
+];
+const SEARCH_CUSTOM_BOOKS_KEY = "book_searchCustomBooks";
+function getSearchCustomBooks_() {
+  try {
+    const a = JSON.parse(localStorage.getItem(SEARCH_CUSTOM_BOOKS_KEY) || "[]");
+    return Array.isArray(a) ? a.map(Number).filter((n) => n >= 1 && n <= 66) : [];
+  } catch (e) { return []; }
+}
+function setSearchCustomBooks_(nums) {
+  try { localStorage.setItem(SEARCH_CUSTOM_BOOKS_KEY, JSON.stringify(Array.from(new Set(nums)).sort((a, b) => a - b))); } catch (e) { /* abaikan */ }
+}
+// null = semua kitab (tidak disaring); selain itu Set nomor kitab yang diizinkan.
+function searchBookSet_(key) {
+  const k = key || "__all__";
+  if (k === "PL" || k === "PB") return new Set(BOOKS.filter((b) => b.testament === k).map((b) => b.num));
+  if (k.indexOf("grp:") === 0) {
+    const g = SEARCH_BOOK_GROUPS.find((x) => "grp:" + x.key === k);
+    return g ? new Set(g.nums) : null;
+  }
+  if (k.indexOf("book:") === 0) return new Set([parseInt(k.slice(5), 10)]);
+  if (k === "custom") return new Set(getSearchCustomBooks_());
+  return null;
+}
+// Nama pilihan untuk judul hasil ("" untuk Semua Alkitab).
+function searchBookLabel_(key) {
+  const k = key || "__all__";
+  if (k === "__all__") return "";
+  if (k === "PL") return "Perjanjian Lama";
+  if (k === "PB") return "Perjanjian Baru";
+  if (k === "custom") return "kitab pilihan sendiri (" + getSearchCustomBooks_().length + " kitab)";
+  if (k.indexOf("grp:") === 0) { const g = SEARCH_BOOK_GROUPS.find((x) => "grp:" + x.key === k); return g ? g.label : ""; }
+  if (k.indexOf("book:") === 0) { const b = BOOKS.find((x) => x.num === parseInt(k.slice(5), 10)); return b ? b.name : ""; }
+  return "";
+}
+// ==== /FILTER KITAB PENCARIAN ====
+
 // scope: "verse" | "notes" | "both". lang: kode bahasa, atau "__all__" untuk semua bahasa.
 // testament: "__all__" | "PL" | "PB" -- menyaring hasil AYAT saja berdasar Perjanjian
 // Lama/Baru kitabnya (lihat BOOKS di js/books.js, field "testament").
@@ -4484,21 +4535,16 @@ function runKeywordSearch(query, lang, scope, testament, mode) {
   const strongId = typeof parseStrongQuery === "function" ? parseStrongQuery(query) : null;
   if (strongId) {
     let pool = bibleData.filter((v) => v.strongText);
-    if (useTestament === "PL" || useTestament === "PB") {
-      pool = pool.filter((v) => { const book = BOOKS.find((b) => b.num === v.bookNumber); return book && book.testament === useTestament; });
-    }
+    const strongBooks = searchBookSet_(useTestament);
+    if (strongBooks) pool = pool.filter((v) => strongBooks.has(v.bookNumber));
     const verseResults = pool.filter((v) => verseHasStrong(v, strongId)).slice(0, cap);
     return { verseResults, noteResults: [], cap, strongId };
   }
 
   function filteredPool() {
     let pool = useLang === "__all__" ? bibleData : bibleData.filter((v) => v.lang === useLang);
-    if (useTestament === "PL" || useTestament === "PB") {
-      pool = pool.filter((v) => {
-        const book = BOOKS.find((b) => b.num === v.bookNumber);
-        return book && book.testament === useTestament;
-      });
-    }
+    const allowedBooks = searchBookSet_(useTestament);
+    if (allowedBooks) pool = pool.filter((v) => allowedBooks.has(v.bookNumber));
     return pool;
   }
 
@@ -4558,6 +4604,72 @@ function setSearchMode(mode) {
   if (lastKeywordQuery) handleSearch(lastKeywordQuery, true);
 }
 
+// v70 -- isi pilihan "Kitab:" (Semua/PL/PB + kelompok + pilih sendiri + satu kitab).
+function buildSearchBookOptions_(sel) {
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  sel.innerHTML =
+    '<option value="__all__">Semua Alkitab</option>' +
+    '<option value="PL">Perjanjian Lama</option>' +
+    '<option value="PB">Perjanjian Baru</option>' +
+    '<optgroup label="Kelompok kitab">' +
+    SEARCH_BOOK_GROUPS.map((g) => '<option value="grp:' + g.key + '">' + esc(g.label) + "</option>").join("") +
+    "</optgroup>" +
+    '<optgroup label="Pilih sendiri"><option value="custom">✏️ Pilih kitab sendiri…</option></optgroup>' +
+    '<optgroup label="Satu kitab saja">' +
+    BOOKS.map((b) => '<option value="book:' + b.num + '">' + esc(b.name) + "</option>").join("") +
+    "</optgroup>";
+}
+
+// v70 -- panel centang "Pilih kitab sendiri" (muncul di bawah baris opsi saat pilihan = custom).
+function syncSearchCustomPanel_() {
+  const sel = el("searchTestamentSelect");
+  const row = el("searchOptionsRow");
+  if (!sel || !row) return;
+  let panel = el("searchCustomBooksPanel");
+  if (sel.value !== "custom") { if (panel) panel.hidden = true; return; }
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "searchCustomBooksPanel";
+    panel.className = "search-custom-books";
+    row.insertAdjacentElement("afterend", panel);
+  }
+  panel.hidden = false;
+  const chosen = new Set(getSearchCustomBooks_());
+  const rerun = () => { if (lastKeywordQuery) handleSearch(lastKeywordQuery, true); };
+  const commit = (nums) => { setSearchCustomBooks_(nums); syncSearchCustomPanel_(); rerun(); };
+  panel.innerHTML = "";
+  const bar = document.createElement("div");
+  bar.className = "search-custom-books-bar";
+  const presets = [
+    ["PL", "PL", () => BOOKS.filter((b) => b.testament === "PL").map((b) => b.num)],
+    ["PB", "PB", () => BOOKS.filter((b) => b.testament === "PB").map((b) => b.num)],
+  ].concat(SEARCH_BOOK_GROUPS.map((g) => [g.key, g.label.split(" (")[0], () => g.nums]));
+  const addBtn = (label, title, fn) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip-btn small"; b.textContent = label; b.title = title; b.addEventListener("click", fn);
+    bar.appendChild(b);
+  };
+  presets.forEach(([k, label, getNums]) => addBtn("+ " + label, "Tambahkan " + label + " ke pilihan", () => commit([...chosen, ...getNums()])));
+  addBtn("Kosongkan", "Hapus semua centang", () => commit([]));
+  panel.appendChild(bar);
+  const grid = document.createElement("div");
+  grid.className = "search-custom-books-grid";
+  BOOKS.forEach((b) => {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = chosen.has(b.num);
+    cb.addEventListener("change", () => { cb.checked ? chosen.add(b.num) : chosen.delete(b.num); setSearchCustomBooks_([...chosen]); updateCount(); rerun(); });
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(" " + b.name));
+    grid.appendChild(lab);
+  });
+  panel.appendChild(grid);
+  const count = document.createElement("div");
+  count.className = "search-custom-books-count";
+  panel.appendChild(count);
+  function updateCount() { count.textContent = chosen.size ? chosen.size + " kitab dipilih" : "Belum ada kitab dicentang — hasil pencarian akan kosong."; }
+  updateCount();
+}
+
 function initSearchOptions() {
   const langSel = el("searchLangSelect");
   const scopeSel = el("searchScopeSelect");
@@ -4569,7 +4681,15 @@ function initSearchOptions() {
       .join("");
   langSel.value = currentLang || "__all__";
   scopeSel.value = "verse";
-  if (testamentSel) testamentSel.value = "__all__";
+  if (testamentSel) {
+    buildSearchBookOptions_(testamentSel);
+    testamentSel.value = "__all__";
+    if (!testamentSel.dataset.customWired) {
+      testamentSel.dataset.customWired = "1";
+      testamentSel.addEventListener("change", syncSearchCustomPanel_);
+    }
+    syncSearchCustomPanel_();
+  }
   searchResultMode = "normal";
   const rerun = () => {
     if (lastKeywordQuery) handleSearch(lastKeywordQuery, true);
@@ -4655,7 +4775,7 @@ function handleMultiReferenceSearch(query) {
 // v69 -- hasil pencarian nomor Strong: teks KJV lengkap dengan nomornya; nomor yang dicari disorot.
 function strongResultHtml_(v, strongId) {
   const html = strongTextToHtml(v.strongText);
-  return html.replace(/<sup class="strong-tag" data-strong="([HG]\d+)">/g, (m, id) => (id === strongId ? '<sup class="strong-tag strong-hit" data-strong="' + id + '">' : m));
+  return html.replace(/<sup class="(strong-tag(?: strong-tense)?)" data-strong="([HG]\d+)">/g, (m, cls, id) => (id === strongId ? '<sup class="' + cls + ' strong-hit" data-strong="' + id + '">' : m));
 }
 // Tekan nomor Strong di teks ayat -> isi kotak cari & tampilkan semua ayat yang memuatnya.
 function searchStrongNumber_(id) {
@@ -4701,7 +4821,7 @@ function handleSearch(rawQuery, isOptionChange) {
   if (!isOptionChange) initSearchOptions(); // isi ulang pilihan bahasa (baru diketahui setelah data siap)
   if (langSel) langSel.value = lang;
   if (scopeSel) scopeSel.value = scope;
-  if (testamentSel) testamentSel.value = testament;
+  if (testamentSel) { testamentSel.value = testament; syncSearchCustomPanel_(); }
   if (el("searchModeNormal")) el("searchModeNormal").classList.toggle("active", searchResultMode === "normal");
   if (el("searchModeMax")) el("searchModeMax").classList.toggle("active", searchResultMode === "max");
 
@@ -4717,10 +4837,10 @@ function handleSearch(rawQuery, isOptionChange) {
     ? ` — tekan tombol ⚡ Maks di atas untuk melihat semua hasil (bisa lebih lambat)`
     : "";
   el("searchResultsTitle").textContent = strongId
-    ? `Nomor Strong ${strongId} — ${total}${cappedNote} ayat ditemukan · muncul ${exactWordCount}${cappedNote} kali (KJV)` + modeHint
+    ? `Nomor Strong ${strongId} — ${total}${cappedNote} ayat ditemukan · muncul ${exactWordCount}${cappedNote} kali (KJV)` + (searchBookLabel_(testament) ? ` · di ${searchBookLabel_(testament)}` : "") + modeHint
     : `Hasil pencarian “${query}” — ${total}${cappedNote} ditemukan` +
     (scope === "both" ? ` (${verseResults.length} di ayat, ${noteResults.length} di catatan kaki)` : "") +
-    ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali` + modeHint;
+    ` · kata "${query}" muncul persis ${exactWordCount}${cappedNote} kali` + (searchBookLabel_(testament) ? ` · di ${searchBookLabel_(testament)}` : "") + modeHint;
   const list = el("searchResultsList");
   list.innerHTML = "";
 
