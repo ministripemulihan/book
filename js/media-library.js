@@ -1174,13 +1174,44 @@ const MediaLibrary = (() => {
     function buildItemWrap_(p) {
       const wrap = document.createElement("div");
       wrap.className = "ml-verse-ref-item";
+      const verseList = p.whole ? [] : versesInChapter.filter((v) => p.verseNums.indexOf(v.verse) !== -1);
+      let tagBtn = null, panel = null;
       if (p.verseNums.length) {
-        const tag = document.createElement("div");
-        tag.className = "ml-verse-ref-tag";
-        tag.textContent = p.whole ? "Seluruh pasal" : "Ayat " + (MB ? MB.compactNums(p.verseNums) : p.verseNums.join(", "));
-        wrap.appendChild(tag);
+        const label = p.whole ? "Seluruh pasal" : "Ayat " + (MB ? MB.compactNums(p.verseNums) : p.verseNums.join(", "));
+        if (verseList.length) {
+          // BARU (book164) -- tulisan "Ayat 30, 31" bisa DITEKAN: ayat yang dirujuk tampil langsung
+          // di bawah video (di kotak ini), sedangkan isi Alkitab di bawahnya tetap tampil seperti biasa.
+          tagBtn = document.createElement("button");
+          tagBtn.type = "button";
+          tagBtn.className = "ml-verse-ref-tag ml-verse-ref-tag-btn";
+          tagBtn.title = "Tekan untuk menampilkan ayatnya di bawah video";
+          tagBtn.setAttribute("aria-expanded", "false");
+          tagBtn.textContent = label + " ▾";
+          wrap.appendChild(tagBtn);
+        } else {
+          const tag = document.createElement("div");
+          tag.className = "ml-verse-ref-tag";
+          tag.textContent = label;
+          wrap.appendChild(tag);
+        }
       }
       wrap.appendChild(itemToCard_(p.it, { verses: versesInChapter, verseNums: p.verseNums, whole: p.whole }));
+      if (tagBtn) {
+        panel = document.createElement("div");
+        panel.className = "ml-vr-panel";
+        panel.hidden = true;
+        wrap.appendChild(panel);
+        const setOpen = (open) => {
+          if (open && !panel.childNodes.length) appendPlayerVerseBlock_(panel, verseList[0].bookName, verseList[0].chapter, verseList);
+          panel.hidden = !open;
+          wrap.classList.toggle("ml-vr-open", open);
+          tagBtn.setAttribute("aria-expanded", open ? "true" : "false");
+          tagBtn.textContent = tagBtn.textContent.replace(/ [▾▴]$/, "") + (open ? " ▴" : " ▾");
+        };
+        tagBtn.addEventListener("click", () => setOpen(panel.hidden));
+        wrap.__setVerses = setOpen;
+        wrap.__versesOpen = () => !panel.hidden;
+      }
       return wrap;
     }
 
@@ -1195,7 +1226,30 @@ const MediaLibrary = (() => {
       const versesText = name === WIDE_GROUP_ ? " · seluruh pasal / rentang lebar" : allVerses.length
         ? " · Ayat " + (allVerses.length > 8 ? allVerses.slice(0, 8).join(", ") + ", …" : allVerses.join(", "))
         : "";
-      sum.textContent = icon + name + " (" + list.length + ")" + versesText;
+      sum.appendChild(document.createTextNode(icon + name + " (" + list.length + ")"));
+      const hasTappable = name !== WIDE_GROUP_ && versesText;
+      if (hasTappable) {
+        // BARU (book164) -- "Ayat 30, 31" di judul grup juga bisa ditekan: buka grup + tampilkan
+        // (atau sembunyikan lagi) ayat SEMUA kartu yang sedang tampil di grup ini.
+        const vs = document.createElement("span");
+        vs.className = "ml-sum-verses";
+        vs.title = "Tekan untuk menampilkan ayat-ayatnya di bawah videonya";
+        vs.textContent = versesText;
+        vs.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (!det.open) det.open = true;
+          if (shown === 0) showMore_(VERSE_REF_GROUP_FIRST_);
+          const wraps = Array.from(grid.querySelectorAll(".ml-verse-ref-item")).filter((w) => w.__setVerses);
+          const allOpen = wraps.length && wraps.every((w) => w.__versesOpen());
+          wraps.forEach((w) => w.__setVerses(!allOpen));
+          // Pengaman: browser yang tetap membuka/menutup <details> walau klik sudah dibatalkan -> grup dijaga terbuka.
+          setTimeout(() => { if (!det.open) det.open = true; }, 0);
+        });
+        sum.appendChild(vs);
+      } else {
+        sum.appendChild(document.createTextNode(versesText));
+      }
       det.appendChild(sum);
       const grid = document.createElement("div");
       grid.className = "ml-grid kidung-media-ref-grid";
