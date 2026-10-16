@@ -9901,40 +9901,113 @@ function initNoteFontFamilyControl() {
 // ------------------------------------------------------------
 // 12) LAYAR PENUH (Fullscreen API)
 // ------------------------------------------------------------
+// book167 (16 Okt 2026) -- MODE BACA PENUH di HP. Tombol ⛶ sekarang: (1) Fullscreen API seperti biasa, DAN
+// (2) body.reader-clean -> header (menu, cari, A+/A-, tema, dst) dan toolbar bawah Kidung/Alkitab disembunyikan,
+// pemutar lagu mini ikut disembunyikan, sehingga teks kidung/ayat memenuhi 1 layar penuh tanpa terpotong.
+// Memunculkan tombol-tombol lagi: ketuk 3x cepat di mana saja pada teks, ATAU ketuk 2x cepat di pinggir atas/bawah
+// layar (body.reader-chrome-show). Ulangi untuk menyembunyikan lagi. Di iPhone (tanpa Fullscreen API) mode ini
+// tetap jalan lewat CSS saja. Hanya aktif di HP/layar sempit/layar sentuh; di komputer ⛶ berperilaku seperti dulu.
+function readerCleanEligible() {
+  try { return !!(window.matchMedia && window.matchMedia("(max-width: 859px), (pointer: coarse)").matches); }
+  catch (e) { return false; }
+}
+function isReaderClean() { return document.body.classList.contains("reader-clean"); }
+function syncFullscreenBtn() {
+  const btn = el("fullscreenToggle");
+  if (!btn) return;
+  const active = !!(document.fullscreenElement || document.webkitFullscreenElement) || isReaderClean();
+  btn.classList.toggle("active", active);
+  btn.textContent = active ? "⤢" : "⛶";
+  btn.title = active ? "Keluar layar penuh" : "Layar penuh";
+  btn.setAttribute("aria-label", btn.title);
+}
+function setReaderClean(on) {
+  on = !!on;
+  if (on === isReaderClean()) return;
+  document.body.classList.toggle("reader-clean", on);
+  if (!on) document.body.classList.remove("reader-chrome-show");
+  syncFullscreenBtn();
+  try { document.dispatchEvent(new CustomEvent("reader-clean-change", { detail: { on } })); } catch (e) { /* abaikan */ }
+  recalcReaderPanesHeight();
+  setTimeout(recalcReaderPanesHeight, 260);
+}
+function toggleReaderChrome() {
+  if (!isReaderClean()) return;
+  const show = !document.body.classList.contains("reader-chrome-show");
+  document.body.classList.toggle("reader-chrome-show", show);
+  if (!show) { try { const a = document.activeElement; if (a && a.blur && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) a.blur(); } catch (e) { /* abaikan */ } }
+}
+function initReaderMultiTap() {
+  let taps = [];
+  let suppressUntil = 0;
+  const TAP_WINDOW = 450, TAP_MOVE = 30;
+  document.addEventListener("pointerup", (e) => {
+    if (!isReaderClean()) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const t = e.target;
+    // tombol/isian/tautan & header/toolbar sendiri tidak ikut dihitung (A+ ditekan 2x harus tetap A+ 2x).
+    if (t && t.closest && t.closest("button, a, input, select, textarea, label, summary, [role='button'], .app-header, .kidung-toolbar, .collapsible-toolbar, .sidebar, .ml-player-overlay, .ml-player-pill")) { taps = []; return; }
+    const now = Date.now();
+    taps = taps.filter((p) => now - p.t < TAP_WINDOW && Math.hypot(p.x - e.clientX, p.y - e.clientY) < TAP_MOVE);
+    taps.push({ t: now, x: e.clientX, y: e.clientY });
+    const h = window.innerHeight || 800;
+    const edge = e.clientY < h * 0.14 || e.clientY > h * 0.86;
+    if (taps.length >= 3) {
+      taps = [];
+      suppressUntil = now + 400; // ketukan ke-3 tidak boleh ikut memilih ayat/membuka sesuatu
+      toggleReaderChrome();
+    } else if (taps.length === 2 && edge) {
+      taps = [];
+      toggleReaderChrome(); // 2 ketukan pada 1 ayat saling membatalkan, jadi aman
+    }
+  }, true);
+  document.addEventListener("click", (e) => {
+    if (Date.now() < suppressUntil) { suppressUntil = 0; e.stopPropagation(); e.preventDefault(); }
+  }, true);
+}
+
 function initFullscreenControl() {
   const btn = el("fullscreenToggle");
   const requestFn = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
   const exitFn = document.exitFullscreen || document.webkitExitFullscreen;
+  initReaderMultiTap();
 
-  if (!requestFn || !exitFn) {
+  if ((!requestFn || !exitFn) && !readerCleanEligible()) {
     btn.disabled = true;
     btn.title = "Layar penuh tidak didukung di browser ini";
     return;
   }
 
   btn.addEventListener("click", () => {
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      requestFn.call(document.documentElement).catch(() => {});
+    const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (!inFs && !isReaderClean()) {
+      if (readerCleanEligible()) setReaderClean(true);
+      if (requestFn) {
+        try { const p = requestFn.call(document.documentElement); if (p && p.catch) p.catch(() => {}); } catch (e) { /* mode CSS tetap jalan */ }
+      }
     } else {
-      exitFn.call(document);
+      setReaderClean(false);
+      if (inFs && exitFn) exitFn.call(document);
     }
   });
-  document.addEventListener("fullscreenchange", () => {
-    const active = !!document.fullscreenElement;
-    btn.classList.toggle("active", active);
-    btn.textContent = active ? "⤢" : "⛶";
-    btn.title = active ? "Keluar layar penuh" : "Layar penuh";
+  let ourFs = false; // layar penuh milik tombol ⛶ ini (bukan layar penuh pemutar video)
+  const onFsChange = () => {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    const active = !!fsEl;
+    if (fsEl === document.documentElement) ourFs = true;
+    // keluar dari layar penuh (gestur sistem/Esc) -> mode baca penuh ikut berakhir
+    if (!active && ourFs) { ourFs = false; setReaderClean(false); }
+    syncFullscreenBtn();
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat recalcReaderPanesHeight()
     // di bawah & catatan panjang --panes-height di css/style.css. Dipicu
     // di sini (bukan cuma lewat event resize) karena browser HP kadang
-    // BELUM selesai menyesuaikan viewport (bar alamat baru saja hilang/
-    // muncul) tepat SAAT event fullscreenchange menyala -- 2 percobaan
-    // (langsung + sesaat lagi lewat setTimeout) supaya keduanya tertangkap:
-    // recalc pertama tetap berguna sebagai perkiraan awal, recalc kedua
-    // "membetulkan" begitu browser benar-benar selesai transisi.
+    // BELUM selesai menyesuaikan viewport tepat SAAT event fullscreenchange
+    // menyala -- 2 percobaan (langsung + sesaat lagi) supaya keduanya tertangkap.
     recalcReaderPanesHeight();
     setTimeout(recalcReaderPanesHeight, 260);
-  });
+  };
+  document.addEventListener("fullscreenchange", onFsChange);
+  document.addEventListener("webkitfullscreenchange", onFsChange);
 }
 
 // ------------------------------------------------------------

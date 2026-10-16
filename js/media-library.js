@@ -899,6 +899,7 @@ const MediaLibrary = (() => {
             <span id="mlPlayerTitle" class="ml-player-title"></span>
             <div class="ml-player-header-actions">
               <button type="button" id="mlPlayerWakeBtn" class="chip-btn small ml-player-btn" aria-pressed="false" hidden></button>
+              <button type="button" id="mlPlayerHideBtn" class="chip-btn small ml-player-btn" title="Sembunyikan pemutar: lagu tetap main, syair tampil penuh" aria-label="Sembunyikan pemutar">🙈<span class="ml-pl-long"> Sembunyikan</span></button>
               <button type="button" id="mlPlayerMiniBtn" class="chip-btn small ml-player-btn"></button>
               <button type="button" id="mlPlayerFsBtn" class="chip-btn small ml-player-btn" title="Layar penuh" aria-label="Layar penuh">⛶<span class="ml-pl-long"> Layar Penuh</span></button>
               <a id="mlPlayerOpenLink" class="chip-btn small ml-player-btn" href="#" target="_blank" rel="noopener" title="Buka link aslinya" aria-label="Buka link aslinya" hidden>🔗</a>
@@ -915,6 +916,18 @@ const MediaLibrary = (() => {
       el_("mlPlayerFsBtn").addEventListener("click", togglePlayerFullscreen_);
       el_("mlPlayerMiniBtn").addEventListener("click", () => setPlayerMini_(!ov.classList.contains("ml-player-mini")));
       el_("mlPlayerWakeBtn").addEventListener("click", togglePlayerWake_);
+      // book167 -- tombol 🙈 Sembunyikan + tombol bulat 🎵 kecil untuk memunculkan lagi (lagu TETAP main).
+      el_("mlPlayerHideBtn").addEventListener("click", () => setPlayerCollapsed_(true));
+      const pill = document.createElement("button");
+      pill.type = "button"; pill.id = "mlPlayerPill"; pill.className = "ml-player-pill"; pill.hidden = true;
+      pill.textContent = "🎵"; pill.title = "Tampilkan pemutar lagu"; pill.setAttribute("aria-label", pill.title);
+      pill.addEventListener("click", () => setPlayerCollapsed_(false));
+      document.body.appendChild(pill);
+      // Mode baca penuh (tombol ⛶ di HP, js/app.js) dinyalakan -> pemutar mini ikut disembunyikan supaya teks penuh layar.
+      document.addEventListener("reader-clean-change", (e) => {
+        const o = el_("mlPlayerOverlay");
+        if (e && e.detail && e.detail.on && o && !o.hidden && o.classList.contains("ml-player-mini")) setPlayerCollapsed_(true);
+      });
       // Layar kembali kelihatan (HP dibuka lagi) -> minta ulang "layar tetap menyala" (otomatis dilepas browser saat tab disembunyikan).
       document.addEventListener("visibilitychange", () => { if (!document.hidden && playerWantsWake_()) acquirePlayerWake_(); });
       // Layar penuh sungguhan keluar lewat Esc / gestur sistem -> samakan tampilan.
@@ -957,6 +970,8 @@ const MediaLibrary = (() => {
     // book166 -- MODE MINI: audio-saja (SoundCloud/MP3) langsung mini; video YouTube mulai besar,
     // tapi bisa dikecilkan dengan tombol 🔽 tanpa memuat ulang videonya (iframe yang sama, hanya CSS).
     ov.classList.toggle("ml-player-mini-audio", !!(opts && opts.mini === "audio"));
+    ov.classList.remove("ml-player-collapsed");
+    { const pl = el_("mlPlayerPill"); if (pl) pl.hidden = true; }
     setPlayerMini_(!!(opts && opts.mini));
     const wakeBtn = el_("mlPlayerWakeBtn");
     if (wakeBtn) wakeBtn.hidden = !(navigator.wakeLock && navigator.wakeLock.request);
@@ -972,7 +987,9 @@ const MediaLibrary = (() => {
     if (!ov) return;
     if (on) exitPlayerFullscreen_();
     ov.classList.toggle("ml-player-mini", !!on);
-    document.body.classList.toggle("ml-player-mini-open", !!on && !ov.hidden);
+    if (!on) { ov.classList.remove("ml-player-collapsed"); const pl = el_("mlPlayerPill"); if (pl) pl.hidden = true; }
+    const collapsed = ov.classList.contains("ml-player-collapsed");
+    document.body.classList.toggle("ml-player-mini-open", !!on && !ov.hidden && !collapsed);
     const b = el_("mlPlayerMiniBtn");
     if (b) {
       b.innerHTML = (on ? "🔼" : "🔽") + '<span class="ml-pl-long">' + (on ? " Besar" : " Kecil") + "</span>";
@@ -981,8 +998,27 @@ const MediaLibrary = (() => {
     }
     // Sisakan ruang di bawah halaman setinggi pemutar mini supaya baris syair terakhir tidak tertutup.
     const box = ov.querySelector(".ml-player-box");
-    const setPad = () => document.documentElement.style.setProperty("--ml-mini-pad", on && box ? (box.offsetHeight + 12) + "px" : "0px");
+    const setPad = () => document.documentElement.style.setProperty("--ml-mini-pad", on && box && !collapsed ? (box.offsetHeight + 12) + "px" : "0px");
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(setPad); else setPad();
+  }
+  // book167 -- SEMBUNYIKAN pemutar: kotak dipindah keluar layar lewat CSS (iframe tetap hidup -> lagu TETAP main),
+  // halaman kembali penuh tanpa ruang kosong di bawah; tombol bulat 🎵 kecil di pojok kiri bawah memunculkannya lagi.
+  function setPlayerCollapsed_(on) {
+    const ov = el_("mlPlayerOverlay");
+    if (!ov || ov.hidden) return;
+    const pill = el_("mlPlayerPill");
+    if (on) {
+      exitPlayerFullscreen_();
+      setPlayerMini_(true);
+      ov.classList.add("ml-player-collapsed");
+      document.body.classList.remove("ml-player-mini-open");
+      document.documentElement.style.setProperty("--ml-mini-pad", "0px");
+      if (pill) pill.hidden = false;
+    } else {
+      ov.classList.remove("ml-player-collapsed");
+      if (pill) pill.hidden = true;
+      setPlayerMini_(true);
+    }
   }
   let playerWakeLock_ = null;
   function playerWantsWake_() {
@@ -1098,7 +1134,8 @@ const MediaLibrary = (() => {
   function enterPlayerFullscreen_() {
     const ov = el_("mlPlayerOverlay");
     if (!ov) return;
-    ov.classList.remove("ml-player-mini");
+    ov.classList.remove("ml-player-mini", "ml-player-collapsed");
+    { const pl = el_("mlPlayerPill"); if (pl) pl.hidden = true; }
     document.body.classList.remove("ml-player-mini-open");
     document.documentElement.style.setProperty("--ml-mini-pad", "0px");
     ov.classList.add("ml-player-full");
@@ -1135,7 +1172,8 @@ const MediaLibrary = (() => {
     exitPlayerFullscreen_();
     el_("mlPlayerBody").innerHTML = "";
     ov.hidden = true;
-    ov.classList.remove("ml-player-mini", "ml-player-mini-audio");
+    ov.classList.remove("ml-player-mini", "ml-player-mini-audio", "ml-player-collapsed");
+    { const pl = el_("mlPlayerPill"); if (pl) pl.hidden = true; }
     document.body.classList.remove("ml-player-mini-open");
     document.documentElement.style.setProperty("--ml-mini-pad", "0px");
     releasePlayerWake_();
