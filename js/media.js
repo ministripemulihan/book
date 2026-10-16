@@ -70,6 +70,7 @@ async function fetchMediaSheetRows_(sheet) {
           pembacaan: r.pembacaan || "",
           bagian: (r.bagian || "").trim(),
           mp3: (r.mp3 || "").trim(),
+          mp3_2: (r.mp3_2 || "").trim(), // BARU (16 Okt 2026): link MP3 ke-2 (kolom "Link MP3 2" di Sheet), opsional
           mp4: (r.mp4 || "").trim(),
           youtube: (r.youtube || "").trim(),
         }));
@@ -113,6 +114,9 @@ async function fetchMediaSheetRows_(sheet) {
       // baris-baris itu digabung jadi satu hari dengan beberapa segmen.
       bagian: (r["bagian"] || r["part"] || "").trim(),
       mp3: (r["link mp3"] || "").trim(),
+      // BARU (16 Okt 2026): kolom OPSIONAL "Link MP3 2" -- MP3 kedua utk bacaan yang sama
+      // (mis. 2 pembaca/2 versi). Kolom tidak ada = "" (sheet lama tetap jalan).
+      mp3_2: (r["link mp3 2"] || r["link mp3 kedua"] || r["link mp3_2"] || r["link_mp3_2"] || r["mp3 2"] || r["mp3_2"] || "").trim(),
       mp4: (r["link mp4"] || "").trim(),
       youtube: (r["youtube"] || "").trim(),
     };
@@ -353,7 +357,7 @@ async function findMediaLinkForReference(bookNumber, chapter, lang) {
     });
     const it = hitDay && hitDay[0];
     if (it && mediaBlockHasContent(it)) {
-      return { segments: it.segments, label: it.label, mp3: it.mp3, mp4: it.mp4, youtube: it.youtube };
+      return { segments: it.segments, label: it.label, mp3: it.mp3, mp3_2: it.mp3_2, mp4: it.mp4, youtube: it.youtube };
     }
   }
   return null;
@@ -366,9 +370,9 @@ async function findMediaLinkForReference(bookNumber, chapter, lang) {
 function mediaBlockHasContent(media) {
   if (!media) return false;
   if (media.segments && media.segments.length) {
-    return media.segments.some((s) => s && (s.mp3 || s.mp4 || s.youtube));
+    return media.segments.some((s) => s && (s.mp3 || s.mp3_2 || s.mp4 || s.youtube));
   }
-  return !!(media.mp3 || media.mp4 || media.youtube);
+  return !!(media.mp3 || media.mp3_2 || media.mp4 || media.youtube);
 }
 
 function mediaLinkButton(label, url) {
@@ -784,8 +788,10 @@ function buildInlineMediaSegment_(media, titleForSession, info) {
     closePlayer();
     const nowBar = buildNowPlayingBar_();
     if (nowBar) playerSlot.appendChild(nowBar);
-    if (kind === "mp3" || kind === "mp4") {
-      const rawUrl = kind === "mp3" ? media.mp3 : media.mp4;
+    // kind "mp3b" = MP3 ke-2 (kolom "Link MP3 2"); diperlakukan sama seperti "mp3".
+    const isAudioKind = kind === "mp3" || kind === "mp3b";
+    if (isAudioKind || kind === "mp4") {
+      const rawUrl = kind === "mp3" ? media.mp3 : kind === "mp3b" ? media.mp3_2 : media.mp4;
       if (isDriveUrl(rawUrl)) {
         // Link Google Drive -- TIDAK BISA dipasang langsung sebagai
         // src <audio>/<video> (itu bukan berkas mentah, tapi halaman
@@ -820,7 +826,7 @@ function buildInlineMediaSegment_(media, titleForSession, info) {
           window.open(driveOpenUrl(rawUrl), "_blank", "noopener,noreferrer");
           return;
         }
-      } else if (kind === "mp3") {
+      } else if (isAudioKind) {
         // Bukan link Drive (file MP3 dihosting sendiri/tempat lain) --
         // tetap pakai elemen <audio> asli seperti sebelumnya.
         const audio = document.createElement("audio");
@@ -872,6 +878,16 @@ function buildInlineMediaSegment_(media, titleForSession, info) {
     btnRow.appendChild(b);
     btnRow.appendChild(shareMediaButton(media.mp3, "MP3"));
   }
+  // BARU (16 Okt 2026): MP3 ke-2, ditaruh PERSIS di sebelah kanan MP3 pertama
+  // (tampilan tombol & pemutarnya sama; hanya ada badge kecil "2" di ikon).
+  if (media.mp3_2) {
+    const b = roundMediaButton("🎵", "Dengar MP3 ke-2 (langsung di halaman ini, tanpa tab baru)");
+    b.classList.add("round-media-btn-second");
+    b.setAttribute("data-badge", "2");
+    b.addEventListener("click", () => openPlayer("mp3b"));
+    btnRow.appendChild(b);
+    btnRow.appendChild(shareMediaButton(media.mp3_2, "MP3 2"));
+  }
   if (media.mp4) {
     const b = roundMediaButton("🎬", "Tonton MP4 (langsung di halaman ini, tanpa tab baru)");
     b.addEventListener("click", () => openPlayer("mp4"));
@@ -899,12 +915,12 @@ function buildInlineMediaSegment_(media, titleForSession, info) {
 function buildInlineMediaBlock(media, titleForSession) {
   const segments = (media && media.segments && media.segments.length)
     ? media.segments
-    : [{ mp3: media && media.mp3, mp4: media && media.mp4, youtube: media && media.youtube }];
+    : [{ mp3: media && media.mp3, mp3_2: media && media.mp3_2, mp4: media && media.mp4, youtube: media && media.youtube }];
 
   const wrap = document.createElement("div");
   wrap.className = "inline-media-block";
 
-  const withContent = segments.filter((s) => s && (s.mp3 || s.mp4 || s.youtube));
+  const withContent = segments.filter((s) => s && (s.mp3 || s.mp3_2 || s.mp4 || s.youtube));
   const showBagianLabel = withContent.length > 1;
 
   withContent.forEach((seg, idx) => {
@@ -1106,6 +1122,7 @@ function buildMediaScheduleFromRows(rows) {
       chapter: ref ? ref.startChapter : null,
       endChapter: ref ? ref.endChapter : null,
       mp3: row.mp3 || "",
+      mp3_2: row.mp3_2 || "",
       mp4: row.mp4 || "",
       youtube: row.youtube || "",
     };
@@ -1127,6 +1144,7 @@ function buildMediaScheduleFromRows(rows) {
       // PERTAMA) supaya kode lain yang masih membaca field ini langsung
       // (bukan lewat `segments`) tetap jalan tanpa perlu diubah sekaligus.
       mp3: segment.mp3,
+      mp3_2: segment.mp3_2,
       mp4: segment.mp4,
       youtube: segment.youtube,
     };

@@ -446,6 +446,40 @@ async function loadKidungYoutubeRefKeys_() {
 // di bawah) -- string angka saja (sudah dibuang non-digitnya), kosong berarti
 // tidak ada filter nomor aktif.
 let kidungListNumberFilter = "";
+// BARU (16 Okt 2026): filter teks (judul / Awal_Lagu) di layar Daftar -- aktif kalau yang
+// diketik BUKAN angka murni. Angka murni tetap berarti "nomor diawali" seperti sebelumnya.
+let kidungListTextFilter = "";
+
+// BARU (16 Okt 2026, permintaan operator: daftar lambat sekali) -- tampilkan item BERTAHAP:
+// `first` item pertama langsung (sinkron), sisanya ditambah per `step` item tiap beberapa
+// milidetik supaya layar tidak membeku. `onProgress(sudahTampil, total)` dipanggil tiap tahap
+// (dipakai untuk teks "150 dari 782 sedang dimuat"). Balikan: objek dengan .cancel() --
+// WAJIB dipanggil sebelum daftar digambar ulang (ganti filter) supaya batch lama berhenti.
+function appendInBatches_(items, buildNode, container, opts) {
+  opts = opts || {};
+  const first = opts.first || 50;
+  const step = opts.step || 50;
+  const state = { cancelled: false, cancel() { this.cancelled = true; } };
+  let i = 0;
+  function addSlice(n) {
+    const frag = document.createDocumentFragment();
+    const end = Math.min(items.length, i + n);
+    for (; i < end; i++) frag.appendChild(buildNode(items[i]));
+    container.appendChild(frag);
+  }
+  addSlice(first);
+  if (opts.onProgress) opts.onProgress(i, items.length);
+  (function next() {
+    if (state.cancelled || i >= items.length) return;
+    setTimeout(() => {
+      if (state.cancelled) return;
+      addSlice(step);
+      if (opts.onProgress) opts.onProgress(i, items.length);
+      next();
+    }, 25);
+  })();
+  return state;
+}
 
 async function renderKidungList(bukuFilter) {
   const panel = el("kidungPanel");
@@ -458,7 +492,13 @@ async function renderKidungList(bukuFilter) {
   title.textContent = "📋 Daftar " + bukuFilter;
   panel.appendChild(title);
 
+  // Tampilkan keterangan SEGERA (data lokal dibaca dulu sebelum daftar bisa digambar).
+  const loadingNote = document.createElement("p");
+  loadingNote.className = "kidung-search-count";
+  loadingNote.textContent = "⏳ Membaca data kidung…";
+  panel.appendChild(loadingNote);
   const fullList = await getKidungList(bukuFilter).catch(() => []);
+  loadingNote.remove();
   if (!fullList.length) {
     const p = document.createElement("p");
     p.textContent = "Belum ada data untuk buku ini.";
@@ -476,13 +516,14 @@ async function renderKidungList(bukuFilter) {
   // sedang dibuka (bukuFilter) saja, direset kosong tiap kali layar
   // Daftar ini dibuka ulang.
   kidungListNumberFilter = "";
+  kidungListTextFilter = "";
   const numberFilterRow = document.createElement("div");
   numberFilterRow.className = "kidung-number-filter-row";
   const numberFilterInput = document.createElement("input");
   numberFilterInput.type = "text";
   numberFilterInput.inputMode = "numeric";
   numberFilterInput.autocomplete = "off";
-  numberFilterInput.placeholder = "Cari nomor " + bukuFilter + "…";
+  numberFilterInput.placeholder = "Cari nomor, judul, atau awal lagu…";
   numberFilterInput.className = "kidung-search-input";
   numberFilterRow.appendChild(numberFilterInput);
   panel.appendChild(numberFilterRow);
@@ -494,22 +535,34 @@ async function renderKidungList(bukuFilter) {
   const anyHasMedia = mlOn || fullList.some((k) => k.linkMp3_1 || k.linkMp3_2 || k.linkVideo || k.linkYoutube || k.linkMidi);
   const countLabel = document.createElement("p");
   countLabel.className = "kidung-search-count";
+  // Info progres saat sisa daftar masih dimuat bertahap (lihat appendInBatches_ di atas).
+  const loadStatus = document.createElement("p");
+  loadStatus.className = "kidung-search-count kidung-load-status";
+  loadStatus.hidden = true;
   const box = document.createElement("div");
   box.className = "kidung-list";
+  let batchState = null;
 
   function renderFilteredList() {
+    if (batchState) batchState.cancel();
     const active = KIDUNG_MEDIA_FILTERS.find((f) => f.key === kidungListMediaFilter) || KIDUNG_MEDIA_FILTERS[0];
     let filtered = active.test ? fullList.filter(active.test) : fullList;
     if (kidungListNumberFilter) {
       filtered = filtered.filter((k) => String(k.noKidung).startsWith(kidungListNumberFilter));
     }
-    const noFilterActive = kidungListMediaFilter === "__all__" && !kidungListNumberFilter;
+    if (kidungListTextFilter) {
+      const tq = kidungListTextFilter;
+      filtered = filtered.filter((k) => (k.judul || "").toLowerCase().includes(tq) || (k.awalLagu || "").toLowerCase().includes(tq));
+    }
+    const noFilterActive = kidungListMediaFilter === "__all__" && !kidungListNumberFilter && !kidungListTextFilter;
     countLabel.textContent = noFilterActive
       ? fullList.length.toLocaleString("id-ID") + " kidung"
       : filtered.length.toLocaleString("id-ID") + " dari " + fullList.length.toLocaleString("id-ID") + " kidung" +
         (kidungListMediaFilter !== "__all__" ? " yang punya " + active.label : "") +
-        (kidungListNumberFilter ? " (nomor diawali \"" + kidungListNumberFilter + "\")" : "");
+        (kidungListNumberFilter ? " (nomor diawali \"" + kidungListNumberFilter + "\")" : "") +
+        (kidungListTextFilter ? " (judul/awal lagu memuat \"" + kidungListTextFilter + "\")" : "");
     box.innerHTML = "";
+    loadStatus.hidden = true;
     if (!filtered.length) {
       const p = document.createElement("p");
       p.className = "media-empty";
@@ -519,18 +572,48 @@ async function renderKidungList(bukuFilter) {
     }
     // Tetap SAMA PERSIS seperti tampilan daftar biasa (nomor + judul),
     // isi syair lengkapnya baru muncul di openKidungReader seperti biasa.
-    filtered.forEach((k) => {
+    // BARU (16 Okt 2026): baris kecil "Awal_Lagu" di bawah judul (kalau diisi di Sheet) supaya
+    // jelas lagu mana & bagaimana mulai menyanyikannya. Tampil 50 pertama langsung, sisanya bertahap.
+    const buildItem = (k) => {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "kidung-list-item";
-      item.textContent = formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
+      const head = document.createElement("span");
+      head.className = "kidung-list-item-title";
+      head.textContent = formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
+      item.appendChild(head);
+      if (k.awalLagu) {
+        const sub = document.createElement("span");
+        sub.className = "kidung-list-item-awal";
+        sub.textContent = k.awalLagu;
+        item.appendChild(sub);
+      }
       item.addEventListener("click", () => openKidungReader(k.buku, k.noKidung));
-      box.appendChild(item);
+      return item;
+    };
+    batchState = appendInBatches_(filtered, buildItem, box, {
+      first: 50, step: 50,
+      onProgress: (shown, all) => {
+        if (shown < all) {
+          loadStatus.hidden = false;
+          loadStatus.textContent = "⏳ " + shown.toLocaleString("id-ID") + " dari " + all.toLocaleString("id-ID") + " kidung sudah tampil, sisanya sedang dimuat…";
+        } else {
+          loadStatus.hidden = true;
+        }
+      },
     });
   }
 
   numberFilterInput.addEventListener("input", () => {
-    kidungListNumberFilter = (numberFilterInput.value || "").replace(/\D/g, "");
+    const raw = (numberFilterInput.value || "").trim();
+    if (raw && /\D/.test(raw)) {
+      // ada huruf -> cari di judul / awal lagu
+      kidungListNumberFilter = "";
+      kidungListTextFilter = raw.toLowerCase();
+    } else {
+      kidungListNumberFilter = raw.replace(/\D/g, "");
+      kidungListTextFilter = "";
+    }
     renderFilteredList();
   });
 
@@ -556,6 +639,7 @@ async function renderKidungList(bukuFilter) {
   }
 
   panel.appendChild(countLabel);
+  panel.appendChild(loadStatus);
   panel.appendChild(box);
   renderFilteredList();
   // DIPERBARUI (4 Okt 2026): video Pustaka Media (KidungRef K51/S1/A1/T1/Y1/KA1) ikut
@@ -636,6 +720,15 @@ async function renderKidungSearch() {
     titleLine.className = "kidung-search-result-title";
     titleLine.textContent = k.buku + " " + formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
     item.appendChild(titleLine);
+
+    // BARU (16 Okt 2026): Awal_Lagu (kalau diisi) tampil di bawah judul, kata yang dicari disorot.
+    if (k.awalLagu) {
+      const awalLine = document.createElement("div");
+      awalLine.className = "kidung-list-item-awal";
+      const safeAwal = escapeHtml(k.awalLagu);
+      awalLine.innerHTML = typeof highlightAllMatches === "function" ? highlightAllMatches(safeAwal, currentQuery) : safeAwal;
+      item.appendChild(awalLine);
+    }
 
     // Cuplikan syair yang cocok (kalau ada) -- kalau yang cocok cuma
     // judul/pengarang (matchExcerpt null), baris ini dilewati saja.
@@ -1422,12 +1515,17 @@ function buildKidungMediaRefSection(meta) {
       const items = all.filter(kidungRefMatch_);
       grid.innerHTML = "";
       if (!items.length) {
-        const p = document.createElement("p");
-        p.className = "ml-empty";
-        p.textContent = "Belum ada referensi media tambahan untuk kidung ini.";
-        grid.appendChild(p);
+        // DIPERKECIL (16 Okt 2026, permintaan operator: hemat tempat) -- tidak ada referensi =
+        // cukup SATU baris kecil abu-abu (ikon 🔗 abu-abu + "Tidak ada referensi lagu"),
+        // tidak lagi judul besar + paragraf kosong. Tombol ➕ tetap ada (kalau berhak).
+        section.classList.add("is-empty");
+        heading.textContent = "🔗 Tidak ada referensi lagu";
+        heading.title = "Belum ada referensi media tambahan untuk kidung ini";
         return;
       }
+      section.classList.remove("is-empty");
+      heading.textContent = "🔗 Referensi Media Lain";
+      heading.title = "";
       items.forEach((it) => grid.appendChild(MediaLibrary.renderItemCard(it)));
     } catch (err) {
       renderGridState_('<p class="ml-error"></p>');

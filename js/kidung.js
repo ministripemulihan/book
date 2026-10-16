@@ -62,13 +62,13 @@
 // kalau suatu saat operator sheet cuma mengisi baris pertama saja seperti
 // judul/pengarang/kategori -- tidak menimpa nilai yang memang sudah diisi.
 function forwardFillKidungRows(rows) {
-  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", polaSukuKata: "", sejarah: "", kategori: "", ikon: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "", linkSoundcloud: "" };
+  let last = { noKidung: null, buku: "Kidung", judul: "", pengarang: "", birama: "", polaSukuKata: "", sejarah: "", awalLagu: "", kategori: "", ikon: "", tags: [], linkMp3_1: "", linkMp3_2: "", linkVideo: "", linkYoutube: "", linkMidi: "", linkSoundcloud: "" };
   return rows.map((r) => {
     if (r.noKidung !== last.noKidung || r.buku !== last.buku) {
       // Kidung baru mulai -- reset "ingatan" forward-fill supaya tidak
       // ketularan metadata kidung sebelumnya kalau baris pertama kidung
       // baru ini entah kenapa kosong juga.
-      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, polaSukuKata: r.polaSukuKata, sejarah: r.sejarah, kategori: r.kategori, ikon: r.ikon, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi, linkSoundcloud: r.linkSoundcloud };
+      last = { noKidung: r.noKidung, buku: r.buku, judul: r.judul, pengarang: r.pengarang, birama: r.birama, polaSukuKata: r.polaSukuKata, sejarah: r.sejarah, awalLagu: r.awalLagu, kategori: r.kategori, ikon: r.ikon, tags: r.tags, linkMp3_1: r.linkMp3_1, linkMp3_2: r.linkMp3_2, linkVideo: r.linkVideo, linkYoutube: r.linkYoutube, linkMidi: r.linkMidi, linkSoundcloud: r.linkSoundcloud };
     } else {
       if (!r.buku || r.buku === "Kidung") r.buku = last.buku; else last.buku = r.buku;
       if (!r.judul) r.judul = last.judul; else last.judul = r.judul;
@@ -76,6 +76,7 @@ function forwardFillKidungRows(rows) {
       if (!r.birama) r.birama = last.birama; else last.birama = r.birama;
       if (!r.polaSukuKata) r.polaSukuKata = last.polaSukuKata; else last.polaSukuKata = r.polaSukuKata;
       if (!r.sejarah) r.sejarah = last.sejarah; else last.sejarah = r.sejarah;
+      if (!r.awalLagu) r.awalLagu = last.awalLagu; else last.awalLagu = r.awalLagu;
       if (!r.kategori) r.kategori = last.kategori; else last.kategori = r.kategori;
       if (!r.ikon) r.ikon = last.ikon; else last.ikon = r.ikon;
       if (!r.tags || !r.tags.length) r.tags = last.tags; else last.tags = r.tags;
@@ -131,7 +132,7 @@ async function getKidungList(bukuFilter) {
     if (!map.has(key)) {
       map.set(key, {
         buku: r.buku, noKidung: r.noKidung, judul: r.judul, pengarang: r.pengarang, birama: r.birama || "",
-        polaSukuKata: r.polaSukuKata || "", sejarah: r.sejarah || "",
+        polaSukuKata: r.polaSukuKata || "", sejarah: r.sejarah || "", awalLagu: r.awalLagu || "",
         kategori: r.kategori, ikon: r.ikon || "", tags: r.tags || [], jumlahBait: 0,
         linkMp3_1: r.linkMp3_1 || "", linkMp3_2: r.linkMp3_2 || "", linkVideo: r.linkVideo || "",
         linkYoutube: r.linkYoutube || "", linkMidi: r.linkMidi || "", linkSoundcloud: r.linkSoundcloud || "",
@@ -673,8 +674,10 @@ async function searchKidungFull(query, bukuFilter) {
     const numberHit = isNumericQuery && String(k.noKidung).startsWith(q);
     const titleHit = (k.judul || "").toLowerCase().includes(q);
     const authorHit = (k.pengarang || "").toLowerCase().includes(q);
+    // BARU (16 Okt 2026): kolom Awal_Lagu ikut dicari (mis. ketik "mulia bagi allah").
+    const awalHit = (k.awalLagu || "").toLowerCase().includes(q);
     const matchExcerpt = findKidungMatchingLine(rows, q);
-    if (!numberHit && !titleHit && !authorHit && !matchExcerpt) return;
+    if (!numberHit && !titleHit && !authorHit && !awalHit && !matchExcerpt) return;
     const entry = Object.assign({}, k, { matchExcerpt });
     if (numberHit) numberMatches.push(entry); else otherMatches.push(entry);
   });

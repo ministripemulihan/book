@@ -420,6 +420,11 @@ function normalizeKidungRecord(rec) {
     // lagu) & panduan cara baca ditaruh di tab "Setup" (panel ℹ️ Info
     // Kami) lewat key "sejarah_kidung"/"cara_baca_kidung", BUKAN di sini.
     sejarah: (get("sejarah", "sejarah_kidung", "sejarah kidung", "latar_belakang", "history") || "").trim(),
+    // BARU (16 Okt 2026) -- kolom Sheet "Awal_Lagu": baris/kata PERTAMA lagu (mis. "K001 Mulia
+    // bagi Allah Bapa dan Kristus,"). Tampil di bawah judul pada daftar kidung & ikut dicari,
+    // supaya orang yang lupa judul tapi ingat awal nyanyiannya tetap ketemu. OPSIONAL: kolom
+    // tidak ada / kosong -> "" (daftar tampil seperti biasa).
+    awalLagu: (get("awal_lagu", "awal lagu", "awallagu", "awal") || "").trim(),
     kategori: (get("kategori", "category") || "").trim(),
     // Ikon/simbol kecil yang tampil di depan "No. XXX -- Judul" di Layar 2
     // (present.html) & label daftar Kumpulan Ayat -- PERMINTAAN OPERATOR

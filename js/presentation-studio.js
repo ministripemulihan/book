@@ -2047,9 +2047,9 @@ const PresentationStudio = (() => {
       if (!resultsWrap || typeof getKidungList !== "function") return;
       const q = (query || "").trim().toLowerCase();
       const list = await getKidungList(currentBuku);
-      const filtered = q ? list.filter((k) => String(k.noKidung).includes(q) || (k.judul || "").toLowerCase().includes(q)) : list;
+      const filtered = q ? list.filter((k) => String(k.noKidung).includes(q) || (k.judul || "").toLowerCase().includes(q) || (k.awalLagu || "").toLowerCase().includes(q)) : list;
       resultsWrap.innerHTML = filtered.length
-        ? filtered.slice(0, 60).map((k) => `<button type="button" class="kidung-list-item" data-no="${escapeHtml(k.noKidung)}">${escapeHtml(typeof formatKidungNo === "function" ? formatKidungNo(k.buku, k.noKidung) : k.noKidung)} — ${escapeHtml(k.judul || "")}</button>`).join("")
+        ? filtered.slice(0, 60).map((k) => `<button type="button" class="kidung-list-item" data-no="${escapeHtml(k.noKidung)}">${escapeHtml(typeof formatKidungNo === "function" ? formatKidungNo(k.buku, k.noKidung) : k.noKidung)} — ${escapeHtml(k.judul || "")}${k.awalLagu ? `<span class="kidung-list-item-awal">${escapeHtml(k.awalLagu)}</span>` : ""}</button>`).join("")
         : '<p class="present-saved-empty">Tidak ada kidung yang cocok.</p>';
       resultsWrap.querySelectorAll(".kidung-list-item").forEach((btn) => {
         btn.addEventListener("click", () => openKidung(currentBuku, btn.dataset.no));
@@ -7234,10 +7234,15 @@ const PresentationStudio = (() => {
     // ratusan video tidak dirender sekaligus; tombol "Tampilkan lagi" menambah
     // baris tanpa menggambar ulang / melompatkan scroll. Ganti filter atau
     // ketikan pencarian -> mulai dari 60 pertama lagi.
-    const YT_PAGE_SIZE_ = 60;
+    // DIUBAH (16 Okt 2026, permintaan operator: "tampilkan 50 dulu, sisanya bertahap + info
+    // 20 dari 500 sedang dimuat") -- 50 pertama langsung tampil, sisanya DITAMBAH OTOMATIS per
+    // 50 video tiap ~40 ms (tanpa perlu menekan tombol), dengan baris info progres di bawah daftar.
+    const YT_PAGE_SIZE_ = 50;
     let ytRenderLimit_ = YT_PAGE_SIZE_;
     let ytRenderSig_ = "";
+    let ytAutoTimer_ = null;
     function renderList(appendMore) {
+      if (ytAutoTimer_) { clearTimeout(ytAutoTimer_); ytAutoTimer_ = null; } // batch lama berhenti kalau daftar digambar ulang
       const videos = filteredVideos();
       if (!videos.length) {
         listWrap.innerHTML = `<p class="present-saved-empty">${allVideos.length ? "Tidak ada video untuk filter ini." : "Belum ada video dimuat -- tempel link Google Sheet lalu tekan \"🔄 Muat Ulang\"."}</p>`;
@@ -7379,13 +7384,13 @@ const PresentationStudio = (() => {
       if (videos.length > endIdx) {
         const more = document.createElement("div");
         more.className = "ps-yt-more-row";
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "chip-btn small primary";
-        btn.textContent = `⬇️ Tampilkan ${Math.min(YT_PAGE_SIZE_, videos.length - endIdx)} lagi (menampilkan ${endIdx} dari ${videos.length})`;
-        btn.addEventListener("click", () => { ytRenderLimit_ += YT_PAGE_SIZE_; renderList(true); });
-        more.appendChild(btn);
+        more.textContent = `⏳ ${endIdx.toLocaleString("id-ID")} dari ${videos.length.toLocaleString("id-ID")} video sudah tampil, sisanya sedang dimuat…`;
         listWrap.appendChild(more);
+        ytAutoTimer_ = setTimeout(() => {
+          ytAutoTimer_ = null;
+          ytRenderLimit_ += YT_PAGE_SIZE_;
+          renderList(true);
+        }, 40);
       }
     }
 
