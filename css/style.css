@@ -5486,3 +5486,15 @@ body.strong-off .strong-tag { display: none; }
 .search-custom-books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 4px 12px; font-size: 0.9rem; }
 .search-custom-books-grid label { cursor: pointer; white-space: nowrap; }
 .search-custom-books-count { margin-top: 8px; font-size: 0.85rem; opacity: .75; }
+
+/* BARU (16 Okt 2026) -- akordion "Media terkait pasal ini" di layar baca Alkitab */
+.ml-acc { border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-raised); margin: 6px 0; }
+.ml-acc-summary { cursor: pointer; padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--ink-soft); list-style: none; user-select: none; }
+.ml-acc-summary::-webkit-details-marker { display: none; }
+.ml-acc-summary::before { content: "▸ "; display: inline-block; transition: transform .15s ease; }
+details[open] > .ml-acc-summary::before { content: "▾ "; }
+.ml-acc-outer > .ml-acc-summary { font-size: 14px; color: var(--ink); }
+.ml-acc-body { padding: 0 8px 8px; }
+.ml-acc-group { background: transparent; }
+.ml-acc-group > .kidung-media-ref-grid { padding: 4px 8px 6px; }
+.ml-acc-more { padding: 0 10px 10px; }
