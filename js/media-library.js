@@ -853,10 +853,11 @@ const MediaLibrary = (() => {
       playVerseCtx_ = null;
       resolveSoundCloudWidgetUrl_(item.link).then((widgetUrl) => {
         playVerseCtx_ = ctxForSc;
-        openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(widgetUrl)}&auto_play=true"></iframe>`, item.nama, item.link);
+        // book166: audio-saja -> langsung MODE MINI (bar kecil di bawah layar, syair tetap terbaca & lagu terus main)
+        openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(widgetUrl)}&auto_play=true&visual=false&show_artwork=false&show_comments=false&show_teaser=false&hide_related=true"></iframe>`, item.nama, item.link, { mini: "audio" });
       });
     } else if (sumber === "mp3" || (sumber === "google_drive" && /\.(mp3|wav|m4a)(\?|$)/i.test(item.link))) {
-      openPlayerOverlay_(`<audio controls autoplay src="${resolvePlayableUrl_(item.link)}"></audio>`, item.nama, item.link);
+      openPlayerOverlay_(`<audio controls autoplay src="${resolvePlayableUrl_(item.link)}"></audio>`, item.nama, item.link, { mini: "audio" });
     } else if (sumber === "google_drive") {
       // PERBAIKAN (12 Sep 2026) -- dulu SEMUA link Drive selain
       // .mp3/.wav/.m4a (termasuk kebanyakan link "share" biasa tanpa
@@ -882,7 +883,7 @@ const MediaLibrary = (() => {
   // (mis. link Drive file besar kena halaman "pindai virus" Google) --
   // operator tinggal tekan ini untuk buka link aslinya di tab baru,
   // tidak perlu menebak-nebak kenapa gagal.
-  function openPlayerOverlay_(innerHtml, title, fallbackLink) {
+  function openPlayerOverlay_(innerHtml, title, fallbackLink, opts) {
     let ov = el_("mlPlayerOverlay");
     if (!ov) {
       ov = document.createElement("div");
@@ -897,6 +898,8 @@ const MediaLibrary = (() => {
           <div class="ml-player-header">
             <span id="mlPlayerTitle" class="ml-player-title"></span>
             <div class="ml-player-header-actions">
+              <button type="button" id="mlPlayerWakeBtn" class="chip-btn small ml-player-btn" aria-pressed="false" hidden></button>
+              <button type="button" id="mlPlayerMiniBtn" class="chip-btn small ml-player-btn"></button>
               <button type="button" id="mlPlayerFsBtn" class="chip-btn small ml-player-btn" title="Layar penuh" aria-label="Layar penuh">⛶<span class="ml-pl-long"> Layar Penuh</span></button>
               <a id="mlPlayerOpenLink" class="chip-btn small ml-player-btn" href="#" target="_blank" rel="noopener" title="Buka link aslinya" aria-label="Buka link aslinya" hidden>🔗</a>
               <button type="button" id="mlPlayerCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
@@ -910,6 +913,10 @@ const MediaLibrary = (() => {
       ov.addEventListener("click", (e) => { if (e.target === ov) closePlayerOverlay_(); });
       el_("mlPlayerCloseBtn").addEventListener("click", closePlayerOverlay_);
       el_("mlPlayerFsBtn").addEventListener("click", togglePlayerFullscreen_);
+      el_("mlPlayerMiniBtn").addEventListener("click", () => setPlayerMini_(!ov.classList.contains("ml-player-mini")));
+      el_("mlPlayerWakeBtn").addEventListener("click", togglePlayerWake_);
+      // Layar kembali kelihatan (HP dibuka lagi) -> minta ulang "layar tetap menyala" (otomatis dilepas browser saat tab disembunyikan).
+      document.addEventListener("visibilitychange", () => { if (!document.hidden && playerWantsWake_()) acquirePlayerWake_(); });
       // Layar penuh sungguhan keluar lewat Esc / gestur sistem -> samakan tampilan.
       const onFsChange = () => {
         if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -947,6 +954,74 @@ const MediaLibrary = (() => {
     fillPlayerVerses_(playVerseCtx_);
     playVerseCtx_ = null;
     ov.hidden = false;
+    // book166 -- MODE MINI: audio-saja (SoundCloud/MP3) langsung mini; video YouTube mulai besar,
+    // tapi bisa dikecilkan dengan tombol 🔽 tanpa memuat ulang videonya (iframe yang sama, hanya CSS).
+    ov.classList.toggle("ml-player-mini-audio", !!(opts && opts.mini === "audio"));
+    setPlayerMini_(!!(opts && opts.mini));
+    const wakeBtn = el_("mlPlayerWakeBtn");
+    if (wakeBtn) wakeBtn.hidden = !(navigator.wakeLock && navigator.wakeLock.request);
+    syncPlayerWakeLabel_();
+    if (playerWantsWake_()) acquirePlayerWake_();
+  }
+  // ---- book166: pemutar mini + layar tetap menyala ----
+  // Mini = tidak ada latar gelap, tidak menutupi halaman: bar di bawah layar (audio) atau jendela kecil
+  // di pojok kanan bawah (video). Halaman di belakangnya tetap bisa diketuk/digulir (syair kidung terbaca),
+  // dan pemutar TETAP hidup saat pengguna pindah kidung/menu -- hanya ✕ yang menghentikannya.
+  function setPlayerMini_(on) {
+    const ov = el_("mlPlayerOverlay");
+    if (!ov) return;
+    if (on) exitPlayerFullscreen_();
+    ov.classList.toggle("ml-player-mini", !!on);
+    document.body.classList.toggle("ml-player-mini-open", !!on && !ov.hidden);
+    const b = el_("mlPlayerMiniBtn");
+    if (b) {
+      b.innerHTML = (on ? "🔼" : "🔽") + '<span class="ml-pl-long">' + (on ? " Besar" : " Kecil") + "</span>";
+      b.title = on ? "Perbesar pemutar" : "Kecilkan pemutar: lagu tetap main, syair/halaman di belakang tetap terlihat";
+      b.setAttribute("aria-label", b.title);
+    }
+    // Sisakan ruang di bawah halaman setinggi pemutar mini supaya baris syair terakhir tidak tertutup.
+    const box = ov.querySelector(".ml-player-box");
+    const setPad = () => document.documentElement.style.setProperty("--ml-mini-pad", on && box ? (box.offsetHeight + 12) + "px" : "0px");
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(setPad); else setPad();
+  }
+  let playerWakeLock_ = null;
+  function playerWantsWake_() {
+    const ov = el_("mlPlayerOverlay");
+    if (!ov || ov.hidden || !(navigator.wakeLock && navigator.wakeLock.request)) return false;
+    let pref = null;
+    try { pref = localStorage.getItem("ml_player_wake"); } catch (e) { /* abaikan */ }
+    if (pref === "1") return true;
+    if (pref === "0") return false;
+    // belum pernah dipilih: nyala otomatis di HP/tablet (layar sentuh) -- layar mati = lagu bisa berhenti
+    return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  }
+  function syncPlayerWakeLabel_() {
+    const b = el_("mlPlayerWakeBtn");
+    if (!b) return;
+    const on = playerWantsWake_();
+    b.innerHTML = "🔆" + '<span class="ml-pl-long">' + (on ? " Layar nyala" : " Layar boleh mati") + "</span>";
+    b.title = on ? "Layar dijaga tetap menyala selama pemutar terbuka (supaya lagu tidak putus). Tekan untuk mematikan." : "Tekan agar layar tetap menyala selama lagu diputar (cegah HP mengunci & menghentikan lagu).";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  function acquirePlayerWake_() {
+    try {
+      if (playerWakeLock_ || !(navigator.wakeLock && navigator.wakeLock.request)) return;
+      navigator.wakeLock.request("screen").then((lock) => {
+        playerWakeLock_ = lock;
+        lock.addEventListener("release", () => { if (playerWakeLock_ === lock) playerWakeLock_ = null; });
+      }).catch(() => { /* ditolak (mis. baterai hemat) -- pemutar tetap jalan */ });
+    } catch (e) { /* abaikan */ }
+  }
+  function releasePlayerWake_() {
+    const lock = playerWakeLock_;
+    playerWakeLock_ = null;
+    try { if (lock && lock.release) lock.release(); } catch (e) { /* abaikan */ }
+  }
+  function togglePlayerWake_() {
+    const next = !playerWantsWake_();
+    try { localStorage.setItem("ml_player_wake", next ? "1" : "0"); } catch (e) { /* abaikan */ }
+    syncPlayerWakeLabel_();
+    if (next) acquirePlayerWake_(); else releasePlayerWake_();
   }
   // Ayat yang dirujuk video -> di bawah video.
   //  ctx.verses+verseNums : dari "Media terkait pasal ini" (pasal yang sedang dibuka)
@@ -1023,6 +1098,9 @@ const MediaLibrary = (() => {
   function enterPlayerFullscreen_() {
     const ov = el_("mlPlayerOverlay");
     if (!ov) return;
+    ov.classList.remove("ml-player-mini");
+    document.body.classList.remove("ml-player-mini-open");
+    document.documentElement.style.setProperty("--ml-mini-pad", "0px");
     ov.classList.add("ml-player-full");
     syncPlayerFsLabel_();
     const req = ov.requestFullscreen || ov.webkitRequestFullscreen;
@@ -1057,6 +1135,10 @@ const MediaLibrary = (() => {
     exitPlayerFullscreen_();
     el_("mlPlayerBody").innerHTML = "";
     ov.hidden = true;
+    ov.classList.remove("ml-player-mini", "ml-player-mini-audio");
+    document.body.classList.remove("ml-player-mini-open");
+    document.documentElement.style.setProperty("--ml-mini-pad", "0px");
+    releasePlayerWake_();
   }
 
   // BARU (14 Sep 2026) -- kotak "📝 Syair" (tombol di kartu, lihat
