@@ -784,7 +784,12 @@ const MediaLibrary = (() => {
   // ------------------------------------------------------------
   // 7) PEMUTARAN per sumber (bagian 4b rencana)
   // ------------------------------------------------------------
-  function playItem_(item) {
+  // BARU (16 Okt 2026, book162) -- konteks ayat untuk jendela pemutar: kalau video dibuka dari
+  // "Media terkait pasal ini", ayat yang dirujuk (mis. Markus 12:30-31) ditampilkan LANGSUNG di
+  // bawah videonya. Diisi playItem_(), dibaca & dikosongkan openPlayerOverlay_().
+  let playVerseCtx_ = null;
+  function playItem_(item, verseCtx) {
+    playVerseCtx_ = verseCtx || null;
     if (item.jenis === "sound" && !item.sumber) {
       // Efek suara kontribusi (link Drive/mp3) -- putar langsung.
       // PERBAIKAN (12 Sep 2026): (1) link Drive "share" biasa ditebak
@@ -877,6 +882,7 @@ const MediaLibrary = (() => {
           </div>
           <div class="ml-player-body" id="mlPlayerBody"></div>
           <div class="ml-player-hint" id="mlPlayerHint" hidden>Video tidak muncul atau ada tulisan “tidak tersedia”? Tekan <b>▶ Buka di YouTube</b>.</div>
+          <div class="ml-player-verses" id="mlPlayerVerses" hidden></div>
         </div>`;
       document.body.appendChild(ov);
       ov.addEventListener("click", (e) => { if (e.target === ov) closePlayerOverlay_(); });
@@ -916,7 +922,68 @@ const MediaLibrary = (() => {
     if (fsBtn) fsBtn.hidden = /^<audio/i.test(String(innerHtml || "").trim());
     ov.classList.remove("ml-player-full");
     syncPlayerFsLabel_();
+    fillPlayerVerses_(playVerseCtx_);
+    playVerseCtx_ = null;
     ov.hidden = false;
+  }
+  // Ayat yang dirujuk video -> di bawah video.
+  //  ctx.verses+verseNums : dari "Media terkait pasal ini" (pasal yang sedang dibuka)
+  //  ctx.refs             : dari menu "🎬 Media" (bisa kitab/pasal mana saja, diambil dari data Alkitab)
+  // Referensi "seluruh pasal" di layar baca tidak ditampilkan (pasalnya sudah ada di layar).
+  function appendPlayerVerseBlock_(box, bookName, chapter, list) {
+    const MB = window.MediaBibleRef;
+    const head = document.createElement("div");
+    head.className = "ml-pv-head";
+    const nums = list.map((v) => v.verse);
+    head.textContent = ("📖 " + (bookName || "") + " " + chapter + ":" +
+      (MB ? MB.compactNums(nums).replace(/, /g, ",") : nums.join(","))).trim();
+    box.appendChild(head);
+    list.forEach((v) => {
+      const p = document.createElement("p");
+      p.className = "ml-pv-verse";
+      const n = document.createElement("b");
+      n.className = "ml-pv-n";
+      n.textContent = String(v.verse);
+      p.appendChild(n);
+      p.appendChild(document.createTextNode(" " + String(v.text || "")));
+      box.appendChild(p);
+    });
+  }
+  function fillPlayerVerses_(ctx) {
+    const box = el_("mlPlayerVerses");
+    if (!box) return;
+    box.innerHTML = "";
+    box.hidden = true;
+    if (!ctx) return;
+    if (ctx.refs) {
+      if (typeof getChapterVerses !== "function") return;
+      const lang = (typeof currentLang !== "undefined" && currentLang) || "";
+      let budget = 60, cut = false, any = false;
+      ctx.refs.forEach((r) => {
+        if (budget <= 0) { cut = true; return; }
+        let list = (getChapterVerses(lang, r.bookNum, r.chapter) || []).filter((v) => v.verse >= r.from && v.verse <= r.to);
+        if (!list.length) return;
+        if (list.length > budget) { list = list.slice(0, budget); cut = true; }
+        budget -= list.length;
+        appendPlayerVerseBlock_(box, r.bookName, r.chapter, list);
+        any = true;
+      });
+      if (!any) return;
+      if (cut) {
+        const more = document.createElement("div");
+        more.className = "ml-pv-head";
+        more.textContent = "… ayat selengkapnya: buka di Alkitab (tombol 📖).";
+        box.appendChild(more);
+      }
+      box.hidden = false;
+      return;
+    }
+    if (ctx.whole || !ctx.verses || !ctx.verseNums || !ctx.verseNums.length) return;
+    const want = new Set(ctx.verseNums);
+    const list = ctx.verses.filter((v) => want.has(v.verse));
+    if (!list.length) return;
+    appendPlayerVerseBlock_(box, list[0].bookName, list[0].chapter, list);
+    box.hidden = false;
   }
   function syncPlayerFsLabel_() {
     const ov = el_("mlPlayerOverlay"), b = el_("mlPlayerFsBtn");
@@ -1001,8 +1068,8 @@ const MediaLibrary = (() => {
   // ------------------------------------------------------------
   // 8) TAB "Semua" / "🎬 YouTube" / "🔊 Efek Suara" / "Kidung"
   // ------------------------------------------------------------
-  function itemToCard_(item) { return makeItemCard_(item, false); }
-  function makeItemCard_(item, plain) {
+  function itemToCard_(item, verseCtx) { return makeItemCard_(item, false, verseCtx); }
+  function makeItemCard_(item, plain, verseCtx) {
     const isOwner = String(item.diuploadOleh || "").toLowerCase() === String(currentUser || "").toLowerCase();
     const canManage = isOwner || isAdministrator();
     return buildCard_({
@@ -1020,7 +1087,7 @@ const MediaLibrary = (() => {
       kidungRef: item.kidungRef,
       noKidungChips: !!plain, // dipakai layar baca kidung (bagian "Referensi Media Lain") -- di sana tombol kidung tidak perlu
       canManage,
-      onPlay: () => playItem_(item),
+      onPlay: () => playItem_(item, verseCtx),
       onEdit: () => openAddForm_({ jenis: item.jenis, editItem: item }),
       onDelete: () => confirmDelete_(item),
       onShowSyair: item.syair ? () => showSyairDialog_(item) : null,
@@ -1113,7 +1180,7 @@ const MediaLibrary = (() => {
         tag.textContent = p.whole ? "Seluruh pasal" : "Ayat " + (MB ? MB.compactNums(p.verseNums) : p.verseNums.join(", "));
         wrap.appendChild(tag);
       }
-      wrap.appendChild(itemToCard_(p.it));
+      wrap.appendChild(itemToCard_(p.it, { verses: versesInChapter, verseNums: p.verseNums, whole: p.whole }));
       return wrap;
     }
 
@@ -1211,6 +1278,169 @@ const MediaLibrary = (() => {
       // offline / server tidak menjawab: tampilan dari daftar tersimpan (kalau ada) tetap dipakai
       if (!memAll_) render({ items: [], matches: [] }, { error: err });
     }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (book163, 16 Okt 2026) -- menu "🎬 Media" di sidebar Alkitab: SEMUA media yang punya
+  // BibleRef, dikelompokkan per kitab. Kartu ditekan = diputar DI MENU INI dan ayatnya tampil di
+  // bawah video (tanpa pindah halaman). Tombol "📖 Buka di Alkitab" = ke pasalnya (di atas ayat
+  // ada kotak "Media terkait pasal ini" berisi video aslinya).
+  // ------------------------------------------------------------
+  const ALLMEDIA_FIRST_ = 24;
+  function allMediaEntries_(items) {
+    const MB = window.MediaBibleRef;
+    const out = [];
+    if (!MB) return out;
+    (items || []).forEach((it) => {
+      let text = String(it.bibleRef || "").trim();
+      if (!text && it.ayatRef) { try { text = MB.fromVerseIds(it.ayatRef).text; } catch (e) { text = ""; } }
+      if (!text) return;
+      const refs = MB.parse(text).filter((r) => r.ok && r.intervals.length);
+      if (!refs.length) return;
+      const first = refs[0], iv = first.intervals[0];
+      out.push({ item: it, refs, bookNum: first.book.num, chapter: iv.ch, from: iv.from, whole: !!iv.whole, label: MB.normalize(text) });
+    });
+    return out;
+  }
+  function refsToPlayerCtx_(entry) {
+    const refs = [];
+    entry.refs.forEach((r) => r.intervals.forEach((iv) => refs.push({ bookNum: r.book.num, bookName: r.book.name, chapter: iv.ch, from: iv.from, to: iv.to })));
+    return { refs };
+  }
+  async function watchAll_(render) {
+    const user = String(typeof currentUser !== "undefined" && currentUser ? currentUser : "").toLowerCase();
+    if (memAll_ && memAll_.user !== user) memAll_ = null;
+    let shown = null;
+    const show = (items, meta) => { if (shown === items) return; shown = items; render(items, meta); };
+    if (memAll_) {
+      show(memAll_.items, { fromCache: true });
+    } else {
+      const cached = await Sync.cachedList({});
+      if (cached && cached.items && cached.items.length) {
+        memAll_ = { user, items: cached.items, netAt: 0, index: null, indexItems: null };
+        show(cached.items, { fromCache: true });
+      }
+    }
+    if (memAll_ && memAll_.netAt && Date.now() - memAll_.netAt < 60000) return;
+    try {
+      const items = await Sync.list({});
+      memAll_ = { user, items, netAt: Date.now(), index: null, indexItems: null };
+      show(items, { fromCache: false });
+    } catch (err) {
+      if (!memAll_) render([], { error: err });
+    }
+  }
+  function buildAllMediaPanel(container, hooks) {
+    hooks = hooks || {};
+    container.innerHTML = "";
+    const h = document.createElement("h2");
+    h.textContent = "🎬 Media dalam Alkitab";
+    container.appendChild(h);
+    const hint = document.createElement("p");
+    hint.className = "ml-hint";
+    hint.textContent = "Semua video/lagu yang ditautkan ke ayat (kolom BibleRef), per kitab. Ketuk kartu = diputar di sini dan ayatnya tampil di bawah video. Tombol 📖 membuka pasalnya di Alkitab.";
+    container.appendChild(hint);
+    const search = document.createElement("input");
+    search.type = "search";
+    search.className = "ml-allmedia-search";
+    search.placeholder = "Cari judul, kitab, atau kategori…";
+    search.autocomplete = "off";
+    container.appendChild(search);
+    const status = document.createElement("div");
+    status.className = "ml-hint";
+    status.textContent = "Memuat daftar media…";
+    container.appendChild(status);
+    const listBox = document.createElement("div");
+    listBox.className = "ml-allmedia-list";
+    container.appendChild(listBox);
+
+    let entries = [], loaded = false, failed = false;
+
+    function drawBookCards_(grid, moreRow, list, state) {
+      list.slice(state.shown, state.shown + ALLMEDIA_FIRST_).forEach((e) => {
+        const wrap = document.createElement("div");
+        wrap.className = "ml-verse-ref-item";
+        const tag = document.createElement("div");
+        tag.className = "ml-verse-ref-tag";
+        tag.textContent = e.label;
+        wrap.appendChild(tag);
+        wrap.appendChild(makeItemCard_(e.item, false, refsToPlayerCtx_(e)));
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "chip-btn small ml-allmedia-open";
+        open.textContent = "📖 Buka di Alkitab";
+        open.addEventListener("click", () => { if (hooks.openChapter) hooks.openChapter(e.bookNum, e.chapter, e.whole ? undefined : e.from); });
+        wrap.appendChild(open);
+        grid.appendChild(wrap);
+      });
+      state.shown = Math.min(list.length, state.shown + ALLMEDIA_FIRST_);
+      moreRow.innerHTML = "";
+      if (state.shown < list.length) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "chip-btn small";
+        b.textContent = "Tampilkan " + Math.min(ALLMEDIA_FIRST_, list.length - state.shown) + " lagi";
+        b.addEventListener("click", () => drawBookCards_(grid, moreRow, list, state));
+        moreRow.appendChild(b);
+      }
+    }
+
+    function render() {
+      listBox.innerHTML = "";
+      if (failed && !loaded) { status.textContent = "Daftar media belum bisa dimuat (tidak ada internet dan belum pernah tersimpan)."; return; }
+      if (!loaded) return;
+      const q = search.value.trim().toLowerCase();
+      const shown = entries.filter((e) => {
+        if (!q) return true;
+        const it = e.item;
+        const bk = (typeof BOOKS !== "undefined" ? (BOOKS.find((b) => b.num === e.bookNum) || {}).name : "") || "";
+        return [it.nama, it.channel, it.kategori, e.label, bk].join(" ").toLowerCase().indexOf(q) !== -1;
+      });
+      const byBook = new Map();
+      shown.forEach((e) => { if (!byBook.has(e.bookNum)) byBook.set(e.bookNum, []); byBook.get(e.bookNum).push(e); });
+      status.textContent = shown.length
+        ? shown.length + " media di " + byBook.size + " kitab" + (q ? " (cocok dengan “" + search.value.trim() + "”)" : "")
+        : (q ? "Tidak ada media yang cocok." : "Belum ada media yang punya BibleRef (isi kolom BibleRef di Sheet Pustaka Media).");
+      const books = typeof BOOKS !== "undefined" ? BOOKS : [];
+      [["PL", "Perjanjian Lama"], ["PB", "Perjanjian Baru"]].forEach(([tes, tesName]) => {
+        const inTes = books.filter((b) => b.testament === tes && byBook.has(b.num));
+        if (!inTes.length) return;
+        const t = document.createElement("h3");
+        t.className = "all-pokok-group-title";
+        t.textContent = tesName;
+        listBox.appendChild(t);
+        inTes.forEach((b) => {
+          const list = byBook.get(b.num).slice().sort((x, y) => (x.chapter - y.chapter) || (x.from - y.from));
+          const det = document.createElement("details");
+          det.className = "ml-acc ml-acc-group";
+          const sum = document.createElement("summary");
+          sum.className = "ml-acc-summary";
+          sum.textContent = "🎬 " + b.name + " (" + list.length + ")";
+          det.appendChild(sum);
+          const grid = document.createElement("div");
+          grid.className = "ml-grid kidung-media-ref-grid";
+          const moreRow = document.createElement("div");
+          moreRow.className = "ml-acc-more";
+          det.appendChild(grid);
+          det.appendChild(moreRow);
+          const state = { shown: 0 };
+          const fill = () => { if (!state.shown) drawBookCards_(grid, moreRow, list, state); };
+          det.addEventListener("toggle", () => { if (det.open) fill(); });
+          if (q) { det.open = true; fill(); }
+          listBox.appendChild(det);
+        });
+      });
+    }
+
+    let timer = null;
+    search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(render, 200); });
+
+    watchAll_((items, meta) => {
+      if (meta && meta.error) { failed = true; render(); return; }
+      entries = allMediaEntries_(items);
+      loaded = true;
+      render();
+    }).catch(() => { failed = true; render(); });
   }
 
   // ------------------------------------------------------------
@@ -2668,6 +2898,8 @@ const MediaLibrary = (() => {
     buildVerseRefSection: buildVerseRefSection_,
     // BARU (16 Okt 2026) -- pasal terbuka -> media terkait (cocok lokal lewat BibleRef).
     watchChapter,
+    // BARU (book163) -- menu sidebar "🎬 Media" (js/app.js showAllMediaPanel()).
+    buildAllMediaPanel,
     openCheckPanel: openCheckPanel_,
   };
 })();

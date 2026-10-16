@@ -2491,6 +2491,24 @@ async function showAllMapsPanel() {
   });
 }
 
+// ------------------------------------------------------------
+//  PANEL GLOBAL "🎬 Media" (book163) -- dibuka dari tombol sidebar: SEMUA media
+//  Pustaka Media yang punya BibleRef, per kitab. Diputar langsung di panel ini
+//  (ayatnya tampil di bawah video); tombol "📖 Buka di Alkitab" -> pasalnya.
+// ------------------------------------------------------------
+function showAllMediaPanel() {
+  hideAllPanels();
+  logActivity("Media (Semua Alkitab)");
+  const panel = el("allMediaPanel");
+  if (!panel) return;
+  panel.hidden = false;
+  if (typeof MediaLibrary === "undefined" || !MediaLibrary.buildAllMediaPanel) {
+    panel.innerHTML = "<p>Pustaka Media belum tersedia.</p>";
+    return;
+  }
+  MediaLibrary.buildAllMediaPanel(panel, { openChapter: (bookNum, chapter, verse) => renderChapter(bookNum, chapter, verse) });
+}
+
 // Tombol sidebar "📌 Pokok Alkitab" / "🗺️ Peta + Gambar" otomatis
 // disembunyikan kalau sheet yang bersangkutan belum diisi URL-nya di
 // CONFIG.OUTLINE_SHEETS -- konsisten dengan perilaku fitur per-kitab.
@@ -2501,6 +2519,11 @@ function initGlobalOutlineSidebarButtons() {
   if (pokokBtn) {
     pokokBtn.hidden = !(cfg.pokokKitabCsvUrl && cfg.pokokKitabCsvUrl.trim());
     pokokBtn.addEventListener("click", () => { closeSidebarOnMobile(); showAllPokokPanel(); });
+  }
+  const mediaBtn = el("allMediaBtn");
+  if (mediaBtn) {
+    mediaBtn.hidden = !(typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled());
+    mediaBtn.addEventListener("click", () => { closeSidebarOnMobile(); showAllMediaPanel(); });
   }
   if (mapsBtn) {
     mapsBtn.hidden = !(cfg.petaGambarCsvUrl && cfg.petaGambarCsvUrl.trim());
@@ -9608,6 +9631,7 @@ function hideAllPanels() {
   if (el("bookInfoPanel")) el("bookInfoPanel").hidden = true;
   if (el("allPokokPanel")) el("allPokokPanel").hidden = true;
   if (el("allMapsPanel")) el("allMapsPanel").hidden = true;
+  if (el("allMediaPanel")) el("allMediaPanel").hidden = true;
   // BARU (21 Sep 2026) -- panel Penanda Saya & Riwayat Edit Ayat (dibuat dinamis)
   if (el("annoPanel")) el("annoPanel").hidden = true;
   if (el("bibleEditPanel")) el("bibleEditPanel").hidden = true;
