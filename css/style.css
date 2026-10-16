@@ -5511,3 +5511,13 @@ details[open] > .ml-acc-summary::before { content: "▾ "; }
 /* book163 -- menu sidebar "🎬 Media" */
 .ml-allmedia-search { width: 100%; box-sizing: border-box; padding: 8px 12px; margin: 6px 0 10px; border: 1px solid var(--rule); border-radius: 8px; font-size: 15px; background: var(--paper); color: var(--ink); }
 .ml-allmedia-open { margin-top: 4px; }
+
+/* book164 -- "Ayat 30, 31" bisa ditekan: ayatnya tampil di bawah video (di kotak Media terkait pasal ini) */
+.ml-verse-ref-tag-btn { background: none; border: 0; padding: 0; margin: 0; text-align: left; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: var(--petrol, #2a5bd7); text-decoration: underline dotted; }
+.ml-verse-ref-tag-btn:hover { text-decoration: underline; }
+.ml-sum-verses { cursor: pointer; color: var(--petrol, #2a5bd7); text-decoration: underline dotted; }
+.ml-sum-verses:hover { text-decoration: underline; }
+.ml-verse-ref-item.ml-vr-open { grid-column: 1 / -1; }
+.ml-verse-ref-item.ml-vr-open > .ml-card { align-self: flex-start; width: 150px; }
+.ml-vr-panel { padding: 8px 12px; margin-top: 2px; max-width: 760px; border-left: 3px solid var(--petrol, #2a5bd7); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.ml-vr-panel[hidden] { display: none !important; }
