@@ -6892,16 +6892,29 @@ const PresentationStudio = (() => {
     // berarti "bukan Efek Suara", sumbernya boleh macam-macam) dilewati
     // diam-diam, PERSIS seperti baris CSV lama tanpa link YouTube yang
     // dikenali (lihat `if (!id) return;` di parseSheetCsv()).
+    // BARU (book165) -- teks BibleRef 1 baris Pustaka Media (kolom BibleRef; AyatRef lama ikut diterjemahkan)
+    // + daftar nomor kitabnya (dipakai filter "Semua BibleRef" per kitab).
+    function bibleRefInfo_(item) {
+      const MB = window.MediaBibleRef;
+      let text = String(item.bibleRef || "").trim();
+      if (!text && item.ayatRef && MB) { try { text = MB.fromVerseIds(item.ayatRef).text; } catch (e) { text = ""; } }
+      if (!text || !MB) return { text: "", books: [] };
+      const books = [];
+      MB.parse(text).forEach((r) => { if (r.ok && r.book && books.indexOf(r.book.num) === -1) books.push(r.book.num); });
+      return { text: books.length ? MB.normalize(text) : text, books };
+    }
+    function isSoundCloudItem_(item) {
+      const link = String(item.link || "").trim();
+      return /soundcloud\.com/i.test(link) || String(item.sumber || "").trim().toLowerCase() === "soundcloud";
+    }
     function mapMediaLibraryItemsToVideos_(items) {
       const out = [];
       (items || []).forEach((item) => {
         const id = typeof extractYoutubeId === "function" ? extractYoutubeId(item.link) : null;
-        if (!id) return;
-        out.push({
-          title: item.nama || id,
+        const common = {
+          title: item.nama || id || item.link || "",
           channel: item.channel || "",
-          url: item.link, videoId: id,
-          embedUrl: buildYoutubeEmbedUrl(id),
+          url: item.link,
           categories: splitKategoriRaw_(item.kategori),
           durationMinutes: item.durasiDetik ? Number(item.durasiDetik) / 60 : null,
           uploadDate: item.tanggalAsli ? parseUploadDate(item.tanggalAsli) : null,
@@ -6912,7 +6925,18 @@ const PresentationStudio = (() => {
           sumber: item.sumber || "",
           keterangan: item.keterangan || "",
           kidungRef: item.kidungRef || "",
-        });
+          // BARU (book165) -- ID Sheet (urutan "ID Z-A") + BibleRef (filter & label).
+          id: item.id == null ? "" : String(item.id),
+          bibleRef: "", bibleBooks: [],
+        };
+        const br = bibleRefInfo_(item);
+        common.bibleRef = br.text; common.bibleBooks = br.books;
+        if (id) {
+          out.push(Object.assign(common, { videoId: id, embedUrl: buildYoutubeEmbedUrl(id) }));
+        } else if (isSoundCloudItem_(item)) {
+          // BARU (book165) -- baris SoundCloud di Sheet (Sumber=soundcloud) ikut tampil di daftar Studio.
+          out.push(Object.assign(common, { kind: "soundcloud", trackUrl: String(item.link).trim(), videoId: "sc:" + (common.id || item.link), embedUrl: "" }));
+        }
       });
       return out;
     }
@@ -7005,6 +7029,7 @@ const PresentationStudio = (() => {
     let activeChannel = "";
     let activeKeterangan = "";
     let activeKidungRef = "";
+    let activeBibleRef = ""; // BARU (book165): "" | "__any" | "__none" | "b:<nomor kitab>"
 
     function sortVideos(list) {
       const arr = list.slice();
@@ -7024,11 +7049,27 @@ const PresentationStudio = (() => {
         // Sama halnya untuk tanggal upload yang belum diisi.
         case "tanggal_desc": arr.sort((a, b) => (b.uploadDate ? b.uploadDate.getTime() : -Infinity) - (a.uploadDate ? a.uploadDate.getTime() : -Infinity)); break;
         case "tanggal_asc": arr.sort((a, b) => (a.uploadDate ? a.uploadDate.getTime() : Infinity) - (b.uploadDate ? b.uploadDate.getTime() : Infinity)); break;
+        // BARU (book165, permintaan operator: "tampil ID Z-A, ID paling baru dimasukkan muncul pertama")
+        case "id_az": arr.sort(cmpVideoId_); break;
         case "terbaru":
         default:
-          arr.reverse(); break;
+          // ID terbesar (= paling baru dimasukkan ke Sheet) PALING ATAS. Kalau ada baris tanpa ID
+          // (skema CSV lama), jatuh balik ke perilaku lama: baris paling bawah di atas.
+          if (arr.length && arr.every((v) => v.id)) arr.sort((a, b) => cmpVideoId_(b, a));
+          else arr.reverse();
+          break;
       }
       return arr;
+    }
+    // ID angka (mis. 1789123527716) dibandingkan sebagai ANGKA (panjang dulu, lalu isi) -- tidak salah
+    // urut walau panjangnya beda; ID bukan angka dibandingkan sebagai teks natural.
+    function cmpVideoId_(a, b) {
+      const x = String(a.id || ""), y = String(b.id || "");
+      if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+        if (x.length !== y.length) return x.length - y.length;
+        return x < y ? -1 : x > y ? 1 : 0;
+      }
+      return x.localeCompare(y, "id", { numeric: true });
     }
 
     // BARU (27 Sep 2026) -- dipakai filteredVideos() di bawah & juga
@@ -7045,7 +7086,7 @@ const PresentationStudio = (() => {
     // kode di kolom KidungRef video itu.
     function matchesQuery_(v, q) {
       if (!q) return true;
-      const text = [v.title, v.channel, v.sumber, v.keterangan].join("\n").toLowerCase();
+      const text = [v.title, v.channel, v.sumber, v.keterangan, v.bibleRef].join("\n").toLowerCase();
       if (text.includes(q)) return true;
       if (window.KidungRef && v.kidungRef) {
         const qt = window.KidungRef.parseToken(q);
@@ -7055,6 +7096,12 @@ const PresentationStudio = (() => {
     }
 
     function fieldEq_(video, field, value) {
+      if (field === "bibleRef") {
+        const bb = video.bibleBooks || [];
+        if (value === "__any") return bb.length > 0;
+        if (value === "__none") return bb.length === 0;
+        return bb.indexOf(Number(String(value).replace(/^b:/, ""))) !== -1;
+      }
       if (field === "kidungRef" && window.KidungRef) {
         return window.KidungRef.parse(video[field]).some((t) => t.key === value);
       }
@@ -7069,6 +7116,7 @@ const PresentationStudio = (() => {
       if (activeChannel) list = list.filter((v) => fieldEq_(v, "channel", activeChannel));
       if (activeKeterangan) list = list.filter((v) => fieldEq_(v, "keterangan", activeKeterangan));
       if (activeKidungRef) list = list.filter((v) => fieldEq_(v, "kidungRef", activeKidungRef));
+      if (activeBibleRef) list = list.filter((v) => fieldEq_(v, "bibleRef", activeBibleRef));
       const q = searchQuery.trim().toLowerCase();
       // PERBAIKAN (4 Sep 2026 v2, permintaan operator) -- pencarian
       // SEKARANG ikut mencocokkan NAMA CHANNEL juga, tidak cuma judul
@@ -7098,6 +7146,7 @@ const PresentationStudio = (() => {
       if (activeChannel) list = list.filter((v) => fieldEq_(v, "channel", activeChannel));
       if (activeKeterangan) list = list.filter((v) => fieldEq_(v, "keterangan", activeKeterangan));
       if (activeKidungRef) list = list.filter((v) => fieldEq_(v, "kidungRef", activeKidungRef));
+      if (activeBibleRef) list = list.filter((v) => fieldEq_(v, "bibleRef", activeBibleRef));
       const q = searchQuery.trim().toLowerCase();
       if (q) list = list.filter((v) => matchesQuery_(v, q));
       return list;
@@ -7124,6 +7173,14 @@ const PresentationStudio = (() => {
     // "apa adanya" (huruf besar/kecil asli) diambil dari kemunculan
     // PERTAMA supaya "BEBAS"/"bebas" campur tidak jadi 2 pilihan beda.
     function computeDistinctField_(field) {
+      if (field === "bibleRef") {
+        // BARU (book165) -- "Ada BibleRef", "Tanpa BibleRef", lalu 1 pilihan per KITAB (urut Kejadian -> Wahyu).
+        const present = new Set();
+        allVideos.forEach((v) => (v.bibleBooks || []).forEach((n) => present.add(n)));
+        const opts = [{ key: "__any", label: "📖 Ada BibleRef" }, { key: "__none", label: "Tanpa BibleRef" }];
+        (typeof BOOKS !== "undefined" ? BOOKS : []).forEach((b) => { if (present.has(b.num)) opts.push({ key: "b:" + b.num, label: b.name }); });
+        return opts;
+      }
       const seen = new Map();
       const perToken = field === "kidungRef" && window.KidungRef; // 28 Sep 2026 -- 1 pilihan per kode (K130, S5, ...), bukan per isi kolom utuh
       allVideos.forEach((v) => {
@@ -7191,14 +7248,15 @@ const PresentationStudio = (() => {
       channel: el("psYtPlaylistFilterChannel"),
       keterangan: el("psYtPlaylistFilterKeterangan"),
       kidungRef: el("psYtPlaylistFilterKidungRef"),
+      bibleRef: el("psYtPlaylistFilterBibleRef"), // BARU (book165)
     };
     const extraFilterState_ = {
       sumber: () => activeSumber, channel: () => activeChannel,
-      keterangan: () => activeKeterangan, kidungRef: () => activeKidungRef,
+      keterangan: () => activeKeterangan, kidungRef: () => activeKidungRef, bibleRef: () => activeBibleRef,
     };
     const extraFilterSetters_ = {
       sumber: (v) => { activeSumber = v; }, channel: (v) => { activeChannel = v; },
-      keterangan: (v) => { activeKeterangan = v; }, kidungRef: (v) => { activeKidungRef = v; },
+      keterangan: (v) => { activeKeterangan = v; }, kidungRef: (v) => { activeKidungRef = v; }, bibleRef: (v) => { activeBibleRef = v; },
     };
     function renderExtraFilters_() {
       Object.keys(extraFilterEls_).forEach((field) => {
@@ -7206,7 +7264,7 @@ const PresentationStudio = (() => {
         if (!sel) return;
         const current = extraFilterState_[field]();
         const opts = computeDistinctField_(field);
-        sel.innerHTML = `<option value="">Semua ${field === "kidungRef" ? "KidungRef" : field}</option>` +
+        sel.innerHTML = `<option value="">Semua ${field === "kidungRef" ? "KidungRef" : (field === "bibleRef" ? "BibleRef" : field)}</option>` +
           opts.map((o) => `<option value="${escapeHtml(o.key)}">${escapeHtml(o.label)} (${allVideos.filter((v) => fieldEq_(v, field, o.key)).length})</option>`).join("");
         sel.value = current;
       });
@@ -7222,7 +7280,7 @@ const PresentationStudio = (() => {
     });
     const extraFilterClearBtn_ = el("psYtPlaylistFilterClear");
     if (extraFilterClearBtn_) extraFilterClearBtn_.addEventListener("click", () => {
-      activeSumber = ""; activeChannel = ""; activeKeterangan = ""; activeKidungRef = ""; activeFilter = "all";
+      activeSumber = ""; activeChannel = ""; activeKeterangan = ""; activeKidungRef = ""; activeBibleRef = ""; activeFilter = "all";
       const searchInputEl_ = el("psYtPlaylistSearch");
       if (searchInputEl_) { searchInputEl_.value = ""; searchQuery = ""; }
       renderExtraFilters_();
@@ -7241,6 +7299,56 @@ const PresentationStudio = (() => {
     let ytRenderLimit_ = YT_PAGE_SIZE_;
     let ytRenderSig_ = "";
     let ytAutoTimer_ = null;
+    // BARU (book165) -- label "📖 Markus 12:30-31" di bawah judul (BibleRef dari Sheet).
+    function appendBibleRefLabel_(row, v) {
+      if (!v.bibleRef) return;
+      const info = row.querySelector(".ps-yt-playlist-info");
+      if (!info) return;
+      const sp = document.createElement("span");
+      sp.className = "ps-yt-playlist-bibleref";
+      sp.textContent = "📖 " + v.bibleRef;
+      sp.title = "BibleRef: ayat yang dirujuk media ini";
+      info.appendChild(sp);
+    }
+    // BARU (book165) -- baris SoundCloud (Sumber=soundcloud di Sheet): ▶️ Tampilkan / 👁️ Pratinjau / ➕ Kumpulan.
+    // (Audio Latar & progress bar detik-mulai tidak tersedia untuk SoundCloud di daftar ini; untuk latar
+    //  SoundCloud pakai tab 🔗 Link / tab Kidung.)
+    function buildScRow_(v) {
+      const row = document.createElement("div");
+      row.className = "ps-yt-playlist-row ps-yt-playlist-row-sc";
+      const tagsHtml = (v.categories || []).map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c)}</span>`).join("");
+      row.innerHTML = `
+        <div class="ps-yt-playlist-thumb ps-yt-playlist-thumb-sc" aria-hidden="true">🎧</div>
+        <div class="ps-yt-playlist-info">
+          <span class="ps-yt-playlist-title">${escapeHtml(v.title)}</span>
+          <span class="ps-yt-playlist-channel">☁️ SoundCloud${v.channel ? " · " + escapeHtml(v.channel) : ""}</span>
+          ${tagsHtml ? `<span class="ps-yt-playlist-tags">${tagsHtml}</span>` : ""}
+        </div>
+        <div class="ps-file-actions">
+          <button type="button" class="chip-btn small primary" data-act="show">▶️ Tampilkan</button>
+          <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
+          <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
+        </div>`;
+      appendBibleRefLabel_(row, v);
+      const send = () => { rawPost({ type: "soundcloud", trackUrl: v.trackUrl }); renderStudioPreview({ type: "soundcloud", trackUrl: v.trackUrl, title: v.title }); };
+      row.querySelector('[data-act="show"]').addEventListener("click", send);
+      row.querySelector('[data-act="preview"]').addEventListener("click", () => stageNext(v.title, v.title, send));
+      row.querySelector('[data-act="addcol"]').addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        if (typeof addSoundCloudToCollection !== "function" || typeof promptCollectionName !== "function") return;
+        const sel = el("psCollectionSelect");
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const name = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+          ? loadCollections(username)[sel.value].name
+          : await promptCollectionName(username);
+        if (!name) return;
+        const id = addSoundCloudToCollection(username, name, { trackUrl: v.trackUrl, title: v.title });
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        btn.textContent = id ? "✅ Ditambahkan" : "⚠️ Gagal";
+        setTimeout(() => { btn.textContent = "➕ Kumpulan"; }, 1200);
+      });
+      return row;
+    }
     function renderList(appendMore) {
       if (ytAutoTimer_) { clearTimeout(ytAutoTimer_); ytAutoTimer_ = null; } // batch lama berhenti kalau daftar digambar ulang
       const videos = filteredVideos();
@@ -7248,7 +7356,7 @@ const PresentationStudio = (() => {
         listWrap.innerHTML = `<p class="present-saved-empty">${allVideos.length ? "Tidak ada video untuk filter ini." : "Belum ada video dimuat -- tempel link Google Sheet lalu tekan \"🔄 Muat Ulang\"."}</p>`;
         return;
       }
-      const sig = [activeFilter, activeSumber, activeChannel, activeKeterangan, activeKidungRef, searchQuery, videos.length, videos[0].videoId].join("|");
+      const sig = [activeFilter, activeSumber, activeChannel, activeKeterangan, activeKidungRef, activeBibleRef, activeSort, searchQuery, videos.length, videos[0].videoId].join("|");
       let startIdx = 0;
       if (appendMore === true && sig === ytRenderSig_) {
         startIdx = listWrap.querySelectorAll(".ps-yt-playlist-row").length;
@@ -7259,8 +7367,10 @@ const PresentationStudio = (() => {
         listWrap.innerHTML = "";
       }
       const endIdx = Math.min(videos.length, ytRenderLimit_);
+      const ytVideos = videos.filter((q) => q.kind !== "soundcloud"); // antrean "Ulang: Semua" hanya YouTube (SoundCloud tidak ikut)
       videos.slice(startIdx, endIdx).forEach((v, k) => {
-        const i = startIdx + k; // indeks di daftar PENUH (dipakai antrean "Ulang: Semua")
+        if (v.kind === "soundcloud") { listWrap.appendChild(buildScRow_(v)); return; }
+        const i = ytVideos.indexOf(v); // indeks di antrean YouTube (dipakai antrean "Ulang: Semua")
         const row = document.createElement("div");
         row.className = "ps-yt-playlist-row";
         const tagsHtml = (v.categories || [])
@@ -7321,6 +7431,7 @@ const PresentationStudio = (() => {
             row.querySelector(".ps-yt-playlist-info").appendChild(refsWrap);
           }
         }
+        appendBibleRefLabel_(row, v);
         // BARU (4 Sep 2026, permintaan operator) -- progress bar "detik
         // mulai" per video, sama persis mekanismenya dengan kotak tempel-
         // link manual di atas (createYtSeekBar()). Kalau kolom opsional
@@ -7336,13 +7447,13 @@ const PresentationStudio = (() => {
         // Yang mau diantre dulu ("standby"), pakai "👁️ Pratinjau" di bawah.
         row.querySelector('[data-act="show"]').addEventListener("click", () => {
           const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
-          const queue = videos.map((q) => ({ embedUrl: q.embedUrl, title: q.title || "" }));
+          const queue = ytVideos.map((q) => ({ embedUrl: q.embedUrl, title: q.title || "" }));
           rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
           renderStudioPreview({ type: "youtube", embedUrl });
         });
         row.querySelector('[data-act="preview"]').addEventListener("click", () => {
           const embedUrl = buildYoutubeEmbedUrl(v.videoId, seek.getStartSeconds());
-          const queue = videos.map((q) => ({ embedUrl: q.embedUrl, title: q.title || "" }));
+          const queue = ytVideos.map((q) => ({ embedUrl: q.embedUrl, title: q.title || "" }));
           stageNext(v.title, v.title, () => {
             rawPost({ type: "youtube", embedUrl, queue, queueIndex: i });
             renderStudioPreview({ type: "youtube", embedUrl });

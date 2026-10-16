@@ -788,6 +788,21 @@ const MediaLibrary = (() => {
   // "Media terkait pasal ini", ayat yang dirujuk (mis. Markus 12:30-31) ditampilkan LANGSUNG di
   // bawah videonya. Diisi playItem_(), dibaca & dikosongkan openPlayerOverlay_().
   let playVerseCtx_ = null;
+  // Link SoundCloud -> link kanonik untuk widget. Hanya link pendek (on.soundcloud.com) yang perlu diselesaikan;
+  // gagal/offline -> pakai link apa adanya (perilaku lama).
+  async function resolveSoundCloudWidgetUrl_(link) {
+    const raw = String(link || "").trim();
+    if (!/^https?:\/\/on\.soundcloud\.com\//i.test(raw)) return raw;
+    try {
+      const res = await fetch("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(raw));
+      if (res && res.ok) {
+        const json = await res.json();
+        const m = /[?&]url=([^&"]+)/.exec((json && json.html) || "");
+        if (m && m[1]) return decodeURIComponent(m[1]);
+      }
+    } catch (e) { /* offline -> pakai link asli */ }
+    return raw;
+  }
   function playItem_(item, verseCtx) {
     playVerseCtx_ = verseCtx || null;
     if (item.jenis === "sound" && !item.sumber) {
@@ -832,7 +847,14 @@ const MediaLibrary = (() => {
       if (!ytId_) { window.open(item.link, "_blank"); return; }
       openPlayerOverlay_(`<iframe src="https://www.youtube.com/embed/${ytId_}?playsinline=1&rel=0" title="${escapeHtml_(item.nama || "YouTube")}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`, item.nama, "https://www.youtube.com/watch?v=" + ytId_);
     } else if (sumber === "soundcloud") {
-      openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(item.link)}&auto_play=true"></iframe>`, item.nama, item.link);
+      // BARU (book165) -- link pendek "on.soundcloud.com/xxx" DITOLAK widget SoundCloud ("not a valid
+      // SoundCloud URL"); diselesaikan dulu lewat oEmbed resmi (sama seperti Layar 2 / present.html).
+      const ctxForSc = playVerseCtx_;
+      playVerseCtx_ = null;
+      resolveSoundCloudWidgetUrl_(item.link).then((widgetUrl) => {
+        playVerseCtx_ = ctxForSc;
+        openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(widgetUrl)}&auto_play=true"></iframe>`, item.nama, item.link);
+      });
     } else if (sumber === "mp3" || (sumber === "google_drive" && /\.(mp3|wav|m4a)(\?|$)/i.test(item.link))) {
       openPlayerOverlay_(`<audio controls autoplay src="${resolvePlayableUrl_(item.link)}"></audio>`, item.nama, item.link);
     } else if (sumber === "google_drive") {
