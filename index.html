@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261016m" />
+<link rel="stylesheet" href="css/style.css?v=20261016n" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2285,11 +2285,13 @@
             <select id="psYtPlaylistFilterChannel" class="columns-lang-select"><option value="">Semua channel</option></select>
             <select id="psYtPlaylistFilterKeterangan" class="columns-lang-select"><option value="">Semua keterangan</option></select>
             <select id="psYtPlaylistFilterKidungRef" class="columns-lang-select"><option value="">Semua KidungRef</option></select>
+            <select id="psYtPlaylistFilterBibleRef" class="columns-lang-select"><option value="">Semua BibleRef</option></select><!-- BARU (book165): per kitab + Ada/Tanpa BibleRef -->
             <button type="button" id="psYtPlaylistFilterClear" class="chip-btn small">✕ Bersihkan Semua Filter</button>
           </div>
           <div class="ps-field-label" style="margin-top:10px;">Urutkan</div>
           <select id="psYtPlaylistSort" class="columns-lang-select">
-            <option value="terbaru">🆕 Terbaru ditambahkan (bawaan -- baris paling bawah di Sheet tampil paling atas)</option>
+            <option value="terbaru">🆕 ID Z-A — ID terbesar (paling baru dimasukkan) tampil paling atas (bawaan)</option>
+            <option value="id_az">ID A-Z — ID terkecil (paling lama dimasukkan) dulu</option>
             <option value="judul_az">Judul A-Z</option>
             <option value="judul_za">Judul Z-A</option>
             <option value="channel_az">Nama Channel A-Z</option>
@@ -4245,7 +4247,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261016i"></script>
+  <script src="js/presentation-studio.js?v=20261016j"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4267,7 +4269,7 @@
        digantikan tab "🎆 Layar Publik" di dalam media-library.js. -->
   <script src="js/favorites.js?v=20260911a"></script>
   <script src="js/media-bibleref.js?v=20261016b"></script>
-  <script src="js/media-library.js?v=20261016e"></script>
+  <script src="js/media-library.js?v=20261016f"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
   <script src="js/app.js?v=20261016i"></script>
