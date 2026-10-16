@@ -303,6 +303,11 @@ html.theme-18 { /* Biru Navy - Putih (BARU, meniru contoh slide Layar Proyeksi: 
   background: var(--paper-raised); color: var(--ink); cursor: pointer; font-size: 0.95rem;
 }
 .kidung-list-item:hover { border-color: var(--petrol); color: var(--petrol); }
+/* BARU (16 Okt 2026) -- baris kecil Awal_Lagu di bawah judul pada daftar/pencarian kidung */
+.kidung-list-item-title { display: block; }
+.kidung-list-item-awal { display: block; margin-top: 2px; font-size: 0.8em; color: var(--ink-soft); font-style: italic; line-height: 1.35; }
+.kidung-list-item-awal mark { background: var(--brass-soft); color: var(--ink); border-radius: 3px; font-style: normal; }
+.kidung-load-status { margin: 4px 0 0; }
 .kidung-search-result-item { display: flex; flex-direction: column; gap: 4px; }
 .kidung-search-result-title { font-weight: 600; }
 .kidung-search-result-excerpt { font-size: 0.85em; color: var(--ink-soft); font-style: italic; line-height: 1.4; }
@@ -2293,6 +2298,14 @@ input { font-family: inherit; }
   font-size: 12px; color: var(--ink-soft); margin-top: -2px;
 }
 .inline-media-drive-hint a { color: var(--petrol); }
+/* BARU (16 Okt 2026) -- tombol MP3 ke-2: tampilan sama, hanya ada badge angka kecil */
+.round-media-btn-second { position: relative; }
+.round-media-btn-second::after {
+  content: attr(data-badge); position: absolute; right: -2px; bottom: -2px;
+  min-width: 16px; height: 16px; border-radius: 8px; padding: 0 3px;
+  background: var(--brass, #c9a24b); color: #fff; font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+}
 .round-media-btn:hover { transform: scale(1.07); }
 .round-media-btn:active { transform: scale(.96); }
 .round-media-btn.share-variant {
@@ -5188,6 +5201,12 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
 */
 .kidung-media-ref-section { display: flex; flex-direction: column; gap: 8px; }
 .kidung-media-ref-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+/* BARU (16 Okt 2026) -- tidak ada referensi: 1 baris kecil abu-abu, hemat tempat */
+.kidung-media-ref-section.is-empty { gap: 0; }
+.kidung-media-ref-section.is-empty .kidung-media-ref-head { justify-content: flex-start; gap: 10px; }
+.kidung-media-ref-section.is-empty .kidung-media-ref-head h4 { font-size: 11px; font-weight: 400; color: var(--ink-soft); opacity: .7; }
+.kidung-media-ref-section.is-empty .kidung-media-ref-grid { display: none; }
+.kidung-media-ref-section.is-empty .chip-btn { padding: 2px 8px; font-size: 11px; }
 .kidung-media-ref-head h4 { margin: 0; font-size: 13px; color: var(--ink-soft); font-weight: 600; }
 .kidung-media-ref-grid.ml-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .kidung-media-ref-grid .ml-empty, .kidung-media-ref-grid .ml-loading { padding: 10px 0; font-size: 12px; }
@@ -5433,10 +5452,10 @@ body.ps-open, html.ps-open { overflow: hidden !important; height: 100%; }
    terang = oranye bata tua; gelap = oranye muda; hitam-kuning = cyan; merah tua = biru muda.
    Dimatikan lewat menu ⋮ (class "strong-off" di <body>).
    ------------------------------------------------------------ */
-:root { --strong-color: #B83A08; --strong-hit-bg: rgba(184, 58, 8, .16); }
-html.theme-3, html.theme-5, html.theme-7, html.theme-10 { --strong-color: #FFB066; --strong-hit-bg: rgba(255, 176, 102, .22); }
-html.theme-12 { --strong-color: #5CE1E6; --strong-hit-bg: rgba(92, 225, 230, .22); }
-html.theme-15 { --strong-color: #8FE9FF; --strong-hit-bg: rgba(143, 233, 255, .22); }
+:root { --strong-color: #B83A08; --strong-hit-bg: rgba(184, 58, 8, .16); --strong-tense-color: #5B3FB5; }
+html.theme-3, html.theme-5, html.theme-7, html.theme-10 { --strong-color: #FFB066; --strong-hit-bg: rgba(255, 176, 102, .22); --strong-tense-color: #C9B6FF; }
+html.theme-12 { --strong-color: #5CE1E6; --strong-hit-bg: rgba(92, 225, 230, .22); --strong-tense-color: #FF9CF0; }
+html.theme-15 { --strong-color: #8FE9FF; --strong-hit-bg: rgba(143, 233, 255, .22); --strong-tense-color: #E2D4FF; }
 .strong-tag {
   cursor: pointer;
   font-family: var(--font-ui, Arial, sans-serif);
@@ -5451,8 +5470,19 @@ html.theme-15 { --strong-color: #8FE9FF; --strong-hit-bg: rgba(143, 233, 255, .2
   touch-action: manipulation;
   white-space: nowrap;
 }
+/* v70 -- kode bentuk kata kerja "(H8802)" warnanya BEDA dari nomor Strong "H430" (ungu/lavender; di tema gelap lebih muda) */
+.strong-tag.strong-tense { color: var(--strong-tense-color); }
 .strong-tag:hover { text-decoration: underline; }
 .strong-tag.strong-hit { background: var(--strong-hit-bg); border-radius: 3px; padding: 1px 3px; font-size: 0.7em; text-decoration: underline; }
 body.strong-off .strong-tag { display: none; }
 /* ayat yang diberi warna highlight pastel memaksa tulisan gelap -> nomor pakai oranye tua agar tetap terbaca di tema gelap */
 .verse-block[class*="hl-"] .strong-tag { color: #A23205; }
+.verse-block[class*="hl-"] .strong-tag.strong-tense { color: #4B2FA0; }
+
+/* v70 -- panel "Pilih kitab sendiri" di opsi pencarian */
+.search-custom-books { margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--line, rgba(0,0,0,.15)); border-radius: 10px; background: var(--surface, transparent); }
+.search-custom-books[hidden] { display: none; }
+.search-custom-books-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.search-custom-books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 4px 12px; font-size: 0.9rem; }
+.search-custom-books-grid label { cursor: pointer; white-space: nowrap; }
+.search-custom-books-count { margin-top: 8px; font-size: 0.85rem; opacity: .75; }
