@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tes Kamera</title>
+<style>body{font:15px system-ui;background:#111;color:#eee;padding:16px;max-width:720px;margin:auto}
+pre{background:#000;padding:12px;border-radius:8px;white-space:pre-wrap}button{font-size:16px;padding:10px 16px;margin:4px 4px 12px 0}
+video{width:100%;background:#222;border-radius:8px}</style></head><body>
+<h2>Tes Kamera</h2>
+<p>Taruh file ini di folder yang sama dengan aplikasi (alamat yang sama dengan Studio), buka, lalu tekan tombol. Kirim isi kotak hasil ke Claude.</p>
+<button id="a">1. Cek lingkungan</button><button id="b">2. Coba nyalakan kamera</button>
+<pre id="out">Belum dijalankan.</pre><video id="v" autoplay playsinline muted></video>
+<script>
+const out=document.getElementById('out'),v=document.getElementById('v');
+const log=t=>out.textContent+=t+"\n";
+document.getElementById('a').onclick=async()=>{
+  out.textContent="";
+  log("Alamat: "+location.href);
+  log("Aman (https/localhost): "+window.isSecureContext);
+  log("navigator.mediaDevices ada: "+!!navigator.mediaDevices);
+  log("Browser: "+navigator.userAgent);
+  try{const p=await navigator.permissions.query({name:'camera'});log("Izin kamera: "+p.state);}catch(e){log("Izin kamera: tidak bisa dicek ("+e.message+")");}
+  try{const d=await navigator.mediaDevices.enumerateDevices();log("Kamera terdeteksi: "+d.filter(x=>x.kind==='videoinput').length);}catch(e){log("enumerateDevices gagal: "+e.message);}
+};
+document.getElementById('b').onclick=async()=>{
+  try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});
+    v.srcObject=s;log("BERHASIL: kamera menyala ("+s.getVideoTracks()[0].label+")");}
+  catch(e){log("GAGAL: "+e.name+" - "+e.message);}
+};
+</script></body></html>
