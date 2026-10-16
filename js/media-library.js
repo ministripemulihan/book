@@ -128,6 +128,10 @@ const MediaLibrary = (() => {
     return { get, set, enabled: desktopOnly_ };
   })();
 
+  // BARU (16 Okt 2026) -- daftar LENGKAP di memori (dipakai watchChapter di bawah:
+  // buka pasal Alkitab -> media terkait muncul dari sini, tanpa menunggu jaringan).
+  let memAll_ = null; // { user, items, netAt, index }
+
   const Sync = {
     enabled() {
       return !!(CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL && CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL.indexOf("http") === 0);
@@ -176,6 +180,7 @@ const MediaLibrary = (() => {
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       if (!data || !data.ok) throw new Error((data && data.error) || "Gagal menambah item");
+      if (memAll_) memAll_.netAt = 0;
       return data;
     },
     async update(id, fields) {
@@ -187,6 +192,7 @@ const MediaLibrary = (() => {
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       if (!data || !data.ok) throw new Error((data && data.error) || "Gagal mengubah item");
+      if (memAll_) memAll_.netAt = 0;
       return data;
     },
     async remove(id) {
@@ -198,6 +204,29 @@ const MediaLibrary = (() => {
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       if (!data || !data.ok) throw new Error((data && data.error) || "Gagal menghapus item");
+      if (memAll_) memAll_.netAt = 0;
+      return data;
+    },
+    // BARU (16 Okt 2026) -- admin: daftar link ganda langsung dari Sheet (lengkap dengan nomor baris).
+    async duplicates() {
+      const params = new URLSearchParams({ type: "media_duplicates", username: currentUser || "", isAdmin: isAdministrator() ? "1" : "0" });
+      const res = await fetch(CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL + "?" + params.toString(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data || !data.ok) throw new Error((data && data.error) || "Gagal memuat daftar link ganda");
+      return data.duplicates || [];
+    },
+    // BARU -- admin: isi BibleRef banyak baris sekaligus (migrasi AyatRef -> BibleRef).
+    async bulkBibleRef(updates) {
+      const res = await fetch(CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ type: "media_bulk_bibleref", username: currentUser || "", isAdmin: isAdministrator(), updates }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data || !data.ok) throw new Error((data && data.error) || "Gagal migrasi BibleRef");
+      if (memAll_) memAll_.netAt = 0;
       return data;
     },
   };
@@ -1007,36 +1036,270 @@ const MediaLibrary = (() => {
   // dipakai untuk mencocokkan ayat MANA di pasal ini yang jadi alasan
   // item itu muncul (1 item bisa cocok ke lebih dari 1 ayat di pasal
   // yang sama).
-  function buildVerseRefSection_(items, versesInChapter) {
+  // DIUBAH (16 Okt 2026, permintaan operator: "terlalu banyak, buat sistem akordion") --
+  // sekarang berbentuk AKORDION 2 tingkat, dan kartu baru digambar SAAT dibuka (jadi pasal
+  // yang punya puluhan media tidak lagi memenuhi layar / lambat):
+  //  1) Kotak luar "🔗 Media terkait pasal ini (N)" -- tertutup kalau N > 6, terbuka kalau sedikit.
+  //  2) Di dalamnya dikelompokkan per JENIS: "🎵 Kidung" (item ber-KidungRef atau kategori Kidung),
+  //     lalu per KATEGORI lain (Animasi Anak, Berita Pengembalaan, dst). Tiap grup tertutup;
+  //     ringkasannya menyebut ayat mana saja yang dirujuk (mis. "Ayat 1, 3, 5").
+  //  3) Dalam 1 grup, kartu diurut menurut nomor ayat; yang tampil duluan MAKS 6, sisanya lewat
+  //     tombol "Tampilkan N lagi".
+  const VERSE_REF_OPEN_LIMIT_ = 6;
+  const VERSE_REF_GROUP_FIRST_ = 6;
+  const WIDE_GROUP_ = "Tema pasal ini";
+  function buildVerseRefSection_(items, versesInChapter, matches) {
     const section = document.createElement("div");
-    section.className = "kidung-media-ref-section";
-    const head = document.createElement("div");
-    head.className = "kidung-media-ref-head";
-    const heading = document.createElement("h4");
-    heading.textContent = "🔗 Media terkait pasal ini";
-    head.appendChild(heading);
-    section.appendChild(head);
-    const grid = document.createElement("div");
-    grid.className = "ml-grid kidung-media-ref-grid";
-    section.appendChild(grid);
-    items.forEach((it) => {
-      const refs = String(it.ayatRef || "").split(",").map((s) => s.trim());
-      const matchedVerseNums = versesInChapter
-        .filter((v) => refs.indexOf(String(v.verseId)) !== -1)
-        .map((v) => v.verse)
-        .sort((a, b) => a - b);
+    section.className = "kidung-media-ref-section ml-verse-acc";
+    const MB = window.MediaBibleRef;
+    const matchById = new Map();
+    (matches || []).forEach((m) => matchById.set(m.item.id, m));
+
+    // --- siapkan data per item: ayat yang cocok + grupnya ---
+    const prepared = items.map((it) => {
+      const m = matchById.get(it.id);
+      let verseNums, wide = false, whole = false;
+      if (m) {
+        verseNums = m.verseNums; wide = m.wide; whole = m.whole;
+      } else {
+        const refs = String(it.ayatRef || "").split(",").map((x) => x.trim());
+        verseNums = versesInChapter
+          .filter((v) => refs.indexOf(String(v.verseId)) !== -1)
+          .map((v) => v.verse)
+          .sort((a, b) => a - b);
+      }
+      const hasKidungRef = !!(window.KidungRef && window.KidungRef.parse(it.kidungRef || "").some((t) => t.kind === "kidung"));
+      const kats = parseKategoriString(it.kategori);
+      const isKidung = hasKidungRef || kats.some((k) => k.toLowerCase() === "kidung");
+      // BARU (16 Okt 2026) -- referensi yang menutup seluruh pasal / rentang lebar
+      // ("Kejadian 1:1-2:3") TIDAK ditempel ke tiap ayat; dikumpulkan di grup "Tema pasal ini".
+      const group = wide ? WIDE_GROUP_ : (isKidung ? "Kidung" : (kats[0] || "Lainnya"));
+      return { it, verseNums, group, isKidung, wide, whole };
+    });
+    const groups = new Map();
+    prepared.forEach((p) => {
+      if (!groups.has(p.group)) groups.set(p.group, []);
+      groups.get(p.group).push(p);
+    });
+    const orderedGroups = Array.from(groups.entries()).sort((a, b) => {
+      if (a[0] === WIDE_GROUP_) return 1;
+      if (b[0] === WIDE_GROUP_) return -1;
+      if (a[0] === "Kidung") return -1;
+      if (b[0] === "Kidung") return 1;
+      if (a[0] === "Lainnya") return 1;
+      if (b[0] === "Lainnya") return -1;
+      return b[1].length - a[1].length;
+    });
+
+    const outer = document.createElement("details");
+    outer.className = "ml-acc ml-acc-outer";
+    outer.open = items.length <= VERSE_REF_OPEN_LIMIT_;
+    const outerSum = document.createElement("summary");
+    outerSum.className = "ml-acc-summary";
+    outerSum.textContent = "🔗 Media terkait pasal ini (" + items.length + ")";
+    outer.appendChild(outerSum);
+    section.appendChild(outer);
+
+    const body = document.createElement("div");
+    body.className = "ml-acc-body";
+    outer.appendChild(body);
+
+    function buildItemWrap_(p) {
       const wrap = document.createElement("div");
       wrap.className = "ml-verse-ref-item";
-      if (matchedVerseNums.length) {
+      if (p.verseNums.length) {
         const tag = document.createElement("div");
         tag.className = "ml-verse-ref-tag";
-        tag.textContent = (matchedVerseNums.length > 1 ? "Ayat " : "Ayat ") + matchedVerseNums.join(", ");
+        tag.textContent = p.whole ? "Seluruh pasal" : "Ayat " + (MB ? MB.compactNums(p.verseNums) : p.verseNums.join(", "));
         wrap.appendChild(tag);
       }
-      wrap.appendChild(itemToCard_(it));
-      grid.appendChild(wrap);
+      wrap.appendChild(itemToCard_(p.it));
+      return wrap;
+    }
+
+    orderedGroups.forEach(([name, list]) => {
+      list.sort((a, b) => (a.verseNums[0] || 9999) - (b.verseNums[0] || 9999));
+      const det = document.createElement("details");
+      det.className = "ml-acc ml-acc-group";
+      const sum = document.createElement("summary");
+      sum.className = "ml-acc-summary";
+      const allVerses = Array.from(new Set([].concat.apply([], list.map((p) => p.verseNums)))).sort((a, b) => a - b);
+      const icon = name === "Kidung" ? "🎵 " : (name === WIDE_GROUP_ ? "📚 " : "🎬 ");
+      const versesText = name === WIDE_GROUP_ ? " · seluruh pasal / rentang lebar" : allVerses.length
+        ? " · Ayat " + (allVerses.length > 8 ? allVerses.slice(0, 8).join(", ") + ", …" : allVerses.join(", "))
+        : "";
+      sum.textContent = icon + name + " (" + list.length + ")" + versesText;
+      det.appendChild(sum);
+      const grid = document.createElement("div");
+      grid.className = "ml-grid kidung-media-ref-grid";
+      det.appendChild(grid);
+      const moreRow = document.createElement("div");
+      moreRow.className = "ml-acc-more";
+      det.appendChild(moreRow);
+      let shown = 0;
+      function showMore_(n) {
+        list.slice(shown, shown + n).forEach((p) => grid.appendChild(buildItemWrap_(p)));
+        shown = Math.min(list.length, shown + n);
+        moreRow.innerHTML = "";
+        if (shown < list.length) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "chip-btn small";
+          btn.textContent = "⬇️ Tampilkan " + (list.length - shown) + " lagi";
+          btn.addEventListener("click", () => showMore_(list.length - shown));
+          moreRow.appendChild(btn);
+        }
+      }
+      // Kartu baru dibuat SAAT grup dibuka pertama kali (hemat waktu & tempat).
+      det.addEventListener("toggle", () => { if (det.open && shown === 0) showMore_(VERSE_REF_GROUP_FIRST_); });
+      body.appendChild(det);
+      // kalau cuma 1 grup & kotak luar terbuka, langsung buka grupnya juga
+      if (orderedGroups.length === 1 && outer.open) { det.open = true; }
     });
     return section;
+  }
+
+  // ------------------------------------------------------------
+  // BARU (16 Okt 2026) -- watchChapter: dipakai js/app.js renderChapter().
+  // Alurnya: daftar LENGKAP media (sekali unduh, disimpan di memori + IndexedDB)
+  // -> dicocokkan LOKAL ke pasal yang dibuka lewat BibleRef (js/media-bibleref.js).
+  // Jadi: (1) buka pasal = instan setelah daftar pernah dimuat, (2) tetap tampil
+  // saat offline (dari daftar tersimpan), (3) kalau ada internet, daftar disegarkan
+  // di belakang layar dan tampilan diperbarui HANYA bila hasilnya berubah.
+  // render(hasil, meta) bisa dipanggil 1-2 kali; hasil = { items, matches }.
+  // ------------------------------------------------------------
+  function chapterResult_(items, bookNum, chapter, verses) {
+    const MB = window.MediaBibleRef;
+    if (!MB) return { items: [], matches: [] };
+    if (!memAll_.index || memAll_.indexItems !== items) {
+      memAll_.index = MB.buildIndex(items);
+      memAll_.indexItems = items;
+    }
+    const matches = MB.forChapter(memAll_.index, bookNum, chapter, verses);
+    return { items: matches.map((m) => m.item), matches };
+  }
+  async function watchChapter(bookNum, chapter, verses, render) {
+    const user = String(typeof currentUser !== "undefined" && currentUser ? currentUser : "").toLowerCase();
+    if (memAll_ && memAll_.user !== user) memAll_ = null;
+    let shownSig = null;
+    const show = (items, meta) => {
+      if (!memAll_ || memAll_.items !== items) return;
+      const res = chapterResult_(items, bookNum, chapter, verses);
+      const sig = res.matches.map((m) => m.item.id + ":" + (m.item.updatedAt || "") + ":" + m.verseNums.length).join("|");
+      if (shownSig === sig) return;
+      shownSig = sig;
+      render(res, meta);
+    };
+    const setMem = (items, fromNet) => {
+      memAll_ = { user, items, netAt: fromNet ? Date.now() : 0, index: null, indexItems: null };
+    };
+    if (memAll_) {
+      show(memAll_.items, { fromCache: true });
+    } else {
+      const cached = await Sync.cachedList({});
+      if (cached && cached.items && cached.items.length) {
+        setMem(cached.items, false);
+        show(cached.items, { fromCache: true, savedAt: cached.savedAt });
+      }
+    }
+    if (memAll_ && memAll_.netAt && Date.now() - memAll_.netAt < 60000) return; // baru saja disegarkan
+    try {
+      const items = await Sync.list({});
+      setMem(items, true);
+      show(items, { fromCache: false });
+    } catch (err) {
+      // offline / server tidak menjawab: tampilan dari daftar tersimpan (kalau ada) tetap dipakai
+      if (!memAll_) render({ items: [], matches: [] }, { error: err });
+    }
+  }
+
+  // ------------------------------------------------------------
+  // BARU (16 Okt 2026) -- 🔎 Cek BibleRef (administrator).
+  //  1) BibleRef yang salah ketik / pasal-ayat yang tidak ada (tombol Edit langsung)
+  //  2) AyatRef lama (Verse ID) yang bisa diubah otomatis jadi teks BibleRef
+  //  3) LINK GANDA di Sheet -- hanya DIINFOKAN (dengan nomor baris) untuk dihapus manual
+  // ------------------------------------------------------------
+  async function openCheckPanel_() {
+    const MB = window.MediaBibleRef;
+    if (!MB) return;
+    let ov = el_("mlCheckOverlay");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "mlCheckOverlay";
+      ov.className = "info-kami-overlay ml-form-overlay";
+      document.body.appendChild(ov);
+      ov.addEventListener("click", (e) => { if (e.target === ov) ov.hidden = true; });
+    }
+    ov.innerHTML = `<div class="info-kami-box ml-syair-box ml-kv-box">
+      <div class="info-kami-header"><h2>🔎 Cek BibleRef</h2>
+        <div class="info-kami-header-actions"><button type="button" id="mlChkClose" class="icon-btn" aria-label="Tutup">✕</button></div></div>
+      <div class="ml-syair-body" id="mlChkBody" style="white-space:normal">Memuat daftar terbaru…</div></div>`;
+    ov.hidden = false;
+    el_("mlChkClose").addEventListener("click", () => { ov.hidden = true; });
+    const body = el_("mlChkBody");
+
+    let items;
+    try { items = await Sync.list({}); } catch (err) {
+      body.innerHTML = `<p class="ml-error">Gagal memuat: ${escapeHtml_(err && err.message ? err.message : String(err))}</p>`;
+      return;
+    }
+    const yt = items.filter((it) => it.jenis !== "sound");
+    const rep = MB.checkAll(yt);
+    let serverDups = null, dupErr = "";
+    try { serverDups = await Sync.duplicates(); } catch (err) { dupErr = err && err.message ? err.message : String(err); }
+
+    const itemLabel = (it) => escapeHtml_(it.nama || "(tanpa nama)");
+    let html = `<p><b>${rep.total}</b> item · <b>${rep.withRef}</b> punya referensi ayat · <b>${rep.errors.length}</b> perlu dibetulkan · <b>${rep.migratable.length}</b> AyatRef lama siap dimigrasi</p>`;
+
+    // 1) kesalahan
+    html += `<h3>1. BibleRef yang perlu dibetulkan (${rep.errors.length})</h3>`;
+    html += rep.errors.length
+      ? `<ul>` + rep.errors.slice(0, 200).map((e, i) => `<li>${itemLabel(e.item)} — “${escapeHtml_(e.raw)}”: ${escapeHtml_(e.error)} <button type="button" class="chip-btn small" data-chk-edit="${i}">✏️ Edit</button></li>`).join("") + `</ul>`
+      : `<p class="ml-hint">✅ Semua BibleRef terbaca dengan benar.</p>`;
+
+    // 2) migrasi
+    html += `<h3>2. Migrasi AyatRef lama → BibleRef (${rep.migratable.length})</h3>`;
+    if (rep.migratable.length) {
+      html += `<p class="ml-hint">Contoh: ${rep.migratable.slice(0, 3).map((m) => escapeHtml_(m.text)).join(" · ")}. Data lama tidak hilang kalau ada yang gagal diubah.</p>` +
+        `<button type="button" id="mlChkMigrate" class="chip-btn primary">⬆️ Ubah ${rep.migratable.length} item sekarang</button> <span id="mlChkMigMsg" class="ml-hint"></span>`;
+    } else html += `<p class="ml-hint">✅ Tidak ada AyatRef lama yang tersisa.</p>`;
+
+    // 3) link ganda
+    const dupGroups = serverDups || rep.duplicates.map((d) => ({ key: d.key, rows: d.items.map((it) => ({ id: it.id, nama: it.nama, link: it.link, diuploadOleh: it.diuploadOleh, bibleRef: it.bibleRef, rowNumber: "?" })) }));
+    html += `<h3>3. Link ganda di Sheet (${dupGroups.length})</h3>`;
+    if (dupErr) html += `<p class="ml-hint">(Nomor baris tidak tersedia: ${escapeHtml_(dupErr)} — deploy ulang Apps Script bila belum.)</p>`;
+    html += dupGroups.length
+      ? `<p class="ml-hint">Tidak dihapus otomatis. Pertahankan 1 baris, hapus sisanya manual di Sheet. BibleRef gabungan disarankan di bawah — salin ke baris yang dipertahankan.</p>` +
+        dupGroups.map((g) => {
+          const merged = g.rows.reduce((acc, r) => [acc, r.bibleRef || ""].join(";"), "");
+          const mergedTxt = MB.normalize(merged.split(/[;\n]+/).map((t) => t.trim()).filter((t, i, a) => t && a.findIndex((x) => x.toLowerCase().replace(/\s+/g, "") === t.toLowerCase().replace(/\s+/g, "")) === i).join("; "));
+          return `<div class="ml-verse-ref-item"><div class="ml-verse-ref-tag">${escapeHtml_(g.rows[0].link || g.key)}</div><ul>` +
+            g.rows.map((r) => `<li>Baris <b>${escapeHtml_(String(r.rowNumber))}</b> · ID ${escapeHtml_(String(r.id))} · ${escapeHtml_(r.nama || "")} · oleh ${escapeHtml_(r.diuploadOleh || "-")} · BibleRef: ${escapeHtml_(r.bibleRef || "(kosong)")}</li>`).join("") +
+            `</ul><div class="ml-hint">BibleRef gabungan: ${escapeHtml_(mergedTxt || "(kosong)")}</div></div>`;
+        }).join("")
+      : `<p class="ml-hint">✅ Tidak ada link ganda.</p>`;
+    body.innerHTML = html;
+
+    body.querySelectorAll("[data-chk-edit]").forEach((btn) => btn.addEventListener("click", () => {
+      const e = rep.errors[parseInt(btn.dataset.chkEdit, 10)];
+      if (e) { ov.hidden = true; openAddForm_({ jenis: e.item.jenis || "youtube", editItem: e.item, onSaved: () => openCheckPanel_() }); }
+    }));
+    const mig = el_("mlChkMigrate");
+    if (mig) mig.addEventListener("click", async () => {
+      mig.disabled = true;
+      const msg = el_("mlChkMigMsg");
+      msg.textContent = "Menyimpan…";
+      try {
+        const updates = rep.migratable.map((m) => ({ id: m.item.id, bibleRef: m.text, ayatRef: m.unresolved.join(",") }));
+        const r = await Sync.bulkBibleRef(updates);
+        msg.textContent = "✅ Selesai: " + r.updated + " item dimigrasi.";
+        loadItems_ && loadItems_(true);
+        setTimeout(() => openCheckPanel_(), 800);
+      } catch (err) {
+        msg.textContent = "Gagal: " + (err && err.message ? err.message : String(err));
+        mig.disabled = false;
+      }
+    });
   }
 
   function builtinSoundToCard_(fx) {
@@ -1698,6 +1961,7 @@ const MediaLibrary = (() => {
           <label>Sumber
             <select id="mlFormSumber">${sumberOptions}</select>
           </label>` : ""}
+          <div id="mlFormDupHint" class="ml-error" hidden></div>
           <label>Nama
             <input type="text" id="mlFormNama" required placeholder="Nama tampil" value="${escapeAttr_(editItem ? editItem.nama : (prefill.nama || ""))}" />
           </label>
@@ -1715,16 +1979,11 @@ const MediaLibrary = (() => {
             <input type="text" id="mlFormKidungSearch" placeholder="Cari judul atau nomor kidung..." autocomplete="off" />
             <div class="ml-kidung-results" id="mlFormKidungResults" hidden></div>
           </fieldset>
-          <fieldset class="ml-kategori-fieldset">
-            <legend>📖 Ayat Alkitab terkait (opsional, boleh lebih dari satu)</legend>
-            <p class="ml-hint">Ketik referensi ayat (mis. "Yohanes 3:16", atau "Yohanes 3:16-18" untuk beberapa ayat sekaligus), lalu tekan "➕". Berlaku otomatis untuk SEMUA bahasa Alkitab (Inggris, Recovery, dst) -- tidak perlu diulang per bahasa. Nanti muncul di bagian "🔗 Media terkait pasal ini" saat ayat itu dibuka.</p>
-            <div class="ml-kidung-chips" id="mlFormAyatChips"></div>
-            <div class="ml-ayat-search-row">
-              <input type="text" id="mlFormAyatSearch" placeholder='mis. "Yohanes 3:16"' autocomplete="off" />
-              <button type="button" id="mlFormAyatAddBtn" class="chip-btn small">➕ Tambah</button>
-            </div>
-            <p id="mlFormAyatError" class="ml-error" hidden></p>
-          </fieldset>
+          <label>📖 BibleRef — ayat Alkitab terkait (opsional)
+            <textarea id="mlFormBibleRef" rows="2" placeholder="Kejadian 1:1-3; Yohanes 1:1; Mazmur 23" autocomplete="off" spellcheck="false"></textarea>
+          </label>
+          <p class="ml-hint">Pisahkan dengan <b>titik-koma ( ; )</b>. Boleh: <i>Kejadian 1</i> (seluruh pasal) · <i>Kejadian 1:1-3</i> · <i>Kejadian 1:1,3,5-7</i> · <i>Kejadian 1:1-2:3</i> (lintas pasal). Berlaku untuk semua bahasa Alkitab.</p>
+          <div id="mlFormBibleRefPreview" class="ml-hint"></div>
           ${jenis === "youtube" ? `
           <label>📝 Syair/Lirik (opsional)
             <textarea id="mlFormSyair" rows="4" placeholder="Tempel syair/lirik lagu di sini...">${escapeHtml_(editItem ? editItem.syair : "")}</textarea>
@@ -1886,59 +2145,66 @@ const MediaLibrary = (() => {
       });
     }
 
-    // ---- Ayat Alkitab terkait (chip + pencarian referensi, lihat
-    //      parseAyatRefString_/resolveVersesFromQuery_ di atas) ----
-    let ayatRefState = parseAyatRefString_(editItem ? editItem.ayatRef : (o.ayatRef || ""));
-    const ayatChipsEl = el_("mlFormAyatChips");
-    const ayatSearchInput = el_("mlFormAyatSearch");
-    const ayatAddBtn = el_("mlFormAyatAddBtn");
-    const ayatErrorEl = el_("mlFormAyatError");
-
-    function renderAyatChips_() {
-      if (!ayatChipsEl) return;
-      if (!ayatRefState.length) { ayatChipsEl.innerHTML = ""; return; }
-      ayatChipsEl.innerHTML = ayatRefState.map((a, i) => {
-        const label = a.label || labelForVerseId_(a.verseId);
-        return `<span class="ml-kidung-chip" data-idx="${i}">${escapeHtml_(label)} <button type="button" data-ml-ayat-remove="${i}" aria-label="Hapus">✕</button></span>`;
-      }).join("");
-      ayatChipsEl.querySelectorAll("[data-ml-ayat-remove]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const idx = parseInt(btn.dataset.mlAyatRemove, 10);
-          ayatRefState.splice(idx, 1);
-          renderAyatChips_();
-        });
-      });
-    }
-    // Isi label yang datang cuma berupa Verse ID mentah (mode edit) --
-    // aman dipanggil langsung (bukan lewat .then seperti kidung) karena
-    // data Alkitab (verseById) sudah pasti termuat duluan sebelum
-    // pengguna sempat membuka form ini.
-    ayatRefState.forEach((a) => { if (!a.label) a.label = labelForVerseId_(a.verseId); });
-    renderAyatChips_();
-
-    function handleAyatAdd_() {
-      if (!ayatSearchInput) return;
-      if (ayatErrorEl) ayatErrorEl.hidden = true;
-      const q = ayatSearchInput.value.trim();
-      if (!q) return;
-      const found = resolveVersesFromQuery_(q);
-      if (!found.length) {
-        if (ayatErrorEl) {
-          ayatErrorEl.hidden = false;
-          ayatErrorEl.textContent = `Ayat "${q}" tidak ditemukan -- pastikan formatnya "Nama Kitab Pasal:Ayat", mis. "Yohanes 3:16".`;
-        }
-        return;
+    // ---- BibleRef (teks, pemisah ";") -- BARU 16 Okt 2026 ----
+    const MB_ = window.MediaBibleRef;
+    const bibleInput = el_("mlFormBibleRef");
+    const biblePreview = el_("mlFormBibleRefPreview");
+    let legacyUnresolved = [];
+    let bibleInitial = editItem ? (editItem.bibleRef || "") : (o.bibleRef || "");
+    const legacyIds = editItem ? editItem.ayatRef : (o.ayatRef || "");
+    let legacyNote = "";
+    if (legacyIds && MB_) {
+      const conv = MB_.fromVerseIds(legacyIds);
+      legacyUnresolved = conv.unresolved;
+      if (conv.text) {
+        const seen = {};
+        bibleInitial = [bibleInitial, conv.text].join(";").split(/[;\n]+/).map((t) => t.trim()).filter((t) => {
+          const k = t.toLowerCase().replace(/\s+/g, "");
+          if (!t || seen[k]) return false;
+          seen[k] = 1; return true;
+        }).join("; ");
+        legacyNote = "ℹ️ AyatRef lama sudah diubah jadi teks di kotak ini. Tersimpan permanen saat Anda menekan Simpan.";
       }
-      found.forEach((f) => { if (!ayatRefState.some((sel) => sel.verseId === f.verseId)) ayatRefState.push(f); });
-      ayatSearchInput.value = "";
-      renderAyatChips_();
     }
-    if (ayatAddBtn) ayatAddBtn.addEventListener("click", handleAyatAdd_);
-    if (ayatSearchInput) {
-      ayatSearchInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); handleAyatAdd_(); }
-      });
+    if (bibleInput) bibleInput.value = bibleInitial;
+    function bibleErrors_() {
+      if (!MB_ || !bibleInput) return [];
+      return MB_.parse(bibleInput.value).map((r) => (r.ok ? null : `✖ "${r.raw}" — ${r.error}`)).filter(Boolean);
     }
+    function renderBiblePreview_() {
+      if (!biblePreview || !MB_ || !bibleInput) return;
+      const parts = MB_.parse(bibleInput.value);
+      const html = parts.map((r) => r.ok
+        ? `<span class="ml-kidung-chip">✔ ${escapeHtml_(MB_.normalize(r.raw))}</span>`
+        : `<span class="ml-kidung-chip" style="color:#b00020">✖ ${escapeHtml_(r.raw)} — ${escapeHtml_(r.error)}</span>`).join(" ");
+      biblePreview.innerHTML = (legacyNote ? `<div>${escapeHtml_(legacyNote)}</div>` : "") + html;
+    }
+    if (bibleInput) bibleInput.addEventListener("input", renderBiblePreview_);
+    renderBiblePreview_();
+
+    // ---- Cek link ganda (hanya saat TAMBAH baru) ----
+    const dupHint = el_("mlFormDupHint");
+    let dupTimer = null;
+    async function checkDup_() {
+      if (!dupHint || editItem || !MB_) return;
+      const link = linkInput.value.trim();
+      dupHint.hidden = true;
+      if (link.length < 8) return;
+      let pool = (state.items && state.items.length) ? state.items : (memAll_ && memAll_.items) || null;
+      if (!pool) { const c = await Sync.cachedList({}); pool = c && c.items; }
+      const found = pool && MB_.findByLink(pool, link);
+      if (!found) return;
+      const canEdit = isAdministrator() || String(found.diuploadOleh || "").toLowerCase() === String(currentUser || "").toLowerCase();
+      dupHint.hidden = false;
+      dupHint.innerHTML = `⚠️ Link ini <b>sudah ada</b>: “${escapeHtml_(found.nama || "(tanpa nama)")}”` +
+        (found.bibleRef ? ` — BibleRef: ${escapeHtml_(found.bibleRef)}` : "") +
+        `.<br>Kalau Anda tetap menekan Tambah, baris baru <b>tidak dibuat</b>; BibleRef yang Anda ketik hanya <b>digabung</b> ke item yang sudah ada.` +
+        (canEdit ? ` <button type="button" class="chip-btn small" id="mlFormDupEditBtn">✏️ Edit item yang sudah ada</button>` : "");
+      const eb = el_("mlFormDupEditBtn");
+      if (eb) eb.addEventListener("click", () => { closeAddForm_(); openAddForm_({ jenis: found.jenis || jenis, editItem: found, onSaved: o.onSaved }); });
+    }
+    linkInput.addEventListener("input", () => { clearTimeout(dupTimer); dupTimer = setTimeout(checkDup_, 400); });
+    checkDup_();
 
     el_("mlForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1951,6 +2217,12 @@ const MediaLibrary = (() => {
       const lain = parseKategoriString(kategoriLainInput ? kategoriLainInput.value : "");
       const kategori = joinKategori(checked.concat(lain));
       const visibility = el_("mlFormVisibility").value === "all" ? "all" : (currentUser || "");
+      const bibleErrs = bibleErrors_();
+      if (bibleErrs.length) {
+        errEl.hidden = false;
+        errEl.textContent = "Perbaiki dulu BibleRef:\n" + bibleErrs.join("\n");
+        return;
+      }
       const fields = {
         jenis,
         sumber: jenis === "youtube" ? (sumberSelect ? sumberSelect.value : guessSumberFromLink(link)) : "",
@@ -1960,7 +2232,8 @@ const MediaLibrary = (() => {
         kategori,
         link,
         kidungRef: [joinKidungRefs_(kidungRefState)].concat(kidungRefTextExtra_).filter(Boolean).join(","),
-        ayatRef: joinAyatRefs_(ayatRefState),
+        bibleRef: MB_ && bibleInput ? MB_.normalize(bibleInput.value) : (bibleInput ? bibleInput.value.trim() : ""),
+        ayatRef: legacyUnresolved.join(","), // yang sudah jadi teks BibleRef dikosongkan dari AyatRef lama
         syair: jenis === "youtube" ? (el_("mlFormSyair") ? el_("mlFormSyair").value.trim() : "") : "",
         visibility,
       };
@@ -1975,8 +2248,16 @@ const MediaLibrary = (() => {
           if (idx !== -1) state.items[idx] = savedItem;
         } else {
           const res = await Sync.add(fields);
-          savedItem = Object.assign({ id: res.id, diuploadOleh: currentUser || "" }, fields);
-          state.items.unshift(savedItem);
+          if (res.duplicate) {
+            // Link sudah ada -> server TIDAK membuat baris baru, BibleRef digabung ke baris lama.
+            const ex = state.items.find((it) => it.id === res.id);
+            if (ex) ex.bibleRef = res.bibleRef;
+            savedItem = ex || Object.assign({ id: res.id }, fields, { bibleRef: res.bibleRef });
+            try { alert("Link ini sudah ada (“" + (res.nama || savedItem.nama || "") + "”), jadi tidak dibuat dobel.\nBibleRef sekarang: " + (res.bibleRef || "(kosong)")); } catch (x) { /* abaikan */ }
+          } else {
+            savedItem = Object.assign({ id: res.id, diuploadOleh: currentUser || "" }, fields);
+            state.items.unshift(savedItem);
+          }
         }
         closeAddForm_();
         // Kalau overlay "Pustaka Media" (mlBody) sedang tidak terbuka --
@@ -2277,6 +2558,8 @@ const MediaLibrary = (() => {
     const showable = (tab === "youtube" || tab === "sound") && canAddMedia();
     addBtn.hidden = !showable;
     addBtn.textContent = tab === "sound" ? "➕ Tambah Efek Suara" : "➕ Tambah YouTube/Link";
+    const chk = el_("mlCheckBtn");
+    if (chk) chk.hidden = !(tab === "youtube" && isAdministrator());
   }
 
   function renderTabs_() {
@@ -2307,6 +2590,11 @@ const MediaLibrary = (() => {
     if (addBtn && !addBtn.dataset.wired) {
       addBtn.dataset.wired = "1";
       addBtn.addEventListener("click", () => openAddForm_({ jenis: state.activeTab === "sound" ? "sound" : "youtube" }));
+    }
+    const chkBtn = el_("mlCheckBtn");
+    if (chkBtn && !chkBtn.dataset.wired) {
+      chkBtn.dataset.wired = "1";
+      chkBtn.addEventListener("click", () => openCheckPanel_());
     }
     const refreshBtn = el_("mlRefreshBtn");
     if (refreshBtn && !refreshBtn.dataset.wired) {
@@ -2378,5 +2666,8 @@ const MediaLibrary = (() => {
     // BARU (14 Sep 2026) -- dipakai js/app.js (renderChapter()) untuk
     // menampilkan "🔗 Media terkait pasal ini" di layar baca Alkitab.
     buildVerseRefSection: buildVerseRefSection_,
+    // BARU (16 Okt 2026) -- pasal terbuka -> media terkait (cocok lokal lewat BibleRef).
+    watchChapter,
+    openCheckPanel: openCheckPanel_,
   };
 })();

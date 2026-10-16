@@ -4034,16 +4034,18 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
     mlSlot.innerHTML = "";
     const mlToken = (renderChapter._mlToken = (renderChapter._mlToken || 0) + 1);
     if (typeof MediaLibrary !== "undefined" && MediaLibrary.Sync && MediaLibrary.Sync.enabled()) {
-      const verseIdsCsv = verses.map((v) => v.verseId).filter(Boolean).join(",");
-      if (verseIdsCsv) {
-        MediaLibrary.Sync.list({ ayatRef: verseIdsCsv }).then((items) => {
-          if (renderChapter._mlToken !== mlToken) return; // pasal sudah berpindah lagi
-          if (!items || !items.length) return;
-          mlSlot.appendChild(MediaLibrary.buildVerseRefSection(items, verses));
-          mlSlot.hidden = false;
-          if (typeof reapplyVerseJump_ === "function") reapplyVerseJump_();
-        }).catch(() => {});
-      }
+      // DIUBAH (16 Okt 2026) -- tidak lagi minta server per pasal. Daftar media dimuat sekali
+      // (memori + IndexedDB, tetap ada saat offline), lalu dicocokkan LOKAL lewat kolom
+      // BibleRef. Tampilan bisa diperbarui sekali lagi kalau penyegaran di belakang layar
+      // membawa perubahan (watchChapter memanggil callback hanya bila hasilnya berbeda).
+      MediaLibrary.watchChapter(bookNum, chapter, verses, (res) => {
+        if (renderChapter._mlToken !== mlToken) return; // pasal sudah berpindah lagi
+        mlSlot.innerHTML = "";
+        if (!res || !res.items || !res.items.length) { mlSlot.hidden = true; return; }
+        mlSlot.appendChild(MediaLibrary.buildVerseRefSection(res.items, verses, res.matches));
+        mlSlot.hidden = false;
+        if (typeof reapplyVerseJump_ === "function") reapplyVerseJump_();
+      }).catch(() => {});
     }
   }
 

@@ -116,6 +116,9 @@ const CONFIG = {
   // "🔊 Efek Suara" & "🎆 Efek Visual". Tab "🎬 YouTube"/Kidung TIDAK
   // dibatasi daftar ini -- selalu terbuka untuk SEMUA orang yang login
   // (lihat bagian 3a dokumen rencana).
+  // BARU (16 Okt 2026) -- daftar media tersimpan untuk offline di SEMUA perangkat (HP juga), supaya
+  // "Media terkait pasal ini" langsung tampil & tetap ada tanpa internet. Hanya metadata (~1 MB / 2000 baris).
+  MEDIA_LIBRARY_OFFLINE_LIST: "semua",
   MEDIA_LIBRARY_ADD_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
   MEDIA_LIBRARY_SOUND_LEVELS: ["administrator", "penatua", "gembala distrik", "gembala"],
 
