@@ -331,17 +331,45 @@ function orderedMediaSheetsForLang(lang) {
   return preferred.concat(rest);
 }
 
+// BARU (16 Okt 2026) -- cache link MP3/MP4/YouTube di localStorage dulu dianggap
+// "selamanya benar" (hanya diambil ulang kalau KOSONG), sehingga link yang diedit di
+// Google Sheet (MP3 pertama maupun kolom "Link MP3 2") tidak pernah muncul di layar
+// baca Alkitab kecuali pemakai menghapus cache sendiri. SEKARANG: cache hanya dipakai
+// langsung kalau umurnya < MEDIA_CACHE_MAX_AGE_MS; kalau lebih tua, diambil ulang dari
+// server (Apps Script) dan kalau gagal/offline tetap jatuh balik ke cache lama.
+const MEDIA_CACHE_MAX_AGE_MS = 10 * 60 * 1000; // 10 menit
+const mediaFetchInflight_ = {}; // sheetKey -> Promise (hindari ambil ganda bersamaan)
+
+function mediaCacheIsFresh_(cached) {
+  if (!cached || !cached.rows || !cached.rows.length) return false;
+  const t = cached.fetchedAt ? Date.parse(cached.fetchedAt) : NaN;
+  return !isNaN(t) && Date.now() - t < MEDIA_CACHE_MAX_AGE_MS;
+}
+
+async function getMediaRowsFreshOrCached_(sheet) {
+  const cached = loadMediaFromCache(sheet.key);
+  if (mediaCacheIsFresh_(cached)) return cached.rows;
+  try {
+    if (!mediaFetchInflight_[sheet.key]) {
+      mediaFetchInflight_[sheet.key] = fetchMediaSheet(sheet).finally(() => {
+        delete mediaFetchInflight_[sheet.key];
+      });
+    }
+    return await mediaFetchInflight_[sheet.key];
+  } catch (e) {
+    if (cached && cached.rows && cached.rows.length) return cached.rows; // offline: pakai cache lama
+    throw e;
+  }
+}
+
 async function findMediaLinkForReference(bookNumber, chapter, lang) {
   if (!bookNumber || !chapter) return null;
   for (const sheet of orderedMediaSheetsForLang(lang)) {
-    let cached = loadMediaFromCache(sheet.key);
-    let rows = cached && cached.rows;
-    if (!rows || !rows.length) {
-      try {
-        rows = await fetchMediaSheet(sheet);
-      } catch (e) {
-        continue; // sheet ini gagal diambil (offline/URL salah) -- coba sheet berikutnya
-      }
+    let rows;
+    try {
+      rows = await getMediaRowsFreshOrCached_(sheet);
+    } catch (e) {
+      continue; // sheet ini gagal diambil (offline/URL salah) -- coba sheet berikutnya
     }
     // Dibangun lewat buildMediaScheduleFromRows() (bukan mengecek row
     // mentah satu-satu) supaya baris yang sudah digabung jadi beberapa
@@ -1182,8 +1210,7 @@ function applySegmentsToItem_(item) {
 // js/plans.js) dari satu sheet Bacaan Bersuara. Memakai data cache lokal
 // dulu kalau ada (instan), baru ambil dari server kalau belum pernah.
 async function buildMediaPlan(sheet) {
-  const cached = loadMediaFromCache(sheet.key);
-  const rows = (cached && cached.rows && cached.rows.length) ? cached.rows : await fetchMediaSheet(sheet);
+  const rows = await getMediaRowsFreshOrCached_(sheet);
   const schedule = buildMediaScheduleFromRows(rows);
   return {
     planId: "media_" + sheet.key,
