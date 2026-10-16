@@ -5498,3 +5498,16 @@ details[open] > .ml-acc-summary::before { content: "▾ "; }
 .ml-acc-group { background: transparent; }
 .ml-acc-group > .kidung-media-ref-grid { padding: 4px 8px 6px; }
 .ml-acc-more { padding: 0 10px 10px; }
+
+/* book162 (16 Okt 2026) -- ayat yang dirujuk video tampil LANGSUNG di bawah video (jendela pemutar) */
+.ml-player-box { max-height: calc(100vh - 16px); overflow-y: auto; }
+.ml-player-verses { padding: 10px 14px 14px; max-height: 38vh; overflow-y: auto; border-top: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+.ml-player-verses[hidden] { display: none !important; }
+.ml-pv-head { font-weight: 700; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+.ml-pv-verse { margin: 0 0 8px; font-size: 16px; line-height: 1.6; }
+.ml-pv-n { font-size: 12px; color: var(--accent, #2a5bd7); margin-right: 2px; vertical-align: super; }
+.ml-player-overlay.ml-player-full .ml-player-verses { display: none; }
+
+/* book163 -- menu sidebar "🎬 Media" */
+.ml-allmedia-search { width: 100%; box-sizing: border-box; padding: 8px 12px; margin: 6px 0 10px; border: 1px solid var(--rule); border-radius: 8px; font-size: 15px; background: var(--paper); color: var(--ink); }
+.ml-allmedia-open { margin-top: 4px; }
