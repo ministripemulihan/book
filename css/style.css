@@ -5794,3 +5794,8 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 .present-studio.ps-yt-wide:has(.ps-tab[data-ps-mid-tab="youtube"].active) .ps-col-right { display: none; }
 .present-studio.ps-yt-wide:has(.ps-tab[data-ps-mid-tab="youtube"].active) .ps-col-mid { border-right: none; }
 #psYtWide.active { background: var(--brass); color: #fff; }
+
+/* book173 -- tombol posisi jendela Layar 2 (⬆️ ◼ ⬇️) di header Studio */
+.ps-win-pos { display: inline-flex; gap: 2px; }
+.ps-win-pos .chip-btn { padding: 2px 7px; }
+.ps-win-pos .chip-btn.active { background: var(--brass); color: #fff; }
