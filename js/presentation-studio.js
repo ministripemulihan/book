@@ -12721,7 +12721,12 @@ const PresentationStudio = (() => {
     if (!handle || !studio) return;
     const STORAGE_KEY = "bible_app_studio_preview_row_h_v1";
     const LABEL_OVERHEAD_FALLBACK = 60; // dipakai kalau pengukuran nyata gagal (elemen belum ada di DOM)
-    const MIN_ROW = 150;
+    // DIUBAH (17 Okt 2026, book171): batas terkecil baris diturunkan 150 -> 100, dan tinggi kotak minimum 90 -> 36.
+    // Dulu kotak "Berikutnya"/"Tayang" DIPAKSA >= 90px walau sisa ruang (baris - kontrol & progress bar di atasnya)
+    // lebih kecil -> kotak terpotong separuh. Sekarang kotak selalu menyesuaikan sisa ruang: tampil UTUH dan sebesar
+    // mungkin, walau baris pendek (lebar ikut mengecil lewat rasio 16:9).
+    const MIN_ROW = 100;
+    const MIN_BOX = 36;
     // PERMINTAAN OPERATOR (28 Agu 2026, direvisi lagi hari yang sama, lalu
     // direvisi SEKALI LAGI di hari yang sama juga -- lihat mockup yang
     // dikirim operator): batas atas 82% tinggi jendela SEHARUSNYA sudah
@@ -12815,9 +12820,12 @@ const PresentationStudio = (() => {
       return Math.max(MIN_ROW, Math.min(byHeight, byWidth));
     }
     function apply(rowPx) {
-      const clamped = Math.max(MIN_ROW, Math.min(maxRow(), Math.round(rowPx)));
+      // BARU (book171): batas terkecil baris ikut ruang yang dipakai kontrol + progress bar di atas kotak
+      // (diukur nyata), supaya kotak Berikutnya/Tayang SELALU muat utuh -- tidak pernah terpotong.
+      const minRow = Math.max(MIN_ROW, currentOverhead() + MIN_BOX + 10);
+      const clamped = Math.max(minRow, Math.min(Math.max(minRow, maxRow()), Math.round(rowPx)));
       studio.style.setProperty("--ps-preview-row-h", clamped + "px");
-      studio.style.setProperty("--ps-preview-box-h", Math.max(90, clamped - currentOverhead()) + "px");
+      studio.style.setProperty("--ps-preview-box-h", Math.max(MIN_BOX, clamped - currentOverhead()) + "px");
       try { localStorage.setItem(STORAGE_KEY, String(clamped)); } catch (e) {}
     }
     // Dipanggil syncYtLiveBarVisibility() (atas) tiap kali #psYtLiveBar
