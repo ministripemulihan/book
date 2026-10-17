@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261017f" />
+<link rel="stylesheet" href="css/style.css?v=20261017g" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2285,8 +2285,9 @@
               <span class="ps-yt-viewmode" role="group" aria-label="Tampilan daftar">
                 <button type="button" id="psYtViewList" class="chip-btn small active" title="Mode daftar (garis): thumbnail + judul + tombol" aria-pressed="true">☰</button>
                 <button type="button" id="psYtViewGrid" class="chip-btn small" title="Mode kotak-kotak: hanya gambar thumbnail, bisa dikecilkan/dibesarkan" aria-pressed="false">▦</button>
+                <button type="button" id="psYtWide" class="chip-btn small" title="Lebarkan daftar: kolom tengah + kanan menyatu jadi 1 kolom lebar (kolom kiri tetap). Tekan lagi untuk mengembalikan 3 kolom." aria-pressed="false">↔</button>
               </span>
-              <input type="range" id="psYtGridSize" class="ps-yt-grid-size" min="64" max="360" step="4" value="140" title="Ukuran kotak thumbnail (kecil sampai besar)" hidden />
+              <input type="range" id="psYtGridSize" class="ps-yt-grid-size" min="64" max="480" step="4" value="140" title="Ukuran kotak thumbnail (kecil sampai besar)" hidden />
             </div>
             <div class="ps-btn-row ps-yt-cats" id="psYtPlaylistFilters">
               <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
@@ -4269,7 +4270,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261017c"></script>
+  <script src="js/presentation-studio.js?v=20261017cb"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
