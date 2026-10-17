@@ -19,4 +19,25 @@ expect("pasangan bahasa", P.pairCode("chs") === "chs_pinyin" && P.pairCode("chss
 expect("isPinyinCode", P.isPinyinCode("chs_pinyin") && !P.isPinyinCode("chs"), null);
 const g = P.align("耶和華神所造的，惟有蛇比田野一切的活物更狡猾。蛇對女人說：神豈是真說不許你們吃園中所有樹上的果子麼？", "yē hé huá shén suǒ zào de, wéi yǒu shé bǐ tián yě yī qiè de huó wù gèng jiǎo huá. shé duì nǚ rén shuō: shén qǐ shì zhēn shuō bù xǔ nǐ men chī yuán zhōng suǒ yǒu shù shàng de guǒ zi me?");
 expect("Kejadian 3:1 sejajar", g && g.length === 46 && g[45].han === "麼？", g && g.length);
+
+// ---- book169: Studio Presentasi (mergeTexts / mergeGroups / alignVerseText) ----
+const mt = P.mergeTexts([
+  { code: "ind", label: "ITB", text: "Kitab silsilah" },
+  { code: "chs", label: "MDR", text: "1 我所愛 2 你們好。" },
+  { code: "chs_pinyin", label: "MDR-PINYIN", text: "1 wǒ suǒ ài 2 nǐ men hǎo." },
+]);
+expect("mergeTexts: IND tetap, Mandarin+pinyin jadi 1 entri", mt.length === 2 && mt[0].code === "ind" && mt[1].ruby && mt[1].label === "MDR + MDR-PINYIN", mt);
+expect("nomor ayat jadi num pada karakter berikutnya, bukan karakter", mt[1].ruby.length === 6 && mt[1].ruby[0].num === "1" && mt[1].ruby[3].num === "2" && mt[1].ruby[2].han === "愛", mt[1].ruby);
+const bad = P.mergeTexts([{ code: "chs", label: "MDR", text: "我所愛" }, { code: "chs_pinyin", label: "P", text: "wǒ suǒ" }]);
+expect("jumlah beda -> TIDAK digabung (tetap 2 blok biasa)", bad.length === 2 && !bad[0].ruby, bad);
+const only = P.mergeTexts([{ code: "chs", label: "MDR", text: "我" }]);
+expect("tanpa pinyin -> apa adanya", only.length === 1 && !only[0].ruby, only);
+const sm = P.mergeTexts([{ code: "chssmp", label: "MDR-S", text: "我" }, { code: "chssmp_pinyin", label: "MDR-S-PINYIN", text: "wǒ" }, { code: "chs", label: "MDR", text: "我" }, { code: "chs_pinyin", label: "MDR-PINYIN", text: "wǒ" }]);
+expect("Sederhana & Tradisional sekaligus: 2 pasangan terpisah", sm.length === 2 && sm[0].label === "MDR-S + MDR-S-PINYIN" && sm[1].label === "MDR + MDR-PINYIN", sm);
+const mg = P.mergeGroups([
+  { ref: "Matius 1:1", texts: [{ code: "chs", label: "MDR", text: "我" }, { code: "chs_pinyin", label: "MDR-PINYIN", text: "wǒ" }, { code: "ind", label: "ITB", text: "a" }] },
+  { ref: "Matius 1:2", texts: [{ code: "chs", label: "MDR", text: "你" }, { code: "chs_pinyin", label: "MDR-PINYIN", text: "nǐ" }, { code: "ind", label: "ITB", text: "b" }] },
+]);
+expect("label Mandarin+Pinyin hanya di ayat paling atas", mg[0].texts[0].label === "MDR + MDR-PINYIN" && mg[1].texts[0].label === "" && mg[1].texts[0].ruby, mg);
+expect("label bahasa lain (ITB) tetap di tiap ayat", mg[0].texts[1].label === "ITB" && mg[1].texts[1].label === "ITB", mg);
 console.log(ok ? "\nALL PASS" : "\nSOME FAIL"); process.exit(ok ? 0 : 1);

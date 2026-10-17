@@ -58,7 +58,7 @@ function makeEnv(online, opts) {
   await E.install();
   const cacheName = Array.from(E.store.keys())[0];
   const C = E.store.get(cacheName);
-  expect("nama cache v82", /v82$/.test(cacheName), cacheName);
+  expect("nama cache v84", /v84$/.test(cacheName), cacheName);
   expect("skipWaiting dipanggil", E.self.skipped === true, null);
   expect("index.html tersimpan", C.has(SCOPE + "index.html"), Array.from(C.keys()).slice(0, 5));
   expect("present.html tersimpan", C.has(SCOPE + "present.html"), null);
