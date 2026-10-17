@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261017h" />
+<link rel="stylesheet" href="css/style.css?v=20261017i" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1022,10 +1022,15 @@
              di bawah & wireQuickMenu() di js/presentation-studio.js. -->
         <button type="button" id="psQuickMenuToggleBtn" class="chip-btn small" title="Menu Cepat -- aksi 1-klik yang sering dipakai, dikelompokkan Offline/Online">⚡ Menu Cepat</button>
         <button type="button" id="psOpenWindowBtn" class="chip-btn small">🖥️ Buka Layar 2</button>
-        <span id="psWinPos" class="ps-win-pos" role="group" aria-label="Posisi jendela Layar 2">
-          <button type="button" class="chip-btn small" data-pos="top" title="Layar 2 menempel di ATAS layar" aria-pressed="false">⬆️</button>
-          <button type="button" class="chip-btn small" data-pos="center" title="Layar 2 di TENGAH layar (bawaan)" aria-pressed="true">◼</button>
-          <button type="button" class="chip-btn small" data-pos="bottom" title="Layar 2 menempel di BAWAH layar" aria-pressed="false">⬇️</button>
+        <span id="psVPos" class="ps-win-pos" role="group" aria-label="Posisi tulisan di Layar 2">
+          <button type="button" class="chip-btn small" data-pos="top" title="Posisi TULISAN di Layar 2: ATAS (ayat, kidung, pengumuman)" aria-pressed="false">⬆️</button>
+          <button type="button" class="chip-btn small" data-pos="center" title="Posisi TULISAN di Layar 2: TENGAH (bawaan)" aria-pressed="true">◼</button>
+          <button type="button" class="chip-btn small" data-pos="bottom" title="Posisi TULISAN di Layar 2: BAWAH" aria-pressed="false">⬇️</button>
+        </span>
+        <span id="psWinPos" class="ps-win-pos" role="group" aria-label="Posisi jendela Layar 2 di monitor">
+          <button type="button" class="chip-btn small" data-pos="top" title="Jendela Layar 2 menempel di ATAS monitor" aria-pressed="false">🪟⬆️</button>
+          <button type="button" class="chip-btn small" data-pos="center" title="Jendela Layar 2 di TENGAH monitor (bawaan)" aria-pressed="true">🪟◼</button>
+          <button type="button" class="chip-btn small" data-pos="bottom" title="Jendela Layar 2 menempel di BAWAH monitor" aria-pressed="false">🪟⬇️</button>
         </span>
         <!-- BARU (10 Sep 2026, sesi ke-10, permintaan operator "monitor
              3 ... untuk monitor pembicara") -- jendela KE-3, terpisah
@@ -3233,6 +3238,13 @@
                ("Teks Penuh, Kamera Bulat" MAUPUN "Kamera Penuh, Teks
                Bulat") -- 1 pengaturan untuk keduanya. Lihat
                body.bubble-pos-* (present.html) & theme.bubblePos. -->
+          <!-- book175: tulisan menyingkir dari lingkaran (mode "Teks Penuh, Kamera Bulat"). Lihat body.bubble-avoid (present.html). -->
+          <label class="announcement-compose-hint" style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-top:14px;">
+            <input type="checkbox" id="psBubbleAvoid" style="margin:0;" />
+            📖 Tulisan menghindari lingkaran (mode "Teks Penuh, Kamera Bulat") -- tulisan tampil penuh di sisi lingkaran, tidak tertutup
+          </label>
+          <div class="ps-pointer-hint">Lingkaran di KIRI → tulisan di kanan; lingkaran di KANAN → tulisan di kiri (pilih posisi di bawah). Kalau mati: tulisan memenuhi layar dan lingkaran menimpanya (mode lama). Posisi "Tengah" tidak dipersempit.</div>
+
           <div class="ps-field-label" style="margin-top:14px;">Posisi lingkaran (mode bulat manapun)</div>
           <div class="ps-btn-row" id="psBubblePosRow">
             <button type="button" class="chip-btn small" data-bubble-pos="tl">↖️ Kiri Atas</button>
@@ -4266,7 +4278,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
   <script src="js/ink-engine.js?v=20260926b"></script>
-  <script src="js/presentation.js?v=20261016hx"></script>
+  <script src="js/presentation.js?v=20261016hxy"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
@@ -4276,7 +4288,8 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261017cbx"></script>
+  <script src="js/bg-audio-source-playlist.js?v=20261017a"></script> <!-- book175: sumber "Dari Playlist SoundCloud" -->
+  <script src="js/presentation-studio.js?v=20261017d175"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4303,7 +4316,7 @@
   <script src="js/adminbell.js?v=20260915b"></script>
   <script src="js/pinyin-ruby.js?v=20261017b"></script>
   <script src="js/tts-sync.js?v=20261017b"></script>
-  <script src="js/app.js?v=20261017d"></script>
+  <script src="js/app.js?v=20261017dy"></script>
   <script src="js/sync-checklist.js?v=20261016a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->

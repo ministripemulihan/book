@@ -298,6 +298,23 @@
     transition: opacity .35s ease, width .3s ease, height .3s ease, top .3s ease, left .3s ease, right .3s ease, bottom .3s ease;
   }
   body.cam-bubble #stage { background: var(--p-bg); }
+  /* book175 (17 Okt 2026): "Tulisan menghindari lingkaran" (theme.bubbleAvoid) -- khusus mode "Teks Penuh, Kamera Bulat".
+     Zona tulisan (#stage) dipersempit supaya SELURUH tulisan tampil di sisi lingkaran (kanan/kiri) dan tidak tertutup kamera.
+     Lingkaran di kiri (tl/bl) -> tulisan di kanan; lingkaran di kanan (tr/br) -> tulisan di kiri.
+     Lingkaran "Tengah" tidak punya sisi, jadi tidak dipersempit. Lebar disisakan = diameter + 28px*2 (jarak tepi). */
+  body.cam-bubble.bubble-avoid.bubble-pos-tl #stage, body.cam-bubble.bubble-avoid.bubble-pos-bl #stage {
+    margin-left: calc(var(--p-cam-bubble-size, 200px) + 56px);
+    width: calc(100% - var(--p-cam-bubble-size, 200px) - 56px);
+  }
+  body.cam-bubble.bubble-avoid.bubble-pos-tr #stage, body.cam-bubble.bubble-avoid.bubble-pos-br #stage {
+    margin-right: calc(var(--p-cam-bubble-size, 200px) + 56px);
+    width: calc(100% - var(--p-cam-bubble-size, 200px) - 56px);
+  }
+  /* Bawaan lama (tanpa class bubble-pos-*) = kanan-bawah */
+  body.cam-bubble.bubble-avoid:not([class*="bubble-pos-"]) #stage {
+    margin-right: calc(var(--p-cam-bubble-size, 200px) + 56px);
+    width: calc(100% - var(--p-cam-bubble-size, 200px) - 56px);
+  }
   /* BARU (9 Sep 2026, sesi ke-9, permintaan operator "teks dalam bentuk
      lingkaran kecil ... + kamera di belakang") -- KEBALIKAN dari
      "cam-bubble" di atas: di sini KAMERA/GAMBAR yang memenuhi SELURUH
@@ -777,6 +794,10 @@
     text-shadow: 0 2px 10px rgba(0,0,0,.6); margin-top: 1vh; min-height: 1em;
   }
 
+  /* book174 (17 Okt 2026): posisi TULISAN (ayat/kidung/pengumuman) di Layar 2 -- atas / tengah (bawaan) / bawah.
+     Dipilih dari Studio (tombol ⬆️ ◼ ⬇️ "Posisi tulisan"). Tidak mengubah mode kamera (cam-*), yang punya tata letak sendiri. */
+  body.vpos-top:not([class*="cam-"]) #stage { justify-content: flex-start; }
+  body.vpos-bottom:not([class*="cam-"]) #stage { justify-content: flex-end; }
   #stage {
     position: relative; z-index: 2;
     height: 100%;
@@ -6298,6 +6319,12 @@
     }
   }
 
+  function applyVpos_(pos) {
+    const p = (pos === "top" || pos === "bottom") ? pos : "center";
+    document.body.classList.remove("vpos-top", "vpos-bottom");
+    if (p !== "center") document.body.classList.add("vpos-" + p);
+  }
+  try { applyVpos_(localStorage.getItem("bible_app_layar2_vpos_v1")); } catch (e) { /* abaikan */ }
   function applyTheme(theme) {
     if (!theme) return;
     const root = document.documentElement.style;
@@ -6450,6 +6477,9 @@
       ["tl", "tr", "bl", "br", "c"].forEach((p) => {
         document.body.classList.toggle("bubble-pos-" + p, theme.bubblePos === p);
       });
+    }
+    if (typeof theme.bubbleAvoid === "boolean") {
+      document.body.classList.toggle("bubble-avoid", theme.bubbleAvoid);
     }
     if (typeof theme.camSplitReverse === "boolean") {
       document.body.classList.toggle("cam-split-lr-reverse", theme.camSplitReverse);
@@ -7244,6 +7274,7 @@
       else if (data.action === "lap") showStopwatchLap_(data);
       return;
     }
+    if (data.type === "vpos") { applyVpos_(data.pos); return; }
     if (data.type === "theme") { applyTheme(data.theme); return; }
     if (data.type === "camera") { applyCameraPayload(data); return; }
     // BARU (28 Agu 2026) -- 🖼️ Latar Gambar (upload), lihat applyBgImagePayload().
