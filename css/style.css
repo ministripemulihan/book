@@ -2466,6 +2466,7 @@ select.chip-select:hover { border-color: var(--petrol); }
 .verse-block[class*="hl-"] { color: #2b2118; }
 .verse-block[class*="hl-"] .verse-copy-btn,
 .verse-block[class*="hl-"] .verse-coll-btn,
+.verse-block[class*="hl-"] .verse-read-btn,
 .verse-block[class*="hl-"] .verse-note-badge { color: #6e5c43; }
 .verse-block.hl-yellow:hover, .verse-block.hl-green:hover, .verse-block.hl-blue:hover,
 .verse-block.hl-pink:hover, .verse-block.hl-purple:hover, .verse-block.hl-orange:hover,
@@ -2860,7 +2861,8 @@ body.present-mode-on .verse-present-btn { display: inline-flex; }
   overflow-wrap: break-word; word-break: break-word;
 }
 .reader-columns-grid .reader-grid-cell .verse-copy-btn,
-.reader-columns-grid .reader-grid-cell .verse-coll-btn {
+.reader-columns-grid .reader-grid-cell .verse-coll-btn,
+.reader-columns-grid .reader-grid-cell .verse-read-btn {
   display: inline-flex; vertical-align: middle;
   margin: 0 0 0 4px;
 }
@@ -3063,7 +3065,8 @@ body.pane-fullscreen-open { overflow: hidden; }
   overflow-wrap: break-word; word-break: break-word;
 }
 .reader-col-pane-body .verse-copy-btn,
-.reader-col-pane-body .verse-coll-btn {
+.reader-col-pane-body .verse-coll-btn,
+.reader-col-pane-body .verse-read-btn {
   display: inline-flex; vertical-align: middle;
   margin: 0 0 0 4px;
 }
@@ -5745,3 +5748,33 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 #psYtPlaylistList.ps-yt-grid.ps-yt-grid-icons .ps-file-actions .chip-btn { font-size: 0; }
 #psYtPlaylistList.ps-yt-grid.ps-yt-grid-icons .ps-file-actions .chip-btn::first-letter { font-size: 13px; }
 #psYtPlaylistList.ps-yt-grid .ps-yt-more-row { grid-column: 1 / -1; }
+
+
+/* ============================================================
+   BARU (17 Okt 2026, book172) -- "▶️" Baca dari sini di baris ikon tiap ayat + kontrol baca melayang.
+   - .verse-read-btn: gaya disamakan dengan 📋 / 📚 (lihat buildVerseBlock() di js/app.js).
+   - .tts-float: ⏸/▶️ + "Ayat N" + ⏹, menempel di kiri-bawah (HP: header bisa tersembunyi di mode layar penuh).
+   ============================================================ */
+.verse-read-btn {
+  flex-shrink: 0; align-self: flex-start; margin-top: 4px;
+  background: transparent; border: none; font-size: 13px;
+  opacity: 0; transition: opacity .15s ease, transform .15s ease;
+  color: var(--petrol); padding: 4px; cursor: pointer;
+}
+.verse-block:hover .verse-read-btn,
+.verse-block:focus-within .verse-read-btn { opacity: .75; }
+.verse-read-btn:hover { opacity: 1 !important; transform: scale(1.12); }
+@media (max-width: 859px) {
+  .verse-read-btn { opacity: .55; padding: 6px 4px; }
+}
+.tts-float {
+  position: fixed; left: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 46;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 6px; border-radius: 999px;
+  background: var(--paper-raised, #fff); color: var(--ink);
+  border: 1.5px solid var(--rule); box-shadow: var(--shadow);
+  font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+}
+.tts-float[hidden] { display: none; }
+.tts-float button { background: transparent; border: none; font-size: 18px; line-height: 1; padding: 6px 8px; min-width: 40px; min-height: 40px; cursor: pointer; color: inherit; }
+.tts-float-label { white-space: nowrap; padding: 0 2px; }
