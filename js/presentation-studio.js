@@ -533,6 +533,12 @@ const PresentationStudio = (() => {
     }
   }
 
+  // book169 -- sel "nempel": karakter Mandarin di atas, 1 suku kata pinyin tepat di bawahnya.
+  function rubyCellsHtml_(cells) {
+    return '<span class="rb-line">' + (cells || []).map((c) =>
+      '<span class="rb-cell">' + (c.num ? '<sup class="rb-num">' + escapeHtml(String(c.num)) + '</sup>' : '') +
+      '<span class="rb-han">' + escapeHtml(c.han || "") + '</span><span class="rb-py">' + escapeHtml(c.py || "") + '</span></span>').join("") + '</span>';
+  }
   function renderStudioPreview(payload) {
     const box = el("psPreviewBox");
     if (!box) return;
@@ -691,7 +697,7 @@ const PresentationStudio = (() => {
         // v54 -- slide gabungan multi-bahasa: tiap ayat berpasangan dengan terjemahannya.
         const groupsHtml = payload.groups.map((g) => {
           const head = g.ref ? `<div class="present-preview-ref" style="font-size:0.8em;">${escapeHtml(g.ref)}</div>` : "";
-          const rows = (g.texts || []).map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${strongTextToHtml(t.text || "")}</div>`).join("");
+          const rows = (g.texts || []).map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${t.ruby ? rubyCellsHtml_(t.ruby) : strongTextToHtml(t.text || "")}</div>`).join("");
           return `<div class="present-preview-group">${head}${rows}</div>`;
         }).join("");
         const hasGroupHeads = payload.groups.some((g) => g && g.ref); // v61: nama gabungan disembunyikan kalau tiap ayat punya nama sendiri
@@ -699,7 +705,7 @@ const PresentationStudio = (() => {
         return;
       }
       if (payload.type === "verse" && Array.isArray(payload.texts) && payload.texts.length) {
-        const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${strongTextToHtml(t.text || "")}</div>`).join("");
+        const versionsHtml = payload.texts.map((t) => `<div class="present-preview-version"><span class="present-preview-version-tag">${escapeHtml(t.label || "")}</span>${t.ruby ? rubyCellsHtml_(t.ruby) : strongTextToHtml(t.text || "")}</div>`).join("");
         box.innerHTML = `${refHtml}${versionsHtml}`;
         return;
       }
@@ -1720,6 +1726,22 @@ const PresentationStudio = (() => {
     });
     return notes.length ? (pf.only ? { notes, notesLang: pf.lang, notesOnly: true } : { notes, notesLang: pf.lang }) : {};
   }
+  // BARU (17 Okt 2026, book169, permintaan operator) -- mode "Nempel per karakter" untuk Mandarin + Pinyin
+  // di slide ayat (Layar 2 & pratinjau). Pilihan di #psQuickRubyMode (diingat di perangkat ini).
+  // Hanya bekerja kalau Mandarin (MDR / MDR-S) DAN pinyin pasangannya sama-sama ada di slide;
+  // bahasa lain (IND, ENG, dst) tidak berubah sama sekali.
+  function rubyModeOn_() {
+    const sel = el("psQuickRubyMode");
+    return !!(sel && sel.value === "nempel");
+  }
+  function rubyTexts_(texts, force) {
+    if (!(force === undefined ? rubyModeOn_() : force) || typeof PinyinRuby === "undefined") return texts;
+    return PinyinRuby.mergeTexts(texts);
+  }
+  function rubyGroups_(groups, force) {
+    if (!(force === undefined ? rubyModeOn_() : force) || typeof PinyinRuby === "undefined") return groups;
+    return PinyinRuby.mergeGroups(groups);
+  }
   function versesFromIds_(ids) {
     if (typeof verseById === "undefined") return [];
     return (ids || []).map((id) => verseById[id]).filter(Boolean);
@@ -1751,10 +1773,12 @@ const PresentationStudio = (() => {
       // berpasangan dengan terjemahannya (groups, sama seperti slide gabungan v54).
       const ml = resolveMultiLangVerseItem_(it);
       let payload;
+      // book169: item tersimpan membawa pilihan Nempel-nya (it.ruby); item lama (tanpa it.ruby) mengikuti pilihan saat ini.
+      const rubyForce = it.ruby === true ? true : (it.ruby === false ? false : undefined);
       if (ml.groups.length === 1) {
-        payload = { type: "verse", ref: ml.ref, texts: ml.groups[0].texts.map((t) => ({ code: t.code, label: t.label, text: t.text })) };
+        payload = { type: "verse", ref: ml.ref, texts: rubyTexts_(ml.groups[0].texts.map((t) => ({ code: t.code, label: t.label, text: t.text })), rubyForce) };
       } else {
-        payload = { type: "verse", ref: ml.ref, texts: ml.flatTexts, groups: ml.groups };
+        payload = { type: "verse", ref: ml.ref, texts: ml.flatTexts, groups: rubyGroups_(ml.groups, rubyForce) };
       }
       Object.assign(payload, buildVerseNotesExtra_(versesFromIds_(it.verseIds && it.verseIds.length ? it.verseIds : [it.verseId]))); // v57
       if (Presentation.postRaw) Presentation.postRaw(payload);
@@ -4758,6 +4782,11 @@ const PresentationStudio = (() => {
     if (el("psVersionGrid")) {
       el("psVersionGrid").querySelectorAll("input[type=checkbox]").forEach((cb) => cb.addEventListener("change", updatePreview));
     }
+    // book169 -- pilihan "Mandarin + Pinyin: nempel" diingat di perangkat ini.
+    if (el("psQuickRubyMode")) {
+      try { const sv = localStorage.getItem("ps_ruby_mode"); if (sv === "nempel" || sv === "biasa") el("psQuickRubyMode").value = sv; } catch (e) { /* abaikan */ }
+      el("psQuickRubyMode").addEventListener("change", () => { try { localStorage.setItem("ps_ruby_mode", el("psQuickRubyMode").value); } catch (e) { /* abaikan */ } });
+    }
     if (el("psQuickShowBtn")) {
       el("psQuickShowBtn").addEventListener("click", () => {
         const blocks = resolveRefBlocks();
@@ -4780,9 +4809,9 @@ const PresentationStudio = (() => {
           if (slideInfo) {
             const doSendM = () => {
               if (typeof Presentation !== "undefined" && Presentation.postRaw) {
-                Presentation.postRaw(Object.assign({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: slideInfo.groups }, slideInfo.extra || {}));
+                Presentation.postRaw(Object.assign({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: rubyGroups_(slideInfo.groups) }, slideInfo.extra || {}));
               }
-              renderStudioPreview({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: slideInfo.groups });
+              renderStudioPreview({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: rubyGroups_(slideInfo.groups) });
               clearMonitorVideo_();
             };
             if (isDualLive()) stageNext(slideInfo.ref, slideInfo.flatTexts.map((t) => "[" + t.label + "] " + t.text).join("  "), doSendM);
@@ -4797,7 +4826,7 @@ const PresentationStudio = (() => {
           if (firstGroupIds.length > 1 && (!el("psQuickEachRef") || el("psQuickEachRef").checked) && typeof resolveMultiLangVerseItem_ === "function") {
             const ml = resolveMultiLangVerseItem_({ type: "verse", verseId: firstGroupIds[0], verseIds: firstGroupIds, eachRef: true });
             if (ml) {
-              const payloadG = Object.assign({ type: "verse", ref: ml.ref, texts: ml.flatTexts, groups: ml.groups }, buildVerseNotesExtra_(versesFromIds_(firstGroupIds))); // v57
+              const payloadG = Object.assign({ type: "verse", ref: ml.ref, texts: ml.flatTexts, groups: rubyGroups_(ml.groups) }, buildVerseNotesExtra_(versesFromIds_(firstGroupIds))); // v57 (+ book169: nempel)
               const doSendG = () => {
                 if (typeof Presentation !== "undefined" && Presentation.postRaw) Presentation.postRaw(payloadG);
                 renderStudioPreview(payloadG);
@@ -4833,9 +4862,9 @@ const PresentationStudio = (() => {
         // benar didorong live (bukan cuma saat diketik/diantre).
         const doSend = () => {
           if (typeof Presentation !== "undefined" && Presentation.sendVerseMulti) {
-            Presentation.sendVerseMulti(first.refLabel, first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text })), buildVerseNotesExtra_(first.versions[0] ? first.versions[0].verses : [])); // v57: + notes
+            Presentation.sendVerseMulti(first.refLabel, rubyTexts_(first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text }))), buildVerseNotesExtra_(first.versions[0] ? first.versions[0].verses : [])); // v57: + notes (book169: + nempel)
           }
-          renderStudioPreview({ type: "verse", ref: first.refLabel, texts: first.versions });
+          renderStudioPreview({ type: "verse", ref: first.refLabel, texts: rubyTexts_(first.versions.map((v) => ({ code: v.code, label: v.label, text: v.text }))) });
           clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
         };
         const previewText = first.versions.map((v) => `[${v.label}] ${stripStrongMarkers(v.text)}`).join("  ");
@@ -4864,7 +4893,7 @@ const PresentationStudio = (() => {
         const langModeSel = el("psQuickLangMode");
         const checkedCodes = getCheckedVersions();
         const multiOpts = (langModeSel && langModeSel.value === "multi" && checkedCodes.length > 1)
-          ? { langs: checkedCodes.slice(), eachRef: !el("psQuickEachRef") || !!el("psQuickEachRef").checked }
+          ? { langs: checkedCodes.slice(), eachRef: !el("psQuickEachRef") || !!el("psQuickEachRef").checked, ruby: rubyModeOn_() }
           : null;
         // BARU (18 Sep 2026, permintaan operator) -- "Kalau lebih dari 1
         // ayat, gabung jadi": groupSize 1 (bawaan) = perilaku LAMA persis

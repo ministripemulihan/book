@@ -331,6 +331,7 @@ function addVerseGroupToCollection(username, name, verseIds, opts) {
   const langs = opts && Array.isArray(opts.langs) ? opts.langs.filter(Boolean) : [];
   if (langs.length > 1) {
     const item = { type: "verse", verseId: ids[0], langs: langs.slice(), eachRef: !(opts && opts.eachRef === false) };
+    if (opts && typeof opts.ruby === "boolean") item.ruby = opts.ruby; // book169: Mandarin + Pinyin "nempel" per karakter
     if (ids.length > 1) item.verseIds = ids.slice();
     return addItemToCollection(username, name, item);
   }

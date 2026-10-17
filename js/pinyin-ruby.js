@@ -36,6 +36,72 @@ const PinyinRuby = (function () {
     return cells;
   }
 
-  return { pairCode, isPinyinCode, syllables, align };
+
+  // BARU (17 Okt 2026, book169) -- versi untuk TEKS AYAT SLIDE Studio Presentasi: teks bisa memuat
+  // nomor ayat ("1 亞伯拉罕… 2 以撒…") yang tidak boleh ikut dihitung sebagai karakter/suku kata.
+  // Nomor ayat jadi `num` pada sel karakter BERIKUTNYA. Sisanya sama dengan align().
+  function alignVerseText(han, pinyin) {
+    const syl = syllables(String(pinyin || "").replace(/\d+/g, " "));
+    const src = Array.from(String(han || ""));
+    const hanCount = src.filter((c) => HAN.test(c)).length;
+    if (!hanCount || syl.length !== hanCount) return null;
+    const cells = [];
+    let prefix = "", si = 0, num = "", digits = "";
+    const flushDigits = () => { if (digits) { num = digits; digits = ""; } };
+    src.forEach((ch) => {
+      if (/\d/.test(ch)) { digits += ch; return; }
+      if (/\s/.test(ch)) { flushDigits(); return; }
+      flushDigits();
+      if (HAN.test(ch)) {
+        const cell = { han: prefix + ch, py: syl[si++] };
+        if (num) { cell.num = num; num = ""; }
+        cells.push(cell); prefix = "";
+      } else if (OPEN.test(ch)) prefix += ch;
+      else if (cells.length) cells[cells.length - 1].han += ch;
+      else prefix += ch;
+    });
+    if (prefix && cells.length) cells[cells.length - 1].han += prefix;
+    return cells;
+  }
+
+  // Menggabungkan daftar [{code,label,text}] : tiap teks Mandarin yang pinyin-nya JUGA ada di daftar
+  // jadi 1 entri {code,label:"MDR + MDR-PINYIN",text,ruby:[{han,py,num?}]} di posisi entri Mandarin;
+  // entri pinyin-nya dibuang. Kalau jumlah karakter != jumlah suku kata -> TIDAK digabung (tidak menebak).
+  function mergeTexts(texts) {
+    const list = Array.isArray(texts) ? texts : [];
+    const used = new Set();
+    const out = [];
+    list.forEach((t, i) => {
+      if (used.has(i)) return;
+      const pc = pairCode(t && t.code);
+      const j = pc ? list.findIndex((x, k) => k !== i && !used.has(k) && x && x.code === pc) : -1;
+      if (j >= 0) {
+        const cells = alignVerseText(t.text, list[j].text);
+        if (cells) {
+          used.add(j);
+          out.push({ code: t.code, label: [t.label, list[j].label].filter(Boolean).join(" + "), text: t.text, ruby: cells });
+          return;
+        }
+      }
+      out.push(t);
+    });
+    return out;
+  }
+
+  // Untuk slide gabungan beberapa ayat (groups): label "MDR + MDR-PINYIN" cukup di kelompok PERTAMA
+  // yang memuatnya (permintaan operator: tidak diulang di ayat di bawahnya).
+  function mergeGroups(groups) {
+    let shown = false;
+    return (groups || []).map((g) => {
+      const texts = mergeTexts(g.texts).map((t) => {
+        if (!t.ruby) return t;
+        if (shown) return Object.assign({}, t, { label: "" });
+        shown = true; return t;
+      });
+      return Object.assign({}, g, { texts });
+    });
+  }
+
+  return { pairCode, isPinyinCode, syllables, align, alignVerseText, mergeTexts, mergeGroups };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = PinyinRuby;
