@@ -3013,6 +3013,7 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   const block = document.createElement("div");
   block.className = "verse-block";
   block.id = "v-" + v.id;
+  block.dataset.verse = String(v.verse); // dipakai penanda pembacaan suara untuk mencari blok ayat (mis. mode Nempel)
   block.style.animationDelay = Math.min(idx * 35, 700) + "ms";
   if (highlightVerse && v.verse === highlightVerse) block.classList.add("highlight");
 
@@ -3917,7 +3918,7 @@ function renderColumnsRuby(wrap, columns, displayName) {
       langTag.className = "reader-stacked-lang-tag";
       const pair = pairs.get(col);
       langTag.textContent = pair ? langLabelFor(col.lang) + " + " + langLabelFor(pair.pcol.lang) : (col.lang ? columnHeadLabel_(col) : "?");
-      block.insertBefore(langTag, block.firstChild);
+      if (groupIdx === 0) block.insertBefore(langTag, block.firstChild); // label bahasa cukup di ayat paling atas (permintaan operator: hemat tempat)
       if (pair) {
         const tw = block.querySelector(".verse-text-wrap");
         if (tw) {
@@ -10230,6 +10231,10 @@ if (typeof document !== "undefined") {
 //     menyorot ayat yang sedang dibacakan.
 // ------------------------------------------------------------
 let ttsPlaying = false;
+let ttsRun = null, ttsRunSeq = 0;
+const TTS_CAL_KEY = "bible_app_tts_cal_v1";
+let ttsCal = {};
+try { ttsCal = JSON.parse(localStorage.getItem(TTS_CAL_KEY) || "{}") || {}; } catch (e) { ttsCal = {}; }
 let ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
 // Pengaturan suara pembacaan (bahasa, jenis suara, kecepatan) — tersimpan
@@ -10453,47 +10458,205 @@ function spokenChapterAnnouncement(bookName, chapterNum) {
 // diucapkan sebagai kalimat pembuka (nama kitab+pasal) SEBELUM ayat 1.
 function speakVerseList(verses, opts) {
   if (!ttsSupported || !verses || !verses.length) return;
+  ttsKillRun_();
   window.speechSynthesis.cancel();
-  const voice = pickVoice();
-  const announceText = opts && opts.announce;
-  if (announceText) {
-    const introUtter = new SpeechSynthesisUtterance(announceText);
-    if (voice) introUtter.voice = voice;
-    introUtter.lang = ttsSettings.lang;
-    introUtter.rate = ttsSettings.rate;
-    window.speechSynthesis.speak(introUtter);
-  }
-  verses.forEach((v, idx) => {
-    let spoken = `${spokenVerseLabel(v.verse)} ${v.text}`;
-    if (ttsSettings.readNotes && v.note && v.note.trim()) {
-      let noteSpoken = noteHtmlToPlainText(v.note);
-      if (ttsSettings.parseArticulation) noteSpoken = cleanArticulationForSpeech(noteSpoken);
-      spoken += ` Catatan. ${noteSpoken}`;
-    }
-    const utter = new SpeechSynthesisUtterance(spoken);
-    if (voice) utter.voice = voice;
-    utter.lang = ttsSettings.lang;
-    utter.rate = ttsSettings.rate;
-    utter.onstart = () => setSpeakingHighlight(el("v-" + v.id));
-    if (idx === verses.length - 1) {
-      utter.onend = () => {
-        ttsPlaying = false;
-        releaseWakeLock();
-        setSpeakingHighlight(null);
-        updateTTSButton();
-      };
-    }
-    window.speechSynthesis.speak(utter);
-  });
+  const run = { id: ++ttsRunSeq, queue: buildTtsQueue_(verses, opts), i: 0, item: null, cur: null, active: null, paused: false, waiting: false, t0: 0, pauseAt: 0, timer: null };
+  ttsRun = run;
   ttsPlaying = true;
   requestWakeLock();
   updateTTSButton();
+  run.timer = setInterval(() => ttsTick_(run), 100);
+  ttsNext_(run);
+}
+
+// ------------------------------------------------------------
+// MESIN PEMBACAAN BARU (17 Okt 2026, book168, permintaan operator: "tanda tidak sama dengan suara;
+// minta tanda bergeser PER KATA, di mode 1 kolom maupun Nempel").
+// Cara lama mengantre SEMUA ayat sekaligus lalu menyorot ayat lewat utter.onstart -- di banyak HP kejadian
+// onstart datang TERLAMBAT satu ayat (tanda baru pindah ke ayat 1 ketika suara sudah di ayat 2), dan tanda
+// cuma per ayat. Sekarang: (1) tiap ayat dipecah jadi potongan kalimat, DIBACAKAN SATU-SATU (urut, tidak
+// diantre), tanda dipasang SAAT potongan dimulai (tidak menunggu onstart); (2) di dalam potongan tanda per
+// kata/karakter: pakai onboundary kalau mesin suara mengirimnya, kalau tidak diperkirakan dari panjang
+// kalimat & kecepatan bicara yang dipelajari dari potongan sebelumnya; (3) selesainya potongan dideteksi
+// dari onend ATAU speechSynthesis.speaking=false (tidak tergantung onend yang telat). Jeda/lanjut ikut
+// membekukan hitungan waktu. "Baca dari sini" (loncat ke ayat 10 dst) tetap lewat playTTSFromVerse().
+// ------------------------------------------------------------
+function ttsLangPrefix_() { return (ttsSettings.lang || "id-ID").slice(0, 2).toLowerCase(); }
+function ttsMsPerChar_(p) { return ttsCal[p] || (p === "zh" ? 230 : p === "ja" ? 200 : 75); }
+function ttsRate_() { const r = Number(ttsSettings.rate); return r > 0 ? r : 1; }
+
+function findVerseBlock_(v) {
+  if (!v) return null;
+  const byId = el("v-" + v.id);
+  if (byId) return byId;
+  const wrap = el("readerVerses");
+  if (!wrap) return null;
+  const sel = '[data-verse="' + v.verse + '"]';
+  return wrap.querySelector(".verse-ruby-block" + sel) || wrap.querySelector(".verse-block" + sel);
+}
+
+function buildTtsQueue_(verses, opts) {
+  const q = [];
+  if (opts && opts.announce) q.push({ kind: "announce", text: opts.announce, v: verses[0] });
+  verses.forEach((v) => {
+    const label = spokenVerseLabel(v.verse);
+    const text = String(v.text || "");
+    const segs = typeof TtsSync !== "undefined" ? TtsSync.splitSegments(text) : (text ? [{ start: 0, end: text.length, text }] : []);
+    if (!segs.length) q.push({ kind: "seg", v, seg: null, first: true, lead: label, text: label });
+    segs.forEach((seg, k) => q.push({ kind: "seg", v, seg, first: k === 0, lead: k === 0 ? label : "", text: (k === 0 ? label + " " : "") + seg.text }));
+    if (ttsSettings.readNotes && v.note && v.note.trim()) {
+      let noteSpoken = noteHtmlToPlainText(v.note);
+      if (ttsSettings.parseArticulation) noteSpoken = cleanArticulationForSpeech(noteSpoken);
+      q.push({ kind: "note", v, text: `Catatan. ${noteSpoken}` });
+    }
+  });
+  return q;
+}
+
+function ttsClearUnit_(run) {
+  if (run && run.active) { if (run.active.el) run.active.el.classList.remove("tts-cur"); run.active = null; }
+  try { if (window.CSS && CSS.highlights) CSS.highlights.delete("tts-word"); } catch (e) { /* abaikan */ }
+}
+function ttsSetUnit_(run, u) {
+  if (run.active === u) return;
+  ttsClearUnit_(run);
+  if (!u) return;
+  run.active = u;
+  let target = null;
+  if (u.el) { u.el.classList.add("tts-cur"); target = u.el; }
+  else if (u.makeRange) {
+    try {
+      const r = u.makeRange();
+      if (window.CSS && CSS.highlights && typeof Highlight !== "undefined") CSS.highlights.set("tts-word", new Highlight(r));
+      target = r;
+    } catch (e) { /* abaikan */ }
+  }
+  if (!target) return;
+  try { // kata keluar dari layar (baris baru di ayat panjang) -> gulir supaya tetap terlihat
+    const rect = target.getBoundingClientRect();
+    const H = window.innerHeight || 800;
+    if (rect && rect.height && (rect.bottom > H - 100 || rect.top < 90)) {
+      const node = u.el || (target.startContainer && target.startContainer.parentElement);
+      if (node && node.scrollIntoView) node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  } catch (e) { /* abaikan */ }
+}
+
+function ttsKillRun_() {
+  if (!ttsRun) return;
+  clearInterval(ttsRun.timer);
+  ttsClearUnit_(ttsRun);
+  ttsRun = null;
+}
+function ttsFinish_(run) {
+  if (run !== ttsRun) return;
+  ttsKillRun_();
+  ttsPlaying = false;
+  releaseWakeLock();
+  setSpeakingHighlight(null);
+  updateTTSButton();
+}
+
+function ttsNext_(run) {
+  if (run !== ttsRun) return;
+  if (run.paused) { run.waiting = true; return; }
+  const item = run.queue[run.i++];
+  if (!item) { ttsFinish_(run); return; }
+  run.item = item;
+  item.done = false; item.boundary = false; item.units = null;
+  if (item.kind === "announce") {
+    ttsClearUnit_(run);
+    setSpeakingHighlight(findVerseBlock_(item.v)); // tanda sudah di ayat pertama sejak pengumuman nama kitab
+  } else if (item.kind === "seg") {
+    if (item.first || !run.cur || run.cur.v !== item.v) {
+      const block = findVerseBlock_(item.v);
+      const tw = block && block.querySelector(".verse-text-wrap");
+      run.cur = { v: item.v, block, units: tw && typeof TtsSync !== "undefined" ? TtsSync.domUnits(tw, String(item.v.text || "")) : [] };
+      ttsClearUnit_(run);
+      setSpeakingHighlight(block);
+    }
+    if (item.seg && run.cur.units.length) {
+      const su = TtsSync.segmentUnits(run.cur.units, String(item.v.text || ""), item.seg);
+      item.units = su.units; item.weights = su.weights; item.segW = su.total;
+    } else { item.segW = 0; }
+    item.off = item.first ? item.lead.length + 1 : 0;
+  } else {
+    ttsClearUnit_(run); // membaca catatan: tanda per kata dilepas, tanda ayat tetap
+  }
+  item.leadW = item.kind === "seg" && item.first && typeof TtsSync !== "undefined" ? TtsSync.spanWeight(item.lead, 0, item.lead.length) : 0;
+  const p = ttsLangPrefix_();
+  const W = (item.leadW || 0) + (item.segW || (item.kind === "seg" ? 0 : String(item.text).length));
+  item.est = Math.max(600, W * ttsMsPerChar_(p) / ttsRate_());
+
+  const utter = new SpeechSynthesisUtterance(item.text);
+  const voice = pickVoice();
+  if (voice) utter.voice = voice;
+  utter.lang = ttsSettings.lang;
+  utter.rate = ttsSettings.rate;
+  utter.onstart = () => {
+    if (item.done || run !== ttsRun) return;
+    // onstart yang datang wajar (bukan telat) dipakai untuk meluruskan jam awal
+    if (performance.now() - run.t0 < 0.6 * item.est + 1200) run.t0 = performance.now();
+  };
+  utter.onboundary = (e) => {
+    if (item.done || run !== ttsRun || run.paused || (e.name && e.name !== "word")) return;
+    if (item.kind !== "seg" || !item.units || !item.units.length) return;
+    item.boundary = true;
+    const idx = e.charIndex - item.off;
+    if (idx < 0) { ttsClearUnit_(run); return; }
+    const k = TtsSync.unitAtChar(item.units, item.seg.start + idx);
+    if (k >= 0) ttsSetUnit_(run, item.units[k]);
+  };
+  utter.onend = () => ttsItemDone_(run, item);
+  utter.onerror = () => ttsItemDone_(run, item);
+  run.t0 = performance.now();
+  window.speechSynthesis.speak(utter);
+}
+
+function ttsItemDone_(run, item) {
+  if (item.done || run !== ttsRun) return;
+  item.done = true;
+  if (item.kind === "seg" && item.seg) { // belajar kecepatan bicara suara ini
+    const real = performance.now() - run.t0, W = (item.leadW || 0) + (item.segW || 0);
+    if (W > 0 && real > 300 && real < item.est * 3) {
+      const p = ttsLangPrefix_(), sample = real * ttsRate_() / W;
+      ttsCal[p] = ttsCal[p] ? ttsCal[p] * 0.6 + sample * 0.4 : sample * 0.7 + ttsMsPerChar_(p) * 0.3;
+      try { localStorage.setItem(TTS_CAL_KEY, JSON.stringify(ttsCal)); } catch (e) { /* abaikan */ }
+    }
+  }
+  if (item.units && item.units.length) ttsSetUnit_(run, item.units[item.units.length - 1]);
+  ttsNext_(run);
+}
+
+function ttsTick_(run) {
+  if (run !== ttsRun) { clearInterval(run.timer); return; }
+  const item = run.item;
+  if (run.paused || !item || item.done) return;
+  const el_ = performance.now() - run.t0;
+  const ss = window.speechSynthesis;
+  // selesai tapi onend tidak datang / telat: suara sudah berhenti
+  if ((el_ > 1500 && !ss.speaking && !ss.pending) || el_ > item.est * 3 + 6000) { ttsItemDone_(run, item); return; }
+  if (item.kind === "seg" && item.units && item.units.length && !item.boundary) {
+    const W = (item.leadW || 0) + item.segW;
+    const prog = Math.min(0.985, Math.max(0, el_ / item.est)) * W - (item.leadW || 0);
+    if (prog >= 0) ttsSetUnit_(run, item.units[TtsSync.pickIndex(item.weights, prog)]);
+  }
 }
 
 function playTTS() {
   if (!ttsSupported) return;
 
   // Kalau sebelumnya dijeda (bukan dihentikan), lanjutkan dari situ
+  if (ttsRun && ttsRun.paused) {
+    ttsRun.t0 += performance.now() - ttsRun.pauseAt; // waktu jeda tidak dihitung
+    ttsRun.paused = false;
+    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    ttsPlaying = true;
+    requestWakeLock();
+    updateTTSButton();
+    if (ttsRun.waiting) { ttsRun.waiting = false; ttsNext_(ttsRun); }
+    return;
+  }
   if (window.speechSynthesis.paused && window.speechSynthesis.pending === false && window.speechSynthesis.speaking) {
     window.speechSynthesis.resume();
     ttsPlaying = true;
@@ -10535,6 +10698,7 @@ function playTTSFromVerse(verses, startVerseNum) {
 
 function pauseTTS() {
   if (!ttsSupported) return;
+  if (ttsRun && !ttsRun.paused) { ttsRun.paused = true; ttsRun.pauseAt = performance.now(); }
   if (window.speechSynthesis.speaking) window.speechSynthesis.pause();
   if (ttsPlaying) releaseWakeLock();
   ttsPlaying = false;
@@ -10543,6 +10707,7 @@ function pauseTTS() {
 
 function stopTTS() {
   if (!ttsSupported) return;
+  ttsKillRun_();
   window.speechSynthesis.cancel();
   if (ttsPlaying) releaseWakeLock();
   ttsPlaying = false;
