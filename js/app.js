@@ -10545,6 +10545,63 @@ function ttsResumeInfo_() {
   return currentChapterVerses.some((v) => v.verse === ttsLastPos.verse) ? ttsLastPos : null;
 }
 
+// book174 (17 Okt 2026, permintaan operator) -- kontrol melayang BISA DIGESER (HP & komputer): sentuh/tahan lalu seret
+// di bagian mana pun (tombol ⏸ ⏹ tetap bisa ditekan biasa -- hanya gerakan >6px yang dianggap menggeser). Posisi diingat.
+const TTS_FLOAT_POS_KEY = "bible_app_tts_float_pos_v1";
+function ttsFloatClamp_(box, x, y) {
+  const w = box.offsetWidth || 160, h = box.offsetHeight || 48;
+  return { x: Math.min(Math.max(0, x), Math.max(0, window.innerWidth - w)), y: Math.min(Math.max(0, y), Math.max(0, window.innerHeight - h)) };
+}
+function ttsFloatPlace_(box, x, y) {
+  const c = ttsFloatClamp_(box, x, y);
+  box.style.left = c.x + "px"; box.style.top = c.y + "px"; box.style.bottom = "auto"; box.style.right = "auto";
+  return c;
+}
+function wireTtsFloatDrag_(box) {
+  try {
+    const sv = JSON.parse(localStorage.getItem(TTS_FLOAT_POS_KEY) || "null");
+    if (sv && Number.isFinite(sv.x) && Number.isFinite(sv.y)) setTimeout(() => ttsFloatPlace_(box, sv.x, sv.y), 0);
+  } catch (e) { /* abaikan */ }
+  let start = null, moved = false;
+  // pointermove/up dipasang di WINDOW (bukan di kotak) supaya seretan tetap terbaca saat jari/kursor keluar dari kotak,
+  // tanpa setPointerCapture (yang bisa membelokkan klik tombol ⏸ ⏹ di dalamnya).
+  const onMove = (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    const dx = e.clientX - start.px, dy = e.clientY - start.py;
+    if (!moved && Math.hypot(dx, dy) < 6) return;
+    if (!moved) { moved = true; box.classList.add("dragging"); }
+    ttsFloatPlace_(box, start.x + dx, start.y + dy);
+    e.preventDefault();
+  };
+  const end = (e) => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    if (!start) return;
+    if (moved) {
+      const r = box.getBoundingClientRect();
+      try { localStorage.setItem(TTS_FLOAT_POS_KEY, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); } catch (err) { /* abaikan */ }
+      box.classList.remove("dragging");
+      // klik yang menyusul setelah geser jangan memicu ⏸/⏹
+      const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      box.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => box.removeEventListener("click", swallow, { capture: true }), 50);
+    }
+    start = null; moved = false;
+  };
+  box.addEventListener("pointerdown", (e) => {
+    const r = box.getBoundingClientRect();
+    start = { px: e.clientX, py: e.clientY, x: r.left, y: r.top, id: e.pointerId };
+    moved = false;
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  });
+  window.addEventListener("resize", () => {
+    if (box.style.left) { const r = box.getBoundingClientRect(); ttsFloatPlace_(box, r.left, r.top); }
+  });
+}
+
 // Kontrol melayang (HP: header bisa tersembunyi di mode layar penuh) -- ⏸/▶️ + nomor ayat + ⏹.
 function updateTTSFloat_() {
   let box = el("ttsFloat");
@@ -10563,6 +10620,7 @@ function updateTTSFloat_() {
     box.querySelector(".tts-float-play").addEventListener("click", (e) => { e.stopPropagation(); toggleTTS(); });
     box.querySelector(".tts-float-stop").addEventListener("click", (e) => { e.stopPropagation(); stopTTS(); ttsClearPos_(); updateTTSFloat_(); });
     document.body.appendChild(box);
+    wireTtsFloatDrag_(box);
   }
   const q0 = ttsRun && ttsRun.queue && ttsRun.queue.find((it) => it.v);
   const verseNo = cur ? cur.verse : (rp ? rp.verse : (q0 ? q0.v.verse : "")); // run baru mulai: item belum berjalan

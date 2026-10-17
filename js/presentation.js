@@ -214,6 +214,20 @@ const Presentation = (() => {
     try { window.dispatchEvent(new CustomEvent("present-window-position", { detail: { pos } })); } catch (e) {}
   }
 
+  // book174 -- posisi TULISAN di dalam Layar 2 (atas/tengah/bawah). Disimpan di localStorage (satu origin dengan
+  // present.html, jadi jendela Layar 2 membacanya sendiri saat dibuka) + dikirim langsung kalau Layar 2 sedang terbuka.
+  const VPOS_KEY = "bible_app_layar2_vpos_v1";
+  function getContentPosition() {
+    try { const v = localStorage.getItem(VPOS_KEY); if (v === "top" || v === "bottom") return v; } catch (e) {}
+    return "center";
+  }
+  function setContentPosition(pos) {
+    if (pos !== "top" && pos !== "bottom") pos = "center";
+    try { localStorage.setItem(VPOS_KEY, pos); } catch (e) {}
+    if (winRef && !winRef.closed) { try { postRaw({ type: "vpos", pos }); } catch (e) {} }
+    try { window.dispatchEvent(new CustomEvent("present-content-position", { detail: { pos } })); } catch (e) {}
+  }
+
   function openWindow() {
     if (winRef && !winRef.closed) {
       winRef.focus();
@@ -527,7 +541,7 @@ const Presentation = (() => {
   // di atas -- supaya toggle nyala/mati badge ini TIDAK menimpa
   // `lastPayload` (yang harus tetap berisi ayat/kidung/dst yang
   // sesungguhnya sedang tayang).
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear", "sc_bg", "sc_bg_control", "sc_bg_clear", "focusmode"];
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear", "sc_bg", "sc_bg_control", "sc_bg_clear", "focusmode", "vpos"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (payload.type === "focusmode") lastFocusMode_ = payload; // BARU (26 Sep 2026) -- lihat catatan panjang di deklarasi lastFocusMode_
@@ -1003,5 +1017,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendVerseCombined, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, getWindowPosition, setWindowPosition, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendVerseCombined, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, getWindowPosition, setWindowPosition, getContentPosition, setContentPosition, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
 })();

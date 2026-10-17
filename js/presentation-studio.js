@@ -6877,6 +6877,8 @@ const PresentationStudio = (() => {
       { key: "bebas", label: "Bebas" },
     ];
     let allVideos = []; // [{ title, channel, url, videoId, embedUrl, categories:["Anak","PPKMA",...] }]
+    // book175: daftar lagu SoundCloud dari playlist ini, dipakai dialog "Audio Latar" (sumber "Dari Playlist SoundCloud").
+    window.getPlaylistSoundCloud_ = () => allVideos.filter((v) => v.kind === "soundcloud" && v.trackUrl);
     let activeFilter = "all";
 
     urlInput.value = localStorage.getItem(SHEET_KEY) || DEFAULT_SHEET_URL;
@@ -7501,8 +7503,18 @@ const PresentationStudio = (() => {
           <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
           <button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai AUDIO LATAR (tanpa tampilan pemutar di Layar 2) -- teks kidung/ayat tetap tampil penuh. Kendali Play/Jeda/Stop ada di kotak Audio Latar.">🎧 Latar</button>
           <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
+          <button type="button" class="chip-btn small" data-act="copylink" title="Salin link SoundCloud ini, lalu tempel di 🎧 Audio Latar item Kidung (sumber 🔗 Link). Atau di dialog itu pilih \"Dari Playlist SoundCloud\".">📋 Salin Link</button>
         </div>`;
       appendBibleRefLabel_(row, v);
+      // book175 -- 📋 Salin Link
+      row.querySelector('[data-act="copylink"]').addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        let ok = false;
+        try { await navigator.clipboard.writeText(v.trackUrl); ok = true; }
+        catch (err) { try { window.prompt("Salin link ini (Ctrl+C):", v.trackUrl); ok = true; } catch (e2) { /* abaikan */ } }
+        btn.textContent = ok ? "✅ Tersalin" : "⚠️ Gagal";
+        setTimeout(() => { btn.textContent = "📋 Salin Link"; }, 1400);
+      });
       // book173 -- 🎧 Latar: SoundCloud jadi suara latar (pemutar disembunyikan di Layar 2), tidak menutupi kidung.
       row.querySelector('[data-act="bg"]').addEventListener("click", () => {
         try {
@@ -11391,6 +11403,12 @@ const PresentationStudio = (() => {
     // dicentang supaya TRANSPARAN (kamera/gambar tetap tembus pandang di
     // baliknya, mirip mode Subtitle tapi utk zona bawah yang solid ini).
     // Lihat theme.stageTransparent & body.cam-split #stage (present.html).
+    // book175: tulisan menghindari lingkaran kamera (mode "Teks Penuh, Kamera Bulat").
+    if (el("psBubbleAvoid")) {
+      el("psBubbleAvoid").addEventListener("change", () => {
+        saveAndSendTheme({ bubbleAvoid: el("psBubbleAvoid").checked });
+      });
+    }
     if (el("psStageTransparent")) {
       el("psStageTransparent").addEventListener("change", () => {
         saveAndSendTheme({ stageTransparent: el("psStageTransparent").checked });
@@ -12458,6 +12476,7 @@ const PresentationStudio = (() => {
     // BARU (8 Sep 2026 v4) -- pulihkan status centang "Latar teks
     // transparan" (mode "Kamera Atas, Teks Bawah").
     if (el("psStageTransparent")) el("psStageTransparent").checked = !!theme.stageTransparent;
+    if (el("psBubbleAvoid")) el("psBubbleAvoid").checked = !!theme.bubbleAvoid;
     // BARU (12 Sep 2026 v2) -- pulihkan sakelar & posisi 🕐 Jam Pojok.
     if (el("psCornerClockOn")) el("psCornerClockOn").checked = !!theme.cornerClockOn;
     if (el("psCornerClockPosRow")) {
@@ -12478,7 +12497,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
   }
 
   function saveAndSendTheme(partial) {
@@ -12502,7 +12521,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -13049,7 +13068,21 @@ const PresentationStudio = (() => {
     // buka menu "⋮" dulu untuk sampai ke tombol "Buka Studio Presentasi".
     if (el("headerStudioBtn")) el("headerStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
-    // book173 -- posisi Layar 2: ⬆️ atas / ◼ tengah (bawaan) / ⬇️ bawah
+    // book174 -- posisi TULISAN di dalam Layar 2 (ayat/kidung/pengumuman): ⬆️ atas / ◼ tengah (bawaan) / ⬇️ bawah
+    const vposBox_ = el("psVPos");
+    if (vposBox_ && typeof Presentation !== "undefined" && Presentation.getContentPosition) {
+      const paintV_ = () => {
+        const cur = Presentation.getContentPosition();
+        vposBox_.querySelectorAll("button[data-pos]").forEach((b) => {
+          const on = b.dataset.pos === cur;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-pressed", String(on));
+        });
+      };
+      vposBox_.querySelectorAll("button[data-pos]").forEach((b) => b.addEventListener("click", () => { Presentation.setContentPosition(b.dataset.pos); paintV_(); }));
+      paintV_();
+    }
+    // book173 -- posisi JENDELA Layar 2 di monitor: 🪟⬆️ atas / 🪟◼ tengah (bawaan) / 🪟⬇️ bawah
     const winPosBox_ = el("psWinPos");
     if (winPosBox_ && typeof Presentation !== "undefined" && Presentation.getWindowPosition) {
       const paintWinPos_ = () => {
