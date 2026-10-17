@@ -5803,3 +5803,38 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 /* book174 -- kontrol baca melayang bisa digeser */
 .tts-float { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
 .tts-float.dragging { cursor: grabbing; opacity: .9; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+
+/* ============================================================
+   BARU (18 Okt 2026, book178) -- ikon ayat (📋 📚 ▶️ ✏️ 📤) di HP TIDAK LAGI memakan kolom lebar.
+   Sebelumnya tombol berada di kanan (teks tinggal separuh lebar) atau turun ke baris sendiri (boros tinggi).
+   Sekarang tombol dibuat kecil & MENGALIR sebaris di ujung teks ayat (seperti ikon 📝), jadi teks dapat
+   lebar penuh dan tidak ada baris tambahan. Berlaku di mode atas-bawah (stacked) & nempel (ruby, utk baris non-Mandarin).
+   ============================================================ */
+@media (max-width: 859px) {
+  .reader-columns-stacked .verse-block:not(.verse-ruby-block):not(.verse-note-block) {
+    display: block; overflow: hidden; gap: 0;
+  }
+  .reader-columns-stacked .verse-block:not(.verse-ruby-block):not(.verse-note-block) > .verse-num {
+    float: left; margin: 2px 8px 2px 0;
+  }
+  .reader-columns-stacked .verse-block:not(.verse-ruby-block):not(.verse-note-block) > .verse-text-wrap {
+    display: inline; flex: none; overflow-wrap: break-word; word-break: break-word;
+  }
+  .reader-columns-stacked .verse-block:not(.verse-ruby-block):not(.verse-note-block) > .reader-stacked-lang-tag {
+    display: block; width: fit-content; margin: 0 0 4px 0;
+  }
+  .reader-columns-stacked .verse-block:not(.verse-note-block) > .verse-copy-btn,
+  .reader-columns-stacked .verse-block:not(.verse-note-block) > .verse-coll-btn,
+  .reader-columns-stacked .verse-block:not(.verse-note-block) > .verse-read-btn,
+  .reader-columns-stacked .verse-block:not(.verse-note-block) > .verse-present-btn {
+    display: inline-flex; vertical-align: baseline;
+    margin: 0 0 0 1px; padding: 2px 3px; font-size: 11px; line-height: 1;
+    opacity: .5;
+  }
+  body:not(.present-mode-on) .reader-columns-stacked .verse-present-btn { display: none; }
+}
+
+/* BARU (18 Okt 2026, book178) -- tombol ⏹ kecil di sebelah 🎵 (hanya tampil saat pemutar disembunyikan) + tombol 🎧 Latar & baca penuh */
+.ml-player-stoppill { left: 64px; }
+.ml-player-pill[hidden] + .ml-player-stoppill { display: none !important; }
+.ml-player-btn-bg { font-weight: 700; }
