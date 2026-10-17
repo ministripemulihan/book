@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261017b" />
+<link rel="stylesheet" href="css/style.css?v=20261017c" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1949,6 +1949,17 @@
             <select id="psQuickLangMode" class="columns-lang-select">
               <option value="first" selected>Hanya versi pertama (1 bahasa / slide, biasa)</option>
               <option value="multi">Semua versi tercentang dalam 1 slide (multi-bahasa)</option>
+            </select>
+          </div>
+          <!-- BARU (17 Okt 2026, book169, permintaan operator) -- Mandarin + Pinyin: "Atas-bawah" (biasa, tiap
+               bahasa 1 blok sendiri) atau "Nempel per karakter" (tiap karakter Mandarin dengan 1 suku kata
+               pinyin tepat di bawahnya; tulisan label "MDR + MDR-PINYIN" cukup di ayat paling atas).
+               Berlaku kalau Mandarin (MDR / MDR-S) DAN pinyin-nya sama-sama dicentang. -->
+          <div class="ps-field-label">Mandarin + Pinyin (kalau keduanya dicentang)</div>
+          <div class="ps-btn-row">
+            <select id="psQuickRubyMode" class="columns-lang-select">
+              <option value="biasa" selected>Atas-bawah (tiap bahasa 1 blok, biasa)</option>
+              <option value="nempel">Nempel per karakter (pinyin tepat di bawah tiap huruf)</option>
             </select>
           </div>
           <label class="ps-checkbox-row" style="display:flex; gap:6px; align-items:center; margin:6px 0; font-size:13px;">
@@ -4209,7 +4220,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20261016a"></script>
+  <script src="js/collections.js?v=20261017a"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -4248,7 +4259,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261016j"></script>
+  <script src="js/presentation-studio.js?v=20261017a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4273,7 +4284,7 @@
   <script src="js/media-library.js?v=20261016h"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
-  <script src="js/pinyin-ruby.js?v=20261017a"></script>
+  <script src="js/pinyin-ruby.js?v=20261017b"></script>
   <script src="js/tts-sync.js?v=20261017b"></script>
   <script src="js/app.js?v=20261017b"></script>
   <script src="js/sync-checklist.js?v=20261016a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->

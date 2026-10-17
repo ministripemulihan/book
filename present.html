@@ -851,6 +851,13 @@
     text-shadow: var(--p-outline-shadow, none);
   }
   .verse-group .verse-version-block { margin-bottom: clamp(6px, 1vh, 14px); }
+  /* BARU (17 Okt 2026, book169) -- mode "Nempel" Mandarin + Pinyin: tiap karakter di atas, 1 suku kata
+     pinyin tepat di bawahnya. Baris dibungkus di tengah; sel selebar yang terpanjang (huruf / pinyin). */
+  .rb-line { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; row-gap: 0.28em; column-gap: 0.04em; line-height: 1.15; }
+  .rb-cell { display: inline-flex; flex-direction: column; align-items: center; position: relative; padding: 0 0.04em; }
+  .rb-han { line-height: 1.2; white-space: nowrap; }
+  .rb-py { font-family: "Inter", Arial, sans-serif; font-weight: 600; font-size: 0.5em; line-height: 1.2; letter-spacing: 0.01em; white-space: nowrap; opacity: 0.92; }
+  .rb-cell .rb-num { position: absolute; top: -0.2em; left: -0.2em; font-size: 0.5em; margin-right: 0; vertical-align: baseline; }
   /* BARU (v63, 15 Okt 2026, permintaan operator) -- NOMOR AYAT di dalam teks ayat gabungan
      (mis. "17 Ketika ... 18 Yesus ...") tampil kecil di ATAS baris (superscript, v64) & berwarna
      beda dari tulisan: tema gelap = kuning, tema terang = biru tua (kontras, BUKAN sama
@@ -6030,6 +6037,15 @@
   }
   // BARU (v69) -- nomor Strong KJV (penanda U+0002 dari Studio, mis. "God\u0002H430\u0002") jadi
   // <sup class="vstrong"> berwarna kontras (lihat strongColorForBg). Teks tanpa penanda tidak berubah.
+  // BARU (17 Okt 2026, book169) -- mode "Nempel": tiap karakter Mandarin di atas, 1 suku kata pinyin
+  // tepat di bawahnya (dikirim Studio sebagai t.ruby = [{han, py, num?}]). Kotak flex per karakter
+  // (bukan <ruby>) supaya sama di semua browser/proyektor.
+  function rubyCellsHtml_(cells) {
+    const e = (x) => String(x == null ? "" : x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    return '<span class="rb-line">' + cells.map((c) =>
+      '<span class="rb-cell">' + (c && c.num ? '<span class="vnum rb-num">' + e(c.num) + '</span>' : "") +
+      '<span class="rb-han">' + e(c && c.han) + '</span><span class="rb-py">' + e(c && c.py) + '</span></span>').join("") + '</span>';
+  }
   function verseNumHtml_(raw) {
     const html = verseNumHtmlBase_(raw);
     if (html.indexOf("\u0002") === -1) return html;
@@ -6809,7 +6825,7 @@
         const esc_ = (x) => String(x == null ? "" : x).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
         textEl.innerHTML = data.groups.map((g) => {
           const head = g.ref ? `<div class="verse-group-ref">${esc_(g.ref)}</div>` : "";
-          const blocks = (g.texts || []).map((t) => `<div class="verse-version-block">${t.label ? `<span class="verse-version-tag">${esc_(t.label)}</span>` : ""}${verseNumHtml_(t.text)}</div>`).join("");
+          const blocks = (g.texts || []).map((t) => `<div class="verse-version-block">${t.label ? `<span class="verse-version-tag">${esc_(t.label)}</span>` : ""}${Array.isArray(t.ruby) && t.ruby.length ? rubyCellsHtml_(t.ruby) : verseNumHtml_(t.text)}</div>`).join("");
           return `<div class="verse-group">${head}${blocks}</div>`;
         }).join("");
         // v61: kalau tiap ayat sudah punya nama sendiri di atasnya, nama gabungan
@@ -6822,8 +6838,9 @@
         // versinya (mis. "ITB", "ENG-RCV") di depan teksnya.
         textEl.innerHTML = data.texts.map((t) => {
           const label = (t.label || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-          const body = verseNumHtml_(t.text || ""); // v63: nomor ayat subscript berwarna
-          return `<div class="verse-version-block"><span class="verse-version-tag">${label}</span>${body}</div>`;
+          const isRuby = Array.isArray(t.ruby) && t.ruby.length; // book169: nempel per karakter
+          const body = isRuby ? rubyCellsHtml_(t.ruby) : verseNumHtml_(t.text || ""); // v63: nomor ayat subscript berwarna
+          return `<div class="verse-version-block${isRuby ? " verse-ruby-block" : ""}">${label ? `<span class="verse-version-tag">${label}</span>` : ""}${body}</div>`;
         }).join("");
       } else {
         textEl.innerHTML = verseNumHtml_(data.text || ""); // v63: nomor ayat subscript berwarna (teks 1 ayat tanpa nomor tidak berubah)
