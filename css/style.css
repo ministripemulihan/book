@@ -5614,3 +5614,11 @@ body.reader-clean:not(.reader-chrome-show) .ml-player-pill { bottom: calc(14px +
 .rb-cell.tts-cur { background: #ffd54a; color: #1d1608; }
 .verse-ruby .rb-cell.tts-cur .rb-py { color: #1d1608; }
 ::highlight(tts-word) { background-color: #ffd54a; color: #1d1608; }
+
+
+/* BARU (17 Okt 2026, book169) -- pratinjau Studio untuk mode "Nempel" (Mandarin + Pinyin per karakter) */
+.present-preview-version .rb-line { display: inline-flex; flex-wrap: wrap; align-items: flex-end; vertical-align: top; row-gap: 3px; max-width: 100%; }
+.present-preview-version .rb-cell { display: inline-flex; flex-direction: column; align-items: center; padding: 0 1px; position: relative; }
+.present-preview-version .rb-han { line-height: 1.2; white-space: nowrap; }
+.present-preview-version .rb-py { font-size: 0.55em; line-height: 1.2; white-space: nowrap; opacity: 0.9; }
+.present-preview-version .rb-num { position: absolute; top: -0.5em; left: -2px; font-size: 0.5em; opacity: 0.8; }
