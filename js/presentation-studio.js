@@ -1494,14 +1494,15 @@ const PresentationStudio = (() => {
         alert("Berbagi ke pengguna lain butuh sambungan ke server -- sinkronisasi belum aktif.");
         return;
       }
-      const target = prompt("Username tujuan (kumpulan ini akan disalin + tema Layar Proyeksi yang sedang dipakai ikut disertakan):");
-      if (!target || !target.trim()) return;
       const username = typeof currentUser !== "undefined" ? currentUser : null;
       const collections = loadCollections(username);
       const col = collections[sel.value];
-      const res = await shareCollectionToUser(username, sel.value, target.trim());
-      if (res && res.ok) alert(`Kumpulan "${col ? col.name : sel.value}" berhasil dibagikan ke "${target.trim()}".`);
-      else alert("Gagal membagikan: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+      const colId = sel.value;
+      openShareTargetPicker_(col ? col.name : colId, username, async (target) => {
+        const res = await shareCollectionToUser(username, colId, target);
+        if (res && res.ok) alert(`Kumpulan "${col ? col.name : colId}" berhasil dikirim ke "${target}" -- menunggu mereka menekan "✅ Terima".`);
+        else alert("Gagal membagikan: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
+      });
     });
   }
 

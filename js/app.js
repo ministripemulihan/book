@@ -6248,31 +6248,11 @@ function handleShareCollection(id, col) {
     alert("Berbagi ke pengguna lain butuh sambungan ke server -- sinkronisasi belum aktif di aplikasi ini.");
     return;
   }
-  showSimpleDialog("🔗 Bagikan Kumpulan", (box) => {
-    const field = document.createElement("div");
-    field.className = "simple-dialog-field";
-    const label = document.createElement("label");
-    label.textContent = "Username tujuan:";
-    field.appendChild(label);
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = "mis. budi.santoso";
-    field.appendChild(input);
-    box.appendChild(field);
-    const hint = document.createElement("p");
-    hint.className = "simple-dialog-hint";
-    hint.textContent = 'Salinan kumpulan "' + col.name + '" (semua item + tema Layar Proyeksi yang sedang Anda pakai) akan dikirim ke akun itu SEBAGAI PERMINTAAN -- baru muncul di daftar Kumpulan Ayat mereka kalau mereka sendiri menekan "✅ Terima". Kumpulan Anda sendiri tidak berubah/hilang.';
-    box.appendChild(hint);
-    setTimeout(() => input.focus(), 0);
-    return () => {
-      const val = input.value.trim();
-      return val ? val : null;
-    };
-  }, async (targetUsername) => {
+  openShareTargetPicker_(col.name, currentUser, async (targetUsername) => {
     const res = await shareCollectionToUser(currentUser, id, targetUsername);
     if (res && res.ok) alert(`Kumpulan "${col.name}" sudah dikirim ke "${targetUsername}" -- menunggu mereka menekan "✅ Terima" (lihat 🔔 di panel Kumpulan Ayat mereka).`);
     else alert("Gagal membagikan: " + ((res && res.error) || "Terjadi kesalahan tidak dikenal."));
-  }, "Bagikan");
+  });
 }
 
 function showCollectionsPanel() {

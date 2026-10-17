@@ -953,6 +953,74 @@ function buildCollectionShareText(col) {
 // ------------------------------------------------------------
 const STUDIO_THEME_KEY_FOR_SHARE_ = "bible_app_studio_theme_v1";
 
+// book177 -- PEMILIH PENERIMA: daftar nama user (dari daftar pengguna yang sudah ada di perangkat) + kotak cari.
+// Klik satu nama -> konfirmasi singkat -> langsung terkirim. Tidak perlu mengetik username (anti salah ketik).
+// onPick(usernameTujuan) dipanggil setelah dikonfirmasi. Kalau daftar pengguna kosong, tersedia kotak ketik manual.
+async function openShareTargetPicker_(colName, selfUsername, onPick) {
+  if (typeof showSimpleDialog !== "function") {
+    const t = prompt("Username tujuan:");
+    if (t && t.trim()) onPick(t.trim());
+    return;
+  }
+  let users = [];
+  try { users = (typeof LocalDB !== "undefined" && LocalDB.getAllUsers) ? await LocalDB.getAllUsers() : []; } catch (e) { users = []; }
+  const self = String(selfUsername || "").toLowerCase();
+  users = (users || [])
+    .filter((u) => u && u.username && String(u.username).toLowerCase() !== self)
+    .map((u) => ({ username: String(u.username), name: String(u.displayName || u.username) }))
+    .sort((a, b) => a.name.localeCompare(b.name, "id"));
+  showSimpleDialog("🔗 Bagikan Kumpulan", (box) => {
+    const hint = document.createElement("p");
+    hint.className = "simple-dialog-hint";
+    hint.textContent = `Pilih penerima untuk kumpulan "${colName}" (semua item + tema Layar Proyeksi Anda). Ketik di kotak cari, lalu KLIK namanya -- langsung dikirim sebagai permintaan yang harus mereka terima.`;
+    box.appendChild(hint);
+    const search = document.createElement("input");
+    search.type = "text"; search.placeholder = "🔍 Cari nama atau username..."; search.style.cssText = "width:100%; margin-bottom:6px;";
+    box.appendChild(search);
+    const list = document.createElement("div");
+    list.style.cssText = "max-height:320px; overflow:auto; border:1px solid rgba(128,128,128,.35); border-radius:8px; padding:4px;";
+    box.appendChild(list);
+    const countEl = document.createElement("div");
+    countEl.style.cssText = "font-size:12px; opacity:.7; margin-top:4px;";
+    box.appendChild(countEl);
+    let picked = null;
+    const manual = document.createElement("input");
+    manual.type = "text"; manual.placeholder = "atau ketik username manual (kalau nama tidak ada di daftar)"; manual.style.cssText = "width:100%; margin-top:8px;";
+    box.appendChild(manual);
+    function pick(u) {
+      if (!confirm(`Kirim kumpulan "${colName}" ke ${u.name} (@${u.username})?`)) return;
+      picked = u.username;
+      const ok = box.querySelector(".simple-dialog-actions .primary");
+      if (ok) ok.click();
+    }
+    function render() {
+      const q = search.value.trim().toLowerCase();
+      const found = users.filter((u) => !q || u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q));
+      list.innerHTML = "";
+      found.slice(0, 80).forEach((u) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "chip-btn";
+        b.style.cssText = "display:flex; width:100%; justify-content:space-between; align-items:center; gap:8px; margin:2px 0; text-align:left;";
+        const n = document.createElement("strong"); n.textContent = u.name;
+        const un = document.createElement("small"); un.style.opacity = ".65"; un.textContent = "@" + u.username;
+        b.appendChild(n); b.appendChild(un);
+        b.addEventListener("click", () => pick(u));
+        list.appendChild(b);
+      });
+      if (!found.length) list.textContent = users.length ? "Tidak ada nama yang cocok." : "Daftar pengguna belum tersedia di perangkat ini -- ketik username manual di bawah.";
+      countEl.textContent = found.length > 80 ? `Menampilkan 80 dari ${found.length} -- ketik lebih spesifik untuk mempersempit.` : (users.length ? `${found.length} pengguna` : "");
+    }
+    search.addEventListener("input", render);
+    render();
+    setTimeout(() => search.focus(), 0);
+    return () => {
+      if (picked) return picked;
+      const m = manual.value.trim();
+      return m ? m : null;
+    };
+  }, (targetUsername) => { onPick(targetUsername); }, "Kirim ke username manual");
+}
+
 async function shareCollectionToUser(username, id, targetUsername) {
   if (typeof Sync === "undefined" || !Sync.enabled()) {
     return { ok: false, error: "Sinkronisasi ke server belum aktif." };
