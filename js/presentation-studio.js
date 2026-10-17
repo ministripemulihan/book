@@ -7317,6 +7317,68 @@ const PresentationStudio = (() => {
       renderList();
     });
 
+    // ------------------------------------------------------------------
+    // BARU (17 Okt 2026, book171, permintaan operator) -- toolbar ringkas + mode kotak-kotak:
+    //  * "🎛 Filter" membuka/menutup bagian Filter tambahan + Urutkan (tertutup = kategori cuma 1 baris).
+    //  * ☰ = mode daftar (seperti dulu, tapi tidak lagi dibatasi tinggi 340px -> daftar memenuhi layar);
+    //    ▦ = mode kotak-kotak: HANYA thumbnail, ukuran diatur slider (kecil -> besar). Klik gambar =
+    //    ▶️ Tampilkan ke Layar 2; arahkan kursor ke gambar -> muncul tombol Tampilkan/Pratinjau/Latar/Kumpulan.
+    //  * Pilihan (buka/tutup, mode, ukuran) diingat di perangkat. Pemuatan bertahap 50 + thumbnail offline
+    //    (js/yt-thumb-cache.js) TIDAK diubah: kotak memakai <img> yang sama.
+    // Semua elemen OPSIONAL -- index.html lama tanpa toolbar ini tetap jalan.
+    const ytToolbarEl_ = el("psYtToolbar");
+    const ytMoreEl_ = el("psYtFilterMore");
+    const ytToggleEl_ = el("psYtFilterToggle");
+    const ytBadgeEl_ = el("psYtFilterBadge");
+    const ytBtnListEl_ = el("psYtViewList");
+    const ytBtnGridEl_ = el("psYtViewGrid");
+    const ytSizeEl_ = el("psYtGridSize");
+    const YT_VIEW_KEY_ = "bible_app_yt_view_v1";
+    const ytView_ = { mode: "list", size: 140, open: false };
+    try {
+      const sv = JSON.parse(localStorage.getItem(YT_VIEW_KEY_) || "null");
+      if (sv && typeof sv === "object") {
+        if (sv.mode === "grid" || sv.mode === "list") ytView_.mode = sv.mode;
+        if (Number.isFinite(sv.size)) ytView_.size = Math.min(360, Math.max(64, sv.size));
+        ytView_.open = !!sv.open;
+      }
+    } catch (e) { /* abaikan: pakai bawaan */ }
+    function applyYtView_() {
+      const grid = ytView_.mode === "grid";
+      if (ytToolbarEl_) ytToolbarEl_.classList.toggle("open", ytView_.open);
+      if (ytMoreEl_) ytMoreEl_.hidden = !ytView_.open;
+      if (ytToggleEl_) ytToggleEl_.setAttribute("aria-expanded", ytView_.open ? "true" : "false");
+      if (ytBtnListEl_) { ytBtnListEl_.classList.toggle("active", !grid); ytBtnListEl_.setAttribute("aria-pressed", String(!grid)); }
+      if (ytBtnGridEl_) { ytBtnGridEl_.classList.toggle("active", grid); ytBtnGridEl_.setAttribute("aria-pressed", String(grid)); }
+      if (ytSizeEl_) { ytSizeEl_.hidden = !grid; ytSizeEl_.value = String(ytView_.size); }
+      listWrap.classList.toggle("ps-yt-grid", grid);
+      listWrap.classList.toggle("ps-yt-grid-titles", grid && ytView_.size >= 150); // kotak besar: judul ikut tampil di bawah gambar
+      listWrap.classList.toggle("ps-yt-grid-icons", grid && ytView_.size < 200);   // kotak kecil: tombol hanya ikon
+      listWrap.style.setProperty("--yt-card", ytView_.size + "px");
+    }
+    function saveYtView_() { try { localStorage.setItem(YT_VIEW_KEY_, JSON.stringify(ytView_)); } catch (e) { /* penuh: abaikan */ } }
+    function updateYtFilterBadge_() {
+      if (!ytBadgeEl_) return;
+      const n = [activeSumber, activeChannel, activeKeterangan, activeKidungRef, activeBibleRef].filter(Boolean).length + (activeSort && activeSort !== "terbaru" ? 1 : 0);
+      ytBadgeEl_.textContent = String(n);
+      ytBadgeEl_.hidden = n === 0; // lencana angka = ada filter tambahan/urutan yang aktif walau bagian ini tertutup
+    }
+    if (ytToggleEl_) ytToggleEl_.addEventListener("click", () => { ytView_.open = !ytView_.open; applyYtView_(); saveYtView_(); });
+    if (ytBtnListEl_) ytBtnListEl_.addEventListener("click", () => { ytView_.mode = "list"; applyYtView_(); saveYtView_(); });
+    if (ytBtnGridEl_) ytBtnGridEl_.addEventListener("click", () => { ytView_.mode = "grid"; applyYtView_(); saveYtView_(); });
+    if (ytSizeEl_) ytSizeEl_.addEventListener("input", () => { ytView_.size = Number(ytSizeEl_.value) || 140; applyYtView_(); });
+    if (ytSizeEl_) ytSizeEl_.addEventListener("change", saveYtView_);
+    // mode kotak: klik gambar (atau bagian kotak di luar tombol) = ▶️ Tampilkan
+    listWrap.addEventListener("click", (e) => {
+      if (!listWrap.classList.contains("ps-yt-grid")) return;
+      if (e.target.closest(".ps-file-actions, button, a, input")) return;
+      const row = e.target.closest(".ps-yt-playlist-row");
+      const showBtn = row && row.querySelector('[data-act="show"]');
+      if (showBtn) showBtn.click();
+    });
+    applyYtView_();
+    updateYtFilterBadge_();
+
     // BARU (28 Sep 2026) -- daftar ditampilkan BERTAHAP (60 per halaman) supaya
     // ratusan video tidak dirender sekaligus; tombol "Tampilkan lagi" menambah
     // baris tanpa menggambar ulang / melompatkan scroll. Ganti filter atau
@@ -7345,6 +7407,7 @@ const PresentationStudio = (() => {
     function buildScRow_(v) {
       const row = document.createElement("div");
       row.className = "ps-yt-playlist-row ps-yt-playlist-row-sc";
+      row.title = v.title || "";
       const tagsHtml = (v.categories || []).map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c)}</span>`).join("");
       row.innerHTML = `
         <div class="ps-yt-playlist-thumb ps-yt-playlist-thumb-sc" aria-hidden="true">🎧</div>
@@ -7380,6 +7443,7 @@ const PresentationStudio = (() => {
     }
     function renderList(appendMore) {
       if (ytAutoTimer_) { clearTimeout(ytAutoTimer_); ytAutoTimer_ = null; } // batch lama berhenti kalau daftar digambar ulang
+      try { updateYtFilterBadge_(); } catch (e) { /* toolbar belum siap */ }
       const videos = filteredVideos();
       if (!videos.length) {
         listWrap.innerHTML = `<p class="present-saved-empty">${allVideos.length ? "Tidak ada video untuk filter ini." : "Belum ada video dimuat -- tempel link Google Sheet lalu tekan \"🔄 Muat Ulang\"."}</p>`;
@@ -7402,6 +7466,7 @@ const PresentationStudio = (() => {
         const i = ytVideos.indexOf(v); // indeks di antrean YouTube (dipakai antrean "Ulang: Semua")
         const row = document.createElement("div");
         row.className = "ps-yt-playlist-row";
+        row.title = (v.title || "") + (v.channel ? " — " + v.channel : ""); // BARU (book171): nama video muncul saat kursor di atas kotak
         const tagsHtml = (v.categories || [])
           .map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c)}</span>`).join("");
         row.innerHTML = `
