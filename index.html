@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261017d" />
+<link rel="stylesheet" href="css/style.css?v=20261017e" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -2274,46 +2274,56 @@
           <div class="ps-yt-hint" id="psYtPlaylistStatus">Belum ada link Google Sheet yang disimpan.</div>
           <!-- BARU (4 Sep 2026, permintaan operator) -- cari judul + urutkan
                daftar, lihat wireYtPlaylistTab() (js/presentation-studio.js). -->
-          <div class="ps-yt-row">
-            <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Ketik judul, channel, atau kode kidung (k130, s12, t5, y7, a3, ka5)..." />
+          <!-- BARU (book171, permintaan operator) -- toolbar ringkas & menempel di atas saat daftar di-scroll:
+               baris 1 = cari + tombol "🎛 Filter" (buka/tutup) + mode ☰ daftar / ▦ kotak + slider ukuran kotak;
+               baris 2 = tombol kategori (1 baris geser samping saat tertutup, lengkap/berlipat saat dibuka);
+               bagian "Filter tambahan + Urutkan" hanya tampil kalau tombol Filter ditekan. Lihat wireYtPlaylistTab(). -->
+          <div class="ps-yt-toolbar" id="psYtToolbar">
+            <div class="ps-yt-toolbar-row">
+              <input type="text" id="psYtPlaylistSearch" class="columns-lang-select" placeholder="🔍 Ketik judul, channel, atau kode kidung (k130, s12, t5, y7, a3, ka5)..." />
+              <button type="button" id="psYtFilterToggle" class="chip-btn small" aria-expanded="false" title="Buka/tutup Filter tambahan &amp; Urutkan">🎛 Filter <span id="psYtFilterBadge" class="ps-yt-filter-badge" hidden></span> <span class="ps-yt-caret">▾</span></button>
+              <span class="ps-yt-viewmode" role="group" aria-label="Tampilan daftar">
+                <button type="button" id="psYtViewList" class="chip-btn small active" title="Mode daftar (garis): thumbnail + judul + tombol" aria-pressed="true">☰</button>
+                <button type="button" id="psYtViewGrid" class="chip-btn small" title="Mode kotak-kotak: hanya gambar thumbnail, bisa dikecilkan/dibesarkan" aria-pressed="false">▦</button>
+              </span>
+              <input type="range" id="psYtGridSize" class="ps-yt-grid-size" min="64" max="360" step="4" value="140" title="Ukuran kotak thumbnail (kecil sampai besar)" hidden />
+            </div>
+            <div class="ps-btn-row ps-yt-cats" id="psYtPlaylistFilters">
+              <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
+              <button type="button" class="chip-btn small" data-filter="anak">Anak</button>
+              <button type="button" class="chip-btn small" data-filter="remaja">Remaja</button>
+              <button type="button" class="chip-btn small" data-filter="pemuda">Pemuda</button>
+              <button type="button" class="chip-btn small" data-filter="spr">SPR</button>
+              <button type="button" class="chip-btn small" data-filter="injil">Injil</button>
+              <button type="button" class="chip-btn small" data-filter="bebas">Bebas</button>
+            </div>
+            <div class="ps-yt-filter-more" id="psYtFilterMore" hidden>
+              <!-- BARU (27 Sep 2026) -- isi dropdown dibangun OTOMATIS dari video yang termuat, lihat renderExtraFilters_(). -->
+              <div class="ps-field-label" style="margin-top:10px;">Filter tambahan</div>
+              <div class="ps-btn-row">
+                <select id="psYtPlaylistFilterSumber" class="columns-lang-select"><option value="">Semua sumber</option></select>
+                <select id="psYtPlaylistFilterChannel" class="columns-lang-select"><option value="">Semua channel</option></select>
+                <select id="psYtPlaylistFilterKeterangan" class="columns-lang-select"><option value="">Semua keterangan</option></select>
+                <select id="psYtPlaylistFilterKidungRef" class="columns-lang-select"><option value="">Semua KidungRef</option></select>
+                <select id="psYtPlaylistFilterBibleRef" class="columns-lang-select"><option value="">Semua BibleRef</option></select><!-- BARU (book165): per kitab + Ada/Tanpa BibleRef -->
+                <button type="button" id="psYtPlaylistFilterClear" class="chip-btn small">✕ Bersihkan Semua Filter</button>
+              </div>
+              <div class="ps-field-label" style="margin-top:10px;">Urutkan</div>
+              <select id="psYtPlaylistSort" class="columns-lang-select">
+                <option value="terbaru">🆕 ID Z-A — ID terbesar (paling baru dimasukkan) tampil paling atas (bawaan)</option>
+                <option value="id_az">ID A-Z — ID terkecil (paling lama dimasukkan) dulu</option>
+                <option value="judul_az">Judul A-Z</option>
+                <option value="judul_za">Judul Z-A</option>
+                <option value="channel_az">Nama Channel A-Z</option>
+                <option value="channel_za">Nama Channel Z-A</option>
+                <option value="durasi_desc">Durasi (menit): 9-0 (terpanjang -&gt; terpendek)</option>
+                <option value="durasi_asc">Durasi (menit): 0-9 (terpendek -&gt; terpanjang)</option>
+                <option value="tanggal_desc">Tanggal upload: terbaru -&gt; terlama</option>
+                <option value="tanggal_asc">Tanggal upload: terlama -&gt; terbaru</option>
+              </select>
+              <p class="announcement-compose-hint">Urutkan "Durasi" &amp; "Tanggal upload" butuh kolom TAMBAHAN opsional di Sheet: <b>Durasi</b> (angka menit, mis. "12" atau "7.5", atau format jam:menit:detik mis. "1:02:30") &amp; <b>Tanggal</b> (mis. "2026-08-30"). Video yang belum diisi kolom itu otomatis ditaruh paling bawah, bukan hilang.</p>
+            </div>
           </div>
-          <div class="ps-btn-row" id="psYtPlaylistFilters">
-            <button type="button" class="chip-btn small active" data-filter="all">Semua</button>
-            <button type="button" class="chip-btn small" data-filter="anak">Anak</button>
-            <button type="button" class="chip-btn small" data-filter="remaja">Remaja</button>
-            <button type="button" class="chip-btn small" data-filter="pemuda">Pemuda</button>
-            <button type="button" class="chip-btn small" data-filter="spr">SPR</button>
-            <button type="button" class="chip-btn small" data-filter="injil">Injil</button>
-            <button type="button" class="chip-btn small" data-filter="bebas">Bebas</button>
-          </div>
-          <!-- BARU (27 Sep 2026, permintaan operator: "filter yang lebih
-               mudah, dari sumber, keterangan, channel, kategori,
-               kidungref") -- isi dropdown dibangun OTOMATIS dari video
-               yang termuat, lihat renderExtraFilters_()
-               (js/presentation-studio.js). -->
-          <div class="ps-field-label" style="margin-top:10px;">Filter tambahan</div>
-          <div class="ps-btn-row">
-            <select id="psYtPlaylistFilterSumber" class="columns-lang-select"><option value="">Semua sumber</option></select>
-            <select id="psYtPlaylistFilterChannel" class="columns-lang-select"><option value="">Semua channel</option></select>
-            <select id="psYtPlaylistFilterKeterangan" class="columns-lang-select"><option value="">Semua keterangan</option></select>
-            <select id="psYtPlaylistFilterKidungRef" class="columns-lang-select"><option value="">Semua KidungRef</option></select>
-            <select id="psYtPlaylistFilterBibleRef" class="columns-lang-select"><option value="">Semua BibleRef</option></select><!-- BARU (book165): per kitab + Ada/Tanpa BibleRef -->
-            <button type="button" id="psYtPlaylistFilterClear" class="chip-btn small">✕ Bersihkan Semua Filter</button>
-          </div>
-          <div class="ps-field-label" style="margin-top:10px;">Urutkan</div>
-          <select id="psYtPlaylistSort" class="columns-lang-select">
-            <option value="terbaru">🆕 ID Z-A — ID terbesar (paling baru dimasukkan) tampil paling atas (bawaan)</option>
-            <option value="id_az">ID A-Z — ID terkecil (paling lama dimasukkan) dulu</option>
-            <option value="judul_az">Judul A-Z</option>
-            <option value="judul_za">Judul Z-A</option>
-            <option value="channel_az">Nama Channel A-Z</option>
-            <option value="channel_za">Nama Channel Z-A</option>
-            <option value="durasi_desc">Durasi (menit): 9-0 (terpanjang -&gt; terpendek)</option>
-            <option value="durasi_asc">Durasi (menit): 0-9 (terpendek -&gt; terpanjang)</option>
-            <option value="tanggal_desc">Tanggal upload: terbaru -&gt; terlama</option>
-            <option value="tanggal_asc">Tanggal upload: terlama -&gt; terbaru</option>
-          </select>
-          <p class="announcement-compose-hint">Urutkan "Durasi" &amp; "Tanggal upload" butuh kolom TAMBAHAN opsional di Sheet: <b>Durasi</b> (angka menit, mis. "12" atau "7.5", atau format jam:menit:detik mis. "1:02:30") &amp; <b>Tanggal</b> (mis. "2026-08-30"). Video yang belum diisi kolom itu otomatis ditaruh paling bawah, bukan hilang.</p>
           <div id="psYtPlaylistList" class="ps-file-list"><p class="present-saved-empty">Belum ada video dimuat -- tempel link Google Sheet lalu tekan "🔄 Muat Ulang".</p></div>
         </div>
 
@@ -4259,7 +4269,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261017a"></script>
+  <script src="js/presentation-studio.js?v=20261017c"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
