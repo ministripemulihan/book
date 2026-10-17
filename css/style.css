@@ -5799,3 +5799,7 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 .ps-win-pos { display: inline-flex; gap: 2px; }
 .ps-win-pos .chip-btn { padding: 2px 7px; }
 .ps-win-pos .chip-btn.active { background: var(--brass); color: #fff; }
+
+/* book174 -- kontrol baca melayang bisa digeser */
+.tts-float { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.tts-float.dragging { cursor: grabbing; opacity: .9; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
