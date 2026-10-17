@@ -5622,3 +5622,76 @@ body.reader-clean:not(.reader-chrome-show) .ml-player-pill { bottom: calc(14px +
 .present-preview-version .rb-han { line-height: 1.2; white-space: nowrap; }
 .present-preview-version .rb-py { font-size: 0.55em; line-height: 1.2; white-space: nowrap; opacity: 0.9; }
 .present-preview-version .rb-num { position: absolute; top: -0.5em; left: -2px; font-size: 0.5em; opacity: 0.8; }
+
+/* ============================================================
+   book170 (17 Okt 2026) -- MODE BACA ALKITAB FULL SCREEN DI HP (semua mode: 1/2/3 kolom, sejajar,
+   bebas + Sync, atas-bawah, nempel). Komputer TIDAK diubah (semua aturan di bawah hanya berlaku di HP /
+   layar sempit atau saat body.reader-clean, yang hanya menyala di HP/layar sentuh).
+   ------------------------------------------------------------
+   1) Garis pemisah antar-kolom: SATU garis tipis (1 piksel perangkat), tanpa jarak (gap) antar-kolom.
+   2) Mode baca penuh (tombol ⛶): kotak kolom "Bebas + Sync" menjadi position:fixed dari tepi ATAS sampai
+      tepi BAWAH layar -> garis pemisah menjulur dari paling atas. Posisi/tinggi dari JS
+      (recalcReaderPanesHeight(): --panes-top / --panes-height).
+   3) Kepala kolom (nama bahasa + saklar Sync + ⤢) disembunyikan; muncul lagi saat tombol-tombol dimunculkan
+      (ketuk 3x di teks, atau 2x di pinggir atas/bawah layar) -> di situ Sync bisa dimatikan per kolom.
+   ============================================================ */
+@media (max-width: 859px) {
+  .reader-columns.reader-columns-panes { gap: 0; }
+  .reader-columns-panes .reader-col-pane {
+    border: 0; border-radius: 0; background: transparent;
+  }
+  .reader-columns-panes .reader-col-pane + .reader-col-pane { border-left: 1px solid var(--rule); }
+  .reader-columns-panes .reader-col-pane.pane-fullscreen { border-left: 0; background: var(--paper); }
+  .reader-col-pane-body { padding: 8px 6px 16px; overscroll-behavior-y: contain; }
+  /* kata "Sync" dihilangkan di HP: cukup ikon 🔗 + saklar */
+  .reader-col-sync-toggle .rcs-word { display: none; }
+  .reader-col-sync-toggle { gap: 4px; }
+
+  /* "Sejajar" (grid): juga 1 garis tipis tanpa jarak */
+  .reader-columns-grid[data-cols="2"], .reader-columns-grid[data-cols="3"] { gap: 0; }
+  .reader-columns-grid[data-cols="2"] > :nth-child(2n),
+  .reader-columns-grid[data-cols="3"] > :nth-child(3n+2),
+  .reader-columns-grid[data-cols="3"] > :nth-child(3n) { border-left: 1px solid var(--rule) !important; }
+  /* kepala kolom "Sejajar": rata (tanpa kotak/sudut bulat), hanya garis bawah tipis -- supaya cuma ada 1 garis pemisah */
+  .reader-columns-grid[data-cols="2"] .reader-column-head.grid-head,
+  .reader-columns-grid[data-cols="3"] .reader-column-head.grid-head {
+    background: transparent; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0;
+    margin-bottom: 0; padding: 4px 4px 6px;
+  }
+  .reader-columns-grid .reader-grid-cell { padding: 0 3px; }
+}
+@media (max-width: 859px) and (-webkit-min-device-pixel-ratio: 2), (max-width: 859px) and (min-resolution: 192dpi) {
+  .reader-columns-panes .reader-col-pane + .reader-col-pane,
+  .reader-columns-grid[data-cols="2"] > :nth-child(2n),
+  .reader-columns-grid[data-cols="3"] > :nth-child(3n+2),
+  .reader-columns-grid[data-cols="3"] > :nth-child(3n) { border-left-width: .5px !important; }
+}
+
+/* ---- mode baca penuh (body.reader-clean): kotak kolom Bebas + Sync memenuhi layar dari atas sampai bawah ---- */
+body.reader-clean .reader-columns.reader-columns-panes {
+  position: fixed; left: 0; right: 0; top: var(--panes-top, 0px);
+  width: auto; max-width: none; margin: 0; z-index: 20;
+  height: 100vh; height: 100dvh; height: var(--panes-height, 100dvh);
+  background: var(--paper);
+}
+body.reader-clean:not(.reader-chrome-show) .reader-col-pane-head { display: none; }
+body.reader-clean .reader-col-pane.pane-fullscreen .reader-col-pane-head { display: flex; }
+body.reader-clean .reader-col-pane-body {
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 6px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+body.reader-clean.reader-chrome-show .reader-col-pane-body { padding-top: 8px; }
+/* toolbar navigasi pasal: tetap menempel di dasar layar & di atas kotak kolom penuh-layar (juga di layar 641-859px) */
+body.reader-clean.reader-chrome-show .collapsible-toolbar {
+  position: fixed; left: 0; right: 0; bottom: 0; margin: 0; z-index: 25;
+  background: var(--paper); border-radius: 14px 14px 0 0;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -4px 10px rgba(0,0,0,.10);
+}
+
+/* ---- mode baca penuh untuk mode yang digulir biasa (1 kolom, sejajar, atas-bawah, nempel) ---- */
+body.reader-clean .content-wrap { padding: max(4px, env(safe-area-inset-top, 0px)) 6px 12px; }
+body.reader-clean .reader-verses { margin-top: 4px; }
+body.reader-clean:not(.reader-chrome-show) .current-reading-indicator { display: none; }
+body.reader-clean.reader-chrome-show .current-reading-indicator { top: var(--hdr-px, 57px); }
+/* bayangan header yang sedang tersembunyi jangan "bocor" menjadi garis kabur di tepi atas layar */
+body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
