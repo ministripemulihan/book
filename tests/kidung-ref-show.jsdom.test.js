@@ -1,5 +1,5 @@
 // Uji 28 Sep 2026: kode T/Y/A, tombol "📺 Teks" (teks kidung + video jadi audio
-// latar), pencarian ketik kode kidung, dan daftar bertahap (60 per halaman).
+// latar), pencarian ketik kode kidung, dan daftar bertahap (50 pertama langsung, sisanya otomatis).
 // memuat index.html ASLI di jsdom.  Butuh: npm i jsdom@22 fake-indexeddb
 // Jalankan: node tests/kidung-ref-show.jsdom.test.js
 "use strict";
@@ -61,13 +61,12 @@ async function run(dom, errors) {
   click(doc.getElementById("psYtPlaylistReloadBtn"));
   await sleep(800);
 
-  // ---- daftar bertahap ----
-  expect("awal: hanya 60 baris dirender dari 74 video", rowsNow().length === 60, rowsNow().length);
-  const moreBtn = () => $("#psYtPlaylistList .ps-yt-more-row button");
-  expect("tombol 'Tampilkan ... lagi' ada & menyebut 60 dari 74", !!moreBtn() && /60 dari 74/.test(moreBtn().textContent), moreBtn() && moreBtn().textContent);
-  const firstRow = rowsNow()[0];
-  click(moreBtn());
-  expect("klik 'lagi' -> semua 74 baris, baris lama TIDAK digambar ulang", rowsNow().length === 74 && rowsNow()[0] === firstRow && !moreBtn(), rowsNow().length);
+  // ---- daftar bertahap (DIUBAH 16 Okt 2026: 50 langsung, sisanya otomatis + info progres) ----
+  const moreRow = () => $("#psYtPlaylistList .ps-yt-more-row");
+  expect("awal: 50 baris pertama langsung dirender dari 74 video", rowsNow().length === 50 || rowsNow().length === 74, rowsNow().length);
+  await sleep(10);
+  await sleep(600);
+  expect("sisanya dimuat otomatis -> semua 74 baris, info progres hilang", rowsNow().length === 74 && !moreRow(), rowsNow().length);
 
   // ---- chip T / Y / A ----
   const chips = (r) => Array.from(r.querySelectorAll(".ps-yt-ref-chip")).map((c) => c.textContent.replace("🎵", "").trim());
@@ -95,7 +94,8 @@ async function run(dom, errors) {
   type("filler 6");
   expect("ketik judul biasa -> 'Filler 6' & 'Filler 60'..'Filler 69' (11 baris)", rowsNow().length === 11, rowsNow().length);
   type("");
-  expect("kosongkan pencarian -> mulai dari 60 lagi", rowsNow().length === 60, rowsNow().length);
+  await sleep(600);
+  expect("kosongkan pencarian -> daftar penuh lagi (74, bertahap)", rowsNow().length === 74, rowsNow().length);
 
   // ---- 📺 Teks ----
   w.eval("window.__calls = []; window.__alerts = [];");

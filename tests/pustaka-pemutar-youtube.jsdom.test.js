@@ -109,6 +109,50 @@ async function run(dom, errors, opened) {
   expect("Fullscreen API dipanggil di elemen pemutar", called === 1 && ov.classList.contains("ml-player-full"), called);
   click($("#mlPlayerCloseBtn"));
 
+  // 3) BARU (book162) -- ayat yang dirujuk video tampil di bawah video (jendela pemutar)
+  w.eval(`(function(){
+    var verses=[{verse:29,text:"Ayat dua puluh sembilan",bookName:"Markus",chapter:12},{verse:30,text:"Kasihilah Tuhan Allahmu",bookName:"Markus",chapter:12},{verse:31,text:"Kasihilah sesamamu manusia",bookName:"Markus",chapter:12}];
+    var items=[{id:"v1",jenis:"youtube",sumber:"youtube",nama:"PPKMA Markus",link:"https://www.youtube.com/watch?v=abcdefghijk",kategori:"PPKMA"},
+               {id:"v2",jenis:"youtube",sumber:"youtube",nama:"Tema Pasal",link:"https://www.youtube.com/watch?v=zzzzzzzzzzz",kategori:"PPKMA"}];
+    var matches=[{item:items[0],verseNums:[30,31],whole:false,wide:false},{item:items[1],verseNums:[29,30,31],whole:true,wide:true}];
+    var sec=MediaLibrary.buildVerseRefSection(items,verses,matches); sec.id="testSec"; document.body.appendChild(sec);
+  })()`);
+  const sec = doc.getElementById("testSec");
+  $$("#testSec details").forEach((d) => { d.open = true; d.dispatchEvent(new w.Event("toggle")); });
+  await sleep(150);
+  const vcard = (t) => Array.from(sec.querySelectorAll(".ml-card")).find((c) => c.textContent.includes(t));
+  click(vcard("PPKMA Markus").querySelector(".ml-card-playable")); await sleep(100);
+  const pv = doc.getElementById("mlPlayerVerses");
+  expect("panel ayat ada di bawah video & terlihat", !!pv && !pv.hidden, pv && pv.hidden);
+  expect("isi: judul rujukan + ayat 30 & 31, TANPA ayat 29", !!pv && /Markus 12:30,31|Markus 12:30-31/.test(pv.textContent) && /Kasihilah Tuhan Allahmu/.test(pv.textContent) && /Kasihilah sesamamu manusia/.test(pv.textContent) && !/dua puluh sembilan/.test(pv.textContent), pv && pv.textContent);
+  expect("panel ayat berada SESUDAH video (urutan DOM)", !!pv && !!doc.getElementById("mlPlayerBody") && (doc.getElementById("mlPlayerBody").compareDocumentPosition(pv) & w.Node.DOCUMENT_POSITION_FOLLOWING) !== 0, null);
+  click($("#mlPlayerCloseBtn"));
+  click(vcard("Tema Pasal").querySelector(".ml-card-playable")); await sleep(100);
+  expect("referensi seluruh pasal -> panel ayat tidak ditampilkan", doc.getElementById("mlPlayerVerses").hidden, null);
+  click($("#mlPlayerCloseBtn"));
+  click(card("Lagu A") ? card("Lagu A").querySelector(".ml-card-playable") : null); await sleep(100);
+  expect("buka dari Pustaka Media (tanpa pasal) -> panel ayat tidak ditampilkan & bersih", doc.getElementById("mlPlayerVerses").hidden && doc.getElementById("mlPlayerVerses").children.length === 0, null);
+  click($("#mlPlayerCloseBtn"));
+
+  // 4) BARU (book164) -- tulisan "Ayat 30, 31" ditekan -> ayat tampil di bawah video (kotak), Alkitab tetap
+  const wrapM = vcard("PPKMA Markus").closest(".ml-verse-ref-item");
+  const tagBtn = wrapM.querySelector(".ml-verse-ref-tag-btn");
+  const vpanel = wrapM.querySelector(".ml-vr-panel");
+  expect("tulisan Ayat berupa tombol & panel tertutup awalnya", !!tagBtn && !!vpanel && vpanel.hidden && /Ayat 30, 31/.test(tagBtn.textContent), tagBtn && tagBtn.textContent);
+  click(tagBtn);
+  expect("klik tulisan Ayat -> panel terbuka berisi ayat 30 & 31 (bukan 29)", !vpanel.hidden && /Kasihilah Tuhan Allahmu/.test(vpanel.textContent) && /Kasihilah sesamamu manusia/.test(vpanel.textContent) && !/dua puluh sembilan/.test(vpanel.textContent), vpanel.textContent);
+  expect("panel berada SESUDAH kartu video (di bawahnya) & baris melebar", (wrapM.querySelector(".ml-card").compareDocumentPosition(vpanel) & w.Node.DOCUMENT_POSITION_FOLLOWING) !== 0 && wrapM.classList.contains("ml-vr-open"), wrapM.className);
+  click(tagBtn);
+  expect("klik lagi -> panel tertutup", vpanel.hidden && !wrapM.classList.contains("ml-vr-open"), null);
+  expect("referensi seluruh pasal tidak punya tombol ayat", !vcard("Tema Pasal").closest(".ml-verse-ref-item").querySelector(".ml-verse-ref-tag-btn"), null);
+  const sumV = sec.querySelector(".ml-sum-verses");
+  expect("judul grup: bagian 'Ayat ...' bisa ditekan", !!sumV && /Ayat 30, 31/.test(sumV.textContent), sumV && sumV.textContent);
+  click(sumV); await sleep(40);
+  expect("klik 'Ayat' di judul grup -> ayat semua kartu grup tampil", !vpanel.hidden, null);
+  click(sumV); await sleep(40);
+  expect("klik lagi di judul grup -> disembunyikan", vpanel.hidden, null);
+  expect("grup tetap terbuka (klik judul-ayat tidak menutup akordion)", sumV.closest("details").open === true, null);
+
   const bad = errors.filter((e) => !/Could not load|not implemented|Not implemented|navigation/i.test(e));
   expect("tidak ada error skrip", bad.length === 0, bad);
 }

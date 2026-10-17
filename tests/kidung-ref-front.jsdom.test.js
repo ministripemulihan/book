@@ -60,7 +60,8 @@ async function run(dom) {
     w.eval("window.__sec = buildKidungMediaRefSection(window.__m); document.body.appendChild(window.__sec);");
     await sleep(500);
     const t = Array.from(w.__sec.querySelectorAll(".ml-card-title")).map((n) => n.textContent).sort().join(",");
-    const empty = !!w.__sec.querySelector(".ml-empty");
+    // 16 Okt 2026: keadaan kosong sekarang = bagian diperkecil (class is-empty, 1 baris "Tidak ada referensi lagu"), bukan paragraf .ml-empty
+    const empty = w.__sec.classList.contains("is-empty") && /Tidak ada referensi lagu/.test(w.__sec.textContent);
     w.__sec.remove();
     return { t, empty };
   }

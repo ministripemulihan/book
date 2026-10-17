@@ -57,14 +57,14 @@ srv.listen(0, async () => {
     expect("jaringan macet: daftar tersimpan tampil duluan (📂)", cards(dom) > 0 && /📂/.test(notice(dom)), [cards(dom), notice(dom)]);
     dom.window.close();
 
-    // HP: cache tidak dipakai (perilaku lama) -> offline = gagal
+    // HP: sejak 16 Okt 2026 CONFIG.MEDIA_LIBRARY_OFFLINE_LIST = "semua" -> HP juga menyimpan & tampil offline
     IDB = { indexedDB: new fi.IDBFactory(), IDBKeyRange: fi.IDBKeyRange };
     dom = await boot(port, "online", MOBILE_UA); await sleep(2500);
     const mob = await dom.window.eval("MediaLibrary.Sync.cachedList({})");
-    expect("HP: daftar TIDAK disimpan", mob === null, mob && mob.items && mob.items.length);
+    expect("HP: daftar tersimpan (offline berlaku di HP juga)", mob && mob.items && mob.items.length === N, mob && mob.items && mob.items.length);
     dom.window.close();
     dom = await boot(port, "offline", MOBILE_UA); await sleep(2500);
-    expect("HP offline: pesan gagal (tidak ada daftar tersimpan)", /Gagal memuat/.test(body(dom)) && cards(dom) === 0, body(dom).slice(0, 100));
+    expect("HP offline: kartu tetap tampil dari daftar tersimpan", cards(dom) > 0, [cards(dom), body(dom).slice(0, 80)]);
     dom.window.close();
 
     // Komputer baru, belum pernah online, offline
