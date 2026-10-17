@@ -7333,14 +7333,16 @@ const PresentationStudio = (() => {
     const ytBtnListEl_ = el("psYtViewList");
     const ytBtnGridEl_ = el("psYtViewGrid");
     const ytSizeEl_ = el("psYtGridSize");
+    const ytBtnWideEl_ = el("psYtWide");
     const YT_VIEW_KEY_ = "bible_app_yt_view_v1";
-    const ytView_ = { mode: "list", size: 140, open: false };
+    const ytView_ = { mode: "list", size: 140, open: false, wide: false };
     try {
       const sv = JSON.parse(localStorage.getItem(YT_VIEW_KEY_) || "null");
       if (sv && typeof sv === "object") {
         if (sv.mode === "grid" || sv.mode === "list") ytView_.mode = sv.mode;
-        if (Number.isFinite(sv.size)) ytView_.size = Math.min(360, Math.max(64, sv.size));
+        if (Number.isFinite(sv.size)) ytView_.size = Math.min(480, Math.max(64, sv.size));
         ytView_.open = !!sv.open;
+        ytView_.wide = !!sv.wide;
       }
     } catch (e) { /* abaikan: pakai bawaan */ }
     function applyYtView_() {
@@ -7355,6 +7357,10 @@ const PresentationStudio = (() => {
       listWrap.classList.toggle("ps-yt-grid-titles", grid && ytView_.size >= 150); // kotak besar: judul ikut tampil di bawah gambar
       listWrap.classList.toggle("ps-yt-grid-icons", grid && ytView_.size < 200);   // kotak kecil: tombol hanya ikon
       listWrap.style.setProperty("--yt-card", ytView_.size + "px");
+      // book172: ↔ = kolom tengah + kanan menyatu (kolom kiri tetap). Hanya berlaku saat tab ▶️ YouTube aktif (lihat css .ps-yt-wide).
+      const studioEl_ = el("presentStudio");
+      if (studioEl_) studioEl_.classList.toggle("ps-yt-wide", ytView_.wide);
+      if (ytBtnWideEl_) { ytBtnWideEl_.classList.toggle("active", ytView_.wide); ytBtnWideEl_.setAttribute("aria-pressed", String(ytView_.wide)); }
     }
     function saveYtView_() { try { localStorage.setItem(YT_VIEW_KEY_, JSON.stringify(ytView_)); } catch (e) { /* penuh: abaikan */ } }
     function updateYtFilterBadge_() {
@@ -7366,6 +7372,7 @@ const PresentationStudio = (() => {
     if (ytToggleEl_) ytToggleEl_.addEventListener("click", () => { ytView_.open = !ytView_.open; applyYtView_(); saveYtView_(); });
     if (ytBtnListEl_) ytBtnListEl_.addEventListener("click", () => { ytView_.mode = "list"; applyYtView_(); saveYtView_(); });
     if (ytBtnGridEl_) ytBtnGridEl_.addEventListener("click", () => { ytView_.mode = "grid"; applyYtView_(); saveYtView_(); });
+    if (ytBtnWideEl_) ytBtnWideEl_.addEventListener("click", () => { ytView_.wide = !ytView_.wide; applyYtView_(); saveYtView_(); });
     if (ytSizeEl_) ytSizeEl_.addEventListener("input", () => { ytView_.size = Number(ytSizeEl_.value) || 140; applyYtView_(); });
     if (ytSizeEl_) ytSizeEl_.addEventListener("change", saveYtView_);
     // mode kotak: klik gambar (atau bagian kotak di luar tombol) = ▶️ Tampilkan
@@ -7401,13 +7408,31 @@ const PresentationStudio = (() => {
       sp.title = "BibleRef: ayat yang dirujuk media ini";
       info.appendChild(sp);
     }
+    // BARU (17 Okt 2026, book172, permintaan operator) -- tooltip thumbnail LENGKAP, urutan tetap seperti header Sheet,
+    // label berupa emoji saja: 📝 Nama · 📂 Sumber · 📺 Channel · 💬 Keterangan · 🗂️ Kategori · 📅 Tanggal · 🎵 KidungRef · 📖 BibleRef.
+    // Kolom kosong tetap ditulis "–" supaya urutan/baris selalu sama di semua video.
+    function ytTooltip_(v) {
+      let tgl = "";
+      try { if (v.uploadDate && !isNaN(v.uploadDate.getTime())) tgl = v.uploadDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }); } catch (e) { tgl = ""; }
+      const val = (x) => (x && String(x).trim()) || "–";
+      return [
+        "📝 " + val(v.title),
+        "📂 " + val(v.sumber),
+        "📺 " + val(v.channel),
+        "💬 " + val(v.keterangan),
+        "🗂️ " + val((v.categories || []).join(", ")),
+        "📅 " + val(tgl),
+        "🎵 " + val(v.kidungRef),
+        "📖 " + val(v.bibleRef),
+      ].join("\n");
+    }
     // BARU (book165) -- baris SoundCloud (Sumber=soundcloud di Sheet): ▶️ Tampilkan / 👁️ Pratinjau / ➕ Kumpulan.
     // (Audio Latar & progress bar detik-mulai tidak tersedia untuk SoundCloud di daftar ini; untuk latar
     //  SoundCloud pakai tab 🔗 Link / tab Kidung.)
     function buildScRow_(v) {
       const row = document.createElement("div");
       row.className = "ps-yt-playlist-row ps-yt-playlist-row-sc";
-      row.title = v.title || "";
+      row.title = ytTooltip_(v);
       const tagsHtml = (v.categories || []).map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c)}</span>`).join("");
       row.innerHTML = `
         <div class="ps-yt-playlist-thumb ps-yt-playlist-thumb-sc" aria-hidden="true">🎧</div>
@@ -7466,7 +7491,7 @@ const PresentationStudio = (() => {
         const i = ytVideos.indexOf(v); // indeks di antrean YouTube (dipakai antrean "Ulang: Semua")
         const row = document.createElement("div");
         row.className = "ps-yt-playlist-row";
-        row.title = (v.title || "") + (v.channel ? " — " + v.channel : ""); // BARU (book171): nama video muncul saat kursor di atas kotak
+        row.title = ytTooltip_(v); // book172: tooltip lengkap (📝 nama, 📂 sumber, 📺 channel, 💬 keterangan, 🗂️ kategori, 📅 tanggal, 🎵 KidungRef, 📖 BibleRef)
         const tagsHtml = (v.categories || [])
           .map((c) => `<span class="ps-yt-playlist-tag">${escapeHtml(c)}</span>`).join("");
         row.innerHTML = `
