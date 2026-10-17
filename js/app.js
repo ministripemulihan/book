@@ -3194,7 +3194,7 @@ function langLabelFor(code) {
 
 // Tampilan kolom tunggal (perilaku lama / default).
 function renderSingleColumn(wrap, verses, displayName, bookNum, chapter) {
-  wrap.classList.remove("reader-columns", "reader-columns-panes", "reader-columns-stacked", "reader-columns-grid");
+  wrap.classList.remove("reader-columns", "reader-columns-panes", "reader-columns-stacked", "reader-columns-grid", "reader-columns-ruby");
   wrap.removeAttribute("data-cols");
   wrap.innerHTML = "";
   verses.forEach((v, idx) => wrap.appendChild(buildVerseBlock(v, idx, displayName, verses)));
@@ -3324,7 +3324,7 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
   // lihat css/style.css) bisa NYANGKUT dari render sebelumnya dan
   // merusak tampilan mode lain yang seharusnya alir normal setinggi
   // kontennya sendiri, bukan dipotong 68vh.
-  wrap.classList.remove("reader-columns-panes", "reader-columns-stacked", "reader-columns-grid");
+  wrap.classList.remove("reader-columns-panes", "reader-columns-stacked", "reader-columns-grid", "reader-columns-ruby");
   wrap.setAttribute("data-cols", String(columnsCount));
   const direction = getSetting(currentUser, "columnDirection") || "side";
   wrap.setAttribute("data-direction", direction);
@@ -3381,6 +3381,13 @@ function renderColumnsView(wrap, bookNum, chapter, primaryVerses, displayName, c
   }
   if (direction === "side-panes" && columnsCount > 1) {
     renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount);
+    return;
+  }
+
+  // BARU (17 Okt 2026, book168) -- "nempel": Mandarin + Pinyin digabung, tiap karakter
+  // dengan pinyin-nya tepat di bawahnya. Bahasa/Notes lain tetap baris atas-bawah biasa.
+  if (direction === "ruby" && columnsCount > 1) {
+    renderColumnsRuby(wrap, columns, displayName);
     return;
   }
 
@@ -3867,6 +3874,72 @@ function renderColumnsStacked(wrap, columns, displayName) {
       if (colIdxInGroup === langsWithVerse.length - 1) block.classList.add("verse-group-end");
       wrap.appendChild(block);
     });
+  });
+}
+
+// BARU (17 Okt 2026, book168, permintaan operator) -- arah "nempel" (ruby): kalau Kolom berisi
+// Mandarin (chs/chssmp) DAN pinyin-nya (chs_pinyin/chssmp_pinyin), keduanya digabung jadi SATU
+// baris: tiap karakter Mandarin di atas, satu suku kata pinyin tepat di bawahnya. Bahasa lain
+// (Indonesia, Inggris) & Notes tetap baris atas-bawah biasa (tidak perlu sama). Kalau jumlah
+// karakter != jumlah suku kata untuk ayat tertentu, ayat itu TIDAK ditebak: tampil atas-bawah biasa.
+function renderColumnsRuby(wrap, columns, displayName) {
+  wrap.classList.add("reader-columns-stacked", "reader-columns-ruby");
+  const verseNumSet = new Set();
+  columns.forEach((col) => col.verses.forEach((v) => verseNumSet.add(v.verse)));
+  const verseNums = Array.from(verseNumSet).sort((a, b) => a - b);
+  if (verseNums.length === 0) {
+    const empty = document.createElement("p");
+    empty.style.fontSize = "13px";
+    empty.style.color = "var(--ink-soft)";
+    empty.textContent = "Pasal ini belum tersedia.";
+    wrap.appendChild(empty);
+    return;
+  }
+  verseNums.forEach((vnum, groupIdx) => {
+    const rows = columns.filter((col) => col.verses.some((vv) => vv.verse === vnum));
+    const verseOf = (col) => col.verses.find((vv) => vv.verse === vnum);
+    const pairs = new Map(), consumed = new Set();
+    rows.forEach((col) => {
+      if (columnKindOf_(col) !== "verse" || typeof PinyinRuby === "undefined") return;
+      const pl = PinyinRuby.pairCode(col.lang);
+      const pcol = pl && rows.find((c) => c !== col && c.lang === pl && columnKindOf_(c) === "verse" && !consumed.has(c));
+      if (!pcol) return;
+      const cells = PinyinRuby.align(verseOf(col).text, verseOf(pcol).text);
+      if (!cells) return;
+      pairs.set(col, { pcol, cells });
+      consumed.add(pcol);
+    });
+    const blocks = [];
+    rows.forEach((col) => {
+      if (consumed.has(col)) return;
+      const block = buildColumnBlock_(col, verseOf(col), groupIdx, displayName);
+      const langTag = document.createElement("span");
+      langTag.className = "reader-stacked-lang-tag";
+      const pair = pairs.get(col);
+      langTag.textContent = pair ? langLabelFor(col.lang) + " + " + langLabelFor(pair.pcol.lang) : (col.lang ? columnHeadLabel_(col) : "?");
+      block.insertBefore(langTag, block.firstChild);
+      if (pair) {
+        const tw = block.querySelector(".verse-text-wrap");
+        if (tw) {
+          const badge = tw.querySelector(".verse-note-badge");
+          tw.textContent = "";
+          tw.classList.add("verse-ruby");
+          pair.cells.forEach((c) => {
+            const cell = document.createElement("span");
+            cell.className = "rb-cell";
+            const h = document.createElement("span"); h.className = "rb-han"; h.textContent = c.han;
+            const p = document.createElement("span"); p.className = "rb-py"; p.textContent = c.py || "\u00a0";
+            cell.appendChild(h); cell.appendChild(p);
+            tw.appendChild(cell);
+          });
+          if (badge) tw.appendChild(badge);
+          block.classList.add("verse-ruby-block");
+        }
+      }
+      blocks.push(block);
+    });
+    if (blocks.length) blocks[blocks.length - 1].classList.add("verse-group-end");
+    blocks.forEach((b) => wrap.appendChild(b));
   });
 }
 
