@@ -3545,7 +3545,8 @@ function renderColumnsIndependentPanes(wrap, columns, displayName, columnsCount)
     syncLabel.className = "reader-col-sync-toggle";
     syncLabel.title = "Kalau aktif, kolom ini ikut bergeser bersama kolom lain yang Sync-nya juga aktif";
     const syncText = document.createElement("span");
-    syncText.textContent = "🔗 Sync";
+    // book170: kata "Sync" dipisah supaya di HP bisa disembunyikan (tinggal ikon 🔗 + saklar) -- lihat .rcs-word di CSS.
+    syncText.innerHTML = '<span class="rcs-ico">🔗</span><span class="rcs-word"> Sync</span>';
     const syncSwitchWrap = document.createElement("span");
     syncSwitchWrap.className = "toggle-switch reader-col-sync-switch";
     const syncInput = document.createElement("input");
@@ -10009,6 +10010,8 @@ function toggleReaderChrome() {
   if (!isReaderClean()) return;
   const show = !document.body.classList.contains("reader-chrome-show");
   document.body.classList.toggle("reader-chrome-show", show);
+  recalcReaderPanesHeight(); // book170: kotak kolom penuh-layar bergeser turun di bawah header saat tombol muncul
+  setTimeout(recalcReaderPanesHeight, 200);
   if (!show) { try { const a = document.activeElement; if (a && a.blur && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) a.blur(); } catch (e) { /* abaikan */ } }
 }
 function initReaderMultiTap() {
@@ -10133,7 +10136,23 @@ function recalcReaderPanesHeight() {
   // SELALU = "sisa tinggi layar di bawah header", konsisten berapa pun
   // sudah digulir, tidak perlu event scroll tambahan.
   const header = document.querySelector(".app-header");
-  const headerH = header ? header.offsetHeight : 0;
+  let headerH = header ? header.offsetHeight : 0;
+  // BARU (book170, 17 Okt 2026) -- MODE BACA PENUH di HP: kotak kolom dibuat position:fixed memenuhi layar
+  // (lihat CSS "book170" di css/style.css). Header sudah disembunyikan (translateY) tapi offsetHeight-nya TETAP
+  // terhitung -- itulah sebab kotak dulu tidak sampai ke tepi atas layar. Di mode ini: atas = 0 (atau setinggi
+  // header kalau tombol lagi dimunculkan lewat ketuk 3x), bawah = setinggi toolbar navigasi pasal kalau sedang tampil.
+  const clean = isReaderClean();
+  if (clean) {
+    const showChrome = document.body.classList.contains("reader-chrome-show");
+    const topPx = showChrome ? headerH : 0;
+    const nw = document.getElementById("readerNavBottomWrap");
+    const botPx = (showChrome && nw && getComputedStyle(nw).display !== "none") ? nw.offsetHeight : 0;
+    const hc = Math.round(vpHeight - topPx - botPx);
+    document.documentElement.style.setProperty("--panes-top", topPx + "px");
+    if (hc > 120) document.documentElement.style.setProperty("--panes-height", hc + "px");
+    return;
+  }
+  document.documentElement.style.setProperty("--panes-top", "0px");
   // PERBAIKAN (laporan operator: "3-kolom cuma 80% tinggi layar, minta
   // sampai 100%") -- SEBELUMNYA `BOTTOM_GAP` angka tebakan tetap (44px)
   // yang mengasumsikan toolbar navigasi pasal (#readerNavBottomWrap)
@@ -11166,6 +11185,8 @@ function updateHeaderHeightVar() {
   const header = document.querySelector(".app-header");
   if (!header) return;
   document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  // book170: tinggi header SUNGGUHAN (body.reader-clean menimpa --header-h jadi 0) -- dipakai penanda pasal saat tombol dimunculkan
+  document.documentElement.style.setProperty("--hdr-px", header.offsetHeight + "px");
 }
 
 // ------------------------------------------------------------
