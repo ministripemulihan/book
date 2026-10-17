@@ -9287,6 +9287,7 @@ const PresentationStudio = (() => {
       });
     }
     wireFocusModeToggle();
+    wireCornerLogo_(); // book178
   }
 
   // BARU (26 Sep 2026, permintaan operator "efek dilarang lihat HP/bicara
@@ -9339,6 +9340,62 @@ const PresentationStudio = (() => {
     }
     markFocusModeBtn_();
   }
+
+  // BARU (18 Okt 2026, book178, permintaan operator) -- 🖼️ Logo Pojok Kiri Atas ("Warta Gereja") di Layar 2.
+  // Pola SAMA seperti toggle Larangan HP/Bicara di atas: status (nyala, ukuran, kepekatan) disimpan di localStorage,
+  // dikirim lewat rawPost({type:"cornerlogo"}) dan dikirim ulang otomatis kalau Layar 2 dibuka ulang
+  // (lastCornerLogo_ di js/presentation.js). Transparan, persisten, z-index di atas semua tulisan (present.html #cornerLogo).
+  const CORNER_LOGO_ON_KEY = "bible_app_cornerlogo_on_v1";
+  const CORNER_LOGO_SIZE_KEY = "bible_app_cornerlogo_size_v1";
+  const CORNER_LOGO_OPACITY_KEY = "bible_app_cornerlogo_opacity_v1";
+  function cornerLogoState_() {
+    let on = false, size = 16, opacity = 100;
+    try {
+      on = localStorage.getItem(CORNER_LOGO_ON_KEY) === "1";
+      size = parseInt(localStorage.getItem(CORNER_LOGO_SIZE_KEY), 10) || 16;
+      opacity = parseInt(localStorage.getItem(CORNER_LOGO_OPACITY_KEY), 10) || 100;
+    } catch (e) { /* pakai bawaan */ }
+    size = Math.max(5, Math.min(40, size));
+    opacity = Math.max(20, Math.min(100, opacity));
+    return { on, size, opacity };
+  }
+  function sendCornerLogo_() {
+    const st = cornerLogoState_();
+    rawPost({ type: "cornerlogo", on: st.on, size: st.size, opacity: st.opacity / 100 });
+  }
+  function wireCornerLogo_() {
+    const btn = el("psCornerLogoToggleBtn");
+    const sizeEl = el("psCornerLogoSize"), opEl = el("psCornerLogoOpacity");
+    if (!btn || btn.dataset.wired) return;
+    btn.dataset.wired = "1";
+    const st = cornerLogoState_();
+    if (sizeEl) sizeEl.value = String(st.size);
+    if (opEl) opEl.value = String(st.opacity);
+    const paint = () => {
+      const s = cornerLogoState_();
+      btn.classList.toggle("active", s.on);
+      btn.textContent = s.on ? "✅ Logo Pojok AKTIF (klik utk matikan)" : "🖼️ Tampilkan Logo Pojok";
+      const sv = el("psCornerLogoSizeVal"), ov = el("psCornerLogoOpacityVal");
+      if (sv) sv.textContent = s.size + "%";
+      if (ov) ov.textContent = s.opacity + "%";
+    };
+    btn.addEventListener("click", () => {
+      const on = !cornerLogoState_().on;
+      try { localStorage.setItem(CORNER_LOGO_ON_KEY, on ? "1" : "0"); } catch (e) {}
+      sendCornerLogo_(); paint();
+    });
+    if (sizeEl) sizeEl.addEventListener("input", () => {
+      try { localStorage.setItem(CORNER_LOGO_SIZE_KEY, String(sizeEl.value)); } catch (e) {}
+      sendCornerLogo_(); paint();
+    });
+    if (opEl) opEl.addEventListener("input", () => {
+      try { localStorage.setItem(CORNER_LOGO_OPACITY_KEY, String(opEl.value)); } catch (e) {}
+      sendCornerLogo_(); paint();
+    });
+    paint();
+    if (st.on) sendCornerLogo_(); // status tersimpan -> ikut tayang begitu Layar 2 ada
+  }
+
   function markFocusModeBtn_() {
     const hpBtn = el("psFocusModeToggleBtn");
     if (hpBtn) {
