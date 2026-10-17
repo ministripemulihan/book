@@ -5596,7 +5596,7 @@ body.reader-clean:not(.reader-chrome-show) .ml-player-pill { bottom: calc(14px +
 .verse-text-wrap.verse-ruby { line-height: 1.2; }
 .verse-ruby .rb-cell {
   display: inline-flex; flex-direction: column; align-items: center;
-  vertical-align: top; margin: 0 1px .5em; padding: 0 .06em; text-align: center;
+  vertical-align: top; margin: 0 1px .3em; padding: 0 .06em; text-align: center; border-radius: 6px;
 }
 .verse-ruby .rb-han { line-height: 1.3; white-space: nowrap; }
 .verse-ruby .rb-py {
@@ -5607,3 +5607,10 @@ body.reader-clean:not(.reader-chrome-show) .ml-player-pill { bottom: calc(14px +
   /* HP: teks ruby diberi lebar penuh baris; tombol salin/kumpulan turun ke baris berikutnya */
   .reader-columns-ruby .verse-ruby-block .verse-text-wrap { flex: 1 1 calc(100% - 34px); }
 }
+.reader-columns-ruby .verse-group-end { padding-bottom: 8px; margin-bottom: 8px; }
+
+/* Penanda per kata saat pembacaan suara (js/app.js ttsSetUnit_): mode Nempel menyorot satu kotak karakter+pinyin;
+   teks biasa memakai CSS Custom Highlight API (::highlight). Teks gelap supaya terbaca di tema terang & gelap. */
+.rb-cell.tts-cur { background: #ffd54a; color: #1d1608; }
+.verse-ruby .rb-cell.tts-cur .rb-py { color: #1d1608; }
+::highlight(tts-word) { background-color: #ffd54a; color: #1d1608; }
