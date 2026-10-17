@@ -3088,6 +3088,10 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
       e.stopPropagation();
       searchStrongNumber_(sup.dataset.strong);
     });
+  } else if (typeof renderVerseTextWithFootnotes === "function" && (v.markedText || v.text) && (v.markedText || "").indexOf("\u0001") === -1
+    && typeof recoverPlainFootnoteMarks === "function" && v.note && recoverPlainFootnoteMarks(v.markedText || v.text, v.note).indexOf("\u0001") !== -1) {
+    // book178: tanda catatan kaki yang tersimpan polos ("1Now ... anames") dipulihkan lewat kolom Note.
+    renderVerseTextWithFootnotes(textWrap, recoverPlainFootnoteMarks(v.markedText || v.text, v.note));
   } else if (typeof renderVerseTextWithFootnotes === "function" && v.markedText) {
     renderVerseTextWithFootnotes(textWrap, v.markedText);
   } else {

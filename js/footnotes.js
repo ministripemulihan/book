@@ -336,7 +336,10 @@ function strongTextToHtml(t) {
   return raw.split("\u0002").map((part, i) => {
     if (i % 2 === 0) return esc(part);
     const num = (part.match(/[HG]\d+/) || [""])[0];
-    return '<sup class="strong-tag" data-strong="' + esc(num) + '">' + esc(part) + "</sup>";
+    // v70 -- kode bentuk kata kerja "(H8802)" (diawali kurung) diberi class tambahan strong-tense supaya
+    // warnanya BEDA dari nomor Strong biasa (H430).
+    const cls = part.charAt(0) === "(" ? "strong-tag strong-tense" : "strong-tag";
+    return '<sup class="' + cls + '" data-strong="' + esc(num) + '">' + esc(part) + "</sup>";
   }).join("");
 }
 // Isi <div class="verse-text-wrap"> di layar baca; tanda ditekan = cari nomornya.
@@ -356,4 +359,40 @@ function parseStrongQuery(q) {
 function verseHasStrong(v, id) {
   if (!v || !v.strongText) return false;
   return new RegExp("\u0002\\(?" + id + "\\)?\u0002").test(v.strongText);
+}
+
+// ------------------------------------------------------------
+//  BARU (18 Okt 2026, book178) -- PEMULIHAN tanda catatan kaki yang "polos".
+//  Sebagian ayat (mis. Keluaran 1:1 Inggris Recovery) tersimpan tanpa pembungkus <FR><sup>..</sup><Fr>,
+//  sehingga tandanya tampil sebagai angka/huruf biasa menempel di kata ("1Now these are the anames ... 2Egypt")
+//  -- tidak biru, tidak bisa ditekan -- padahal kolom Note-nya ada.
+//  Fungsi ini memakai kolom Note sebagai KUNCI PENGECEKAN: tanda hanya dipulihkan kalau
+//  (angka/huruf) + (kata pertama entri Note) persis menempel di teks, mis. entri "(a)names" -> "anames".
+//  Tidak cocok = tidak diubah sama sekali (aman, tidak menebak). Mengembalikan teks bertanda U+0001
+//  seperti extractFootnoteMarkedText(), atau teks asli kalau tidak ada yang cocok.
+// ------------------------------------------------------------
+function recoverPlainFootnoteMarks(text, noteHtml) {
+  if (!text || !noteHtml || typeof parseFootnoteEntries !== "function") return text;
+  const entries = parseFootnoteEntries(noteHtml);
+  if (!entries.length) return text;
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let out = text;
+  let changed = false;
+  const seen = new Set();
+  entries.forEach((e) => {
+    const key = (e.num || "") + (e.letter || "");
+    if (!key || !e.parts || !e.parts[0]) return;
+    const plain = e.parts[0].replace(/<[^>]*>/g, "").replace(/^\s*(\(\s*[0-9A-Za-z]+\s*\)\s*)+/, "");
+    const m = plain.match(/^[^\s,;.:!?()]+/);
+    if (!m || m[0].length < 2) return;
+    const id = key + "|" + m[0].toLowerCase();
+    if (seen.has(id)) return;
+    seen.add(id);
+    const re = new RegExp("(^|[^A-Za-z0-9\\u0001])(" + esc(key) + ")(" + esc(m[0]) + ")", "i");
+    if (re.test(out)) {
+      out = out.replace(re, (all, pre, k, w) => pre + "\u0001" + k + "\u0001" + w);
+      changed = true;
+    }
+  });
+  return changed ? out : text;
 }

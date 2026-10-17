@@ -899,6 +899,7 @@ const MediaLibrary = (() => {
             <span id="mlPlayerTitle" class="ml-player-title"></span>
             <div class="ml-player-header-actions">
               <button type="button" id="mlPlayerWakeBtn" class="chip-btn small ml-player-btn" aria-pressed="false" hidden></button>
+              <button type="button" id="mlPlayerBgBtn" class="chip-btn small ml-player-btn ml-player-btn-bg" title="Lagu jalan di belakang layar + teks kidung/ayat tampil penuh (1 ketukan)" aria-label="Lagu di belakang layar dan baca layar penuh">🎧<span class="ml-pl-long"> Latar &amp; baca penuh</span><span class="ml-pl-short"> Latar</span></button>
               <button type="button" id="mlPlayerHideBtn" class="chip-btn small ml-player-btn" title="Sembunyikan pemutar: lagu tetap main, syair tampil penuh" aria-label="Sembunyikan pemutar">🙈<span class="ml-pl-long"> Sembunyikan</span></button>
               <button type="button" id="mlPlayerMiniBtn" class="chip-btn small ml-player-btn"></button>
               <button type="button" id="mlPlayerFsBtn" class="chip-btn small ml-player-btn" title="Layar penuh" aria-label="Layar penuh">⛶<span class="ml-pl-long"> Layar Penuh</span></button>
@@ -918,11 +919,25 @@ const MediaLibrary = (() => {
       el_("mlPlayerWakeBtn").addEventListener("click", togglePlayerWake_);
       // book167 -- tombol 🙈 Sembunyikan + tombol bulat 🎵 kecil untuk memunculkan lagi (lagu TETAP main).
       el_("mlPlayerHideBtn").addEventListener("click", () => setPlayerCollapsed_(true));
+      // book178 -- 🎧 Latar & baca penuh: SATU ketukan = pemutar disembunyikan (lagu tetap main) + mode baca penuh (teks penuh layar).
+      el_("mlPlayerBgBtn").addEventListener("click", () => {
+        setPlayerCollapsed_(true);
+        try {
+          const fsBtn = document.getElementById("fullscreenToggle");
+          if (fsBtn && !fsBtn.disabled && !document.body.classList.contains("reader-clean")) fsBtn.click();
+        } catch (e) { /* abaikan: lagu tetap jalan di belakang */ }
+      });
       const pill = document.createElement("button");
       pill.type = "button"; pill.id = "mlPlayerPill"; pill.className = "ml-player-pill"; pill.hidden = true;
       pill.textContent = "🎵"; pill.title = "Tampilkan pemutar lagu"; pill.setAttribute("aria-label", pill.title);
       pill.addEventListener("click", () => setPlayerCollapsed_(false));
       document.body.appendChild(pill);
+      // book178 -- ⏹ kecil di sebelah 🎵: matikan lagu langsung (tanpa buka pemutar dulu). Hanya tampil saat pemutar disembunyikan.
+      const stopPill = document.createElement("button");
+      stopPill.type = "button"; stopPill.id = "mlPlayerStopPill"; stopPill.className = "ml-player-pill ml-player-stoppill";
+      stopPill.textContent = "⏹"; stopPill.title = "Matikan lagu"; stopPill.setAttribute("aria-label", stopPill.title);
+      stopPill.addEventListener("click", closePlayerOverlay_);
+      document.body.appendChild(stopPill);
       // Mode baca penuh (tombol ⛶ di HP, js/app.js) dinyalakan -> pemutar mini ikut disembunyikan supaya teks penuh layar.
       document.addEventListener("reader-clean-change", (e) => {
         const o = el_("mlPlayerOverlay");
