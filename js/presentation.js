@@ -179,6 +179,41 @@ const Presentation = (() => {
   // ------------------------------------------------------------
   // Buka / tutup Layar 2
   // ------------------------------------------------------------
+  // BARU (17 Okt 2026, book173, permintaan operator) -- POSISI jendela Layar 2: tengah / atas / bawah.
+  // Dulu posisi dibiarkan ditentukan browser (di komputer lain bisa muncul di bawah/di luar layar & tidak
+  // ketemu). Sekarang bawaan = TENGAH layar, bisa diganti lewat tombol ⬆️ ◼ ⬇️ di header Studio
+  // (berlaku langsung kalau Layar 2 sedang terbuka; kalau belum, dipakai saat dibuka). Pilihan diingat.
+  const WIN_POS_KEY = "bible_app_layar2_pos_v1";
+  function getWindowPosition() {
+    try { const v = localStorage.getItem(WIN_POS_KEY); if (v === "top" || v === "bottom" || v === "center") return v; } catch (e) {}
+    return "center";
+  }
+  function calcWindowPos(width, height, pos) {
+    const sc = window.screen || {};
+    const aL = sc.availLeft || 0, aT = sc.availTop || 0;
+    const aW = sc.availWidth || 1280, aH = sc.availHeight || 800;
+    const left = Math.max(aL, Math.round(aL + (aW - width) / 2));
+    let top;
+    if (pos === "top") top = aT;
+    else if (pos === "bottom") top = Math.max(aT, aT + aH - height);
+    else top = Math.max(aT, Math.round(aT + (aH - height) / 2));
+    return { left, top };
+  }
+  function applyWindowPosition() {
+    if (!winRef || winRef.closed) return;
+    try {
+      const w = winRef.outerWidth || winRef.innerWidth || 800, h = winRef.outerHeight || winRef.innerHeight || 600;
+      const { left, top } = calcWindowPos(w, h, getWindowPosition());
+      winRef.moveTo(left, top);
+    } catch (e) { /* browser membatasi moveTo: abaikan */ }
+  }
+  function setWindowPosition(pos) {
+    if (pos !== "top" && pos !== "bottom" && pos !== "center") pos = "center";
+    try { localStorage.setItem(WIN_POS_KEY, pos); } catch (e) {}
+    applyWindowPosition();
+    try { window.dispatchEvent(new CustomEvent("present-window-position", { detail: { pos } })); } catch (e) {}
+  }
+
   function openWindow() {
     if (winRef && !winRef.closed) {
       winRef.focus();
@@ -187,10 +222,11 @@ const Presentation = (() => {
     winReady = false;
     msgQueue = [];
     const { width, height } = getDesiredWindowSize();
+    const pos = calcWindowPos(width, height, getWindowPosition());
     winRef = window.open(
       "present.html",
       WIN_NAME,
-      `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`
+      `width=${width},height=${height},left=${pos.left},top=${pos.top},menubar=no,toolbar=no,location=no,status=no`
     );
     startPolling();
   }
@@ -205,6 +241,7 @@ const Presentation = (() => {
     if (!winRef || winRef.closed) return;
     const { width, height } = clampToScreen(w, h);
     try { winRef.resizeTo(width, height); } catch (e) {}
+    try { const pp = calcWindowPos(width, height, getWindowPosition()); winRef.moveTo(pp.left, pp.top); } catch (e) {}
   }
 
   function closeWindow() {
@@ -966,5 +1003,5 @@ const Presentation = (() => {
     // tampilkan tombol "Buka Layar 2" supaya pengguna yang menekannya.
   }
 
-  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendVerseCombined, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
+  return { init, refreshGuestGate, sendVerse, sendVerseMulti, sendVerseCombined, sendFreeText, sendKidung, clearScreen, isTwoScreenMode, openWindow, closeWindow, getWindowPosition, setWindowPosition, postRaw, resizeWindow, openMonitorWindow, closeMonitorWindow, isMonitorWindowOpen, postMonitorStatus, postMonitorVideo, postMonitorVideoControl };
 })();

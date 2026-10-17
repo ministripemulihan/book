@@ -1012,6 +1012,16 @@ const PresentationStudio = (() => {
         if (!(it.mediaItemId in mediaGroupFirstIdx)) mediaGroupFirstIdx[it.mediaItemId] = i;
       }
     });
+    // book173 -- kelompok ayat per kitab+pasal (untuk "🗑️ Hapus N ayat Matius 3" sekali klik)
+    const verseGroupCount = {}, verseGroupFirstIdx = {}, verseGroupName = {};
+    items.forEach((it, i) => {
+      if (it && it.type === "verse" && it.verseId && typeof verseById !== "undefined" && verseById[it.verseId]) {
+        const vv = verseById[it.verseId];
+        const key = vv.bookNumber + "|" + vv.chapter;
+        verseGroupCount[key] = (verseGroupCount[key] || 0) + 1;
+        if (!(key in verseGroupFirstIdx)) { verseGroupFirstIdx[key] = i; verseGroupName[key] = (vv.bookName || "") + " " + vv.chapter; }
+      }
+    });
     wrap.innerHTML = "";
     items.forEach((it, i) => {
       const ref = genericItemRefText(it);
@@ -1026,6 +1036,10 @@ const PresentationStudio = (() => {
       const isMedia = it && it.type === "media" && it.mediaItemId;
       const mediaGroupN = isMedia ? mediaGroupCount[it.mediaItemId] : 0;
       const showMediaGroupDelete = isMedia && mediaGroupN > 1 && mediaGroupFirstIdx[it.mediaItemId] === i;
+      const vv_ = (it && it.type === "verse" && it.verseId && typeof verseById !== "undefined") ? verseById[it.verseId] : null;
+      const vKey_ = vv_ ? vv_.bookNumber + "|" + vv_.chapter : null;
+      const showVerseGroupDelete = !!vKey_ && verseGroupCount[vKey_] > 1 && verseGroupFirstIdx[vKey_] === i;
+      const isAnn_ = !!(it && it.type === "announcement");
       // BARU (16 Sep 2026, permintaan operator "kumpulan ayat yang sudah
       // tersimpan youtubenya, yang pakai link, apa bisa dibuat gambar
       // thumbnailnya youtube tampil di sana, jadi tidak hanya tulisan")
@@ -1085,6 +1099,8 @@ const PresentationStudio = (() => {
         `<div class="ps-verse-row-del">
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
            ${showMediaGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="mediagroup" title="Hapus SEMUA ${mediaGroupN} halaman berkas ini dari kumpulan, sekali klik">🗑️ Hapus Semua ${mediaGroupN} Halaman Ini</button>` : ""}
+           ${isAnn_ ? `<button type="button" class="chip-btn small" data-edit-ann title="Ubah judul/isi pengumuman ini (kalau salah ketik)">✏️ Edit</button>` : ""}
+           ${showVerseGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="versegroup" title="Hapus SEMUA ${verseGroupCount[vKey_]} item ayat ${escapeHtml(verseGroupName[vKey_])} dari kumpulan, sekali klik">🗑️ Hapus ${verseGroupCount[vKey_]} item ${escapeHtml(verseGroupName[vKey_])}</button>` : ""}
            <button type="button" class="chip-btn small danger" data-del="one" title="Hapus item ini saja dari kumpulan">🗑️ Hapus Item Ini</button>
          </div>` +
         (reorderOn
@@ -1128,6 +1144,34 @@ const PresentationStudio = (() => {
           renderCollectionSelect();
         }
       });
+      // book173 -- "🗑️ Hapus N item Matius 3": hapus semua item ayat kitab+pasal yang sama sekaligus.
+      const verseGroupBtn = row.querySelector('[data-del="versegroup"]');
+      if (verseGroupBtn) {
+        verseGroupBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (!confirm(`Hapus SEMUA ${verseGroupCount[vKey_]} item ayat "${verseGroupName[vKey_]}" dari kumpulan "${col.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+          const removed = removeVerseChapterGroupFromCollection(username, sel.value, vv_.bookNumber, vv_.chapter);
+          if (removed > 0) { activePlaylist = null; renderCollectionSelect(); }
+        });
+      }
+      // book173 -- ✏️ Edit pengumuman (judul + isi) langsung dari Kumpulan Ayat.
+      const editAnnBtn = row.querySelector("[data-edit-ann]");
+      if (editAnnBtn && typeof showSimpleDialog === "function") {
+        editAnnBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          showSimpleDialog("Edit pengumuman", (box) => {
+            const t = document.createElement("input");
+            t.type = "text"; t.className = "columns-lang-select"; t.placeholder = "Judul (boleh kosong)"; t.value = it.title || ""; t.style.width = "100%";
+            const b = document.createElement("textarea");
+            b.className = "columns-lang-select"; b.rows = 8; b.placeholder = "Isi pengumuman"; b.value = it.text || ""; b.style.cssText = "width:100%; margin-top:8px; resize:vertical;";
+            box.appendChild(t); box.appendChild(b);
+            setTimeout(() => b.focus(), 30);
+            return () => { const body = b.value.trim(), title = t.value.trim(); return (body || title) ? { body, title } : null; };
+          }, (val) => {
+            if (updateAnnouncementInCollection(username, sel.value, i, val.body, val.title)) { renderCollectionSelect(); }
+          }, "Simpan perubahan");
+        });
+      }
       // "🗑️ Hapus N Bait Kidung Ini" -- hapus SEMUA bait kidung yang sama
       // sekaligus (permintaan operator: dulu harus hapus satu-satu).
       const groupBtn = row.querySelector('[data-del="group"]');
@@ -3237,6 +3281,17 @@ const PresentationStudio = (() => {
         // 📤 Kirim), judul TIDAK ikut tebal lagi -- yang tersimpan di
         // situ cuma teks gabungan biasa (lihat sendFreeText() di js/
         // presentation.js), belum menyimpan mana bagian judulnya.
+        // book173 (17 Okt 2026, permintaan operator): "Sisipkan ke Kumpulan Ayat" HANYA menyimpan -- TIDAK lagi
+        // langsung menayangkan ke Layar 2 (dulu menimpa isi yang sedang tampil). Mau tampil sekarang: tombol
+        // "📺 Tayangkan sekarang" di sebelahnya, atau klik itemnya di Kumpulan Ayat.
+      });
+    }
+    if (el("psAnnShowBtn")) {
+      el("psAnnShowBtn").addEventListener("click", () => {
+        const title = (el("psAnnTitle") && el("psAnnTitle").value.trim()) || "";
+        const body = (el("psAnnBody") && el("psAnnBody").value.trim()) || "";
+        if (!title && !body) return;
+        const full = title ? `${title}\n\n${body}` : body;
         post({ type: "text", text: full, align: psAnnAlign_, annTitle: title, annBody: body });
       });
     }
@@ -7444,9 +7499,17 @@ const PresentationStudio = (() => {
         <div class="ps-file-actions">
           <button type="button" class="chip-btn small primary" data-act="show">▶️ Tampilkan</button>
           <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
+          <button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai AUDIO LATAR (tanpa tampilan pemutar di Layar 2) -- teks kidung/ayat tetap tampil penuh. Kendali Play/Jeda/Stop ada di kotak Audio Latar.">🎧 Latar</button>
           <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
         </div>`;
       appendBibleRefLabel_(row, v);
+      // book173 -- 🎧 Latar: SoundCloud jadi suara latar (pemutar disembunyikan di Layar 2), tidak menutupi kidung.
+      row.querySelector('[data-act="bg"]').addEventListener("click", () => {
+        try {
+          loadSharedBgAudio_("sc", v.trackUrl, v.title || "SoundCloud");
+          controlSharedBgAudio_("play");
+        } catch (e) { alert("Gagal memuat SoundCloud sebagai latar: " + (e && e.message ? e.message : e)); }
+      });
       const send = () => { rawPost({ type: "soundcloud", trackUrl: v.trackUrl }); renderStudioPreview({ type: "soundcloud", trackUrl: v.trackUrl, title: v.title }); };
       row.querySelector('[data-act="show"]').addEventListener("click", send);
       row.querySelector('[data-act="preview"]').addEventListener("click", () => stageNext(v.title, v.title, send));
@@ -12986,6 +13049,20 @@ const PresentationStudio = (() => {
     // buka menu "⋮" dulu untuk sampai ke tombol "Buka Studio Presentasi".
     if (el("headerStudioBtn")) el("headerStudioBtn").addEventListener("click", openStudio);
     if (el("psOpenWindowBtn")) el("psOpenWindowBtn").addEventListener("click", () => { if (typeof Presentation !== "undefined") { Presentation.openWindow(); refreshStatusUi(); } });
+    // book173 -- posisi Layar 2: ⬆️ atas / ◼ tengah (bawaan) / ⬇️ bawah
+    const winPosBox_ = el("psWinPos");
+    if (winPosBox_ && typeof Presentation !== "undefined" && Presentation.getWindowPosition) {
+      const paintWinPos_ = () => {
+        const cur = Presentation.getWindowPosition();
+        winPosBox_.querySelectorAll("button[data-pos]").forEach((b) => {
+          const on = b.dataset.pos === cur;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-pressed", String(on));
+        });
+      };
+      winPosBox_.querySelectorAll("button[data-pos]").forEach((b) => b.addEventListener("click", () => { Presentation.setWindowPosition(b.dataset.pos); paintWinPos_(); }));
+      paintWinPos_();
+    }
     // BARU (10 Sep 2026, sesi ke-10) -- "🖥️③ Monitor Pembicara".
     if (el("psOpenMonitorBtn")) {
       el("psOpenMonitorBtn").addEventListener("click", () => {

@@ -718,6 +718,41 @@ function removeItemFromCollection(username, id, index) {
   return true;
 }
 
+// BARU (17 Okt 2026, book173, permintaan operator) -- hapus SEKUMPULAN ayat dalam 1 kitab+pasal sekaligus
+// (mis. salah memasukkan "Matius 3" 1 ayat/slide: dulu harus hapus 17 kali satu-satu). Mengembalikan jumlah item yang terhapus.
+function removeVerseChapterGroupFromCollection(username, id, bookNumber, chapter) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col) return 0;
+  const before = col.items.length;
+  col.items = col.items.filter((it) => {
+    if (!it || it.type !== "verse") return true;
+    const v = (typeof verseById !== "undefined" && it.verseId) ? verseById[it.verseId] : null;
+    return !(v && v.bookNumber === bookNumber && v.chapter === chapter);
+  });
+  const n = before - col.items.length;
+  if (!n) return 0;
+  _migrateCollection(col);
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return n;
+}
+
+// BARU (17 Okt 2026, book173) -- ubah judul/isi item "announcement" yang sudah ada di Kumpulan Ayat (salah ketik).
+function updateAnnouncementInCollection(username, id, index, text, title) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  const it = col && col.items[index];
+  if (!it || it.type !== "announcement") return false;
+  it.text = String(text || "").trim();
+  it.title = String(title || "").trim();
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+
 // BARU (4 Sep 2026, permintaan operator) -- kidung yang ditambahkan lewat
 // "➕ Semua" (addAllBtn, lihat wireKidungTab() di js/presentation-studio.js)
 // tersimpan sebagai BANYAK item TERPISAH di kumpulan (1 item per bait/
