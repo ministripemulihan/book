@@ -3142,6 +3142,24 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
     handleAddToCollection(v);
   });
 
+  // BARU (17 Okt 2026, book172, permintaan operator) -- "▶️" Baca dari sini LANGSUNG di baris ikon
+  // ayat (sejajar 📋 📚), tidak perlu buka panel catatan dulu. Google Voice membaca dari ayat ini
+  // sampai akhir pasal, memakai bahasa/kolom tempat ayat ini berasal (sourceVerses).
+  let readBtn = null;
+  if (typeof ttsSupported !== "undefined" && ttsSupported) {
+    readBtn = document.createElement("button");
+    readBtn.type = "button";
+    readBtn.className = "verse-read-btn";
+    readBtn.title = "Baca dari ayat ini (Google Voice)";
+    readBtn.setAttribute("aria-label", "Baca dari ayat " + v.verse);
+    readBtn.textContent = "▶️";
+    readBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const src = sourceVerses || (typeof currentChapterVerses !== "undefined" ? currentChapterVerses : []);
+      playTTSFromVerse(src, v.verse);
+    });
+  }
+
   // Tombol "kirim ke Layar 2" -- ada di DOM untuk setiap ayat, tapi hanya
   // TERLIHAT saat Mode Presentasi 2 Layar aktif (lihat body.present-mode-on
   // di css/style.css & js/presentation.js). Tidak tampil untuk Mode Tamu
@@ -3162,6 +3180,7 @@ function buildVerseBlock(v, idx, fallbackBookName, sourceVerses) {
   block.appendChild(textWrap);
   block.appendChild(copyBtn);
   block.appendChild(collBtn);
+  if (readBtn) block.appendChild(readBtn);
   block.appendChild(presentBtn);
   // BARU (21 Sep 2026) -- tombol ✏️ Edit Ayat, hanya untuk administrator (js/bible-edit.js)
   if (typeof BibleEdit !== "undefined") BibleEdit.decorateBlock(block, v, textWrap);
@@ -3980,6 +3999,7 @@ function renderChapter(bookNum, chapter, verseToHighlight, opts) {
 
   hideAllPanels();
   el("reader").hidden = false;
+  setTimeout(updateTTSFloat_, 0);
   const displayName = verses[0].bookName || book.name;
   el("readerTitle").textContent = `${displayName} ${chapter}`;
   if (el("readerTitleBottom")) el("readerTitleBottom").textContent = `${displayName} ${chapter}`;
@@ -9689,6 +9709,7 @@ function hideAllPanels() {
   el("chapterPicker").hidden = true;
   el("searchResults").hidden = true;
   el("reader").hidden = true;
+  try { updateTTSFloat_(); } catch (e) { /* belum siap saat awal muat */ }
   el("emptyState").hidden = true;
   el("planPanel").hidden = true;
   if (el("announcementPanel")) el("announcementPanel").hidden = true;
@@ -10294,6 +10315,7 @@ function initTTS() {
     el("ttsToggle").title = "Perangkat/browser ini tidak mendukung pembacaan suara";
     return;
   }
+  wireTtsFollowGuard_();
   // beberapa browser memuat daftar suara secara asinkron
   window.speechSynthesis.onvoiceschanged = () => {};
   el("ttsToggle").addEventListener("click", toggleTTS);
@@ -10415,19 +10437,147 @@ function cleanArticulationForSpeech(text) {
   return out.replace(/\s{2,}/g, " ").trim();
 }
 
+// ------------------------------------------------------------
+// book172 (17 Okt 2026) -- LAYAR MENGIKUTI SUARA, TAPI TIDAK MENARIK PEMBACA.
+// Masalah lama: (1) scrollIntoView(block:"center") hanya memusatkan SATU bahasa; di mode Nempel/Atas-bawah
+// (3 bahasa menumpuk per ayat) bahasa ke-2/ke-3 terpotong di bawah layar, (2) angka batas 90/100px tidak
+// memperhitungkan header & bilah navigasi yang menempel, (3) layar ditarik lagi tiap pindah ayat/kata walau
+// pembaca sedang menggeser sendiri untuk membaca bahasa ke-3.
+// Sekarang: seluruh kelompok bahasa 1 ayat dijaga tampil UTUH di area aman (di antara header & bilah bawah);
+// kalau pembaca menyentuh/menggulir sendiri, layar TIDAK digeser otomatis selama TTS_FOLLOW_PAUSE_MS.
+// ------------------------------------------------------------
+const TTS_FOLLOW_PAUSE_MS = 15000;
+let ttsUserTouchAt_ = 0, ttsUserTouching_ = false, ttsFollowWired_ = false;
+function wireTtsFollowGuard_() {
+  if (ttsFollowWired_) return;
+  ttsFollowWired_ = true;
+  const mark = () => { ttsUserTouchAt_ = Date.now(); };
+  const opt = { capture: true, passive: true };
+  ["wheel", "mousedown", "keydown", "touchmove"].forEach((evt) => document.addEventListener(evt, mark, opt));
+  document.addEventListener("touchstart", () => { ttsUserTouching_ = true; mark(); }, opt);
+  ["touchend", "touchcancel"].forEach((evt) => document.addEventListener(evt, () => { ttsUserTouching_ = false; mark(); }, opt));
+}
+function ttsFollowBlocked_() { return ttsUserTouching_ || (Date.now() - ttsUserTouchAt_ < TTS_FOLLOW_PAUSE_MS); }
+
+function ttsScrollParent_(node) {
+  for (let p = node && node.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 2) return p;
+  }
+  return null; // halaman (window)
+}
+function ttsSafeArea_(container) {
+  const H = window.innerHeight || 800;
+  let top = 0, bottom = H;
+  if (container) { const r = container.getBoundingClientRect(); top = Math.max(top, r.top); bottom = Math.min(bottom, r.bottom); }
+  const visible = (n) => { if (!n) return null; const cs = getComputedStyle(n); if (cs.display === "none" || cs.visibility === "hidden") return null; const r = n.getBoundingClientRect(); return r.height > 0 ? r : null; };
+  [document.querySelector(".app-header"), document.querySelector(".current-reading-indicator")].forEach((n) => {
+    const r = visible(n);
+    if (r && r.bottom > top && r.top < H * 0.45) top = Math.max(top, r.bottom); // menempel di atas (sticky)
+  });
+  const tb = visible(el("readerNavBottomWrap"));
+  if (tb && tb.top > H * 0.5 && getComputedStyle(el("readerNavBottomWrap")).position === "fixed") bottom = Math.min(bottom, tb.top);
+  return { top: top + 6, bottom: Math.max(top + 60, bottom - 6) };
+}
+function ttsScrollBy_(container, delta) {
+  if (!delta || Math.abs(delta) < 2) return;
+  try { (container || window).scrollBy({ top: delta, behavior: "smooth" }); }
+  catch (e) { if (container) container.scrollTop += delta; else window.scrollBy(0, delta); }
+}
+// Semua blok bahasa milik ayat yang sama (mode Nempel / Atas-bawah menumpuknya berurutan).
+function ttsVerseGroup_(block) {
+  const parent = block && block.parentElement;
+  if (!parent || !parent.classList.contains("reader-columns-stacked") || !block.dataset || !block.dataset.verse) return [block];
+  const vn = block.dataset.verse;
+  const out = Array.from(parent.children).filter((ch) => ch.dataset && ch.dataset.verse === vn && (ch.classList.contains("verse-block") || ch.classList.contains("verse-ruby-block")));
+  return out.length ? out : [block];
+}
+function ttsEnsureGroupVisible_(first, last) {
+  if (!first || ttsFollowBlocked_()) return;
+  const container = ttsScrollParent_(first);
+  const area = ttsSafeArea_(container);
+  const top = first.getBoundingClientRect().top, bottom = (last || first).getBoundingClientRect().bottom;
+  const avail = area.bottom - area.top, h = bottom - top;
+  let delta = 0;
+  if (h <= avail) {
+    if (top < area.top) delta = top - area.top;                 // ujung atas terpotong
+    else if (bottom > area.bottom) delta = bottom - area.bottom; // bahasa paling bawah terpotong
+  } else if (top < area.top || top > area.top + avail * 0.3) {
+    delta = top - area.top; // terlalu tinggi untuk muat: sejajarkan bagian atas; sisanya diikuti per kata
+  }
+  ttsScrollBy_(container, delta);
+}
+function ttsEnsureWordVisible_(rect, node) {
+  if (!rect || !rect.height || ttsFollowBlocked_()) return;
+  const container = ttsScrollParent_(node);
+  const area = ttsSafeArea_(container);
+  if (rect.top >= area.top && rect.bottom <= area.bottom) return; // kata masih di area aman
+  ttsScrollBy_(container, rect.top - (area.top + (area.bottom - area.top) * 0.3));
+}
+
 function setSpeakingHighlight(block) {
   document.querySelectorAll(".verse-block.speaking").forEach((b) => b.classList.remove("speaking"));
   if (block) {
     block.classList.add("speaking");
-    block.scrollIntoView({ behavior: "smooth", block: "center" });
+    const g = ttsVerseGroup_(block);
+    ttsEnsureGroupVisible_(g[0], g[g.length - 1]);
   }
+}
+
+// book172 -- POSISI TERAKHIR BACA. Dulu setelah jeda lalu ▶️ (atau pembacaan terhenti) selalu kembali ke ayat 1.
+// Sekarang tiap ayat yang mulai dibacakan dicatat (per kitab+pasal, tersimpan di perangkat); ▶️ tanpa
+// pembacaan aktif melanjutkan dari ayat terakhir itu. ⏹ di kontrol melayang = hapus catatan (mulai dari ayat 1).
+const TTS_LASTPOS_KEY = "bible_app_tts_lastpos_v1";
+let ttsLastPos = null, ttsLastSrc = null;
+try { ttsLastPos = JSON.parse(localStorage.getItem(TTS_LASTPOS_KEY) || "null"); } catch (e) { ttsLastPos = null; }
+function ttsSavePos_(v) {
+  if (!v || !v.verse) return;
+  ttsLastPos = { book: v.bookNumber, chapter: v.chapter, verse: v.verse };
+  try { localStorage.setItem(TTS_LASTPOS_KEY, JSON.stringify(ttsLastPos)); } catch (e) { /* abaikan */ }
+}
+function ttsClearPos_() {
+  ttsLastPos = null; ttsLastSrc = null;
+  try { localStorage.removeItem(TTS_LASTPOS_KEY); } catch (e) { /* abaikan */ }
+}
+function ttsResumeInfo_() {
+  if (!ttsLastPos || typeof currentChapterVerses === "undefined" || !currentChapterVerses.length) return null;
+  if (ttsLastPos.book !== currentBookNum || ttsLastPos.chapter !== currentChapter) return null;
+  return currentChapterVerses.some((v) => v.verse === ttsLastPos.verse) ? ttsLastPos : null;
+}
+
+// Kontrol melayang (HP: header bisa tersembunyi di mode layar penuh) -- ⏸/▶️ + nomor ayat + ⏹.
+function updateTTSFloat_() {
+  let box = el("ttsFloat");
+  const reader = el("reader");
+  const rp = ttsResumeInfo_();
+  const cur = ttsRun && ttsRun.item && ttsRun.item.v ? ttsRun.item.v : null;
+  const show = ttsSupported && reader && !reader.hidden && (ttsRun || rp);
+  if (!show) { if (box) box.hidden = true; return; }
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "ttsFloat";
+    box.className = "tts-float";
+    box.innerHTML = '<button type="button" class="tts-float-play" aria-label="Jeda / lanjutkan pembacaan"></button>' +
+      '<span class="tts-float-label"></span>' +
+      '<button type="button" class="tts-float-stop" title="Berhenti (pembacaan berikutnya mulai dari ayat 1)" aria-label="Berhenti">⏹</button>';
+    box.querySelector(".tts-float-play").addEventListener("click", (e) => { e.stopPropagation(); toggleTTS(); });
+    box.querySelector(".tts-float-stop").addEventListener("click", (e) => { e.stopPropagation(); stopTTS(); ttsClearPos_(); updateTTSFloat_(); });
+    document.body.appendChild(box);
+  }
+  const q0 = ttsRun && ttsRun.queue && ttsRun.queue.find((it) => it.v);
+  const verseNo = cur ? cur.verse : (rp ? rp.verse : (q0 ? q0.v.verse : "")); // run baru mulai: item belum berjalan
+  box.hidden = false;
+  box.querySelector(".tts-float-play").textContent = ttsPlaying ? "⏸" : "▶️";
+  box.querySelector(".tts-float-label").textContent = (ttsPlaying ? "Ayat " : "Lanjut ayat ") + verseNo;
 }
 
 function updateTTSButton() {
   const btn = el("ttsToggle");
   btn.textContent = ttsPlaying ? "⏸" : "▶️";
   btn.classList.toggle("playing", ttsPlaying);
-  btn.title = ttsPlaying ? "Jeda pembacaan" : "Putar pembacaan ayat";
+  const rp = !ttsPlaying && !ttsRun ? ttsResumeInfo_() : null;
+  btn.title = ttsPlaying ? "Jeda pembacaan" : (ttsRun && ttsRun.paused ? "Lanjutkan pembacaan" : (rp ? "Lanjutkan baca dari ayat " + rp.verse : "Putar pembacaan ayat"));
+  updateTTSFloat_();
 }
 
 // BARU (8 Sep 2026, permintaan operator) -- kata "Ayat"/"Pasal" yang
@@ -10477,6 +10627,8 @@ function spokenChapterAnnouncement(bookName, chapterNum) {
 // diucapkan sebagai kalimat pembuka (nama kitab+pasal) SEBELUM ayat 1.
 function speakVerseList(verses, opts) {
   if (!ttsSupported || !verses || !verses.length) return;
+  ttsLastSrc = (opts && opts.src) || null;
+  ttsUserTouchAt_ = 0; ttsUserTouching_ = false; // pembaca baru menekan tombol -> layar boleh mengikuti lagi
   ttsKillRun_();
   window.speechSynthesis.cancel();
   const run = { id: ++ttsRunSeq, queue: buildTtsQueue_(verses, opts), i: 0, item: null, cur: null, active: null, paused: false, waiting: false, t0: 0, pauseAt: 0, timer: null };
@@ -10551,13 +10703,9 @@ function ttsSetUnit_(run, u) {
     } catch (e) { /* abaikan */ }
   }
   if (!target) return;
-  try { // kata keluar dari layar (baris baru di ayat panjang) -> gulir supaya tetap terlihat
-    const rect = target.getBoundingClientRect();
-    const H = window.innerHeight || 800;
-    if (rect && rect.height && (rect.bottom > H - 100 || rect.top < 90)) {
-      const node = u.el || (target.startContainer && target.startContainer.parentElement);
-      if (node && node.scrollIntoView) node.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+  try { // kata keluar dari area aman (baris baru di ayat panjang) -> gulir, KECUALI pembaca sedang menggeser sendiri
+    const node = u.el || (target.startContainer && target.startContainer.parentElement);
+    ttsEnsureWordVisible_(target.getBoundingClientRect(), node);
   } catch (e) { /* abaikan */ }
 }
 
@@ -10571,6 +10719,7 @@ function ttsFinish_(run) {
   if (run !== ttsRun) return;
   ttsKillRun_();
   ttsPlaying = false;
+  ttsClearPos_(); // pasal selesai dibacakan -> pembacaan berikutnya mulai dari ayat 1 lagi
   releaseWakeLock();
   setSpeakingHighlight(null);
   updateTTSButton();
@@ -10583,11 +10732,13 @@ function ttsNext_(run) {
   if (!item) { ttsFinish_(run); return; }
   run.item = item;
   item.done = false; item.boundary = false; item.units = null;
+  if (item.v) setTimeout(updateTTSFloat_, 0); // nomor ayat di kontrol melayang ikut berganti
   if (item.kind === "announce") {
     ttsClearUnit_(run);
     setSpeakingHighlight(findVerseBlock_(item.v)); // tanda sudah di ayat pertama sejak pengumuman nama kitab
   } else if (item.kind === "seg") {
     if (item.first || !run.cur || run.cur.v !== item.v) {
+      ttsSavePos_(item.v);
       const block = findVerseBlock_(item.v);
       const tw = block && block.querySelector(".verse-text-wrap");
       run.cur = { v: item.v, block, units: tw && typeof TtsSync !== "undefined" ? TtsSync.domUnits(tw, String(item.v.text || "")) : [] };
@@ -10669,6 +10820,7 @@ function playTTS() {
   if (ttsRun && ttsRun.paused) {
     ttsRun.t0 += performance.now() - ttsRun.pauseAt; // waktu jeda tidak dihitung
     ttsRun.paused = false;
+    ttsUserTouchAt_ = 0; ttsUserTouching_ = false;
     if (window.speechSynthesis.paused) window.speechSynthesis.resume();
     ttsPlaying = true;
     requestWakeLock();
@@ -10685,6 +10837,15 @@ function playTTS() {
   }
 
   if (!currentChapterVerses.length) return;
+
+  // book172 -- tidak ada pembacaan aktif tapi ada ayat terakhir yang tercatat di pasal ini -> lanjutkan dari situ.
+  const rp = ttsResumeInfo_();
+  if (rp && rp.verse !== currentChapterVerses[0].verse) {
+    const srcOk = ttsLastSrc && ttsLastSrc.length && ttsLastSrc[0].bookNumber === currentBookNum && ttsLastSrc[0].chapter === currentChapter;
+    const src = srcOk ? ttsLastSrc : currentChapterVerses;
+    const idx = src.findIndex((v) => v.verse === rp.verse);
+    if (idx > 0) { speakVerseList(src.slice(idx), { src }); return; }
+  }
 
   // BARU (8 Sep 2026, permintaan operator) -- umumkan nama kitab + nomor
   // pasal sebelum ayat 1 (lihat spokenChapterAnnouncement()). Nama kitab
@@ -10712,13 +10873,24 @@ function playTTSFromVerse(verses, startVerseNum) {
   if (!ttsSupported || !verses || !verses.length) return;
   const idx = verses.findIndex((v) => v.verse === startVerseNum);
   const toRead = idx >= 0 ? verses.slice(idx) : verses;
-  speakVerseList(toRead);
+  speakVerseList(toRead, { src: verses });
 }
 
 function pauseTTS() {
   if (!ttsSupported) return;
-  if (ttsRun && !ttsRun.paused) { ttsRun.paused = true; ttsRun.pauseAt = performance.now(); }
-  if (window.speechSynthesis.speaking) window.speechSynthesis.pause();
+  const run = ttsRun;
+  if (run && !run.paused) {
+    run.paused = true; run.pauseAt = performance.now();
+    // book172: speechSynthesis.pause()/resume() tidak andal di HP (Android/iOS: suara berhenti total atau lanjutnya
+    // kembali ke awal). Jadi jeda = berhenti sungguhan; antrean TETAP di posisi sekarang & potongan kalimat yang
+    // sedang dibacakan diulang saat ▶️ (lihat playTTS). Posisi ayat juga tercatat -> aman walau halaman dimuat ulang.
+    if (run.item && !run.item.done) { run.item.done = true; run.i = Math.max(0, run.i - 1); }
+    run.waiting = true;
+    window.speechSynthesis.cancel();
+    if (run.item && run.item.v) ttsSavePos_(run.item.v);
+  } else if (!run && window.speechSynthesis.speaking) {
+    window.speechSynthesis.pause();
+  }
   if (ttsPlaying) releaseWakeLock();
   ttsPlaying = false;
   updateTTSButton();
@@ -10949,6 +11121,7 @@ async function startTTSRecording() {
   ttsRecordState = { recorder, stream };
   recorder.start();
   updateTTSRecordButton(true);
+  ttsClearPos_(); // rekaman selalu dari ayat 1
   stopTTS();
   playTTS();
 
