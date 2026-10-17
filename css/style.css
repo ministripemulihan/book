@@ -5778,3 +5778,19 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 .tts-float[hidden] { display: none; }
 .tts-float button { background: transparent; border: none; font-size: 18px; line-height: 1; padding: 6px 8px; min-width: 40px; min-height: 40px; cursor: pointer; color: inherit; }
 .tts-float-label { white-space: nowrap; padding: 0 2px; }
+
+
+/* ============================================================
+   BARU (17 Okt 2026, book172) -- tombol ↔ di toolbar Daftar YouTube Studio: kolom TENGAH + KANAN menyatu jadi 1 kolom lebar
+   (kolom kiri tetap) supaya kotak thumbnail bisa lebih besar. Hanya aktif saat tab ▶️ YouTube dibuka (tab lain tetap 3 kolom,
+   jadi tidak pernah "terjebak"). Tekan ↔ lagi = kembali 3 kolom.
+   ============================================================ */
+.present-studio.ps-yt-wide:has(.ps-tab[data-ps-mid-tab="youtube"].active) .ps-columns {
+  grid-template-areas: "left preview preview" "left mid mid";
+}
+.present-studio.ps-yt-wide.ps-dual-live:has(.ps-tab[data-ps-mid-tab="youtube"].active) .ps-columns {
+  grid-template-areas: "preview preview preview" "controls-left controls-mid controls-mid";
+}
+.present-studio.ps-yt-wide:has(.ps-tab[data-ps-mid-tab="youtube"].active) .ps-col-right { display: none; }
+.present-studio.ps-yt-wide:has(.ps-tab[data-ps-mid-tab="youtube"].active) .ps-col-mid { border-right: none; }
+#psYtWide.active { background: var(--brass); color: #fff; }
