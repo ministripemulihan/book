@@ -1263,6 +1263,34 @@ const PresentationStudio = (() => {
     const act = activePlaylist.items[activePlaylist.index];
     if (act && isSame(act)) syncArmForItem_(act);
   }
+  // book175 -- "📌 Pasang ke Item": jadikan lagu (SoundCloud/YouTube) dari Playlist Video sebagai Audio Latar item
+  // Kumpulan yang SEDANG TERPILIH (baris yang disorot di kolom kiri). Tanpa buka dialog, tanpa salin-tempel.
+  function attachBgToActiveItem_(kind, url, title) {
+    const sel = el("psCollectionSelect");
+    if (!activePlaylist || !sel || !sel.value || !activePlaylist.items[activePlaylist.index]) {
+      alert("Klik dulu satu item di Kumpulan Ayat (kolom kiri) -- itu yang akan diberi Audio Latar, lalu tekan tombol ini lagi.");
+      return false;
+    }
+    const username = typeof currentUser !== "undefined" ? currentUser : null;
+    const i = activePlaylist.index;
+    const it = activePlaylist.items[i];
+    const col = loadCollections(username)[sel.value];
+    if (!col || !col.items || !col.items[i]) { alert("Item tidak ditemukan di kumpulan ini."); return false; }
+    const bg = { url, kind, label: title || "", source: "link", managed: true, armStart: true, autoplay: false,
+      continuePrev: false, loopFile: false, loopAll: false, extraUrls: [], mediaId: "" };
+    let targets = [i];
+    if (it.type === "kidung") {
+      const same = [];
+      col.items.forEach((x, k) => { if (x && x.type === "kidung" && x.buku === it.buku && String(x.kidungNo) === String(it.kidungNo)) same.push(k); });
+      if (same.length > 1 && confirm(`Pasang juga ke semua ${same.length} slide kidung yang sama di kumpulan ini?\n\nOK = semua slide kidung ini (lagu tidak putus antar bait)\nBatal = hanya item yang dipilih`)) targets = same;
+    }
+    const n = updateItemsBgAudioInCollection(username, sel.value, targets.map((k) => ({ index: k, bgAudio: bg })));
+    if (!n) { alert("Gagal menyimpan Audio Latar."); return false; }
+    const norm = typeof normalizeBgAudio === "function" ? normalizeBgAudio(bg) : bg;
+    targets.forEach((k) => { if (activePlaylist.items[k]) activePlaylist.items[k].bgAudio = norm; });
+    renderCollectionList();
+    return true;
+  }
   async function openBgAudioDialog_(username, colId, index, it) {
     if (!colId) return;
     const sameKidung = (x) => !!(it && x && x.type === "kidung" && it.type === "kidung" && x.buku === it.buku && String(x.kidungNo) === String(it.kidungNo));
@@ -1544,6 +1572,69 @@ const PresentationStudio = (() => {
   // "🗑️ Hapus Item Ini" per baris (yang cuma hapus 1 item). Dipakai
   // kalau operator mau bersihkan/buang total 1 kumpulan (mis. sudah
   // lewat acaranya & tidak dipakai lagi).
+  // book175 -- "🧹 Hapus Banyak": centang beberapa Kumpulan sekaligus lalu hapus (tidak bisa dibatalkan).
+  function wireCollectionBulkDelete_() {
+    const btn = el("psCollectionBulkDeleteBtn");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      if (typeof loadCollections !== "function" || typeof deleteCollection !== "function" || typeof showSimpleDialog !== "function") return;
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      const collections = loadCollections(username);
+      const ids = Object.keys(collections).sort((a, b) =>
+        new Date(collections[b].updatedAt || collections[b].createdAt || 0) - new Date(collections[a].updatedAt || collections[a].createdAt || 0));
+      if (!ids.length) { alert("Belum ada Kumpulan."); return; }
+      const fmt = (d) => { try { return d ? new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"; } catch (e) { return "-"; } };
+      showSimpleDialog("🧹 Hapus Banyak Kumpulan", (box) => {
+        const hint = document.createElement("p");
+        hint.className = "simple-dialog-hint";
+        hint.textContent = `Centang Kumpulan yang tidak dipakai lagi (${ids.length} Kumpulan). Yang dihapus hilang permanen beserta semua itemnya.`;
+        box.appendChild(hint);
+        const tools = document.createElement("div");
+        tools.className = "ps-btn-row";
+        const search = document.createElement("input");
+        search.type = "text"; search.placeholder = "🔍 Cari nama..."; search.style.cssText = "flex:1; min-width:120px;";
+        tools.appendChild(search);
+        const mkBtn = (t, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip-btn small"; b.textContent = t; b.addEventListener("click", fn); tools.appendChild(b); return b; };
+        box.appendChild(tools);
+        const list = document.createElement("div");
+        list.style.cssText = "max-height:320px; overflow:auto; border:1px solid rgba(128,128,128,.35); border-radius:8px; padding:4px 8px; margin-top:6px;";
+        box.appendChild(list);
+        const info = document.createElement("div");
+        info.style.cssText = "margin-top:6px; font-weight:600;";
+        box.appendChild(info);
+        const checks = new Map();
+        ids.forEach((id) => {
+          const c = collections[id]; const n = (c.items || c.verseIds || []).length;
+          const row = document.createElement("label");
+          row.style.cssText = "display:flex; align-items:center; gap:8px; margin:4px 0; cursor:pointer;";
+          const cb = document.createElement("input"); cb.type = "checkbox"; cb.addEventListener("change", upd);
+          const t = document.createElement("span");
+          t.textContent = `${c.name || "(tanpa nama)"} — ${n} item · ${fmt(c.updatedAt || c.createdAt)}`;
+          row.appendChild(cb); row.appendChild(t); list.appendChild(row);
+          checks.set(id, { cb, row, name: String(c.name || "").toLowerCase(), n });
+        });
+        function upd() { const k = ids.filter((id) => checks.get(id).cb.checked).length; info.textContent = k ? `${k} Kumpulan dipilih` : "Belum ada yang dipilih"; }
+        function visible() { return ids.filter((id) => !checks.get(id).row.hidden); }
+        search.addEventListener("input", () => { const q = search.value.trim().toLowerCase(); ids.forEach((id) => { const e = checks.get(id); e.row.hidden = !!q && !e.name.includes(q); }); });
+        mkBtn("☑️ Semua", () => { visible().forEach((id) => { checks.get(id).cb.checked = true; }); upd(); });
+        mkBtn("⬜ Kosongkan", () => { ids.forEach((id) => { checks.get(id).cb.checked = false; }); upd(); });
+        mkBtn("📭 Yang kosong (0 item)", () => { visible().forEach((id) => { if (checks.get(id).n === 0) checks.get(id).cb.checked = true; }); upd(); });
+        upd();
+        return () => {
+          const picked = ids.filter((id) => checks.get(id).cb.checked);
+          if (!picked.length) { alert("Centang dulu Kumpulan yang mau dihapus."); return null; }
+          return picked;
+        };
+      }, async (picked) => {
+        const ok = await confirmDangerAction("Hapus " + picked.length + " Kumpulan?", `${picked.length} Kumpulan beserta SEMUA item di dalamnya akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`, "Ya, Hapus");
+        if (!ok) return;
+        picked.forEach((id) => deleteCollection(username, id));
+        activePlaylist = null;
+        renderCollectionSelect();
+      }, "Hapus yang dicentang");
+    });
+  }
+
   function wireCollectionDeleteAllButton() {
     const btn = el("psCollectionDeleteAllBtn");
     const sel = el("psCollectionSelect");
@@ -7454,6 +7545,34 @@ const PresentationStudio = (() => {
     let ytRenderLimit_ = YT_PAGE_SIZE_;
     let ytRenderSig_ = "";
     let ytAutoTimer_ = null;
+    // book175 -- tombol "📋 Salin Link" (dipakai baris YouTube; baris SoundCloud punya versinya sendiri di buildScRow_).
+    function addCopyLinkBtn_(row, url, opts) {
+      const box = row.querySelector(".ps-file-actions");
+      if (!box || !url) return;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip-btn small"; b.dataset.act = "copylink";
+      b.title = "Salin link video ini ke clipboard"; b.textContent = "📋 Salin Link";
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        let ok = false;
+        try { await navigator.clipboard.writeText(url); ok = true; }
+        catch (err) { try { window.prompt("Salin link ini (Ctrl+C):", url); ok = true; } catch (e2) { /* abaikan */ } }
+        b.textContent = ok ? "✅ Tersalin" : "⚠️ Gagal";
+        setTimeout(() => { b.textContent = "📋 Salin Link"; }, 1400);
+      });
+      box.appendChild(b);
+      if (opts && opts.attach) {
+        const ab = document.createElement("button");
+        ab.type = "button"; ab.className = "chip-btn small"; ab.dataset.act = "attach";
+        ab.title = "Jadikan video ini Audio Latar item Kumpulan yang sedang dipilih (klik dulu itemnya di kolom kiri)";
+        ab.textContent = "📌 Pasang ke Item";
+        ab.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (attachBgToActiveItem_("yt", opts.attach.url, opts.attach.title)) { ab.textContent = "✅ Terpasang"; setTimeout(() => { ab.textContent = "📌 Pasang ke Item"; }, 1400); }
+        });
+        box.appendChild(ab);
+      }
+    }
     // BARU (book165) -- label "📖 Markus 12:30-31" di bawah judul (BibleRef dari Sheet).
     function appendBibleRefLabel_(row, v) {
       if (!v.bibleRef) return;
@@ -7503,9 +7622,14 @@ const PresentationStudio = (() => {
           <button type="button" class="chip-btn small" data-act="preview">👁️ Pratinjau</button>
           <button type="button" class="chip-btn small" data-act="bg" title="Putar sebagai AUDIO LATAR (tanpa tampilan pemutar di Layar 2) -- teks kidung/ayat tetap tampil penuh. Kendali Play/Jeda/Stop ada di kotak Audio Latar.">🎧 Latar</button>
           <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
+          <button type="button" class="chip-btn small" data-act="attach" title="Jadikan lagu ini Audio Latar item Kumpulan yang sedang dipilih (klik dulu itemnya di kolom kiri)">📌 Pasang ke Item</button>
           <button type="button" class="chip-btn small" data-act="copylink" title="Salin link SoundCloud ini, lalu tempel di 🎧 Audio Latar item Kidung (sumber 🔗 Link). Atau di dialog itu pilih \"Dari Playlist SoundCloud\".">📋 Salin Link</button>
         </div>`;
       appendBibleRefLabel_(row, v);
+      row.querySelector('[data-act="attach"]').addEventListener("click", (e) => {
+        const btn = e.currentTarget;
+        if (attachBgToActiveItem_("sc", v.trackUrl, v.title || "SoundCloud")) { btn.textContent = "✅ Terpasang"; setTimeout(() => { btn.textContent = "📌 Pasang ke Item"; }, 1400); }
+      });
       // book175 -- 📋 Salin Link
       row.querySelector('[data-act="copylink"]').addEventListener("click", async (e) => {
         const btn = e.currentTarget;
@@ -7582,6 +7706,7 @@ const PresentationStudio = (() => {
             <button type="button" class="chip-btn small" data-act="bg" title="Putar video ini sebagai Audio Latar SEKARANG JUGA, tanpa perlu disimpan dulu ke Media Tersimpan">🎧 Latar</button>
             <button type="button" class="chip-btn small" data-act="addcol">➕ Kumpulan</button>
           </div>`;
+        { const yu_ = v.url || ("https://www.youtube.com/watch?v=" + v.videoId); addCopyLinkBtn_(row, yu_, { attach: { url: yu_, title: v.title } }); }
         // BARU (28 Sep 2026, permintaan operator) -- isi kolom KidungRef
         // (K130 / S130 / KA13, boleh banyak dipisah koma) tampil sebagai
         // tombol kecil; ditekan -> membuka kidung itu di tab 🎵 Kidung.
@@ -13060,6 +13185,7 @@ const PresentationStudio = (() => {
     wireCollectionNewButton();
     wireCollectionShareButton();
     wireCollectionDeleteAllButton();
+    wireCollectionBulkDelete_();
     wireCollectionThumbSize_();
 
     if (el("presentOpenStudioBtn")) el("presentOpenStudioBtn").addEventListener("click", openStudio);
