@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261017g" />
+<link rel="stylesheet" href="css/style.css?v=20261017h" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -1022,6 +1022,11 @@
              di bawah & wireQuickMenu() di js/presentation-studio.js. -->
         <button type="button" id="psQuickMenuToggleBtn" class="chip-btn small" title="Menu Cepat -- aksi 1-klik yang sering dipakai, dikelompokkan Offline/Online">⚡ Menu Cepat</button>
         <button type="button" id="psOpenWindowBtn" class="chip-btn small">🖥️ Buka Layar 2</button>
+        <span id="psWinPos" class="ps-win-pos" role="group" aria-label="Posisi jendela Layar 2">
+          <button type="button" class="chip-btn small" data-pos="top" title="Layar 2 menempel di ATAS layar" aria-pressed="false">⬆️</button>
+          <button type="button" class="chip-btn small" data-pos="center" title="Layar 2 di TENGAH layar (bawaan)" aria-pressed="true">◼</button>
+          <button type="button" class="chip-btn small" data-pos="bottom" title="Layar 2 menempel di BAWAH layar" aria-pressed="false">⬇️</button>
+        </span>
         <!-- BARU (10 Sep 2026, sesi ke-10, permintaan operator "monitor
              3 ... untuk monitor pembicara") -- jendela KE-3, terpisah
              dari Layar 2 (yang dilihat jemaat) -- lihat monitor.html &
@@ -1502,6 +1507,7 @@
           <div class="ps-btn-row">
             <button type="button" id="psAnnClearBtn" class="chip-btn small">🗑️ Hapus Isi</button>
             <button type="button" id="psAnnInsertBtn" class="chip-btn small">➕ Sisipkan ke Kumpulan Ayat</button>
+            <button type="button" id="psAnnShowBtn" class="chip-btn small" title="Tayangkan pengumuman ini ke Layar 2 SEKARANG (tanpa menyimpan ke kumpulan)">📺 Tayangkan sekarang</button>
             <!-- BARU (7 Sep 2026, permintaan operator) -- salin judul+isi
                  pengumuman (apa adanya, termasuk ikon yang sudah
                  disisipkan) ke clipboard perangkat, supaya bisa ditempel
@@ -4231,7 +4237,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20261017a"></script>
+  <script src="js/collections.js?v=20261017ax"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -4260,7 +4266,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
   <script src="js/ink-engine.js?v=20260926b"></script>
-  <script src="js/presentation.js?v=20261016h"></script>
+  <script src="js/presentation.js?v=20261016hx"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
@@ -4270,7 +4276,7 @@
   <script src="js/bg-audio-dialog.js?v=20261001b"></script>
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
-  <script src="js/presentation-studio.js?v=20261017cb"></script>
+  <script src="js/presentation-studio.js?v=20261017cbx"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip

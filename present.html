@@ -1123,7 +1123,11 @@
      skrip bawah) walau widget bawaan ini kelihatan -- operator boleh
      pakai salah satu (tombol Studio ATAU klik langsung di bilah ini,
      keduanya sinkron karena sama-sama lewat 1 objek SC.Widget). */
-  #scView { width: 100vw; height: 166px; position: fixed; left: 0; right: 0; bottom: 0; border: none; }
+  /* book173 (17 Okt 2026, permintaan operator): pemutar SoundCloud dulu selebar layar & setinggi 166px sehingga
+     menutupi kidung/ayat di bagian bawah. Sekarang dikecilkan (skala 50%) & dipojokkan di kanan-bawah; ukuran
+     layout aslinya (640x166) tetap dipertahankan supaya widget SoundCloud tidak berubah tata letak. */
+  #scView { width: 640px; height: 166px; position: fixed; left: auto; right: 6px; bottom: 6px; border: none; border-radius: 8px;
+            transform: scale(0.5); transform-origin: bottom right; z-index: 30; }
   /* BARU (18 Sep 2026, permintaan operator "kadang cuma butuh MP3/Drive
      link, bukan SoundCloud") -- kind "mp3" (lihat showMain() bawah).
      #mp3DriveView dipakai utk link Google Drive (iframe ".../preview",
