@@ -796,8 +796,10 @@
 
   /* book174 (17 Okt 2026): posisi TULISAN (ayat/kidung/pengumuman) di Layar 2 -- atas / tengah (bawaan) / bawah.
      Dipilih dari Studio (tombol ⬆️ ◼ ⬇️ "Posisi tulisan"). Tidak mengubah mode kamera (cam-*), yang punya tata letak sendiri. */
-  body.vpos-top:not([class*="cam-"]) #stage { justify-content: flex-start; }
-  body.vpos-bottom:not([class*="cam-"]) #stage { justify-content: flex-end; }
+  /* book175: dulu syaratnya :not([class*="cam-"]) -- ikut mati saat kelas "cam-active" (kamera/gambar/Latar Master aktif) menempel di <body>.
+     Sekarang hanya mode yang punya tata letak #stage sendiri yang dikecualikan. */
+  body.vpos-top:not(.cam-split):not(.cam-split-lr):not(.cam-subtitle):not(.cam-textbubble) #stage { justify-content: flex-start; }
+  body.vpos-bottom:not(.cam-split):not(.cam-split-lr):not(.cam-subtitle):not(.cam-textbubble) #stage { justify-content: flex-end; }
   #stage {
     position: relative; z-index: 2;
     height: 100%;
