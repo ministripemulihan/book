@@ -3857,6 +3857,25 @@
             <button type="button" class="chip-btn small" id="psFocusModeToggleBtn">🚫 Tampilkan Larangan Lihat HP</button>
             <button type="button" class="chip-btn small" id="psFocusModeBicaraToggleBtn">🗣️ Tampilkan Larangan Bicara</button>
           </div>
+          <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
+          <!-- BARU (18 Okt 2026, book178, permintaan operator) -- 🖼️ Logo "Warta Gereja" di pojok KIRI ATAS Layar 2:
+               transparan, PERSISTEN, selalu DI ATAS segala tulisan (kidung, ayat, pengumuman). Lihat wireCornerLogo_()
+               (js/presentation-studio.js) & #cornerLogo (present.html). -->
+          <div class="ps-field-label" style="margin-top:0;">🖼️ Logo Pojok Kiri Atas (Warta Gereja)</div>
+          <p class="announcement-compose-hint" style="margin-top:0;">Logo transparan di pojok kiri atas Layar 2, selalu di ATAS semua tulisan. Tidak hilang saat berpindah ayat/kidung/pengumuman.</p>
+          <div class="ps-btn-row">
+            <button type="button" class="chip-btn small" id="psCornerLogoToggleBtn">🖼️ Tampilkan Logo Pojok</button>
+          </div>
+          <div class="ps-btn-row" style="align-items:center; gap:8px; margin-top:8px;">
+            <label for="psCornerLogoSize" style="font-size:12px;">Ukuran</label>
+            <input type="range" id="psCornerLogoSize" min="5" max="40" step="1" value="16" style="flex:1; min-width:90px;" />
+            <span id="psCornerLogoSizeVal" style="font-size:12px; min-width:34px;">16%</span>
+          </div>
+          <div class="ps-btn-row" style="align-items:center; gap:8px;">
+            <label for="psCornerLogoOpacity" style="font-size:12px;">Kepekatan</label>
+            <input type="range" id="psCornerLogoOpacity" min="20" max="100" step="5" value="100" style="flex:1; min-width:90px;" />
+            <span id="psCornerLogoOpacityVal" style="font-size:12px; min-width:34px;">100%</span>
+          </div>
         </div>
 
         <!-- BARU (9 Sep 2026, permintaan operator) -- 🎡 Roda Undian
@@ -4279,7 +4298,7 @@
   <script src="js/indonesia-regencies.js?v=20260909a"></script>
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN present.html -->
   <script src="js/ink-engine.js?v=20260926b"></script>
-  <script src="js/presentation.js?v=20261016hxy"></script>
+  <script src="js/presentation.js?v=20261018b178"></script>
   <script src="js/soundfx.js?v=20260911c"></script>
   <!-- BARU (19 Sep 2026) -- Audio Latar dipindah ke berkasnya sendiri; WAJIB dimuat
        SEBELUM presentation-studio.js (yang memanggil window.BgAudioModule.create()). -->
@@ -4290,7 +4309,7 @@
   <script src="js/bg-audio-source-kidung.js?v=20260920d"></script> <!-- tahap 2: sumber "Dari kidung ini" -->
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
   <script src="js/bg-audio-source-playlist.js?v=20261017a"></script> <!-- book175: sumber "Dari Playlist SoundCloud" -->
-  <script src="js/presentation-studio.js?v=20261017f177"></script>
+  <script src="js/presentation-studio.js?v=20261018b178"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
