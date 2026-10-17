@@ -5695,3 +5695,53 @@ body.reader-clean:not(.reader-chrome-show) .current-reading-indicator { display:
 body.reader-clean.reader-chrome-show .current-reading-indicator { top: var(--hdr-px, 57px); }
 /* bayangan header yang sedang tersembunyi jangan "bocor" menjadi garis kabur di tepi atas layar */
 body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
+
+
+/* ============================================================
+   BARU (17 Okt 2026, book171) -- Daftar YouTube Studio: toolbar ringkas + mode kotak-kotak.
+   - Toolbar menempel di atas saat daftar di-scroll; "🎛 Filter" membuka/menutup Filter tambahan + Urutkan.
+   - Tertutup: tombol kategori hanya 1 baris (geser samping). Terbuka: lengkap seperti sebelumnya.
+   - Daftar TIDAK lagi dibatasi 340px (dulu cuma ~3 baris tampak) -- mengikuti scroll kolom.
+   - Mode ▦: hanya gambar thumbnail, ukuran diatur slider (--yt-card); tombol muncul saat disorot.
+   ============================================================ */
+.ps-yt-toolbar { position: sticky; top: 0; z-index: 5; background: var(--ps-bg, #14100b); padding: 6px 2px 6px; margin: 0 -2px; border-bottom: 1px solid var(--ps-col-border, #ddd); }
+.ps-yt-toolbar-row { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.ps-yt-toolbar-row #psYtPlaylistSearch { flex: 1 1 100px; min-width: 60px; width: auto; }
+.ps-yt-toolbar-row .chip-btn { flex: 0 0 auto; white-space: nowrap; }
+.ps-yt-viewmode { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+.ps-yt-grid-size { flex: 0 1 110px; width: 110px; min-width: 60px; accent-color: var(--brass); }
+.ps-yt-caret { display: inline-block; transition: transform .15s; }
+#psYtFilterToggle[aria-expanded="true"] .ps-yt-caret { transform: rotate(180deg); }
+.ps-yt-filter-badge { display: inline-block; min-width: 14px; padding: 0 4px; border-radius: 999px; background: var(--brass); color: #fff; font-size: 10px; font-weight: 700; text-align: center; }
+/* tertutup: kategori 1 baris, geser samping */
+.ps-yt-toolbar .ps-yt-cats { flex-wrap: nowrap !important; overflow-x: auto; margin-top: 6px; padding-bottom: 3px; scrollbar-width: thin; }
+.ps-yt-toolbar .ps-yt-cats .chip-btn { flex: 0 0 auto; white-space: nowrap; }
+/* terbuka: semua tulisan menu tampil (berlipat) */
+.ps-yt-toolbar.open .ps-yt-cats { flex-wrap: wrap !important; overflow-x: visible; }
+.ps-yt-toolbar.open .ps-yt-filter-more { max-height: 55vh; overflow-y: auto; }
+/* daftar mengikuti scroll kolom */
+#psYtPlaylistList.ps-file-list { max-height: none; overflow: visible; padding-right: 0; }
+/* ---- mode kotak-kotak ---- */
+#psYtPlaylistList.ps-yt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--yt-card, 140px), 1fr)); gap: 6px; }
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-row { position: relative; display: block; padding: 0; overflow: hidden; border-radius: 8px; cursor: pointer; }
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-thumb { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 0; object-fit: cover; }
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-thumb-sc { display: flex; }
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-info,
+#psYtPlaylistList.ps-yt-grid .ps-yt-seek { display: none; }
+#psYtPlaylistList.ps-yt-grid.ps-yt-grid-titles .ps-yt-playlist-info { display: flex; padding: 3px 5px 4px; }
+#psYtPlaylistList.ps-yt-grid.ps-yt-grid-titles .ps-yt-playlist-title { font-size: 11.5px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-channel,
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-tags,
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-refs,
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-bibleref { display: none; }
+#psYtPlaylistList.ps-yt-grid .ps-file-actions {
+  position: absolute; left: 0; right: 0; top: 0; display: none; flex-wrap: wrap; gap: 3px; justify-content: center; padding: 3px;
+  background: linear-gradient(rgba(0,0,0,.65), rgba(0,0,0,0));
+}
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-row:hover .ps-file-actions,
+#psYtPlaylistList.ps-yt-grid .ps-yt-playlist-row:focus-within .ps-file-actions { display: flex; }
+/* tombol di kotak: hanya ikon (teks disembunyikan lewat font-size 0, ikon = karakter pertama) */
+#psYtPlaylistList.ps-yt-grid .ps-file-actions .chip-btn { padding: 1px 5px; min-width: 22px; line-height: 1.3; }
+#psYtPlaylistList.ps-yt-grid.ps-yt-grid-icons .ps-file-actions .chip-btn { font-size: 0; }
+#psYtPlaylistList.ps-yt-grid.ps-yt-grid-icons .ps-file-actions .chip-btn::first-letter { font-size: 13px; }
+#psYtPlaylistList.ps-yt-grid .ps-yt-more-row { grid-column: 1 / -1; }
