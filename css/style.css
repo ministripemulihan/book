@@ -5838,3 +5838,20 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 .ml-player-stoppill { left: 64px; }
 .ml-player-pill[hidden] + .ml-player-stoppill { display: none !important; }
 .ml-player-btn-bg { font-weight: 700; }
+
+
+/* ============================================================
+   book179 -- Pustaka Media tab YouTube: filter ringkas & tanggal kecil
+   ============================================================ */
+.ml-filter-row { display: block; }
+.ml-filter-body { display: flex; flex-wrap: wrap; gap: 8px; }
+.ml-filter-toggle { display: none; }
+.ml-card-date { float: right; font-size: 10px; opacity: .65; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .ml-filter-toggle { display: inline-flex; margin-bottom: 8px; }
+  .ml-filter-body { display: none; }
+  .ml-filter-body.open { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-bottom: 10px; }
+  .ml-filter-body .ml-filter-field select { min-width: 0; width: 100%; max-width: none; padding: 5px 8px; font-size: 12.5px; }
+  .ml-filter-body #mlFilterClear { grid-column: 1 / -1; }
+  .ml-count-line { font-size: 12px; margin-bottom: 4px; }
+}
