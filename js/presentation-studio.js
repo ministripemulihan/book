@@ -1728,8 +1728,33 @@ const PresentationStudio = (() => {
     const rowEl = document.querySelector(
       `#psCollectionList [data-playlist-idx="${activePlaylist.index}"], #psKidungSlideList [data-playlist-idx="${activePlaylist.index}"]`
     );
-    if (rowEl) rowEl.classList.add("active");
+    if (rowEl) { rowEl.classList.add("active"); scrollRowIntoListView_(rowEl); }
   }
+  // book179 (permintaan operator) -- baris yang sedang tayang di Layar 2 HARUS ikut terlihat di daftar Kumpulan Ayat Studio
+  // (dulu daftar tetap di ayat 10 padahal tayangan sudah ayat 20 -- operator harus cari mouse & gulir). Gulir INSTAN
+  // (bukan smooth: jendela Studio yang sedang di belakang Layar 2 menahan animasi) hanya pada pembungkus daftarnya,
+  // bukan halaman. Sisakan ~1 baris di atas/bawah supaya baris berikutnya ikut kelihatan.
+  function scrollRowIntoListView_(row) {
+    try {
+      for (let p = row.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+        if (!/(auto|scroll)/.test(getComputedStyle(p).overflowY) || p.scrollHeight <= p.clientHeight + 2) continue;
+        const pr = p.getBoundingClientRect(), rr = row.getBoundingClientRect();
+        const pad = Math.min(rr.height + 8, pr.height / 3);
+        if (rr.top < pr.top + pad) p.scrollTop += rr.top - (pr.top + pad);
+        else if (rr.bottom > pr.bottom - pad) p.scrollTop += rr.bottom - (pr.bottom - pad);
+        return;
+      }
+      // book181 -- tidak ada pembungkus yang menggulir (halaman/jendela yang menggulir): pakai gulir bawaan browser, instan.
+      row.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } catch (e) { /* abaikan */ }
+  }
+  // book181 -- kembali dari Layar 2 (present.html) ke Studio: setelah jendela Studio aktif lagi, baris yang tayang
+  // digulirkan ke area terlihat sekali lagi (gulir saat jendela di belakang bisa tidak dipakai browser).
+  (function wireListFollowOnReturn_() {
+    const again = () => { try { if (!document.hidden && typeof activePlaylist !== "undefined" && activePlaylist) highlightActivePlaylistRow(); } catch (e) { /* abaikan */ } };
+    window.addEventListener("focus", again);
+    document.addEventListener("visibilitychange", again);
+  })();
 
   // Ambil ref/teks 1 item generik lewat fungsi yang SAMA dipakai panel
   // Kumpulan Ayat biasa (js/app.js: collectionItemRef/collectionItemBodyText)
@@ -4934,6 +4959,39 @@ const PresentationStudio = (() => {
       try { const sv = localStorage.getItem("ps_ruby_mode"); if (sv === "nempel" || sv === "biasa") el("psQuickRubyMode").value = sv; } catch (e) { /* abaikan */ }
       el("psQuickRubyMode").addEventListener("change", () => { try { localStorage.setItem("ps_ruby_mode", el("psQuickRubyMode").value); } catch (e) { /* abaikan */ } });
     }
+    // book179 -- di mode 2 layar ("ps-dual-live") ▶️ Tampilkan hanya menaruh ayat di kotak "Berikutnya" (perlu ▶ Tayangkan lagi).
+    // ⚡ Langsung ke Layar 2 = SAMA seperti Tampilkan tetapi langsung tayang di present.html tanpa lewat kotak Berikutnya.
+    let quickForceLive_ = false;
+    // book181 -- ⚡ Langsung ke Layar 2: SEMUA ayat yang diketik (mis. Pengkhotbah 3:10-11) dipecah per "Kalau lebih dari 1 ayat, gabung jadi"
+    // (1,2,3,4,5 ayat / semua), slide pertama LANGSUNG tayang di present.html, dan panah kiri/kanan (atau clicker) berjalan melewati
+    // SEMUA kelompok -- sisa terakhir yang kurang dari N tetap tampil (11 ayat dibagi 5 = 5+5+1). Tidak disimpan ke Kumpulan Ayat.
+    if (el("psQuickLiveBtn")) {
+      el("psQuickLiveBtn").addEventListener("click", () => {
+        const blocks = resolveRefBlocks();
+        const verses = [];
+        blocks.forEach((b) => { if (b.versions[0]) verses.push(...b.versions[0].verses); });
+        if (!verses.length || typeof sendGenericItemLive !== "function") { quickForceLive_ = true; try { el("psQuickShowBtn").click(); } finally { quickForceLive_ = false; } return; }
+        const groupSize = getQuickGroupSize();
+        const gSize = groupSize === Infinity ? verses.length : Math.max(1, groupSize);
+        const eachRef = !el("psQuickEachRef") || !!el("psQuickEachRef").checked;
+        const langModeSel = el("psQuickLangMode");
+        const checkedCodes = getCheckedVersions();
+        const multi = !!(langModeSel && langModeSel.value === "multi" && checkedCodes.length > 1);
+        const items = [];
+        for (let i = 0; i < verses.length; i += gSize) {
+          const ids = verses.slice(i, i + gSize).map((v) => v.id);
+          const item = { type: "verse", verseId: ids[0] };
+          if (ids.length > 1) item.verseIds = ids.slice();
+          if (multi) { item.langs = checkedCodes.slice(); item.eachRef = eachRef; item.ruby = rubyModeOn_(); }
+          else if (ids.length > 1 && eachRef) item.eachRef = true;
+          items.push(item);
+        }
+        const label = (input && input.value.trim()) || "Ayat langsung";
+        setActivePlaylist(items, 0, label);
+        sendGenericItemLive(items[0]);
+        clearMonitorVideo_();
+      });
+    }
     if (el("psQuickShowBtn")) {
       el("psQuickShowBtn").addEventListener("click", () => {
         const blocks = resolveRefBlocks();
@@ -4961,7 +5019,7 @@ const PresentationStudio = (() => {
               renderStudioPreview({ type: "verse", ref: slideInfo.ref, texts: slideInfo.flatTexts, groups: rubyGroups_(slideInfo.groups) });
               clearMonitorVideo_();
             };
-            if (isDualLive()) stageNext(slideInfo.ref, slideInfo.flatTexts.map((t) => "[" + t.label + "] " + t.text).join("  "), doSendM);
+            if (isDualLive() && !quickForceLive_) stageNext(slideInfo.ref, slideInfo.flatTexts.map((t) => "[" + t.label + "] " + t.text).join("  "), doSendM);
             else doSendM();
             return;
           }
@@ -4979,7 +5037,7 @@ const PresentationStudio = (() => {
                 renderStudioPreview(payloadG);
                 clearMonitorVideo_();
               };
-              if (isDualLive()) stageNext(ml.ref, ml.groups.map((g) => (g.ref ? g.ref + " " : "") + g.texts.map((t) => t.text).join(" ")).join("  "), doSendG);
+              if (isDualLive() && !quickForceLive_) stageNext(ml.ref, ml.groups.map((g) => (g.ref ? g.ref + " " : "") + g.texts.map((t) => t.text).join(" ")).join("  "), doSendG);
               else doSendG();
               return;
             }
@@ -4992,7 +5050,7 @@ const PresentationStudio = (() => {
             renderStudioPreview({ type: "verse", ref: combined.ref, texts: [{ label: "", text: combined.text }] });
             clearMonitorVideo_();
           };
-          if (isDualLive()) stageNext(combined.ref, combined.text, doSend);
+          if (isDualLive() && !quickForceLive_) stageNext(combined.ref, combined.text, doSend);
           else doSend();
           return;
         }
@@ -5015,7 +5073,7 @@ const PresentationStudio = (() => {
           clearMonitorVideo_(); // ayat bukan video -- sembunyikan area video Monitor 3
         };
         const previewText = first.versions.map((v) => `[${v.label}] ${stripStrongMarkers(v.text)}`).join("  ");
-        if (isDualLive()) stageNext(first.refLabel, previewText, doSend);
+        if (isDualLive() && !quickForceLive_) stageNext(first.refLabel, previewText, doSend);
         else doSend();
       });
     }
@@ -7026,6 +7084,8 @@ const PresentationStudio = (() => {
     function parseUploadDate(v) {
       const s = String(v == null ? "" : v).trim();
       if (!s) return null;
+      // book179: 181026 (ddmmyy), 18/10/26, "18 Okt 2026" dst ikut terbaca lewat js/media-date.js
+      if (window.MediaDate) { const md = window.MediaDate.parse(s); if (md) return md; }
       const d = new Date(s);
       return isNaN(d.getTime()) ? null : d;
     }

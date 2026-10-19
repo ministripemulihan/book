@@ -10430,25 +10430,38 @@ function cleanArticulationForSpeech(text) {
 // Sekarang: seluruh kelompok bahasa 1 ayat dijaga tampil UTUH di area aman (di antara header & bilah bawah);
 // kalau pembaca menyentuh/menggulir sendiri, layar TIDAK digeser otomatis selama TTS_FOLLOW_PAUSE_MS.
 // ------------------------------------------------------------
-const TTS_FOLLOW_PAUSE_MS = 15000;
-let ttsUserTouchAt_ = 0, ttsUserTouching_ = false, ttsFollowWired_ = false;
+const TTS_FOLLOW_PAUSE_MS = 6000;
+let ttsUserTouchAt_ = 0, ttsUserTouching_ = false, ttsFollowWired_ = false, ttsTouchMoved_ = false;
+// book180: dulu SETIAP ketukan/klik/tombol (termasuk ketukan ▶️ untuk mulai baca) dianggap "pembaca menggulir sendiri"
+// dan menahan layar selama 15 detik -> ayat 4-5 hilang karena layar tidak ikut. Sekarang hanya GERAKAN gulir nyata
+// (roda mouse, geser jari, tombol panah/PageUp/PageDown/Spasi) yang menahan, dan hanya 6 detik.
 function wireTtsFollowGuard_() {
   if (ttsFollowWired_) return;
   ttsFollowWired_ = true;
   const mark = () => { ttsUserTouchAt_ = Date.now(); };
   const opt = { capture: true, passive: true };
-  ["wheel", "mousedown", "keydown", "touchmove"].forEach((evt) => document.addEventListener(evt, mark, opt));
-  document.addEventListener("touchstart", () => { ttsUserTouching_ = true; mark(); }, opt);
-  ["touchend", "touchcancel"].forEach((evt) => document.addEventListener(evt, () => { ttsUserTouching_ = false; mark(); }, opt));
+  document.addEventListener("wheel", mark, opt);
+  document.addEventListener("keydown", (e) => { if (/^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End| )$/.test(e.key)) mark(); }, opt);
+  document.addEventListener("touchstart", () => { ttsTouchMoved_ = false; }, opt);
+  document.addEventListener("touchmove", () => { ttsTouchMoved_ = true; ttsUserTouching_ = true; mark(); }, opt);
+  ["touchend", "touchcancel"].forEach((evt) => document.addEventListener(evt, () => { ttsUserTouching_ = false; if (ttsTouchMoved_) mark(); ttsTouchMoved_ = false; }, opt));
 }
 function ttsFollowBlocked_() { return ttsUserTouching_ || (Date.now() - ttsUserTouchAt_ < TTS_FOLLOW_PAUSE_MS); }
 
 function ttsScrollParent_(node) {
+  const list = ttsScrollers_(node);
+  return list.length ? list[0] : null; // halaman (window)
+}
+// book179: SEMUA pembungkus yang benar-benar bisa menggulir, dari yang terdalam. Dulu hanya yang pertama dipakai;
+// pembungkus ber-overflow-x:auto (mis. .reader-columns) otomatis ber-overflow-y:auto juga dan bisa terpilih
+// padahal tidak menggulir -> layar tidak mengikuti suara (ayat 1-3 masih terlihat, ayat 4-5 hilang di bawah).
+function ttsScrollers_(node) {
+  const out = [];
   for (let p = node && node.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
     const cs = getComputedStyle(p);
-    if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 2) return p;
+    if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 2) out.push(p);
   }
-  return null; // halaman (window)
+  return out;
 }
 function ttsSafeArea_(container) {
   const H = window.innerHeight || 800;
@@ -10463,10 +10476,20 @@ function ttsSafeArea_(container) {
   if (tb && tb.top > H * 0.5 && getComputedStyle(el("readerNavBottomWrap")).position === "fixed") bottom = Math.min(bottom, tb.top);
   return { top: top + 6, bottom: Math.max(top + 60, bottom - 6) };
 }
-function ttsScrollBy_(container, delta) {
+function ttsScrollBy_(container, delta, node) {
   if (!delta || Math.abs(delta) < 2) return;
-  try { (container || window).scrollBy({ top: delta, behavior: "smooth" }); }
-  catch (e) { if (container) container.scrollTop += delta; else window.scrollBy(0, delta); }
+  const smooth = (box, top) => { try { box.scrollTo({ top, behavior: "smooth" }); } catch (e) { box.scrollTop = top; } };
+  let rest = delta;
+  // book179: bagikan gulir ke pembungkus yang MASIH punya sisa ruang gulir; sisanya diserahkan ke halaman (window).
+  const boxes = node ? ttsScrollers_(node) : (container ? [container] : []);
+  for (const b of boxes) {
+    const max = Math.max(0, b.scrollHeight - b.clientHeight);
+    const want = Math.min(max, Math.max(0, b.scrollTop + rest));
+    const room = want - b.scrollTop;
+    if (Math.abs(room) >= 2) { smooth(b, want); rest -= room; }
+    if (Math.abs(rest) < 2) return;
+  }
+  try { window.scrollBy({ top: rest, behavior: "smooth" }); } catch (e) { window.scrollBy(0, rest); }
 }
 // Semua blok bahasa milik ayat yang sama (mode Nempel / Atas-bawah menumpuknya berurutan).
 function ttsVerseGroup_(block) {
@@ -10489,14 +10512,14 @@ function ttsEnsureGroupVisible_(first, last) {
   } else if (top < area.top || top > area.top + avail * 0.3) {
     delta = top - area.top; // terlalu tinggi untuk muat: sejajarkan bagian atas; sisanya diikuti per kata
   }
-  ttsScrollBy_(container, delta);
+  ttsScrollBy_(container, delta, first);
 }
 function ttsEnsureWordVisible_(rect, node) {
   if (!rect || !rect.height || ttsFollowBlocked_()) return;
   const container = ttsScrollParent_(node);
   const area = ttsSafeArea_(container);
   if (rect.top >= area.top && rect.bottom <= area.bottom) return; // kata masih di area aman
-  ttsScrollBy_(container, rect.top - (area.top + (area.bottom - area.top) * 0.3));
+  ttsScrollBy_(container, rect.top - (area.top + (area.bottom - area.top) * 0.3), node);
 }
 
 function setSpeakingHighlight(block) {
@@ -10602,6 +10625,15 @@ function updateTTSFloat_() {
       '<span class="tts-float-label"></span>' +
       '<button type="button" class="tts-float-stop" title="Berhenti (pembacaan berikutnya mulai dari ayat 1)" aria-label="Berhenti">⏹</button>';
     box.querySelector(".tts-float-play").addEventListener("click", (e) => { e.stopPropagation(); toggleTTS(); });
+    // book179: ketuk "Ayat N" = layar langsung kembali ke ayat yang sedang dibacakan (dan mengikuti lagi).
+    box.querySelector(".tts-float-label").addEventListener("click", (e) => {
+      e.stopPropagation();
+      ttsUserTouchAt_ = 0; ttsUserTouching_ = false;
+      const b = document.querySelector(".verse-block.speaking");
+      if (!b) return;
+      const g = ttsVerseGroup_(b);
+      ttsEnsureGroupVisible_(g[0], g[g.length - 1]);
+    });
     box.querySelector(".tts-float-stop").addEventListener("click", (e) => { e.stopPropagation(); stopTTS(); ttsClearPos_(); updateTTSFloat_(); });
     document.body.appendChild(box);
     wireTtsFloatDrag_(box);

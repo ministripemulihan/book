@@ -524,6 +524,10 @@ const MediaLibrary = (() => {
     filterSumber: "",
     filterKeterangan: "",
     filterKidungRef: "",
+    // book179 -- filter BibleRef (per kitab) & Tanggal (per bulan); nilai khusus "__ada" / "__tanpa".
+    filterBibleRef: "",
+    filterTanggal: "",
+    ytFilterOpen: false, // HP: blok filter dilipat dulu (1 baris)
     notice: "",
   };
 
@@ -716,10 +720,18 @@ const MediaLibrary = (() => {
     const metaBits = [];
     if (spec.kategori) metaBits.push(spec.kategori);
     if (spec.durasiDetik) metaBits.push(formatDurasi_(spec.durasiDetik));
-    if (metaBits.length) {
+    const tglTxt = spec.tanggal && window.MediaDate ? window.MediaDate.ddmmyy(spec.tanggal) : "";
+    if (metaBits.length || tglTxt) {
       const meta = document.createElement("div");
       meta.className = "ml-card-meta";
       meta.textContent = metaBits.join(" · ");
+      if (tglTxt) {
+        const dt = document.createElement("span");
+        dt.className = "ml-card-date";
+        dt.textContent = tglTxt;
+        dt.title = "Tanggal (ddmmyy)";
+        meta.appendChild(dt);
+      }
       body.appendChild(meta);
     }
     // BARU (14 Sep 2026) -- tombol "📝 Syair" HANYA muncul kalau item ini
@@ -1242,6 +1254,7 @@ const MediaLibrary = (() => {
       gambar: item.gambar,
       durasiDetik: item.durasiDetik,
       kidungRef: item.kidungRef,
+      tanggal: item.jenis === "sound" ? "" : (item.tanggal || item.tanggalAsli || ""), // book179: tampil kecil ddmmyy
       noKidungChips: !!plain, // dipakai layar baca kidung (bagian "Referensi Media Lain") -- di sana tombol kidung tidak perlu
       canManage,
       onPlay: () => playItem_(item, verseCtx),
@@ -1804,11 +1817,37 @@ const MediaLibrary = (() => {
   // supaya semua pilihan tetap punya angka yang benar).
   function ytSumberOf_(item) { return resolveSumber_(item.sumber, item.link) || ""; }
   function ytKidungKeys_(item) { return window.KidungRef ? window.KidungRef.parse(item.kidungRef).map((t) => t.key) : []; }
+  // book179 -- BibleRef per kitab (nomor kitab sebagai teks) & tanggal per bulan. Tanggal = kolom Tanggal, cadangan TanggalAsli.
+  const bibleBooksMemo_ = new WeakMap();
+  function ytBibleBooks_(item) {
+    const MB = window.MediaBibleRef;
+    let text = String(item.bibleRef || "").trim();
+    if (!text && item.ayatRef && MB) { try { text = MB.fromVerseIds(item.ayatRef).text; } catch (e) { text = ""; } }
+    const memo = bibleBooksMemo_.get(item);
+    if (memo && memo.text === text) return memo.books;
+    const books = [];
+    if (text && MB) MB.parse(text).forEach((r) => { if (r.ok && r.book && books.indexOf(String(r.book.num)) === -1) books.push(String(r.book.num)); });
+    bibleBooksMemo_.set(item, { text, books });
+    return books;
+  }
+  function ytDateRaw_(item) { return item.tanggal || item.tanggalAsli || ""; }
+  function ytMonthKey_(item) { return window.MediaDate ? window.MediaDate.monthKey(ytDateRaw_(item)) : ""; }
   function matchesYoutubeFilters_(item, skip) {
     if (skip !== "kategori" && state.filterKategori && parseKategoriString(item.kategori).indexOf(state.filterKategori) === -1) return false;
     if (skip !== "channel" && state.filterChannel && (item.channel || "").trim().toLowerCase() !== state.filterChannel.toLowerCase()) return false;
     if (skip !== "sumber" && state.filterSumber && ytSumberOf_(item).toLowerCase() !== state.filterSumber.toLowerCase()) return false;
     if (skip !== "keterangan" && state.filterKeterangan && String(item.keterangan || "").trim().toLowerCase() !== state.filterKeterangan.toLowerCase()) return false;
+    if (skip !== "bibleref" && state.filterBibleRef) {
+      const bks = ytBibleBooks_(item);
+      if (state.filterBibleRef === "__ada") { if (!bks.length) return false; }
+      else if (state.filterBibleRef === "__tanpa") { if (bks.length) return false; }
+      else if (bks.indexOf(state.filterBibleRef) === -1) return false;
+    }
+    if (skip !== "tanggal" && state.filterTanggal) {
+      const mk = ytMonthKey_(item);
+      if (state.filterTanggal === "__tanpa") { if (mk) return false; }
+      else if (mk !== state.filterTanggal) return false;
+    }
     if (skip !== "kidungref" && state.filterKidungRef) {
       const keys = ytKidungKeys_(item);
       if (state.filterKidungRef === "__ada") { if (!keys.some((k) => k.indexOf("text:") !== 0)) return false; }
@@ -1818,11 +1857,11 @@ const MediaLibrary = (() => {
     return true;
   }
   function anyYoutubeFilterActive_() {
-    return !!(state.filterKategori || state.filterChannel || state.filterSumber || state.filterKeterangan || state.filterKidungRef);
+    return !!(state.filterKategori || state.filterChannel || state.filterSumber || state.filterKeterangan || state.filterKidungRef || state.filterBibleRef || state.filterTanggal);
   }
   function clearYoutubeFilters_() {
     state.filterKategori = ""; state.filterChannel = ""; state.filterSumber = "";
-    state.filterKeterangan = ""; state.filterKidungRef = "";
+    state.filterKeterangan = ""; state.filterKidungRef = ""; state.filterBibleRef = ""; state.filterTanggal = "";
   }
   function youtubeItems_() { return state.items.filter((it) => it.jenis === "youtube"); }
 
@@ -1840,6 +1879,8 @@ const MediaLibrary = (() => {
       if (name === "kategori") parseKategoriString(it.kategori).forEach((k) => add(k, k));
       else if (name === "channel") add((it.channel || "").trim(), (it.channel || "").trim());
       else if (name === "sumber") add(ytSumberOf_(it), ytSumberOf_(it));
+      else if (name === "bibleref") ytBibleBooks_(it).forEach((n) => { const b = (typeof BOOKS !== "undefined" ? BOOKS.find((x) => String(x.num) === n) : null); add(n, b ? b.name : "Kitab " + n, String(n).padStart(3, "0")); });
+      else if (name === "tanggal") { const mk = ytMonthKey_(it); if (mk) add(mk, window.MediaDate.monthLabel(mk), mk); }
       else if (name === "keterangan") { const k = String(it.keterangan || "").trim(); add(k, k.length > 45 ? k.slice(0, 44) + "…" : k); }
       else if (name === "kidungref" && window.KidungRef) {
         window.KidungRef.parse(it.kidungRef).forEach((t) => {
@@ -1848,6 +1889,7 @@ const MediaLibrary = (() => {
         });
       }
     });
+    if (name === "tanggal") return Array.from(map.values()).sort((a, b) => (a.sort < b.sort ? 1 : a.sort > b.sort ? -1 : 0));
     return Array.from(map.values()).sort((a, b) => (name === "kidungref" ? (a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0) : a.sort.localeCompare(b.sort, "id")));
   }
 
@@ -1874,13 +1916,27 @@ const MediaLibrary = (() => {
       </select></label>`;
     };
     const refExtra = `<option value="__ada" ${state.filterKidungRef === "__ada" ? "selected" : ""}>✅ Punya referensi kidung (${withRef})</option><option value="__tanpa" ${state.filterKidungRef === "__tanpa" ? "selected" : ""}>— Tanpa referensi (${noRef})</option>`;
+    const noBible = youtubeItems_().filter((it) => !ytBibleBooks_(it).length).length;
+    const withBible = youtubeItems_().length - noBible;
+    const bibleExtra = `<option value="__ada" ${state.filterBibleRef === "__ada" ? "selected" : ""}>✅ Punya BibleRef (${withBible})</option><option value="__tanpa" ${state.filterBibleRef === "__tanpa" ? "selected" : ""}>— Tanpa BibleRef (${noBible})</option>`;
+    const noTgl = youtubeItems_().filter((it) => !ytMonthKey_(it)).length;
+    const tglExtra = noTgl ? `<option value="__tanpa" ${state.filterTanggal === "__tanpa" ? "selected" : ""}>— Tanpa tanggal (${noTgl})</option>` : "";
+    const nActive = [state.filterBibleRef, state.filterKeterangan, state.filterKategori, state.filterKidungRef, state.filterTanggal, state.filterSumber, state.filterChannel].filter(Boolean).length;
+    // book179: HP -> tombol 🎛 Filter (1 baris) membuka/menutup blok filter; urutan: BibleRef, Keterangan, Kategori, KidungRef, Tanggal, lalu Sumber & Channel.
     filterRow.innerHTML =
+      `<button type="button" id="mlFilterToggle" class="chip-btn small ml-filter-toggle" aria-expanded="${state.ytFilterOpen ? "true" : "false"}">🎛 Filter${nActive ? " (" + nActive + ")" : ""} ${state.ytFilterOpen ? "▴" : "▾"}</button>` +
+      `<div class="ml-filter-body${state.ytFilterOpen ? " open" : ""}">` +
+      sel("mlFilterBibleRef", "BibleRef", "Semua BibleRef", "bibleref", state.filterBibleRef, bibleExtra) +
+      sel("mlFilterKeterangan", "Keterangan", "Semua keterangan", "keterangan", state.filterKeterangan) +
+      sel("mlFilterKategori", "Kategori", "Semua kategori", "kategori", state.filterKategori) +
+      sel("mlFilterKidungRef", "KidungRef", "Semua KidungRef", "kidungref", state.filterKidungRef, refExtra) +
+      sel("mlFilterTanggal", "Tanggal", "Semua tanggal", "tanggal", state.filterTanggal, tglExtra) +
       sel("mlFilterSumber", "Sumber", "Semua sumber", "sumber", state.filterSumber) +
       sel("mlFilterChannel", "Channel", "Semua channel", "channel", state.filterChannel) +
-      sel("mlFilterKategori", "Kategori", "Semua kategori", "kategori", state.filterKategori) +
-      sel("mlFilterKeterangan", "Keterangan", "Semua keterangan", "keterangan", state.filterKeterangan) +
-      sel("mlFilterKidungRef", "KidungRef", "Semua KidungRef", "kidungref", state.filterKidungRef, refExtra) +
-      (anyYoutubeFilterActive_() || state.search ? `<button type="button" id="mlFilterClear" class="chip-btn small">✕ Bersihkan filter</button>` : "");
+      (anyYoutubeFilterActive_() || state.search ? `<button type="button" id="mlFilterClear" class="chip-btn small">✕ Bersihkan filter</button>` : "") +
+      `</div>`;
+    const tg = filterRow.querySelector("#mlFilterToggle");
+    if (tg) tg.addEventListener("click", () => { state.ytFilterOpen = !state.ytFilterOpen; renderYoutubeFilterRow_(filterRow, countEl, grid); });
 
     const bind = (id, key) => {
       const s = filterRow.querySelector("#" + id);
@@ -1889,6 +1945,7 @@ const MediaLibrary = (() => {
     bind("mlFilterSumber", "filterSumber"); bind("mlFilterChannel", "filterChannel");
     bind("mlFilterKategori", "filterKategori"); bind("mlFilterKeterangan", "filterKeterangan");
     bind("mlFilterKidungRef", "filterKidungRef");
+    bind("mlFilterBibleRef", "filterBibleRef"); bind("mlFilterTanggal", "filterTanggal");
     const clr = filterRow.querySelector("#mlFilterClear");
     if (clr) clr.addEventListener("click", () => {
       clearYoutubeFilters_(); state.search = "";
