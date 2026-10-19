@@ -4965,31 +4965,46 @@ const PresentationStudio = (() => {
     // book181 -- ⚡ Langsung ke Layar 2: SEMUA ayat yang diketik (mis. Pengkhotbah 3:10-11) dipecah per "Kalau lebih dari 1 ayat, gabung jadi"
     // (1,2,3,4,5 ayat / semua), slide pertama LANGSUNG tayang di present.html, dan panah kiri/kanan (atau clicker) berjalan melewati
     // SEMUA kelompok -- sisa terakhir yang kurang dari N tetap tampil (11 ayat dibagi 5 = 5+5+1). Tidak disimpan ke Kumpulan Ayat.
-    if (el("psQuickLiveBtn")) {
-      el("psQuickLiveBtn").addEventListener("click", () => {
-        const blocks = resolveRefBlocks();
-        const verses = [];
-        blocks.forEach((b) => { if (b.versions[0]) verses.push(...b.versions[0].verses); });
-        if (!verses.length || typeof sendGenericItemLive !== "function") { quickForceLive_ = true; try { el("psQuickShowBtn").click(); } finally { quickForceLive_ = false; } return; }
-        const groupSize = getQuickGroupSize();
-        const gSize = groupSize === Infinity ? verses.length : Math.max(1, groupSize);
-        const eachRef = !el("psQuickEachRef") || !!el("psQuickEachRef").checked;
-        const langModeSel = el("psQuickLangMode");
-        const checkedCodes = getCheckedVersions();
-        const multi = !!(langModeSel && langModeSel.value === "multi" && checkedCodes.length > 1);
-        const items = [];
-        for (let i = 0; i < verses.length; i += gSize) {
-          const ids = verses.slice(i, i + gSize).map((v) => v.id);
-          const item = { type: "verse", verseId: ids[0] };
-          if (ids.length > 1) item.verseIds = ids.slice();
-          if (multi) { item.langs = checkedCodes.slice(); item.eachRef = eachRef; item.ruby = rubyModeOn_(); }
-          else if (ids.length > 1 && eachRef) item.eachRef = true;
-          items.push(item);
-        }
-        const label = (input && input.value.trim()) || "Ayat langsung";
+    // book181e -- dipakai ⚡ DAN ▶️ Tampilkan: pecah SEMUA ayat (juga 1 rentang seperti Pengkhotbah 2:1-30) per N ayat/slide.
+    // stage=true (mode 2 layar, ▶️ Tampilkan): slide pertama hanya diantre di "Berikutnya"; daftar baru aktif saat ▶ Tayangkan.
+    function startQuickPlaylist_(blocks, stage) {
+      const verses = [];
+      blocks.forEach((b) => { if (b.versions[0]) verses.push(...b.versions[0].verses); });
+      if (!verses.length || typeof sendGenericItemLive !== "function") return false;
+      const groupSize = getQuickGroupSize();
+      const gSize = groupSize === Infinity ? verses.length : Math.max(1, groupSize);
+      const eachRef = !el("psQuickEachRef") || !!el("psQuickEachRef").checked;
+      const langModeSel = el("psQuickLangMode");
+      const checkedCodes = getCheckedVersions();
+      // banyak versi tercentang + 1 ayat/slide = tumpuk semua versi (seperti Tampilkan lama); gabung >1 ayat = sesuai pilihan "1 slide"
+      const multi = checkedCodes.length > 1 && ((langModeSel && langModeSel.value === "multi") || gSize === 1);
+      const items = [];
+      for (let i = 0; i < verses.length; i += gSize) {
+        const ids = verses.slice(i, i + gSize).map((v) => v.id);
+        const item = { type: "verse", verseId: ids[0] };
+        if (ids.length > 1) item.verseIds = ids.slice();
+        if (multi) { item.langs = checkedCodes.slice(); item.eachRef = eachRef; item.ruby = rubyModeOn_(); }
+        else if (ids.length > 1 && eachRef) item.eachRef = true;
+        items.push(item);
+      }
+      const label = (input && input.value.trim()) || "Ayat langsung";
+      const goLive = () => {
         setActivePlaylist(items, 0, label);
         sendGenericItemLive(items[0]);
         clearMonitorVideo_();
+      };
+      if (stage) {
+        const ids0 = items[0].verseIds || [items[0].verseId];
+        let c0 = null;
+        try { c0 = typeof combineVerseGroupForSlide === "function" ? combineVerseGroupForSlide(ids0) : null; } catch (e) { c0 = null; }
+        stageNext(c0 ? c0.ref : label, (c0 ? c0.text : label) + (items.length > 1 ? "  (+" + (items.length - 1) + " slide berikutnya)" : ""), goLive);
+      } else goLive();
+      return true;
+    }
+    if (el("psQuickLiveBtn")) {
+      el("psQuickLiveBtn").addEventListener("click", () => {
+        const blocks = resolveRefBlocks();
+        if (!startQuickPlaylist_(blocks, false)) { quickForceLive_ = true; try { el("psQuickShowBtn").click(); } finally { quickForceLive_ = false; } }
       });
     }
     if (el("psQuickShowBtn")) {
@@ -4997,6 +5012,14 @@ const PresentationStudio = (() => {
         const blocks = resolveRefBlocks();
         if (!blocks.length) return;
         const groupSize = getQuickGroupSize();
+        // book181e -- lebih dari 1 ayat (termasuk 1 rentang "2:1-30"): pecah per N ayat/slide + panah lanjut.
+        // (Pengecualian: banyak referensi + "semua versi dalam 1 slide" tetap pakai jalur gabungan lama di bawah.)
+        {
+          const totalV = blocks.reduce((n, b) => n + (b.versions[0] ? b.versions[0].verses.length : 0), 0);
+          const lm = el("psQuickLangMode");
+          const oldMulti = !!(lm && lm.value === "multi") && getCheckedVersions().length > 1 && blocks.length > 1 && groupSize > 1;
+          if (totalV > 1 && !oldMulti && startQuickPlaylist_(blocks, isDualLive() && !quickForceLive_)) return;
+        }
         // BARU (18 Sep 2026) -- kalau ada LEBIH DARI 1 ayat DAN operator
         // memilih gabung >1 ayat/slide, "Tampilkan" mengirim GABUNGAN N
         // ayat PERTAMA (bukan cuma 1 ayat pertama seperti bawaan) --
