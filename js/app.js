@@ -10656,11 +10656,12 @@ function updateTTSFloat_() {
   const verseNo = cur ? cur.verse : (rp ? rp.verse : (q0 ? q0.v.verse : "")); // run baru mulai: item belum berjalan
   box.hidden = false;
   box.querySelector(".tts-float-play").textContent = ttsPlaying ? "⏸" : "▶️";
-  // book181: saat dijeda tulis "Lanjut Mat 1:1" (singkatan LAI); saat berjalan tetap "Ayat N".
+  // book181: saat berjalan tulis "Hak 3:1", saat dijeda "Lanjut Hak 3:1" (singkatan LAI).
   const abbr181 = (typeof laiAbbr === "function" && typeof currentBookNum !== "undefined") ? laiAbbr(currentBookNum) : "";
+  const ref181 = (abbr181 && typeof currentChapter !== "undefined") ? abbr181 + " " + currentChapter + ":" + verseNo : "";
   box.querySelector(".tts-float-label").textContent = ttsPlaying
-    ? "Ayat " + verseNo
-    : (abbr181 && typeof currentChapter !== "undefined" ? "Lanjut " + abbr181 + " " + currentChapter + ":" + verseNo : "Lanjut ayat " + verseNo);
+    ? (ref181 || "Ayat " + verseNo)
+    : (ref181 ? "Lanjut " + ref181 : "Lanjut ayat " + verseNo);
 }
 
 function updateTTSButton() {

@@ -169,3 +169,19 @@ const OSIS_ABBR_INDEX = {};
 OSIS_ABBR_3.forEach((abbr, i) => {
   if (BOOKS[i]) OSIS_ABBR_INDEX[abbr.toLowerCase()] = BOOKS[i]; // simpan objek kitab (perlu .num & .name)
 });
+
+// book181 -- Singkatan nama kitab gaya Lembaga Alkitab Indonesia (LAI), urutan SAMA dengan BOOKS (66 kitab).
+// Dipakai a.l. untuk tulisan "Lanjut Mat 1:1" pada tombol jeda suara. Dipakai lewat laiAbbr(nomorKitab).
+const LAI_ABBR = [
+  "Kej", "Kel", "Im", "Bil", "Ul", "Yos", "Hak", "Rut", "1Sam", "2Sam",
+  "1Raj", "2Raj", "1Taw", "2Taw", "Ezr", "Neh", "Est", "Ayb", "Mzm", "Ams",
+  "Pkh", "Kid", "Yes", "Yer", "Rat", "Yeh", "Dan", "Hos", "Yl", "Am",
+  "Ob", "Yun", "Mi", "Nah", "Hab", "Zef", "Hag", "Zak", "Mal",
+  "Mat", "Mrk", "Luk", "Yoh", "Kis", "Rm", "1Kor", "2Kor", "Gal", "Ef",
+  "Flp", "Kol", "1Tes", "2Tes", "1Tim", "2Tim", "Tit", "Flm", "Ibr", "Yak",
+  "1Ptr", "2Ptr", "1Yoh", "2Yoh", "3Yoh", "Yud", "Why",
+];
+function laiAbbr(bookNum) {
+  const n = parseInt(bookNum, 10);
+  return (n >= 1 && n <= LAI_ABBR.length) ? LAI_ABBR[n - 1] : "";
+}
