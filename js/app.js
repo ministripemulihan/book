@@ -444,7 +444,21 @@ function logout() {
 // 2) MEMUAT DATA ALKITAB — dari IndexedDB (lokal) bila ada, kalau tidak
 //    ambil sekali dari Google Sheet Alkitab lalu simpan lokal.
 // ------------------------------------------------------------
+// book181 -- minta Chrome menandai penyimpanan aplikasi ini PERMANEN. Tanpa ini, Chrome (terutama di HP yang ruangnya sempit)
+// boleh menghapus IndexedDB (Alkitab, Kidung) sendiri, lalu aplikasi minta unduh Alkitab lagi. Hasilnya diingat untuk diagnosa.
+async function requestPersistentStorage_() {
+  try {
+    if (!navigator.storage || !navigator.storage.persist) return;
+    let ok = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+    if (!ok) ok = await navigator.storage.persist();
+    let est = null;
+    try { est = navigator.storage.estimate ? await navigator.storage.estimate() : null; } catch (e) { /* abaikan */ }
+    localStorage.setItem("bible_storage_persist_v1", JSON.stringify({ ok: !!ok, at: Date.now(), usage: est && est.usage, quota: est && est.quota }));
+  } catch (e) { /* abaikan */ }
+}
+
 async function startApp() {
+  requestPersistentStorage_(); // tidak ditunggu
   el("appTitle").textContent = CONFIG.APP_TITLE;
   document.title = CONFIG.APP_TITLE;
 
@@ -10642,7 +10656,11 @@ function updateTTSFloat_() {
   const verseNo = cur ? cur.verse : (rp ? rp.verse : (q0 ? q0.v.verse : "")); // run baru mulai: item belum berjalan
   box.hidden = false;
   box.querySelector(".tts-float-play").textContent = ttsPlaying ? "⏸" : "▶️";
-  box.querySelector(".tts-float-label").textContent = (ttsPlaying ? "Ayat " : "Lanjut ayat ") + verseNo;
+  // book181: saat dijeda tulis "Lanjut Mat 1:1" (singkatan LAI); saat berjalan tetap "Ayat N".
+  const abbr181 = (typeof laiAbbr === "function" && typeof currentBookNum !== "undefined") ? laiAbbr(currentBookNum) : "";
+  box.querySelector(".tts-float-label").textContent = ttsPlaying
+    ? "Ayat " + verseNo
+    : (abbr181 && typeof currentChapter !== "undefined" ? "Lanjut " + abbr181 + " " + currentChapter + ":" + verseNo : "Lanjut ayat " + verseNo);
 }
 
 function updateTTSButton() {
