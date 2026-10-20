@@ -5855,3 +5855,35 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
   .ml-filter-body #mlFilterClear { grid-column: 1 / -1; }
   .ml-count-line { font-size: 12px; margin-bottom: 4px; }
 }
+
+/* ============================================================
+   BARU (book182, 20 Okt 2026) -- Pustaka Media di HP: LEGA & tetap ada navigasi.
+   - Judul + tombol atas ringkas satu baris; hilang saat gulir ke bawah, muncul lagi saat gulir ke atas.
+   - Tab (Semua/YouTube/Efek Suara/...) pindah ke BILAH BAWAH 1 baris yang bisa digeser samping (jempol mudah).
+   - Tombol ⛶ = layar penuh (Fullscreen API) supaya bilah alamat browser ikut hilang.
+   ============================================================ */
+@media (max-width: 899px) {
+  .ml-box .info-kami-header {
+    padding: 6px 10px; gap: 6px; flex-wrap: nowrap;
+    padding-top: calc(6px + env(safe-area-inset-top, 0px));
+    max-height: 70px; overflow: hidden;
+    transition: max-height .18s ease, padding .18s ease, border-width .18s ease;
+  }
+  .ml-box .info-kami-header h2 { font-size: 15px; white-space: nowrap; flex: 0 0 auto; }
+  .ml-box .info-kami-header-actions { flex: 1 1 auto; min-width: 0; justify-content: flex-end; gap: 6px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .ml-box .info-kami-header-actions::-webkit-scrollbar { display: none; }
+  .ml-box .info-kami-header-actions .chip-btn { white-space: nowrap; flex: 0 0 auto; padding: 4px 9px; font-size: 12px; }
+  .ml-box.ml-hdr-hidden .info-kami-header { max-height: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
+  .ml-box .ml-tabs {
+    order: 3; flex-wrap: nowrap; overflow-x: auto; gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    border-bottom: 0; border-top: 1px solid var(--rule);
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .ml-box .ml-tabs::-webkit-scrollbar { display: none; }
+  .ml-box .ml-tab { flex: 0 0 auto; white-space: nowrap; padding: 7px 12px; }
+  .ml-box .ml-body { padding: 8px 10px 12px; }
+}
+.ml-full-btn { font-size: 18px; }
+.nc-section { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; }
+.nc-section h3 { margin: 0 0 6px; font-size: 16px; }
