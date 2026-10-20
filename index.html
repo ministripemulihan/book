@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261018a179" />
+<link rel="stylesheet" href="css/style.css?v=20261020a182" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -242,6 +242,7 @@
           <button type="button" id="mlRefreshBtn" class="icon-btn" title="Segarkan" aria-label="Segarkan">🔄</button>
           <button type="button" id="mlAddBtn" class="chip-btn small primary" hidden>➕ Tambah</button>
           <button type="button" id="mlCheckBtn" class="chip-btn small" hidden>🔎 Cek BibleRef</button>
+          <button type="button" id="mlFullBtn" class="icon-btn ml-full-btn" title="Layar penuh (sembunyikan bilah alamat browser)" aria-label="Layar penuh" hidden>⛶</button>
           <button type="button" id="mediaLibraryCloseBtn" class="icon-btn" aria-label="Tutup">✕</button>
         </div>
       </div>
@@ -4334,7 +4335,7 @@
        digantikan tab "🎆 Layar Publik" di dalam media-library.js. -->
   <script src="js/favorites.js?v=20260911a"></script>
   <script src="js/media-bibleref.js?v=20261016b"></script>
-  <script src="js/media-library.js?v=20261018a179"></script>
+  <script src="js/media-library.js?v=20261020a182"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20260915b"></script>
   <script src="js/pinyin-ruby.js?v=20261017b"></script>
@@ -4345,7 +4346,8 @@
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->
   <script src="js/aichat-riset.js?v=20260921a"></script>
   <script src="js/aichat.js?v=20260921a"></script>
-  <script src="js/langcheck.js?v=20261016a"></script>
+  <script src="js/notescompare.js?v=20261020a182"></script>
+  <script src="js/langcheck.js?v=20261020a182"></script>
   <script src="js/kidungversecheck.js?v=20260821a"></script>
   <!-- BARU (7 Sep 2026, permintaan operator) -- daftarkan Service Worker
        (sw.js) supaya aplikasi ini SENDIRI (HTML/CSS/JS/font) bisa
