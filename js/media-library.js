@@ -3083,6 +3083,43 @@ const MediaLibrary = (() => {
     });
   }
 
+  // BARU (book182, 20 Okt 2026) -- tampilan HP lebih LEGA: judul/tombol atas disembunyikan saat daftar digulir
+  // ke bawah (muncul lagi saat gulir ke atas), tab pindah ke bilah bawah (lihat css .ml-tabs), dan tombol ⛶
+  // memakai Fullscreen API supaya bilah alamat Chrome ikut hilang. Semua isi & fitur tetap sama.
+  function wireMobileChrome_() {
+    const body = el_("mlBody");
+    const box = document.querySelector("#mediaLibraryOverlay .ml-box");
+    if (body && box && !body.dataset.chromeWired) {
+      body.dataset.chromeWired = "1";
+      let lastTop = 0;
+      body.addEventListener("scroll", () => {
+        const top = body.scrollTop;
+        const dy = top - lastTop;
+        if (top < 24) box.classList.remove("ml-hdr-hidden");
+        else if (dy > 8) box.classList.add("ml-hdr-hidden");
+        else if (dy < -8) box.classList.remove("ml-hdr-hidden");
+        if (Math.abs(dy) > 8) lastTop = top;
+      }, { passive: true });
+    }
+    const fullBtn = el_("mlFullBtn");
+    const ov = el_("mediaLibraryOverlay");
+    if (fullBtn && ov && !fullBtn.dataset.wired) {
+      fullBtn.dataset.wired = "1";
+      const supported = !!(ov.requestFullscreen || ov.webkitRequestFullscreen);
+      fullBtn.hidden = !supported;
+      const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+      fullBtn.addEventListener("click", () => {
+        try {
+          if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+          else (ov.requestFullscreen || ov.webkitRequestFullscreen).call(ov);
+        } catch (e) { /* tidak didukung browser ini -- abaikan */ }
+      });
+      const sync = () => { fullBtn.textContent = isFull() ? "🗗" : "⛶"; };
+      document.addEventListener("fullscreenchange", sync);
+      document.addEventListener("webkitfullscreenchange", sync);
+    }
+  }
+
   function wireOnce_() {
     const addBtn = el_("mlAddBtn");
     if (addBtn && !addBtn.dataset.wired) {
@@ -3094,6 +3131,7 @@ const MediaLibrary = (() => {
       chkBtn.dataset.wired = "1";
       chkBtn.addEventListener("click", () => openCheckPanel_());
     }
+    wireMobileChrome_();
     const refreshBtn = el_("mlRefreshBtn");
     if (refreshBtn && !refreshBtn.dataset.wired) {
       refreshBtn.dataset.wired = "1";
@@ -3118,6 +3156,7 @@ const MediaLibrary = (() => {
   function close() {
     const overlay = el_("mediaLibraryOverlay");
     if (overlay) overlay.hidden = true;
+    try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) { /* abaikan */ }
     closePlayerOverlay_();
     resetLayarPublikAnim_();
   }

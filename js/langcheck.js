@@ -270,6 +270,9 @@ function renderLangCheckPanel() {
     container.appendChild(kidungVerseRow);
   }
 
+  // 📝 BARU (book182) -- bandingkan notes Indonesia (Recovery) vs Inggris (Recovery), lihat js/notescompare.js
+  if (typeof NotesCompare !== "undefined") container.appendChild(NotesCompare.buildSection());
+
   const langFilterSel = controls.querySelector("#langCheckLangFilter");
   (CONFIG.LANGUAGES || []).forEach((l) => {
     const opt = document.createElement("option");
