@@ -4,11 +4,22 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Alkitab — Baca &amp; Cari Ayat</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Alkitab" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 <meta name="description" content="Aplikasi pembacaan Alkitab dengan data lokal, pencarian ayat dan kata cepat." />
+<!-- book184: percepat pemutar YouTube di Pustaka Media (jabat tangan koneksi lebih awal) -->
+<link rel="preconnect" href="https://www.youtube.com" />
+<link rel="preconnect" href="https://i.ytimg.com" />
+<link rel="dns-prefetch" href="https://s.ytimg.com" />
+<link rel="dns-prefetch" href="https://www.google.com" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261020a182" />
+<link rel="stylesheet" href="css/style.css?v=20261022a184" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -239,6 +250,7 @@
       <div class="info-kami-header">
         <h2>🎵 Pustaka Media</h2>
         <div class="info-kami-header-actions">
+          <span id="mlSignalSlot" class="ml-signal-slot" title="Sinyal ke YouTube"></span>
           <button type="button" id="mlRefreshBtn" class="icon-btn" title="Segarkan" aria-label="Segarkan">🔄</button>
           <button type="button" id="mlAddBtn" class="chip-btn small primary" hidden>➕ Tambah</button>
           <button type="button" id="mlCheckBtn" class="chip-btn small" hidden>🔎 Cek BibleRef</button>
@@ -790,6 +802,11 @@
         <div class="sidebar-section sidebar-section-shortcut">
           <button type="button" id="allMediaBtn" class="sidebar-wide-btn" hidden>🎬 Media</button>
           <button type="button" id="allMapsBtn" class="sidebar-wide-btn" hidden>🗺️ Peta + Gambar</button>
+        </div>
+        <!-- BARU (book183) -- Pasang sebagai aplikasi HP (js/pwa-install.js).
+             Hanya tampil di HP/tablet yang belum memasangnya. -->
+        <div class="sidebar-section sidebar-section-shortcut">
+          <button type="button" id="pwaInstallBtn" class="sidebar-wide-btn" hidden>📲 Pasang Aplikasi di HP</button>
         </div>
       </aside>
       <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
@@ -3807,6 +3824,11 @@
             <button type="button" class="chip-btn small" data-shout-color="red">🔴 Merah polos</button>
           </div>
           <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
+          <!-- BARU (book184) -- efek layar ria (js/fun-fx.js): pesta, Golden Buzzer, boneka bengong, boneka orang tua "Ssst".
+               Dikirim ke Layar 2 lewat {type:"funfx"} (dirender present.html). Link lagu bisa diganti sendiri. -->
+          <div class="ps-field-label" style="margin-top:0;">🎉 Efek Layar Ria (Layar 2)</div>
+          <div id="psFunFxGrid"></div>
+          <hr style="margin:18px 0; opacity:.2; border-color:var(--ps-dropzone-border, #4a3c28);" />
           <div class="ps-field-label" style="margin-top:0;">🔊 Efek Suara</div>
           <p class="announcement-compose-hint" style="margin-top:0;">Diputar dari perangkat Layar 2 (biasanya tersambung ke sound system venue) -- pastikan Layar 2 tidak di-mute.</p>
           <!-- BARU (10 Sep 2026, sesi ke-13, permintaan operator "supaya
@@ -4313,7 +4335,9 @@
   <script src="js/bg-audio-source-upload.js?v=20260920d"></script> <!-- tahap 3: sumber "Dari upload" -->
   <script src="js/bg-audio-source-playlist.js?v=20261017a"></script> <!-- book175: sumber "Dari Playlist SoundCloud" -->
   <script src="js/media-date.js?v=20261018a179"></script>
-  <script src="js/presentation-studio.js?v=20261018c181"></script>
+  <script src="js/signal-meter.js?v=20261022a184"></script>
+  <script src="js/fun-fx.js?v=20261022a184"></script>
+  <script src="js/presentation-studio.js?v=20261022a184"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4335,9 +4359,9 @@
        digantikan tab "🎆 Layar Publik" di dalam media-library.js. -->
   <script src="js/favorites.js?v=20260911a"></script>
   <script src="js/media-bibleref.js?v=20261016b"></script>
-  <script src="js/media-library.js?v=20261020a182"></script>
+  <script src="js/media-library.js?v=20261022a184"></script>
   <script src="js/signup.js?v=20260818b"></script>
-  <script src="js/adminbell.js?v=20260915b"></script>
+  <script src="js/adminbell.js?v=20261022a183"></script>
   <script src="js/pinyin-ruby.js?v=20261017b"></script>
   <script src="js/tts-sync.js?v=20261017b"></script>
   <script src="js/app.js?v=20261018b181"></script>
@@ -4346,7 +4370,8 @@
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->
   <script src="js/aichat-riset.js?v=20260921a"></script>
   <script src="js/aichat.js?v=20260921a"></script>
-  <script src="js/notescompare.js?v=20261020a182"></script>
+  <script src="js/notescompare.js?v=20261022a183"></script>
+  <script src="js/pwa-install.js?v=20261022a183"></script>
   <script src="js/langcheck.js?v=20261020a182"></script>
   <script src="js/kidungversecheck.js?v=20260821a"></script>
   <!-- BARU (7 Sep 2026, permintaan operator) -- daftarkan Service Worker
