@@ -9343,6 +9343,10 @@ const PresentationStudio = (() => {
       });
     });
     markActiveShoutColor_();
+    // BARU (book184) -- 🎉 Efek Layar Ria (js/fun-fx.js): tombol dibangun FunFX, dikirim ke Layar 2.
+    if (typeof FunFX !== "undefined" && el("psFunFxGrid")) {
+      FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "" }));
+    }
     document.querySelectorAll("[data-shout]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.shout, color: shoutColor_ }));
     });

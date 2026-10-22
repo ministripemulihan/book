@@ -910,6 +910,7 @@ const MediaLibrary = (() => {
           <div class="ml-player-header">
             <span id="mlPlayerTitle" class="ml-player-title"></span>
             <div class="ml-player-header-actions">
+              <span id="mlPlayerSignal" class="ml-signal-slot" title="Sinyal ke YouTube"></span>
               <button type="button" id="mlPlayerWakeBtn" class="chip-btn small ml-player-btn" aria-pressed="false" hidden></button>
               <button type="button" id="mlPlayerBgBtn" class="chip-btn small ml-player-btn ml-player-btn-bg" title="Lagu jalan di belakang layar + teks kidung/ayat tampil penuh (1 ketukan)" aria-label="Lagu di belakang layar dan baca layar penuh">🎧<span class="ml-pl-long"> Latar &amp; baca penuh</span><span class="ml-pl-short"> Latar</span></button>
               <button type="button" id="mlPlayerHideBtn" class="chip-btn small ml-player-btn" title="Sembunyikan pemutar: lagu tetap main, syair tampil penuh" aria-label="Sembunyikan pemutar">🙈<span class="ml-pl-long"> Sembunyikan</span></button>
@@ -920,6 +921,7 @@ const MediaLibrary = (() => {
             </div>
           </div>
           <div class="ml-player-body" id="mlPlayerBody"></div>
+          <div class="ml-load-stat" id="mlPlayerLoad" hidden></div>
           <div class="ml-player-hint" id="mlPlayerHint" hidden>Video tidak muncul atau ada tulisan “tidak tersedia”? Tekan <b>▶ Buka di YouTube</b>.</div>
           <div class="ml-player-verses" id="mlPlayerVerses" hidden></div>
         </div>`;
@@ -974,6 +976,17 @@ const MediaLibrary = (() => {
     }
     el_("mlPlayerTitle").textContent = title || "";
     el_("mlPlayerBody").innerHTML = innerHtml;
+    // BARU (book184) -- 📶 sinyal 4 garis + hitung detik memuat video (js/signal-meter.js).
+    if (typeof SignalMeter !== "undefined") {
+      try {
+        if (playerLoadStop_) { playerLoadStop_(); playerLoadStop_ = null; }
+        SignalMeter.mount(el_("mlPlayerSignal"));
+        const ytFrame = el_("mlPlayerBody").querySelector("iframe");
+        const loadEl = el_("mlPlayerLoad");
+        if (ytFrame && loadEl && /youtube\.com\/embed/.test(ytFrame.src || "")) playerLoadStop_ = SignalMeter.watchIframe(ytFrame, loadEl);
+        else if (loadEl) loadEl.hidden = true;
+      } catch (e) { /* indikator tidak boleh menghalangi pemutar */ }
+    }
     const openLink = el_("mlPlayerOpenLink");
     const isYt = !!(fallbackLink && youtubeIdFromLink(fallbackLink));
     if (openLink) {
@@ -1005,6 +1018,7 @@ const MediaLibrary = (() => {
     syncPlayerWakeLabel_();
     if (playerWantsWake_()) acquirePlayerWake_();
   }
+  let playerLoadStop_ = null; // book184 -- penghenti pemantau waktu memuat iframe
   // ---- book166: pemutar mini + layar tetap menyala ----
   // Mini = tidak ada latar gelap, tidak menutupi halaman: bar di bawah layar (audio) atau jendela kecil
   // di pojok kanan bawah (video). Halaman di belakangnya tetap bisa diketuk/digulir (syair kidung terbaca),
