@@ -5887,3 +5887,14 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 .ml-full-btn { font-size: 18px; }
 .nc-section { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 10px; }
 .nc-section h3 { margin: 0 0 6px; font-size: 16px; }
+
+/* BARU (book183) -- dialog petunjuk Pasang Aplikasi (js/pwa-install.js) */
+.pwa-help-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.pwa-help-overlay[hidden] { display: none; }
+.pwa-help-card { background: var(--paper-raised, #fff); color: var(--ink, #222); border-radius: 12px; padding: 18px; max-width: 360px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+.pwa-help-card h3 { margin: 0 0 8px; }
+.pwa-help-card ol { margin: 0 0 14px; padding-left: 20px; line-height: 1.5; }
+.admin-bell-logins small { opacity: .7; }
+
+/* BARU (book184) -- slot indikator sinyal 4 garis (js/signal-meter.js) */
+.ml-signal-slot { display: inline-flex; align-items: center; margin-right: 4px; }
