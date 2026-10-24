@@ -1008,6 +1008,24 @@
   @keyframes anUp { from { opacity: 0; transform: translateY(45vh); } to { opacity: 1; transform: translateY(0); } }
   @keyframes anDown { from { opacity: 0; transform: translateY(-45vh); } to { opacity: 1; transform: translateY(0); } }
   @keyframes anPlaneIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+  /* BARU (book186) -- animasi pindah slide untuk gambar/PDF/PPT (#slideView, kind "slide").
+     PENTING: #slideView sudah memakai `transform` (mode Zoom & kunci Zoom Layar), jadi di sini
+     dipakai properti terpisah translate/scale/rotate (BUKAN transform) supaya tidak bentrok,
+     dan fill-mode `backwards` supaya tidak ada sisa setelah animasi selesai. */
+  #stage[data-anim="book"].fade-in #slideView { transform-origin: 0% 50%; animation: anSlideBook .75s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim="shrink"].fade-in #slideView { animation: anSlideShrink .6s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim="right"].fade-in #slideView { animation: anSlideRight .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim="left"].fade-in #slideView { animation: anSlideLeft .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim="up"].fade-in #slideView { animation: anSlideUp .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim="down"].fade-in #slideView { animation: anSlideDown .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim="plane"].fade-in #slideView { animation: anSlidePlane .7s ease .25s backwards; }
+  @keyframes anSlideBook { from { opacity: 0; rotate: 0 1 0 -100deg; } to { opacity: 1; rotate: 0 1 0 0deg; } }
+  @keyframes anSlideShrink { from { opacity: 0; scale: 1.8; } to { opacity: 1; scale: 1; } }
+  @keyframes anSlideRight { from { opacity: 0; translate: -45vw 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes anSlideLeft { from { opacity: 0; translate: 45vw 0; } to { opacity: 1; translate: 0 0; } }
+  @keyframes anSlideUp { from { opacity: 0; translate: 0 45vh; } to { opacity: 1; translate: 0 0; } }
+  @keyframes anSlideDown { from { opacity: 0; translate: 0 -45vh; } to { opacity: 1; translate: 0 0; } }
+  @keyframes anSlidePlane { from { opacity: 0; scale: .96; } to { opacity: 1; scale: 1; } }
   /* Pesawat kertas kecil yang meluncur melintasi layar (dibuat oleh flyPaperPlane_()). */
   #paperPlaneFx { position: fixed; left: 0; top: 0; width: 64px; height: 64px; z-index: 99990; pointer-events: none; animation: anPlaneFly 1.1s cubic-bezier(.4,.1,.5,1) forwards; filter: drop-shadow(0 4px 6px rgba(0,0,0,.45)); }
   @keyframes anPlaneFly {
