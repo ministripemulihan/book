@@ -2959,6 +2959,20 @@
                Kidung di Layar 2: SATU jarak seragam antar bait/koor, ukuran
                tulisan "KOOR:", dan warna nomor bait. Lihat applyTheme()
                di present.html & wireKidungLook di js/presentation-studio.js. -->
+          <!-- BARU (book185) -- 🎞️ Animasi Pindah Slide (Layar 2). Ikon kecil; bawaan = tanpa animasi.
+               Lihat markSlideAnimButtons_ & wireSlideAnim di js/presentation-studio.js, dan data-anim di present.html. -->
+          <div class="ps-field-label">🎞️ Animasi Pindah Slide (Layar 2)</div>
+          <div id="psSlideAnimGrid" style="display:flex; flex-wrap:wrap; gap:6px; margin:4px 0;">
+            <button type="button" class="chip-btn small" data-anim="none" title="Tanpa animasi (bawaan)" aria-label="Tanpa animasi (bawaan)" style="font-size:18px; line-height:1; padding:6px 9px;">⛔</button>
+            <button type="button" class="chip-btn small" data-anim="book" title="Buka lembar kertas seperti buku" aria-label="Buka lembar kertas seperti buku" style="font-size:18px; line-height:1; padding:6px 9px;">📖</button>
+            <button type="button" class="chip-btn small" data-anim="shrink" title="Mengecil" aria-label="Mengecil" style="font-size:18px; line-height:1; padding:6px 9px;">🔍</button>
+            <button type="button" class="chip-btn small" data-anim="right" title="Geser ke kanan" aria-label="Geser ke kanan" style="font-size:18px; line-height:1; padding:6px 9px;">➡️</button>
+            <button type="button" class="chip-btn small" data-anim="up" title="Geser ke atas" aria-label="Geser ke atas" style="font-size:18px; line-height:1; padding:6px 9px;">⬆️</button>
+            <button type="button" class="chip-btn small" data-anim="left" title="Geser ke kiri" aria-label="Geser ke kiri" style="font-size:18px; line-height:1; padding:6px 9px;">⬅️</button>
+            <button type="button" class="chip-btn small" data-anim="down" title="Geser ke bawah" aria-label="Geser ke bawah" style="font-size:18px; line-height:1; padding:6px 9px;">⬇️</button>
+            <button type="button" class="chip-btn small" data-anim="plane" title="Pesawat kertas meluncur" aria-label="Pesawat kertas meluncur" style="font-size:18px; line-height:1; padding:6px 9px;">✈️</button>
+          </div>
+          <div class="ps-pointer-hint">Dipakai saat pindah dari satu slide ke slide berikutnya (ayat, kidung, teks). ⛔ = tanpa animasi (bawaan). Arahkan kursor ke ikon untuk melihat namanya.</div>
           <div class="ps-field-label">🎵 Jarak Bait / Koor (Kidung)</div>
           <div class="ps-btn-row">
             <button type="button" id="psKidungGapDec" class="chip-btn small" title="Rapatkan jarak bait/koor">≡-</button>
