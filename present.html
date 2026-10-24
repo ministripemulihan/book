@@ -993,13 +993,13 @@
      dikirim lewat pesan "theme" -> applyTheme() mengisi #stage[data-anim].
      "none" (bawaan) TIDAK punya aturan di sini -> tetap fadeUp lama di atas.
      Yang dianimasikan: #ref, #refSub, #text (isi slide), bukan seluruh layar. */
-  #stage[data-anim="book"].fade-in #text, #stage[data-anim="book"].fade-in #ref, #stage[data-anim="book"].fade-in #refSub { transform-origin: 0% 50%; backface-visibility: hidden; animation: anBook .75s cubic-bezier(.22,.8,.3,1) both; }
-  #stage[data-anim="shrink"].fade-in #text, #stage[data-anim="shrink"].fade-in #ref, #stage[data-anim="shrink"].fade-in #refSub { animation: anShrink .6s cubic-bezier(.22,.8,.3,1) both; }
-  #stage[data-anim="right"].fade-in #text, #stage[data-anim="right"].fade-in #ref, #stage[data-anim="right"].fade-in #refSub { animation: anRight .55s cubic-bezier(.22,.8,.3,1) both; }
-  #stage[data-anim="left"].fade-in #text, #stage[data-anim="left"].fade-in #ref, #stage[data-anim="left"].fade-in #refSub { animation: anLeft .55s cubic-bezier(.22,.8,.3,1) both; }
-  #stage[data-anim="up"].fade-in #text, #stage[data-anim="up"].fade-in #ref, #stage[data-anim="up"].fade-in #refSub { animation: anUp .55s cubic-bezier(.22,.8,.3,1) both; }
-  #stage[data-anim="down"].fade-in #text, #stage[data-anim="down"].fade-in #ref, #stage[data-anim="down"].fade-in #refSub { animation: anDown .55s cubic-bezier(.22,.8,.3,1) both; }
-  #stage[data-anim="plane"].fade-in #text, #stage[data-anim="plane"].fade-in #ref, #stage[data-anim="plane"].fade-in #refSub { animation: anPlaneIn .7s ease .25s both; }
+  #stage[data-anim-eff="book"].fade-in #text, #stage[data-anim-eff="book"].fade-in #ref, #stage[data-anim-eff="book"].fade-in #refSub { transform-origin: 0% 50%; backface-visibility: hidden; animation: anBook .75s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="shrink"].fade-in #text, #stage[data-anim-eff="shrink"].fade-in #ref, #stage[data-anim-eff="shrink"].fade-in #refSub { animation: anShrink .6s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="right"].fade-in #text, #stage[data-anim-eff="right"].fade-in #ref, #stage[data-anim-eff="right"].fade-in #refSub { animation: anRight .55s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="left"].fade-in #text, #stage[data-anim-eff="left"].fade-in #ref, #stage[data-anim-eff="left"].fade-in #refSub { animation: anLeft .55s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="up"].fade-in #text, #stage[data-anim-eff="up"].fade-in #ref, #stage[data-anim-eff="up"].fade-in #refSub { animation: anUp .55s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="down"].fade-in #text, #stage[data-anim-eff="down"].fade-in #ref, #stage[data-anim-eff="down"].fade-in #refSub { animation: anDown .55s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="plane"].fade-in #text, #stage[data-anim-eff="plane"].fade-in #ref, #stage[data-anim-eff="plane"].fade-in #refSub { animation: anPlaneIn .7s ease .25s both; }
   @keyframes anBook { from { opacity: 0; transform: perspective(1400px) rotateY(-100deg); } to { opacity: 1; transform: perspective(1400px) rotateY(0deg); } }
   @keyframes anShrink { from { opacity: 0; transform: scale(1.8); } to { opacity: 1; transform: scale(1); } }
   /* "Geser ke kanan" = isi baru bergerak ke arah kanan (masuk dari kiri), dst. */
@@ -1008,17 +1008,22 @@
   @keyframes anUp { from { opacity: 0; transform: translateY(45vh); } to { opacity: 1; transform: translateY(0); } }
   @keyframes anDown { from { opacity: 0; transform: translateY(-45vh); } to { opacity: 1; transform: translateY(0); } }
   @keyframes anPlaneIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+  /* BARU (book187) -- arah MUNDUR: "book" dibalik (engsel di kanan). Arah lain dibalik di JS (showMain). */
+  #stage[data-anim-eff="bookback"].fade-in #text, #stage[data-anim-eff="bookback"].fade-in #ref, #stage[data-anim-eff="bookback"].fade-in #refSub { transform-origin: 100% 50%; backface-visibility: hidden; animation: anBookBack .75s cubic-bezier(.22,.8,.3,1) both; }
+  #stage[data-anim-eff="bookback"].fade-in #slideView { transform-origin: 100% 50%; animation: anSlideBookBack .75s cubic-bezier(.22,.8,.3,1) backwards; }
+  @keyframes anBookBack { from { opacity: 0; transform: perspective(1400px) rotateY(100deg); } to { opacity: 1; transform: perspective(1400px) rotateY(0deg); } }
+  @keyframes anSlideBookBack { from { opacity: 0; rotate: 0 1 0 100deg; } to { opacity: 1; rotate: 0 1 0 0deg; } }
   /* BARU (book186) -- animasi pindah slide untuk gambar/PDF/PPT (#slideView, kind "slide").
      PENTING: #slideView sudah memakai `transform` (mode Zoom & kunci Zoom Layar), jadi di sini
      dipakai properti terpisah translate/scale/rotate (BUKAN transform) supaya tidak bentrok,
      dan fill-mode `backwards` supaya tidak ada sisa setelah animasi selesai. */
-  #stage[data-anim="book"].fade-in #slideView { transform-origin: 0% 50%; animation: anSlideBook .75s cubic-bezier(.22,.8,.3,1) backwards; }
-  #stage[data-anim="shrink"].fade-in #slideView { animation: anSlideShrink .6s cubic-bezier(.22,.8,.3,1) backwards; }
-  #stage[data-anim="right"].fade-in #slideView { animation: anSlideRight .55s cubic-bezier(.22,.8,.3,1) backwards; }
-  #stage[data-anim="left"].fade-in #slideView { animation: anSlideLeft .55s cubic-bezier(.22,.8,.3,1) backwards; }
-  #stage[data-anim="up"].fade-in #slideView { animation: anSlideUp .55s cubic-bezier(.22,.8,.3,1) backwards; }
-  #stage[data-anim="down"].fade-in #slideView { animation: anSlideDown .55s cubic-bezier(.22,.8,.3,1) backwards; }
-  #stage[data-anim="plane"].fade-in #slideView { animation: anSlidePlane .7s ease .25s backwards; }
+  #stage[data-anim-eff="book"].fade-in #slideView { transform-origin: 0% 50%; animation: anSlideBook .75s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim-eff="shrink"].fade-in #slideView { animation: anSlideShrink .6s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim-eff="right"].fade-in #slideView { animation: anSlideRight .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim-eff="left"].fade-in #slideView { animation: anSlideLeft .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim-eff="up"].fade-in #slideView { animation: anSlideUp .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim-eff="down"].fade-in #slideView { animation: anSlideDown .55s cubic-bezier(.22,.8,.3,1) backwards; }
+  #stage[data-anim-eff="plane"].fade-in #slideView { animation: anSlidePlane .7s ease .25s backwards; }
   @keyframes anSlideBook { from { opacity: 0; rotate: 0 1 0 -100deg; } to { opacity: 1; rotate: 0 1 0 0deg; } }
   @keyframes anSlideShrink { from { opacity: 0; scale: 1.8; } to { opacity: 1; scale: 1; } }
   @keyframes anSlideRight { from { opacity: 0; translate: -45vw 0; } to { opacity: 1; translate: 0 0; } }
@@ -6912,6 +6917,17 @@
     if (kind !== "mp3" && !mp3AudioEl.hidden) { mp3AudioEl.hidden = true; mp3AudioEl.pause(); mp3AudioEl.src = ""; }
     stageEl.classList.remove("fade-in");
     void stageEl.offsetWidth;
+    // BARU (book187) -- arah animasi: maju = sesuai pilihan; mundur (data.navDir === "prev")
+    // dibalik: kiri<->kanan, atas<->bawah, buka-buku dibalik. Lainnya (mengecil, pesawat) tetap.
+    {
+      const baseAnim = stageEl.getAttribute("data-anim");
+      if (!baseAnim) stageEl.removeAttribute("data-anim-eff");
+      else {
+        const back = data && data.navDir === "prev";
+        const rev = { left: "right", right: "left", up: "down", down: "up", book: "bookback" };
+        stageEl.setAttribute("data-anim-eff", back && rev[baseAnim] ? rev[baseAnim] : baseAnim);
+      }
+    }
     // BARU (4 Sep 2026) -- #refSub HANYA dipakai untuk kind "kidung" (lihat
     // di bawah) -- disembunyikan lebih dulu di sini untuk SEMUA jenis
     // tayangan lain supaya tidak ada sisa baris kecil kidung sebelumnya
