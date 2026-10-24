@@ -556,6 +556,15 @@ const Presentation = (() => {
         return;
       }
     }
+    // BARU (book187) -- arah navigasi (maju/mundur) untuk animasi pindah slide di Layar 2.
+    // Studio menandai window.__psNavDir = {dir:"next"|"prev", t:waktu} tepat sebelum mengirim
+    // (lihat playlistNext/playlistPrev & tombol ◀ ▶ halaman file di js/presentation-studio.js);
+    // dipakai SEKALI untuk tayangan isi pertama sesudahnya, kedaluwarsa 2 detik.
+    if (OVERLAY_TYPES.indexOf(payload.type) === -1 && window.__psNavDir) {
+      const nd = window.__psNavDir;
+      window.__psNavDir = null;
+      if (nd && nd.dir && (Date.now() - (nd.t || 0)) < 2000) payload = Object.assign({}, payload, { navDir: nd.dir });
+    }
     if (OVERLAY_TYPES.indexOf(payload.type) === -1) {
       lastPayload = payload;
       renderPreview(payload);

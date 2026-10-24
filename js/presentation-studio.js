@@ -2139,9 +2139,10 @@ const PresentationStudio = (() => {
   function playlistNext() {
     if (!activePlaylist) return;
     if (BG.pendingArrow) { startBgForItem_(BG.pendingArrow.it); return; }
+    window.__psNavDir = { dir: "next", t: Date.now() }; // BARU (book187) -- arah animasi pindah slide
     playlistGoTo(activePlaylist.index + 1);
   }
-  function playlistPrev() { if (activePlaylist) playlistGoTo(activePlaylist.index - 1); }
+  function playlistPrev() { if (activePlaylist) { window.__psNavDir = { dir: "prev", t: Date.now() }; playlistGoTo(activePlaylist.index - 1); } }
 
   // Panah kiri/kanan papan ketik (dan Page Up/Down -- sebagian
   // clicker/stylus presentasi meniru tombol ini alih-alih panah, sama
@@ -3194,8 +3195,8 @@ const PresentationStudio = (() => {
       // ◀ ▶ pindah slide/video LANGSUNG (juga saat live di mode dual
       // monitor) -- ini yang dipakai untuk "geser ke video berikutnya"
       // saat presentasi sedang berjalan, sama seperti slide gambar/PDF.
-      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
-      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
+      if (prevBtn) prevBtn.addEventListener("click", () => { window.__psNavDir = { dir: "prev", t: Date.now() }; idx = (idx - 1 + images.length) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { window.__psNavDir = { dir: "next", t: Date.now() }; idx = (idx + 1) % images.length; updateCount(); doSend(); if (thumbApi) thumbApi.refreshActive(); });
       // "📋" Salin NAMA FILE saja (bukan isinya -- PDF/gambar/Word tidak
       // punya bentuk teks yang masuk akal buat disalin, cuma namanya yang
       // berguna, mis. buat ditempel ke rundown acara). Nama yang disalin =
@@ -5564,8 +5565,8 @@ const PresentationStudio = (() => {
       const prevBtn = row.querySelector('[data-act="prev"]');
       const nextBtn = row.querySelector('[data-act="next"]');
       let thumbApi = null;
-      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + images.length) % images.length; updateCount(); sendSlide(images, idx); if (thumbApi) thumbApi.refreshActive(); });
-      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % images.length; updateCount(); sendSlide(images, idx); if (thumbApi) thumbApi.refreshActive(); });
+      if (prevBtn) prevBtn.addEventListener("click", () => { window.__psNavDir = { dir: "prev", t: Date.now() }; idx = (idx - 1 + images.length) % images.length; updateCount(); sendSlide(images, idx); if (thumbApi) thumbApi.refreshActive(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { window.__psNavDir = { dir: "next", t: Date.now() }; idx = (idx + 1) % images.length; updateCount(); sendSlide(images, idx); if (thumbApi) thumbApi.refreshActive(); });
       const gridBtn = row.querySelector('[data-act="grid"]');
       if (gridBtn && multi) {
         const gridWrap = document.createElement("div");
@@ -5686,8 +5687,8 @@ const PresentationStudio = (() => {
       playBtn.addEventListener("click", doSend);
       const prevBtn = row.querySelector('[data-act="prev"]');
       const nextBtn = row.querySelector('[data-act="next"]');
-      if (prevBtn) prevBtn.addEventListener("click", () => { idx = (idx - 1 + pages.length) % pages.length; updateView(); doSend(); });
-      if (nextBtn) nextBtn.addEventListener("click", () => { idx = (idx + 1) % pages.length; updateView(); doSend(); });
+      if (prevBtn) prevBtn.addEventListener("click", () => { window.__psNavDir = { dir: "prev", t: Date.now() }; idx = (idx - 1 + pages.length) % pages.length; updateView(); doSend(); });
+      if (nextBtn) nextBtn.addEventListener("click", () => { window.__psNavDir = { dir: "next", t: Date.now() }; idx = (idx + 1) % pages.length; updateView(); doSend(); });
       const addColBtn = row.querySelector('[data-act="addcol"]');
       if (!pages.length) addColBtn.disabled = true;
       addColBtn.addEventListener("click", async () => {
