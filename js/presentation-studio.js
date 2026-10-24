@@ -12573,7 +12573,22 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
+  const DEFAULT_STAGE_THEME = { slideAnim: "none", swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
+  // BARU (book185) -- 🎞️ Animasi Pindah Slide di Layar 2. Pilihan disimpan di
+  // theme.slideAnim (none | book | shrink | right | up | left | down | plane),
+  // dikirim ke present.html lewat pesan "theme" yang sama dengan pengaturan
+  // tampilan lain. Bawaan "none" = tampilan lama tidak berubah.
+  function markSlideAnimButtons_(name) {
+    const grid = document.getElementById("psSlideAnimGrid");
+    if (!grid) return;
+    const cur = name || "none";
+    grid.querySelectorAll("button[data-anim]").forEach((b) => {
+      const on = b.getAttribute("data-anim") === cur;
+      b.style.outline = on ? "2px solid #ffd84a" : "";
+      b.style.background = on ? "rgba(255,216,74,0.22)" : "";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
 
   // Sama seperti koorColorForBg() di present.html (Layar 2) -- kuning
   // terang kontras bagus di latar gelap tapi nyaris tak kelihatan di
@@ -12647,6 +12662,7 @@ const PresentationStudio = (() => {
     if (el("psKoorLabelScale")) el("psKoorLabelScale").value = String(Math.round((theme.koorLabelScale || 1.6) * 100));
     if (el("psKoorLabelScaleValue")) el("psKoorLabelScaleValue").value = Math.round((theme.koorLabelScale || 1.6) * 100);
     if (el("psKidungNoColor")) el("psKidungNoColor").checked = theme.kidungNoColor !== false;
+    markSlideAnimButtons_(theme.slideAnim); // BARU (book185)
     // BARU (v54) -- pulihkan ukuran & warna tulisan nama kitab (Layar 2).
     if (el("psRefScale")) el("psRefScale").value = String(Math.round((theme.refScale || 1.5) * 100));
     if (el("psRefScaleValue")) el("psRefScaleValue").value = Math.round((theme.refScale || 1.5) * 100);
@@ -12767,7 +12783,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim } });
   }
 
   function saveAndSendTheme(partial) {
@@ -12791,7 +12807,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -12980,6 +12996,18 @@ const PresentationStudio = (() => {
       if (el("psKidungNoColor")) el("psKidungNoColor").addEventListener("change", () => saveAndSendTheme({ kidungNoColor: !!el("psKidungNoColor").checked }));
     }
     wireKidungLook();
+    // BARU (book185) -- ikon kecil pilihan animasi pindah slide (Layar 2).
+    (function wireSlideAnim() {
+      const grid = el("psSlideAnimGrid");
+      if (!grid) return;
+      grid.addEventListener("click", (ev) => {
+        const btn = ev.target.closest("button[data-anim]");
+        if (!btn) return;
+        const name = btn.getAttribute("data-anim") || "none";
+        markSlideAnimButtons_(name);
+        saveAndSendTheme({ slideAnim: name });
+      });
+    })();
 
     // BARU (v54, 15 Okt 2026, permintaan operator) -- ukuran & warna tulisan
     // NAMA KITAB (mis. "Wahyu 2:5") di Layar 2. Warna: 24 pilihan + "Bawaan"
