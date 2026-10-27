@@ -7143,7 +7143,8 @@
       // ada) DISOROT warna kuning terpisah dari warna teks bait biasa,
       // supaya jemaat langsung tahu bagian mana yang koor.
       refEl.hidden = !data.ref;
-      refEl.textContent = data.ref || "";
+      // book188 -- jaga-jaga huruf depan dobel ("KKidung", "SSuplemen", "YYoung People") -> tampil 1x.
+      refEl.textContent = String(data.ref || "").replace(/^([A-Za-z])\1(?=[a-z]{2})/i, "$1");
       // BARU (4 Sep 2026) -- baris kecil kedua "Pengarang Birama (N Bait)"
       // (mis. "Witness Lee B 4/4 (7 Bait)", contoh mockup yang diminta
       // operator) -- disusun dari 3 field terpisah yang dikirim
