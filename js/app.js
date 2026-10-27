@@ -6889,7 +6889,7 @@ function collectionItemRef(it) {
   if (it.type === "text") return "📝 Teks Bebas";
   if (it.type === "announcement") return it.title ? `📢 ${it.title}` : "📢 Pengumuman";
   if (it.type === "kidung") {
-    const bukuLabel = it.buku && it.buku !== "Kidung" ? it.buku + " " : "";
+    const bukuLabel = it.buku && String(it.buku).trim().toLowerCase() !== "kidung" ? it.buku + " " : "";
     const noLabel = typeof formatKidungNo === "function" ? formatKidungNo(it.buku || "Kidung", it.kidungNo) : it.kidungNo;
     // PERMINTAAN OPERATOR (28 Agu 2026): ikon di depan "No. XXX -- Judul"
     // ini SEKARANG diambil dari kolom "ikon" di Google Sheet Kidung
@@ -6899,7 +6899,11 @@ function collectionItemRef(it) {
     // Kalau kolom itu masih kosong/belum ditambahkan di Sheet, dipakai
     // fallback "♪" (karakter not musik polos, BUKAN emoji berwarna) --
     // supaya kidung yang belum diisi kolom "ikon"-nya tetap tampil wajar.
-    const ikon = it.ikon || "♪";
+    let ikon = it.ikon || "♪";
+    // book188 -- ikon berupa HURUF kode buku (K/S/Y...) + nama buku ("Suplemen") dulu tampil dobel
+    // ("SSuplemen 200", "YYoung People 7"). Kalau ikon huruf itu sama dengan awal nama bukunya,
+    // ikon dibuang -- nama buku cukup tampil 1x ("Suplemen 200"). Kidung biasa tetap "K169".
+    if (bukuLabel && /^[A-Za-z]{1,3}$/.test(String(ikon).trim()) && bukuLabel.toLowerCase().startsWith(String(ikon).trim().toLowerCase())) ikon = "";
     // PERMINTAAN OPERATOR (28 Agu 2026, revisi lagi hari yang sama): tulisan
     // "No." dulu selalu ditulis di antara ikon & nomor (mis. "K No. 169"),
     // membuat baris judul di Layar 2 (present.html) terasa panjang &

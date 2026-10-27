@@ -580,7 +580,7 @@ async function renderKidungList(bukuFilter) {
       item.className = "kidung-list-item";
       const head = document.createElement("span");
       head.className = "kidung-list-item-title";
-      head.textContent = formatKidungNo(k.buku, k.noKidung) + " — " + k.judul;
+      head.textContent = (typeof kidungShortLabel === "function" ? kidungShortLabel(k.buku, k.noKidung) : formatKidungNo(k.buku, k.noKidung)) + " — " + k.judul; // book188: "K365 — judul" (bukan "365 — judul")
       item.appendChild(head);
       if (k.awalLagu) {
         const sub = document.createElement("span");

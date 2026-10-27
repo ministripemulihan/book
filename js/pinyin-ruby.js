@@ -67,6 +67,14 @@ const PinyinRuby = (function () {
   // Menggabungkan daftar [{code,label,text}] : tiap teks Mandarin yang pinyin-nya JUGA ada di daftar
   // jadi 1 entri {code,label:"MDR + MDR-PINYIN",text,ruby:[{han,py,num?}]} di posisi entri Mandarin;
   // entri pinyin-nya dibuang. Kalau jumlah karakter != jumlah suku kata -> TIDAK digabung (tidak menebak).
+  // book188 -- label gabungan dipersingkat (permintaan operator: "hanya tertulis mdrnpy"), bukan
+  // "Mandarin (中文) + Mandarin Pinyin (拼音)". Mandarin Sederhana (chssmp) diberi "-s" supaya
+  // tetap bisa dibedakan kalau dua-duanya tampil di 1 slide. Kode lain: jatuh ke label lama.
+  function rubyShortLabel_(code, label1, label2) {
+    if (code === "chs") return "mdrnpy";
+    if (code === "chssmp") return "mdrnpy-s";
+    return [label1, label2].filter(Boolean).join(" + ");
+  }
   function mergeTexts(texts) {
     const list = Array.isArray(texts) ? texts : [];
     const used = new Set();
@@ -79,7 +87,7 @@ const PinyinRuby = (function () {
         const cells = alignVerseText(t.text, list[j].text);
         if (cells) {
           used.add(j);
-          out.push({ code: t.code, label: [t.label, list[j].label].filter(Boolean).join(" + "), text: t.text, ruby: cells });
+          out.push({ code: t.code, label: rubyShortLabel_(t.code, t.label, list[j].label), text: t.text, ruby: cells });
           return;
         }
       }

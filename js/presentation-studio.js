@@ -7172,6 +7172,7 @@ const PresentationStudio = (() => {
     function mapMediaLibraryItemsToVideos_(items) {
       const out = [];
       (items || []).forEach((item) => {
+        if (String(item.jenis || "").trim().toLowerCase() === "sound" && !isSoundCloudItem_(item)) return; // book189: efek suara biasa bukan bagian daftar ini
         const id = typeof extractYoutubeId === "function" ? extractYoutubeId(item.link) : null;
         const common = {
           title: item.nama || id || item.link || "",
@@ -7346,10 +7347,17 @@ const PresentationStudio = (() => {
     // channel / sumber / keterangan, ATAU kode kidung yang diketik (k130,
     // "s 12", t5, y7, a3, ka5, "kidung 130") sama persis dengan salah satu
     // kode di kolom KidungRef video itu.
+    function ytNormSearch_(x) {
+      return String(x == null ? "" : x).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+    }
     function matchesQuery_(v, q) {
       if (!q) return true;
-      const text = [v.title, v.channel, v.sumber, v.keterangan, v.bibleRef].join("\n").toLowerCase();
-      if (text.includes(q)) return true;
+      // book189 -- pencarian toleran: huruf besar/kecil, aksen & spasi ganda diabaikan; ikut mencocokkan kategori
+      // dan link SoundCloud (supaya baris SoundCloud mudah ditemukan lewat namanya / potongan linknya).
+      const nq = ytNormSearch_(q);
+      const rawText = [v.title, v.channel, v.sumber, v.keterangan, v.bibleRef, (v.categories || []).join(" "), v.kind === "soundcloud" ? "soundcloud " + (v.trackUrl || "") : ""].join("\n");
+      const text = rawText.toLowerCase();
+      if (text.includes(q) || (nq && ytNormSearch_(rawText).includes(nq))) return true;
       if (window.KidungRef && v.kidungRef) {
         const qt = window.KidungRef.parseToken(q);
         if (qt && qt.kind === "kidung") return window.KidungRef.parse(v.kidungRef).some((t) => t.key === qt.key);
@@ -7568,14 +7576,14 @@ const PresentationStudio = (() => {
     const ytSizeEl_ = el("psYtGridSize");
     const ytBtnWideEl_ = el("psYtWide");
     const YT_VIEW_KEY_ = "bible_app_yt_view_v1";
-    const ytView_ = { mode: "list", size: 140, open: false, wide: false };
+    const ytView_ = { mode: "list", size: 140, open: false, wide: 0 }; // book188: wide 0/1/2 (1 kolom -> 2 kolom -> 3 kolom)
     try {
       const sv = JSON.parse(localStorage.getItem(YT_VIEW_KEY_) || "null");
       if (sv && typeof sv === "object") {
         if (sv.mode === "grid" || sv.mode === "list") ytView_.mode = sv.mode;
         if (Number.isFinite(sv.size)) ytView_.size = Math.min(480, Math.max(64, sv.size));
         ytView_.open = !!sv.open;
-        ytView_.wide = !!sv.wide;
+        ytView_.wide = sv.wide === true ? 1 : (sv.wide === 1 || sv.wide === 2 ? sv.wide : 0); // true lama (book172) = 1
       }
     } catch (e) { /* abaikan: pakai bawaan */ }
     function applyYtView_() {
@@ -7592,8 +7600,19 @@ const PresentationStudio = (() => {
       listWrap.style.setProperty("--yt-card", ytView_.size + "px");
       // book172: ↔ = kolom tengah + kanan menyatu (kolom kiri tetap). Hanya berlaku saat tab ▶️ YouTube aktif (lihat css .ps-yt-wide).
       const studioEl_ = el("presentStudio");
-      if (studioEl_) studioEl_.classList.toggle("ps-yt-wide", ytView_.wide);
-      if (ytBtnWideEl_) { ytBtnWideEl_.classList.toggle("active", ytView_.wide); ytBtnWideEl_.setAttribute("aria-pressed", String(ytView_.wide)); }
+      // book188: tombol ↔ kini 3 tingkat -- 0 = 1 kolom (tengah saja), 1 = 2 kolom (tengah + kanan menyatu),
+      // 2 = 3 kolom (kiri + tengah + kanan menyatu semua). Tekan lagi dari 3 kolom = balik ke 1 kolom.
+      if (studioEl_) {
+        studioEl_.classList.toggle("ps-yt-wide", ytView_.wide >= 1);
+        studioEl_.classList.toggle("ps-yt-wide3", ytView_.wide >= 2);
+      }
+      if (ytBtnWideEl_) {
+        const lv_ = ytView_.wide;
+        ytBtnWideEl_.classList.toggle("active", lv_ >= 1);
+        ytBtnWideEl_.setAttribute("aria-pressed", String(lv_ >= 1));
+        ytBtnWideEl_.textContent = "↔" + (lv_ + 1);
+        ytBtnWideEl_.title = "Lebarkan daftar (sekarang " + (lv_ + 1) + " kolom). Tekan = " + (lv_ === 0 ? "2 kolom: tengah + kanan menyatu" : lv_ === 1 ? "3 kolom: kiri + tengah + kanan menyatu" : "kembali ke 1 kolom") + ".";
+      }
     }
     function saveYtView_() { try { localStorage.setItem(YT_VIEW_KEY_, JSON.stringify(ytView_)); } catch (e) { /* penuh: abaikan */ } }
     function updateYtFilterBadge_() {
@@ -7605,7 +7624,7 @@ const PresentationStudio = (() => {
     if (ytToggleEl_) ytToggleEl_.addEventListener("click", () => { ytView_.open = !ytView_.open; applyYtView_(); saveYtView_(); });
     if (ytBtnListEl_) ytBtnListEl_.addEventListener("click", () => { ytView_.mode = "list"; applyYtView_(); saveYtView_(); });
     if (ytBtnGridEl_) ytBtnGridEl_.addEventListener("click", () => { ytView_.mode = "grid"; applyYtView_(); saveYtView_(); });
-    if (ytBtnWideEl_) ytBtnWideEl_.addEventListener("click", () => { ytView_.wide = !ytView_.wide; applyYtView_(); saveYtView_(); });
+    if (ytBtnWideEl_) ytBtnWideEl_.addEventListener("click", () => { ytView_.wide = (ytView_.wide + 1) % 3; applyYtView_(); saveYtView_(); });
     if (ytSizeEl_) ytSizeEl_.addEventListener("input", () => { ytView_.size = Number(ytSizeEl_.value) || 140; applyYtView_(); });
     if (ytSizeEl_) ytSizeEl_.addEventListener("change", saveYtView_);
     // mode kotak: klik gambar (atau bagian kotak di luar tombol) = ▶️ Tampilkan
@@ -7950,11 +7969,15 @@ const PresentationStudio = (() => {
       // tidak pernah menahan pemuatan dari jaringan.
       const fmtSaved = (t) => { try { return new Date(t).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
       let netDone = false;
-      const netP = MediaLibrary.Sync.list({ jenis: "youtube" });
+      // book189 -- dulu hanya jenis "youtube", sehingga baris SoundCloud yang tersimpan sebagai jenis "sound"
+      // (Efek Suara/Audio) TIDAK PERNAH ikut termuat -> dicari persis nama pun tidak ketemu. Sekarang ambil
+      // semua jenis; baris "sound" yang BUKAN SoundCloud dibuang di mapMediaLibraryItemsToVideos_().
+      const netP = MediaLibrary.Sync.list({});
       netP.then(() => { netDone = true; }, () => { netDone = true; });
       if (statusEl) statusEl.textContent = "⏳ Memuat dari Pustaka Media…";
       let cached = null;
-      try { cached = await MediaLibrary.Sync.cachedList({ jenis: "youtube" }); } catch (e) { cached = null; }
+      try { cached = await MediaLibrary.Sync.cachedList({}); } catch (e) { cached = null; }
+      if (!(cached && cached.items && cached.items.length)) { try { cached = await MediaLibrary.Sync.cachedList({ jenis: "youtube" }); } catch (e) { cached = null; } } // daftar tersimpan versi lama (hanya YouTube)
       const hasCache = !!(cached && cached.items && cached.items.length);
       const showCached_ = () => {
         allVideos = mapMediaLibraryItemsToVideos_(cached.items).reverse();
