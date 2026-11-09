@@ -389,7 +389,7 @@ const Presentation = (() => {
   // untuk jendela SATU ORIGIN seperti ini, tidak perlu diunggah kemana
   // pun, tetap 100% offline untuk berkas lokal).
   function postMonitorVideo(data) {
-    postMonitorRaw({ type: "speaker_video", kind: (data && data.kind) || "none", embedUrl: (data && data.embedUrl) || "", blob: (data && data.blob) || null, name: (data && data.name) || "" });
+    postMonitorRaw({ type: "speaker_video", kind: (data && data.kind) || "none", embedUrl: (data && data.embedUrl) || "", blob: (data && data.blob) || null, name: (data && data.name) || "", autoplay: !(data && data.autoplay === false) });
   }
   // Meneruskan kontrol PLAY/PAUSE/STOP Video Lokal supaya pratinjau di
   // Monitor 3 tetap SINKRON posisinya dengan Layar 2 -- SENGAJA TIDAK

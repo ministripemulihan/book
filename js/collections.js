@@ -400,6 +400,19 @@ function addMp3ToCollection(username, name, mp3Item) {
   });
 }
 
+// BARU (book190) -- item 🎬 Video Lokal (tab "🎬 Video Lokal" Studio Presentasi). Browser TIDAK boleh menyimpan
+// isi/alamat berkas video di komputer ke dalam Kumpulan Ayat (localStorage), jadi yang disimpan HANYA NAMA berkasnya
+// (`name`). Saat ditayangkan, Studio mencari berkas bernama itu di folder video yang terhubung / berkas yang dipilih
+// sesi ini (lihat findLocalVideoFileByName_() di js/presentation-studio.js). Item ini hanya bisa tayang di komputer
+// (dual layar) -- sama seperti tab Video Lokal-nya.
+function addLocalVideoToCollection(username, name, lvItem) {
+  if (!lvItem || !lvItem.name) return null;
+  return addItemToCollection(username, name, {
+    type: "localvideo",
+    name: lvItem.name,
+  });
+}
+
 // BARU (5 Sep 2026) -- item YouTube PORTABEL, dipakai tombol "🔗 Tambah
 // Link" di panel Kumpulan Ayat BIASA (js/app.js, renderCollectionDetailInto())
 // supaya bisa ditambahkan LANGSUNG dari HP tanpa perlu Studio Presentasi

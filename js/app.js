@@ -6933,6 +6933,9 @@ function collectionItemRef(it) {
   // BARU (18 Sep 2026) -- item MP3/Audio (link langsung atau Google
   // Drive), lihat addMp3ToCollection() (js/collections.js).
   if (it.type === "mp3") return `🎵 MP3/Audio${it.title ? ": " + it.title : ""}`;
+  // BARU (book190) -- item 🎬 Video Lokal (MP4 dari komputer, tidak diunggah). Cuma menyimpan NAMA berkasnya;
+  // videonya dicari lagi di folder/berkas yang terhubung di Studio saat ditayangkan.
+  if (it.type === "localvideo") return `🎬 Video Lokal: ${it.name || it.title || "(tanpa nama)"}`;
   // BARU (5 Sep 2026) -- item YouTube portabel (addYoutubeLinkToCollection(),
   // js/collections.js), ditambahkan lewat tombol "🔗 Tambah Link" di panel
   // ini sendiri (bisa dari HP) -- beda dari it.type==="media" yang jadi
@@ -6995,6 +6998,7 @@ function collectionItemBodyText(it) {
   if (it.type === "canva") return "";
   if (it.type === "soundcloud") return "";
   if (it.type === "mp3") return "";
+  if (it.type === "localvideo") return ""; // book190
   // BARU (5 Sep 2026) -- lihat catatan di collectionItemRef() di atas.
   // Beda dari "media"/"canva"/"soundcloud" (yang keterangannya menyuruh
   // pindah ke Studio Presentasi), video YouTube portabel ini SUDAH bisa

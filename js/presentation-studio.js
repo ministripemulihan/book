@@ -350,7 +350,7 @@ const PresentationStudio = (() => {
       Presentation.postMonitorVideo({ kind: "youtube", embedUrl: payload.embedUrl || "" });
     } else if (payload.type === "localvideo") {
       if (payload.action === "stop") clearMonitorVideo_();
-      else Presentation.postMonitorVideo({ kind: "localvideo", blob: payload.blob || null, name: payload.name || "" });
+      else Presentation.postMonitorVideo({ kind: "localvideo", blob: payload.blob || null, name: payload.name || "", autoplay: payload.autoplay !== false });
     } else if (payload.type === "localvideo_control") {
       // Monitor 3 selalu senyap -- hanya teruskan play/pause/stop
       // (posisi pemutaran), JANGAN mute/unmute (tidak relevan, dan
@@ -1908,6 +1908,30 @@ const PresentationStudio = (() => {
     return (ids || []).map((id) => verseById[id]).filter(Boolean);
   }
 
+  // ------------------------------------------------------------
+  // BARU (book190, permintaan operator) -- item 🎬 Video Lokal di Kumpulan Ayat.
+  // Alur: (1) masuk ke slide ini (klik baris / panah dari slide sebelumnya) -> video HANYA TAMPIL (bingkai pertama,
+  // belum main) di Layar 2; (2) panah kanan/next -> video DIPUTAR penuh layar; (3) panah kanan/next lagi (video masih
+  // jalan atau sudah selesai) -> pindah ke slide berikutnya (showMain() di present.html otomatis menghentikan video).
+  // Pola SAMA dengan "klik panah ke-2 baru main" untuk audio latar (BG.pendingArrow) -- tapi terpisah (LVQ).
+  // Item hanya menyimpan NAMA berkas; berkasnya dicari lagi lewat window.__psLocalVideo.getFile() (diisi wireLocalVideoTab()).
+  // ------------------------------------------------------------
+  const LVQ = { pending: null, token: 0 };
+  async function sendLocalVideoSlide_(it) {
+    const my = LVQ.token;
+    const api = window.__psLocalVideo;
+    const file = api && api.getFile ? await api.getFile(it.name) : null;
+    if (LVQ.token !== my) return; // sudah pindah slide selagi mencari berkas
+    if (!file) {
+      alert(`Video "${it.name}" tidak ditemukan.\n\nBuka tab "🎬 Video Lokal" di kolom tengah lalu "📂 Hubungkan Folder Video" (folder tempat video ini berada) atau "➕ Pilih File Video", kemudian tayangkan slide ini lagi.`);
+      return;
+    }
+    rawPost({ type: "localvideo", action: "play", blob: file, name: it.name, autoplay: false });
+    renderStudioPreview({ type: "localvideo", name: it.name });
+    if (api.setNowPlaying) api.setNowPlaying(it.name);
+    LVQ.pending = { it };
+  }
+
   // Kirim 1 item generik ke Layar 2 SEKARANG JUGA (live langsung, TIDAK
   // lewat antrean "Berikutnya" -- lihat stageOrSend() di atas, yang
   // TETAP dipakai apa adanya oleh Ayat Cepat/File/YouTube, tidak
@@ -1916,6 +1940,7 @@ const PresentationStudio = (() => {
   // sesudahnya selalu terasa 1 alur yang sama, bukan 2 perilaku beda.
   function sendGenericItemLive(it) {
     if (!it || typeof Presentation === "undefined") return;
+    LVQ.token++; LVQ.pending = null; // book190 -- pindah slide membatalkan video lokal yang sedang "menunggu panah"
     // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
     // otomatis begitu masuk slide, entah mp3 unggahan/mp4/YouTube")
     // -- dipanggil di sini (BUKAN dobel di playlistGoTo() + tiap klik
@@ -1982,6 +2007,8 @@ const PresentationStudio = (() => {
       sendSoundCloudSlide(it);
     } else if (it.type === "mp3") {
       sendMp3Slide(it);
+    } else if (it.type === "localvideo") {
+      sendLocalVideoSlide_(it); // book190
     } else if (it.type === "youtube_link") {
       // BARU (5 Sep 2026) -- item YouTube portabel yang ditambahkan dari
       // panel Kumpulan Ayat biasa/HP (addYoutubeLinkToCollection(),
@@ -2139,6 +2166,13 @@ const PresentationStudio = (() => {
   function playlistNext() {
     if (!activePlaylist) return;
     if (BG.pendingArrow) { startBgForItem_(BG.pendingArrow.it); return; }
+    // BARU (book190) -- slide 🎬 Video Lokal yang baru "tampil" (bingkai pertama, belum main): panah/next BERIKUTNYA
+    // memutar videonya (layar penuh di Layar 2) dan TIDAK pindah slide. Panah/next sesudah itu baru pindah ke slide berikutnya.
+    if (LVQ.pending) {
+      LVQ.pending = null;
+      rawPost({ type: "localvideo_control", action: "play" });
+      return;
+    }
     window.__psNavDir = { dir: "next", t: Date.now() }; // BARU (book187) -- arah animasi pindah slide
     playlistGoTo(activePlaylist.index + 1);
   }
@@ -5554,6 +5588,8 @@ const PresentationStudio = (() => {
           ${multi ? `<button type="button" class="chip-btn small" data-act="prev">◀</button><span class="ps-file-slide-count" data-role="count">1/${images.length}</span><button type="button" class="chip-btn small" data-act="next">▶</button><button type="button" class="chip-btn small" data-act="grid" title="Lihat semua halaman sebagai mini-preview">🔳</button>` : ""}
           <button type="button" class="chip-btn small" data-act="play">▶️</button>
           <button type="button" class="chip-btn small" data-act="add" title="Simpan ke Media Tersimpan (kolom kiri)">➕ Daftar</button>
+          <button type="button" class="chip-btn small" data-act="addcol" title="Langsung masukkan ke Kumpulan Ayat (halaman yang sedang tampil) -- bisa dipindah-pindah urutannya">➕ Kumpulan</button>
+          ${multi ? `<button type="button" class="chip-btn small" data-act="addcolall" title="Masukkan SEMUA ${images.length} halaman sekaligus, berurutan, ke Kumpulan Ayat">➕ Semua Halaman</button>` : ""}
           <button type="button" class="chip-btn small danger" data-act="del">✖️</button>
         </span>`;
       wrapper.appendChild(row);
@@ -5577,6 +5613,59 @@ const PresentationStudio = (() => {
       }
       const addBtn = row.querySelector('[data-act="add"]');
       if (!images.length) addBtn.disabled = true;
+      // BARU (book190, permintaan operator "File bisa masuk Kumpulan Ayat, bisa diatur urutannya") -- tombol
+      // ➕ Kumpulan / ➕ Semua Halaman: simpan berkas ke Media Tersimpan (sekali saja, kecuali sudah lewat ➕ Daftar)
+      // lalu langsung masukkan ke Kumpulan Ayat (referensi, addMediaToCollection()). Urutannya bisa diubah di Kumpulan Ayat
+      // seperti item lain (mode atur urutan). Slide gambar/PDF tampil biasa begitu masuk slide itu & ditekan next.
+      let savedMediaItem_ = null;
+      async function ensureSavedMedia_() {
+        if (savedMediaItem_) return savedMediaItem_;
+        if (typeof addMediaItem !== "function" || !images.length) return null;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const baseName = file.name.replace(/\.[^.]+$/, "");
+        const syncBox = el("psSyncToDrive");
+        const id = await addMediaItem(username, baseName, images, file.name, null, null, originalFileDataUrl || null, !!(syncBox && syncBox.checked), null);
+        if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh? coba hapus item Media Tersimpan lama)."); return null; }
+        savedMediaItem_ = { id, name: baseName, sourceFileName: file.name, images };
+        if (typeof renderMediaList === "function") renderMediaList();
+        return savedMediaItem_;
+      }
+      async function pickCollectionNameForFile_(username) {
+        const sel = el("psCollectionSelect");
+        return (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+          ? loadCollections(username)[sel.value].name
+          : await promptCollectionName(username);
+      }
+      const addColBtn0 = row.querySelector('[data-act="addcol"]');
+      if (addColBtn0) {
+        if (!images.length) addColBtn0.disabled = true;
+        addColBtn0.addEventListener("click", async () => {
+          if (typeof addMediaToCollection !== "function") return;
+          const username = typeof currentUser !== "undefined" ? currentUser : null;
+          const colName = await pickCollectionNameForFile_(username);
+          if (!colName) return;
+          const item = await ensureSavedMedia_();
+          if (!item) return;
+          addMediaToCollection(username, colName, item, idx);
+          if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+          addColBtn0.textContent = "✅ Ditambahkan";
+          setTimeout(() => { addColBtn0.textContent = "➕ Kumpulan"; }, 1200);
+        });
+      }
+      const addColAllBtn0 = row.querySelector('[data-act="addcolall"]');
+      if (addColAllBtn0) addColAllBtn0.addEventListener("click", async () => {
+        if (typeof addMediaToCollection !== "function") return;
+        const username = typeof currentUser !== "undefined" ? currentUser : null;
+        const colName = await pickCollectionNameForFile_(username);
+        if (!colName) return;
+        if (!confirm(`Tambahkan SEMUA ${images.length} halaman "${file.name}" ke kumpulan "${colName}"?\n\nIni membuat ${images.length} item terpisah (satu per halaman) yang bisa diatur urutannya.`)) return;
+        const item = await ensureSavedMedia_();
+        if (!item) return;
+        for (let i = 0; i < images.length; i++) addMediaToCollection(username, colName, item, i);
+        if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+        addColAllBtn0.textContent = "✅ Ditambahkan";
+        setTimeout(() => { addColAllBtn0.textContent = "➕ Semua Halaman"; }, 1200);
+      });
       addBtn.addEventListener("click", async () => {
         if (typeof addMediaItem !== "function") return;
         const username = typeof currentUser !== "undefined" ? currentUser : null;
@@ -5624,6 +5713,7 @@ const PresentationStudio = (() => {
             }
           } : null);
         if (!id) { alert("Gagal menyimpan (penyimpanan perangkat penuh? coba hapus item Media Tersimpan lama, atau kosongkan sedikit ruang penyimpanan perangkat -- kalau baru saja mencentang \"Simpan file PDF asli\", coba matikan centang itu, berkas PDF asli cukup boros ruang)."); return; }
+        savedMediaItem_ = { id, name, sourceFileName: file.name, images }; // book190: ➕ Kumpulan memakai ulang simpanan ini (tidak dobel)
         renderMediaList();
         addBtn.textContent = "✅ Tersimpan";
         setTimeout(() => { addBtn.textContent = "➕ Daftar"; }, 1200);
@@ -11360,6 +11450,7 @@ const PresentationStudio = (() => {
           <span class="ps-file-name" title="${escapeHtml(f.name)}">🎬 ${escapeHtml(f.name)}</span>
           <span class="ps-file-actions">
             <button type="button" class="chip-btn small" data-lv-act="show">▶️ Tampilkan</button>
+            <button type="button" class="chip-btn small" data-lv-act="addcol" title="Tambahkan ke Kumpulan Ayat (bisa dipindah-pindah urutannya). Slide ini: tampil dulu, panah berikutnya baru main.">➕ Kumpulan</button>
           </span>`;
         row.querySelector('[data-lv-act="show"]').addEventListener("click", async () => {
           const file = f.kind === "handle" ? await f.fileHandle.getFile() : f.file;
@@ -11367,6 +11458,21 @@ const PresentationStudio = (() => {
           rawPost({ type: "localvideo", action: "play", blob: file, name: f.name });
           renderStudioPreview({ type: "localvideo", name: f.name });
           setNowPlaying_(f.name);
+        });
+        // BARU (book190) -- ➕ Kumpulan: simpan NAMA video ke Kumpulan Ayat (lihat addLocalVideoToCollection(), js/collections.js).
+        const addColBtn = row.querySelector('[data-lv-act="addcol"]');
+        if (addColBtn) addColBtn.addEventListener("click", async () => {
+          if (typeof addLocalVideoToCollection !== "function") return;
+          const username = typeof currentUser !== "undefined" ? currentUser : null;
+          const sel = el("psCollectionSelect");
+          const colName = (sel && sel.value && typeof loadCollections === "function" && loadCollections(username)[sel.value])
+            ? loadCollections(username)[sel.value].name
+            : await promptCollectionName(username);
+          if (!colName) return;
+          addLocalVideoToCollection(username, colName, { name: f.name });
+          if (typeof renderCollectionSelect === "function") renderCollectionSelect();
+          addColBtn.textContent = "✅ Ditambahkan";
+          setTimeout(() => { addColBtn.textContent = "➕ Kumpulan"; }, 1200);
         });
         box.appendChild(row);
       });
@@ -11403,6 +11509,27 @@ const PresentationStudio = (() => {
       el("psLvMuteBtn").classList.toggle("active", lvMuted_);
     });
 
+    // BARU (book190) -- dipakai sendLocalVideoSlide_() (item 🎬 Video Lokal di Kumpulan Ayat) untuk mengambil berkas
+    // berdasarkan NAMA: dari daftar saat ini, kalau tidak ada coba sambung ulang folder yang pernah diizinkan.
+    window.__psLocalVideo = {
+      setNowPlaying: setNowPlaying_,
+      getFile: async (name) => {
+        const same = (x) => x.name === name || String(x.name).toLowerCase() === String(name).toLowerCase();
+        let f = lvFiles.find(same);
+        if (!f) {
+          const h = await loadLvFolderHandle_();
+          if (h) {
+            try {
+              let perm = await h.queryPermission({ mode: "read" });
+              if (perm !== "granted") perm = await h.requestPermission({ mode: "read" });
+              if (perm === "granted") { await refreshFolderList_(h); f = lvFiles.find(same); }
+            } catch (e) { /* izin ditolak/handle rusak -- biarkan, pemanggil menampilkan petunjuk */ }
+          }
+        }
+        if (!f) return null;
+        try { return f.kind === "handle" ? await f.fileHandle.getFile() : f.file; } catch (e) { return null; }
+      },
+    };
     tryAutoReconnect_(); // coba sambung ulang folder yang pernah dipakai, TANPA dialog (lihat catatan panjang di atas)
   }
 
@@ -12597,7 +12724,7 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { slideAnim: "none", swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false };
+  const DEFAULT_STAGE_THEME = { slideAnim: "none", swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false, autoFit: true, refSubScale: 1, refSubFont: "" };
   // BARU (book185) -- 🎞️ Animasi Pindah Slide di Layar 2. Pilihan disimpan di
   // theme.slideAnim (none | book | shrink | right | up | left | down | plane),
   // dikirim ke present.html lewat pesan "theme" yang sama dengan pengaturan
@@ -12686,6 +12813,11 @@ const PresentationStudio = (() => {
     if (el("psKoorLabelScale")) el("psKoorLabelScale").value = String(Math.round((theme.koorLabelScale || 1.6) * 100));
     if (el("psKoorLabelScaleValue")) el("psKoorLabelScaleValue").value = Math.round((theme.koorLabelScale || 1.6) * 100);
     if (el("psKidungNoColor")) el("psKidungNoColor").checked = theme.kidungNoColor !== false;
+    // BARU (book190) -- pulihkan Auto Full & ukuran/font info kidung.
+    syncAutoFitUi_(theme.autoFit !== false);
+    if (el("psRefSubScale")) el("psRefSubScale").value = String(Math.round((theme.refSubScale || 1) * 100));
+    if (el("psRefSubScaleValue")) el("psRefSubScaleValue").value = Math.round((theme.refSubScale || 1) * 100);
+    if (el("psRefSubFont")) el("psRefSubFont").value = theme.refSubFont || "";
     markSlideAnimButtons_(theme.slideAnim); // BARU (book185)
     // BARU (v54) -- pulihkan ukuran & warna tulisan nama kitab (Layar 2).
     if (el("psRefScale")) el("psRefScale").value = String(Math.round((theme.refScale || 1.5) * 100));
@@ -12807,7 +12939,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim, autoFit: theme.autoFit, refSubScale: theme.refSubScale, refSubFont: theme.refSubFont } });
   }
 
   function saveAndSendTheme(partial) {
@@ -12831,7 +12963,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim, autoFit: theme.autoFit, refSubScale: theme.refSubScale, refSubFont: theme.refSubFont } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -12904,6 +13036,57 @@ const PresentationStudio = (() => {
     clockInterval = setInterval(tick, 1000);
   }
 
+  // ============================================================
+  // BARU (book190, permintaan operator) -- AUTO FULL & tampilan baris info Kidung.
+  //  - "Auto Full" (theme.autoFit, bawaan NYALA): present.html mengatur ukuran huruf ayat/pengumuman/kidung
+  //    otomatis supaya pas penuh layar tanpa terpotong (lihat fitMainText_() di present.html).
+  //  - Mengubah ukuran huruf MANUAL (A-/A+/slider Ukuran Teks) otomatis MEMATIKAN Auto Full -- jadi kontrol manual
+  //    yang lama tetap bekerja persis seperti dulu kalau Auto Full gagal/tidak diinginkan. Tombol "Auto Full" bisa
+  //    dinyalakan lagi kapan saja.
+  //  - Baris info kidung (pengarang · birama · jumlah bait): slider ukuran + pilihan font sendiri (--p-refsub-scale / --p-refsub-font).
+  // ============================================================
+  function readStoredThemeForAutoFit_() {
+    const raw = localStorage.getItem(THEME_KEY);
+    let t = { ...DEFAULT_STAGE_THEME };
+    if (raw) { try { t = { ...t, ...JSON.parse(raw) }; } catch (e) {} }
+    return t;
+  }
+  function isAutoFitOn_() { return readStoredThemeForAutoFit_().autoFit !== false; }
+  function syncAutoFitUi_(on) {
+    const top = el("psAutoFitTop");
+    if (top) { top.classList.toggle("active", !!on); top.textContent = on ? "🔲 Auto" : "▫️ Manual"; top.title = on ? "Auto Full NYALA: ukuran huruf ayat/pengumuman/kidung diatur otomatis supaya pas layar. Klik untuk beralih ke manual." : "Mode MANUAL: ukuran huruf diatur dengan A-/A+. Klik untuk menyalakan Auto Full."; }
+    if (el("psAutoFitCheck")) el("psAutoFitCheck").checked = !!on;
+  }
+  function setAutoFit_(on) { syncAutoFitUi_(on); saveAndSendTheme({ autoFit: !!on }); }
+  function wireAutoFitAndInfoLook_() {
+    if (el("psAutoFitTop")) el("psAutoFitTop").addEventListener("click", () => setAutoFit_(!isAutoFitOn_()));
+    if (el("psAutoFitCheck")) el("psAutoFitCheck").addEventListener("change", () => setAutoFit_(!!el("psAutoFitCheck").checked));
+    function applyInfoScale() {
+      const pct = Number(el("psRefSubScale").value);
+      if (el("psRefSubScaleValue")) el("psRefSubScaleValue").value = pct;
+      saveAndSendTheme({ refSubScale: pct / 100 });
+    }
+    if (el("psRefSubScale")) el("psRefSubScale").addEventListener("input", applyInfoScale);
+    if (el("psRefSubScaleDec")) el("psRefSubScaleDec").addEventListener("click", () => { el("psRefSubScale").value = Math.max(50, Number(el("psRefSubScale").value) - 10); applyInfoScale(); });
+    if (el("psRefSubScaleInc")) el("psRefSubScaleInc").addEventListener("click", () => { el("psRefSubScale").value = Math.min(400, Number(el("psRefSubScale").value) + 10); applyInfoScale(); });
+    if (typeof wireManualValueInput === "function") wireManualValueInput("psRefSubScaleValue", "psRefSubScale");
+    // Pilihan font: salin daftar font dari pilihan font utama; tiap pilihan TAMPIL dengan fontnya sendiri.
+    const sel = el("psRefSubFont"), src = el("psFontSelect");
+    if (sel && src && sel.options.length <= 1) {
+      Array.from(src.options).forEach((o) => {
+        const opt = document.createElement("option");
+        opt.value = o.value; opt.textContent = o.textContent; opt.style.fontFamily = o.value;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener("change", () => saveAndSendTheme({ refSubFont: sel.value }));
+      const t = readStoredThemeForAutoFit_();
+      sel.value = t.refSubFont || "";
+      sel.style.fontFamily = sel.value || "";
+    }
+    if (sel) sel.addEventListener("change", () => { sel.style.fontFamily = sel.value || ""; });
+    syncAutoFitUi_(isAutoFitOn_());
+  }
+
   function wireTheme() {
     document.querySelectorAll("#psThemeGrid [data-theme]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -12919,6 +13102,7 @@ const PresentationStudio = (() => {
     // BARU (4 Sep 2026) -- toggle "Tulisan Tebal" (Layar 2).
     if (el("psFontBold")) el("psFontBold").addEventListener("change", () => saveAndSendTheme({ bold: el("psFontBold").checked }));
     function applyScale() {
+      if (isAutoFitOn_()) setAutoFit_(false); // book190: ukuran manual = ambil alih dari Auto Full
       const pct = Number(el("psFontScale").value);
       if (el("psFontScaleValue")) el("psFontScaleValue").value = pct; // BARU (4 Sep 2026)
       // BARU (7 Sep 2026 v4) -- ikut perbarui angka % di panel gabungan
@@ -13020,6 +13204,7 @@ const PresentationStudio = (() => {
       if (el("psKidungNoColor")) el("psKidungNoColor").addEventListener("change", () => saveAndSendTheme({ kidungNoColor: !!el("psKidungNoColor").checked }));
     }
     wireKidungLook();
+    wireAutoFitAndInfoLook_(); // book190
     // BARU (book185) -- ikon kecil pilihan animasi pindah slide (Layar 2).
     (function wireSlideAnim() {
       const grid = el("psSlideAnimGrid");
