@@ -818,7 +818,7 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--p-cam-ink, var(--p-accent));
-    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale));
+    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale) * var(--p-fit, 1));
     margin-bottom: clamp(14px, 2.4vh, 34px);
     opacity: 0.92;
     /* BARU (28 Agu 2026) -- lihat catatan panjang di #text di bawah:
@@ -838,11 +838,11 @@
      utama tapi tetap ikut var(--p-ink) tema supaya kontrasnya selalu
      terjaga di tema apa pun (Terang/Sepia/Putih/Krem dst). */
   #refSub {
-    font-family: "Inter", Arial, sans-serif;
+    font-family: var(--p-refsub-font, "Inter"), "Inter", Arial, sans-serif; /* book190: font info kidung bisa dipilih */
     font-weight: var(--p-font-weight, 500);
     color: var(--p-cam-ink, var(--p-ink));
     opacity: 0.75;
-    font-size: calc(clamp(14px, 1.6vw, 20px) * var(--p-scale));
+    font-size: calc(clamp(14px, 1.6vw, 20px) * var(--p-scale) * var(--p-fit, 1) * var(--p-refsub-scale, 1)); /* book190: Auto Full + slider ukuran info kidung */
     margin-top: clamp(-10px, -1.6vh, -4px);
     margin-bottom: clamp(14px, 2.4vh, 34px);
     text-shadow: var(--p-outline-shadow, none);
@@ -854,7 +854,7 @@
      Warna: --p-ref-color (kosong = warna emas/aksen bawaan seperti
      sebelumnya). Judul kidung (#ref tanpa kelas ini) TIDAK berubah. */
   #ref.ref-verse {
-    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale) * var(--p-ref-scale, 1.5));
+    font-size: calc(clamp(16px, 2.4vw, 30px) * var(--p-scale) * var(--p-fit, 1) * var(--p-ref-scale, 1.5));
     color: var(--p-ref-color, var(--p-cam-ink, var(--p-accent)));
   }
   /* Slide gabungan beberapa ayat: tiap ayat punya blok sendiri, dengan
@@ -869,7 +869,7 @@
     text-transform: uppercase;
     text-align: center;
     color: var(--p-ref-color, var(--p-accent));
-    font-size: calc(clamp(14px, 1.9vw, 24px) * var(--p-scale) * var(--p-ref-scale, 1.5) * 0.85);
+    font-size: calc(clamp(14px, 1.9vw, 24px) * var(--p-scale) * var(--p-fit, 1) * var(--p-ref-scale, 1.5) * 0.85);
     margin-bottom: clamp(4px, 0.8vh, 10px);
     text-shadow: var(--p-outline-shadow, none);
   }
@@ -911,7 +911,7 @@
   .vstrong.vtense { color: var(--p-tense, #ff9cf0); }
   #text {
     font-weight: var(--p-font-weight, 400);
-    font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale));
+    font-size: calc(clamp(28px, 4.6vw, 68px) * var(--p-scale) * var(--p-fit, 1));
     /* BARU (28 Agu 2026) -- dulu terkunci "1.35" tetap, sekarang bisa
        diatur dari Studio (slider "Spasi Baris", lihat --p-line-height
        di applyTheme()/js/presentation-studio.js) supaya teks panjang
@@ -947,7 +947,7 @@
   .verse-version-block {
     display: block;
     margin: 0 auto clamp(18px, 2.6vh, 30px);
-    font-size: calc(clamp(20px, 3vw, 42px) * var(--p-scale));
+    font-size: calc(clamp(20px, 3vw, 42px) * var(--p-scale) * var(--p-fit, 1));
   }
   .verse-version-block:last-child { margin-bottom: 0; }
   .verse-version-tag {
@@ -976,11 +976,11 @@
     text-align: left;
     line-height: 1.35;
     white-space: pre-wrap;
-    font-size: calc(clamp(15px, 1.9vw, 28px) * var(--p-scale));
+    font-size: calc(clamp(15px, 1.9vw, 28px) * var(--p-scale) * var(--p-fit, 1));
     text-shadow: none;
     opacity: 0.92;
   }
-  .verse-notes.verse-notes-only { margin-top: 0; padding-top: 0; border-top: 0; opacity: 1; font-size: calc(clamp(20px, 2.8vw, 42px) * var(--p-scale)); }
+  .verse-notes.verse-notes-only { margin-top: 0; padding-top: 0; border-top: 0; opacity: 1; font-size: calc(clamp(20px, 2.8vw, 42px) * var(--p-scale) * var(--p-fit, 1)); }
   .verse-notes-title {
     font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
     color: var(--p-accent); font-size: 0.7em; margin-bottom: 0.3em; text-align: center;
@@ -5961,6 +5961,14 @@
     localVideoEl.src = localVideoObjectUrl_;
     localVideoEl.hidden = false;
     localVideoEl.currentTime = 0;
+    // BARU (book190) -- data.autoplay === false = mode "tampil dulu": video dimuat & bingkai pertamanya
+    // tampil penuh di layar, TAPI belum diputar. Pemutaran dimulai oleh perintah "localvideo_control play"
+    // (dikirim Studio saat operator menekan panah/next sekali lagi). Tanpa field ini perilaku LAMA (langsung main).
+    if (data.autoplay === false) {
+      try { localVideoEl.pause(); } catch (e) {}
+      localVideoEl.addEventListener("loadeddata", () => { try { localVideoEl.currentTime = 0.05; } catch (e) {} }, { once: true });
+      return;
+    }
     const p = localVideoEl.play();
     if (p && typeof p.catch === "function") p.catch(() => { /* diblokir kebijakan autoplay -- biarkan siap/paused, lihat catatan panjang di atas */ });
   }
@@ -6404,6 +6412,11 @@
     if (!theme) return;
     const root = document.documentElement.style;
     if (theme.font) root.setProperty("--p-font", theme.font);
+    // BARU (book190) -- Auto Full tulisan + ukuran/font baris info kidung (pengarang/birama/jumlah bait).
+    if (typeof theme.autoFit === "boolean") { autoFitOn_ = theme.autoFit; if (document.body) document.body.classList.toggle("auto-fit-on", autoFitOn_); }
+    if (typeof theme.refSubScale === "number" && theme.refSubScale > 0) root.setProperty("--p-refsub-scale", theme.refSubScale);
+    if (typeof theme.refSubFont === "string") { if (theme.refSubFont) root.setProperty("--p-refsub-font", theme.refSubFont); else root.removeProperty("--p-refsub-font"); }
+    if (typeof scheduleFit_ === "function") scheduleFit_();
     if (theme.bgColor) {
       root.setProperty("--p-bg", theme.bgColor);
       root.setProperty("--p-koor", koorColorForBg(theme.bgColor));
@@ -6884,7 +6897,68 @@
     });
   }
 
+  // ============================================================
+  // BARU (book190, permintaan operator "auto full") -- AUTO FULL tulisan.
+  // Setelah ayat / pengumuman / kidung tampil, ukuran hurufnya DISESUAIKAN OTOMATIS
+  // supaya seluruh isi (nama ayat + info + teks) PAS memenuhi layar tanpa terpotong:
+  //   - ayat (1/2/lebih ayat, multi-bahasa, notes): hanya DIKECILKAN kalau kebesaran
+  //     (ukuran Ukuran Teks yang diatur operator = batas paling besar).
+  //   - pengumuman & kidung: dikecilkan kalau kebesaran, DIBESARKAN kalau kekecilan
+  //     (sampai FIT_MAX_GROW x ukuran dasar).
+  // Caranya: variabel CSS --p-fit (pengali, bawaan 1) yang ikut dikalikan di semua
+  // font-size tulisan utama (lihat #text/#ref/#refSub/.verse-*), dicari lewat
+  // pencarian biner sampai tinggi isi <= tinggi area layar & tidak melebar.
+  // Tombol "Auto Full" di Studio (tema.autoFit) bisa dimatikan -> kembali 100% ke
+  // pengaturan manual (A-/A+ & slider Ukuran Teks seperti sebelumnya).
+  // Dipakai ulang tiap kali: ganti slide, ganti tema/ukuran, ubah ukuran jendela, font selesai dimuat.
+  // ============================================================
+  let autoFitOn_ = true;
+  let fitKind_ = null;
+  let fitTimer_ = 0;
+  const FIT_MIN = 0.2;
+  const FIT_MAX_GROW = 3;
+  function fitContentHeight_() {
+    const kids = [refEl, refSubEl, textEl].filter((n) => n && !n.hidden);
+    if (!kids.length) return 0;
+    // offsetTop/offsetHeight = ukuran tata letak (tidak terpengaruh animasi transform pindah slide)
+    return (textEl.offsetTop + textEl.offsetHeight) - kids[0].offsetTop;
+  }
+  function fitFits_(availH) {
+    if (fitContentHeight_() > availH) return false;
+    if (textEl.scrollWidth > textEl.clientWidth + 1) return false;
+    return true;
+  }
+  function fitMainText_() {
+    const rootStyle = document.documentElement.style;
+    if (!autoFitOn_) { rootStyle.removeProperty("--p-fit"); return; }
+    if (!fitKind_) return; // yang tayang bukan ayat/teks/kidung (mis. video + tulisan di atasnya) -- biarkan nilai terakhir
+    const cs = getComputedStyle(stageEl);
+    const availH = (stageEl.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0)) * 0.97;
+    if (!(availH > 40)) return; // jendela tersembunyi/terlalu kecil -- jangan menebak
+    if (!textEl.textContent.trim() && !textEl.children.length) return;
+    const grow = fitKind_ !== "verse";
+    const hi0 = grow ? FIT_MAX_GROW : 1;
+    rootStyle.setProperty("--p-fit", String(hi0));
+    if (fitFits_(availH)) return; // muat pada ukuran terbesar yang diizinkan
+    rootStyle.setProperty("--p-fit", String(FIT_MIN));
+    if (!fitFits_(availH)) return; // sangat panjang -- tetap pakai ukuran terkecil
+    let lo = FIT_MIN, hi = hi0;
+    for (let i = 0; i < 12; i++) {
+      const mid = (lo + hi) / 2;
+      rootStyle.setProperty("--p-fit", String(mid));
+      if (fitFits_(availH)) lo = mid; else hi = mid;
+    }
+    rootStyle.setProperty("--p-fit", String(lo));
+  }
+  function scheduleFit_() {
+    if (fitTimer_) clearTimeout(fitTimer_);
+    fitTimer_ = setTimeout(() => { fitTimer_ = 0; try { fitMainText_(); } catch (e) {} }, 60);
+  }
+  window.addEventListener("resize", scheduleFit_);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFit_);
+
   function showMain(kind, data) {
+    fitKind_ = (kind === "verse" || kind === "text" || kind === "kidung") ? kind : null; // book190 Auto Full
     stopTimer(false);
     stopStopwatch(false);
     stopTimerClock(false); // BARU (7 Sep 2026)
@@ -7175,6 +7249,7 @@
       }
       textEl.innerHTML = textHtml;
     }
+    if (fitKind_) { try { fitMainText_(); } catch (e) {} scheduleFit_(); } // book190 Auto Full (langsung + sekali lagi sesudah font/tata letak settle)
     stageEl.classList.add("fade-in");
     if (stageEl.getAttribute("data-anim") === "plane") flyPaperPlane_(); // BARU (book185)
   }
@@ -8503,8 +8578,9 @@
           else panZoom_(step, 0);
           return;
         }
-        if (e.key === "ArrowUp") { e.preventDefault(); sendNavKey_("prev"); return; }
-        if (e.key === "ArrowDown") { e.preventDefault(); sendNavKey_("next"); return; }
+        // book190 -- panah KIRI/KANAN ikut = mundur/maju (alias panah atas/bawah), seperti di jendela Studio.
+        if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); sendNavKey_("prev"); return; }
+        if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); sendNavKey_("next"); return; }
         return;
       }
       if (!active) return;

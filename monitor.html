@@ -324,7 +324,7 @@
         localVideo.muted = true; // dipaksa senyap, lihat catatan header file ini
         localVideo.volume = 0;
         localVideo.style.display = "block";
-        localVideo.play().catch(function () {});
+        if (data.autoplay === false) { try { localVideo.pause(); } catch (e2) {} } else { localVideo.play().catch(function () {}); } // book190: "tampil dulu"
       } catch (e) { /* Blob gagal dibaca -- diamkan, area video cukup kosong */ }
       wrap.style.display = "block";
       document.body.classList.add("mon-video-active");

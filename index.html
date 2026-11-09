@@ -1556,7 +1556,8 @@
             <button type="button" id="psAnnTemplateSaveBtn" class="chip-btn small primary">💾 Simpan sebagai Template</button>
           </div>
           <div class="ps-btn-row" id="psAnnQuickPhraseRow" style="margin-top:6px;">
-            <button type="button" class="chip-btn small" data-ann-quick="📅 Acara: 17-  -2026&#10;⏰ 09.00 WIB&#10;📍 di Tempat&#10;👥 Semua Tim datang">📅 Acara</button>
+            <button type="button" class="chip-btn small" data-ann-quick="📖 &quot;Judul&quot;&#10;📅 Hari  , 6  - - 2026&#10;🕛 Pukul 18.00&#10;📍 Sulung 55-57, Surabaya">📅 Acara</button>
+            <button type="button" class="chip-btn small" data-ann-quick="📖 “ ”&#10;📅 Hari   ,  6 - - 2026&#10;🕛 Pukul 12.00 WIB&#10;💻 Melalui Zoom Meeting&#10;🆔 Zoom ID: 870 6059 1590&#10;🔑 Passcode: kakidian">💻 Acara Zoom</button>
             <button type="button" class="chip-btn small" data-ann-quick="🎵 Kidung No. ____ ____, syair ____ bait.">🎵 Kidung</button>
             <button type="button" class="chip-btn small" data-ann-quick="✅ Bawa Buku Alkitab / Catatan">✅ Bawa Buku</button>
             <button type="button" class="chip-btn small" data-ann-quick="🙏 Doa Pembuka">🙏 Doa Pembuka</button>
@@ -2539,6 +2540,7 @@
             <span class="ps-quicktools-sep"></span>
             <button type="button" id="psFontDecTop" class="chip-btn small" title="Perkecil huruf di Layar 2">A-</button>
             <button type="button" id="psFontIncTop" class="chip-btn small" title="Perbesar huruf di Layar 2">A+</button>
+            <button type="button" id="psAutoFitTop" class="chip-btn small active" title="Auto Full: ukuran huruf ayat/pengumuman/kidung diatur otomatis supaya pas layar">🔲 Auto</button>
             <span class="ps-quicktools-sep"></span>
             <!-- Kontrol video YouTube yang sedang tayang di Layar 2 (lihat
                  js/presentation-studio.js: wireYtControls() & yt_control di
@@ -2924,6 +2926,11 @@
             <!-- BARU (4 Sep 2026, permintaan operator) -->
             <input type="number" id="psFontScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="60" max="480" step="1" value="100" title="Ketik angka Ukuran Teks manual (60-480), lalu tekan Enter" />%
           </div>
+          <!-- BARU (book190) -- Auto Full: ukuran huruf otomatis pas layar (ayat 2+ ayat, pengumuman, kidung). A-/A+ atau slider di atas = ambil alih manual (Auto Full mati). -->
+          <label class="ps-checkbox-row" style="display:flex; gap:6px; align-items:center; margin:6px 0;">
+            <input type="checkbox" id="psAutoFitCheck" checked style="margin:0;" />
+            🔲 Auto Full -- ukuran huruf ayat / pengumuman / kidung diatur otomatis supaya pas penuh layar (ayat hanya dikecilkan bila kebesaran; pengumuman &amp; kidung bisa dibesarkan/dikecilkan). Mengubah ukuran manual (A-/A+) mematikannya.
+          </label>
           <!-- BARU (28 Agu 2026) -- "Spasi Baris" (jarak antar baris di
                Layar 2), dipisah dari "Ukuran Teks" -- lihat --p-line-height
                di present.html & applyLineHeight() (js/presentation-studio.js).
@@ -2991,6 +2998,18 @@
             <input type="checkbox" id="psKidungNoColor" checked style="margin:0;" />
             Nomor bait berwarna (sama dengan warna "KOOR") supaya jelas sudah ganti bait
           </label>
+          <!-- BARU (book190) -- baris info kidung: pengarang · birama · jumlah bait (mis. "Witness Lee B 4/4 (7 Bait)") -->
+          <div class="ps-field-label">🎵 Ukuran Tulisan Info Kidung (pengarang · birama · jumlah bait)</div>
+          <div class="ps-btn-row">
+            <button type="button" id="psRefSubScaleDec" class="chip-btn small" title="Kecilkan info kidung">A-</button>
+            <input type="range" id="psRefSubScale" min="50" max="400" value="100" style="flex:1;" />
+            <button type="button" id="psRefSubScaleInc" class="chip-btn small" title="Besarkan info kidung">A+</button>
+            <input type="number" id="psRefSubScaleValue" class="ps-pen-size-value ps-pen-size-value-input" min="50" max="400" step="1" value="100" title="Ketik angka ukuran info kidung (50-400), lalu tekan Enter" />%
+          </div>
+          <div class="ps-field-label">🔤 Font Info Kidung (tiap pilihan tampil dengan fontnya)</div>
+          <div class="ps-btn-row">
+            <select id="psRefSubFont" class="columns-lang-select"><option value="">Sama dengan huruf utama</option></select>
+          </div>
           <!-- BARU (v54, 15 Okt 2026, permintaan operator) -- ukuran & warna
                tulisan NAMA KITAB (mis. "Wahyu 2:5") di Layar 2. Lihat
                wireRefLook() (js/presentation-studio.js) & #ref.ref-verse
