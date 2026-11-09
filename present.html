@@ -7338,7 +7338,7 @@
     // (js/presentation-studio.js).
     if (data.type === "shout") { playShout_(data.text, data.color); return; }
     // BARU (book184) -- 🎉 Efek Layar Ria (js/fun-fx.js), dikirim dari tab Efek Studio.
-    if (data.type === "funfx") { if (typeof FunFX !== "undefined") FunFX.play(data.name, { src: data.src, text: data.text }); return; }
+    if (data.type === "funfx") { if (typeof FunFX !== "undefined") FunFX.play(data.name, { src: data.src, text: data.text, seconds: data.seconds }); return; }
     // BARU (10 Sep 2026, sesi ke-12) -- lihat catatan panjang
     // setEffectsMuted_()/getEffectsMasterGain_() dekat beep() di atas --
     // dikirim bareng tombol/pintasan "M" Mute di Studio
