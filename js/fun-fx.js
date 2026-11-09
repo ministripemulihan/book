@@ -20,6 +20,8 @@ const FunFX = (function () {
     { id: "golden", icon: "🏆", label: "Golden Buzzer", song: "golden" },
     { id: "walker", icon: "🧸", label: "Boneka bengong", song: null },
     { id: "shush", icon: "🤫", label: "Boneka orang tua: Ssst!", song: null },
+    { id: "icecream", icon: "🍦", label: "Es Krim Tenang (hadiah duduk diam)", song: null },
+    { id: "aquarium", icon: "🐠", label: "Akuarium Tenang", song: null },
   ];
   const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer" };
   const LS_PREFIX = "funfx_song_";
@@ -261,8 +263,16 @@ const FunFX = (function () {
     layer.appendChild(rays);
     const stage = document.createElement("div");
     stage.className = "ff-gold-stage";
-    stage.innerHTML = BUZZER_SVG + `<div class="ff-gold-text">${esc(text || "GOLDEN BUZZER!")}</div>`;
+    stage.innerHTML = BUZZER_SVG + `<div class="ff-gold-text"><span>${esc(text || "GOLDEN BUZZER!")}</span></div>`;
     layer.appendChild(stage);
+    // book191 -- teks panjang (mis. "Selamat Ulang Tahun ...") dikecilkan otomatis sampai seluruh piala + teks muat di layar.
+    try {
+      const gt = stage.querySelector(".ff-gold-text");
+      let fs = Math.min(72, W * 0.065);
+      gt.style.fontSize = fs + "px";
+      const bottomOf = () => H * 0.45 - 0.26 * Math.min(W, H) + stage.offsetHeight;
+      while (bottomOf() > H * 0.96 && fs > 20) { fs -= 2; gt.style.fontSize = fs + "px"; }
+    } catch (e) { /* ukuran bawaan CSS tetap dipakai */ }
     const jobs = [];
     jobs.push(animate(glow, [{ opacity: 0 }, { opacity: 0.95, offset: 0.08 }, { opacity: 0.45, offset: 0.4 }, { opacity: 0 }], { duration: 7500, fill: "forwards" }));
     jobs.push(animate(rays, [{ opacity: 0, transform: "translate(-50%,-50%) rotate(0deg)" }, { opacity: 0.8, offset: 0.12 }, { opacity: 0.6, offset: 0.8 }, { opacity: 0, transform: "translate(-50%,-50%) rotate(120deg)" }], { duration: 7500, fill: "forwards", easing: "linear" }));
@@ -430,6 +440,86 @@ const FunFX = (function () {
   }
 
   // ------------------------------------------------------------
+  //  BARU (book191, permintaan operator "anak kecil yang suka jalan-jalan bisa diam duduk tenang")
+  //  🍦 Es Krim Tenang: tantangan duduk diam bersama -- tiap N detik (bawaan 12) SATU scoop es krim jatuh pelan ke cone;
+  //     sesudah 6 scoop tampil "Hebat! ... ambil hadiahmu" (bagikan stiker/permen sesudahnya). Operator bisa menekan ⏹ kapan saja
+  //     (mis. kalau ribut lagi: tayangkan ulang supaya mulai dari nol).
+  //  🐠 Akuarium Tenang: ikan-ikan berenang pelan + gelembung naik, terus tampil sampai ⏹ Hentikan -- pemandangan yang
+  //     menenangkan untuk ditonton (tidak ada suara/kilat).
+  // ------------------------------------------------------------
+  const IC_COLORS = ["#ff9ec4", "#fff1d6", "#9be8c8", "#a9724f", "#ff6b81", "#9ec5ff"];
+  async function iceCream(text, seconds) {
+    const layer = makeLayer();
+    let dead = false;
+    const clean = register(layer, () => { dead = true; });
+    const total = IC_COLORS.length;
+    const gap = Math.max(3, Math.min(120, Number(seconds) || 12)) * 1000;
+    const bg = document.createElement("div"); bg.className = "ff-ic-bg"; layer.appendChild(bg);
+    const title = document.createElement("div"); title.className = "ff-ic-title"; title.textContent = text || "Duduk tenang yuk… 🍦"; layer.appendChild(title);
+    const stack = document.createElement("div"); stack.className = "ff-ic-stack"; layer.appendChild(stack);
+    stack.innerHTML = `<svg class="ff-ic-cone" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M8 0 L92 0 L50 100Z" fill="#e8b36a" stroke="#b9823d" stroke-width="3"/><path d="M22 0 L50 60 M50 0 L50 100 M78 0 L50 60 M14 32 L86 32 M30 64 L70 64" stroke="#c98f45" stroke-width="2" fill="none"/></svg>`;
+    const count = document.createElement("div"); count.className = "ff-ic-count"; layer.appendChild(count);
+    animate(bg, [{ opacity: 0 }, { opacity: 1 }], { duration: 900, fill: "forwards" });
+    // ukuran dihitung dari sisi terpendek layar supaya 6 scoop + cone + judul selalu muat
+    const vm = Math.min(vw(), vh());
+    const stW = vm * 0.18;
+    stack.style.width = stW + "px";
+    stack.style.bottom = "9vh";
+    const coneEl = stack.querySelector(".ff-ic-cone");
+    const coneH = stW * 1.1;
+    coneEl.style.height = coneH + "px";
+    const scoopW = stW * 0.94;
+    for (let i = 0; i < total; i++) {
+      count.textContent = i === 0 ? "Ayo duduk tenang… es krimnya akan datang 🍦" : `${i} dari ${total} es krim — hebat, terus duduk tenang!`;
+      await sleep(i === 0 ? Math.min(gap, 4000) : gap); if (dead) return;
+      const sc = document.createElement("div");
+      sc.className = "ff-ic-scoop";
+      sc.style.background = `radial-gradient(circle at 35% 30%, #fff9, ${IC_COLORS[i]} 55%)`;
+      sc.style.bottom = (coneH - scoopW * 0.18 + i * scoopW * 0.5) + "px";
+      stack.appendChild(sc);
+      try { tone(523 + i * 66, 0, 0.5, "sine", 0.07); } catch (e) { /* suara opsional */ }
+      await animate(sc, [{ transform: `translateY(${-vh()}px)`, opacity: 0 }, { transform: "translateY(0)", opacity: 1, offset: 0.7 }, { transform: "translateY(-3%)", offset: 0.85 }, { transform: "translateY(0)" }], { duration: 1500, easing: "cubic-bezier(.3,.7,.4,1)", fill: "forwards" });
+      if (dead) return;
+    }
+    count.textContent = "";
+    title.textContent = "🎉 Hebat! Semua duduk tenang — ambil hadiahmu ya! 🎁";
+    animate(title, [{ transform: "scale(.8)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 900, easing: "ease-out" });
+    const sp = ["✨", "⭐", "💖", "🌟"];
+    for (let i = 0; i < 36; i++) {
+      const e = document.createElement("div"); e.className = "ff-p"; e.textContent = pick(sp); e.style.fontSize = rnd(20, 44) + "px"; layer.appendChild(e);
+      const x0 = rnd(0, vw()), T = rnd(5, 9);
+      animate(e, [{ transform: `translate(${x0}px,-40px)`, opacity: 1 }, { transform: `translate(${x0 + rnd(-60, 60)}px,${vh() + 40}px)`, opacity: 0.9 }], { duration: T * 1000, delay: rnd(0, 3000), easing: "linear", fill: "forwards" });
+    }
+    await sleep(15000); if (dead) return;
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 1200, fill: "forwards" });
+    clean();
+  }
+  function aquarium(text) {
+    const layer = makeLayer();
+    register(layer);
+    const W = vw(), H = vh();
+    const bg = document.createElement("div"); bg.className = "ff-aq-bg"; layer.appendChild(bg);
+    animate(bg, [{ opacity: 0 }, { opacity: 1 }], { duration: 1500, fill: "forwards" });
+    const title = document.createElement("div"); title.className = "ff-ic-title"; title.style.color = "#fff"; title.style.textShadow = "0 2px 8px #0a3a6a99";
+    title.textContent = text || "Ssst… lihat ikan-ikan berenang 🐠"; layer.appendChild(title);
+    const fishes = ["🐠", "🐟", "🐡", "🐠", "🐙", "🐢", "🐟", "🐬"];
+    fishes.forEach((f, i) => {
+      const el = document.createElement("div"); el.className = "ff-aq-fish"; el.textContent = f; layer.appendChild(el);
+      const y = H * (0.2 + 0.7 * (i / fishes.length)) + rnd(-20, 20), dur = rnd(20000, 36000), ltr = i % 2 === 0;
+      const x0 = ltr ? -160 : W + 60, x1 = ltr ? W + 60 : -160, flip = ltr ? " scaleX(-1)" : "";
+      const fr = [];
+      for (let k = 0; k <= 10; k++) { const p = k / 10; fr.push({ transform: `translate(${x0 + (x1 - x0) * p}px, ${y + Math.sin(p * 9 + i) * 22}px)${flip}` }); }
+      try { el.animate(fr, { duration: dur, iterations: Infinity, delay: -rnd(0, dur), easing: "linear" }); } catch (e) { /* abaikan */ }
+    });
+    for (let i = 0; i < 18; i++) {
+      const b = document.createElement("div"); b.className = "ff-aq-bub"; const sz = rnd(8, 26); b.style.width = b.style.height = sz + "px"; layer.appendChild(b);
+      const x = rnd(0, W), dur = rnd(7000, 14000);
+      try { b.animate([{ transform: `translate(${x}px,0)`, opacity: 0.9 }, { transform: `translate(${x + rnd(-40, 40)}px,${-(H + 80)}px)`, opacity: 0 }], { duration: dur, iterations: Infinity, delay: -rnd(0, dur), easing: "ease-in" }); } catch (e) { /* abaikan */ }
+    }
+    return Promise.resolve();
+  }
+
+  // ------------------------------------------------------------
   //  API
   // ------------------------------------------------------------
   function play(id, opts) {
@@ -444,6 +534,8 @@ const FunFX = (function () {
     if (id === "golden") return golden(o.text);
     if (id === "walker") return walker();
     if (id === "shush") return shush();
+    if (id === "icecream") return iceCream(o.text, o.seconds);
+    if (id === "aquarium") return aquarium(o.text);
     return Promise.resolve();
   }
 
@@ -456,13 +548,17 @@ const FunFX = (function () {
     const textIn = document.createElement("input");
     textIn.type = "text"; textIn.className = "ps-input"; textIn.placeholder = "Teks di layar (opsional), mis. Selamat Ulang Tahun!";
     textIn.style.cssText = "width:100%; margin:6px 0;";
+    const secIn = document.createElement("input");
+    secIn.type = "number"; secIn.min = "3"; secIn.max = "120"; secIn.value = "12"; secIn.className = "ps-input";
+    secIn.title = "Es Krim Tenang: berapa DETIK jeda tiap scoop es krim (6 scoop total)";
+    secIn.style.cssText = "width:70px; margin:6px 6px 6px 0;";
     LIST.forEach((e) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "chip-btn small";
       b.textContent = e.icon + " " + e.label;
       b.addEventListener("click", () => {
-        const withText = e.id === "golden" || e.id.indexOf("party") === 0;
-        onPick(e.id, { src: e.song ? getSongUrl(e.song) : "", text: withText ? textIn.value.trim() : "" });
+        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium";
+        onPick(e.id, { src: e.song ? getSongUrl(e.song) : "", text: withText ? textIn.value.trim() : "", seconds: Number(secIn.value) || 12 });
       });
       row.appendChild(b);
     });
@@ -472,6 +568,8 @@ const FunFX = (function () {
     row.appendChild(stop);
     container.appendChild(row);
     container.appendChild(textIn);
+    const secLbl = document.createElement("div"); secLbl.className = "ps-pointer-hint"; secLbl.appendChild(secIn); secLbl.appendChild(document.createTextNode("detik per scoop (🍦 Es Krim Tenang, 6 scoop). Teks di atas dipakai sebagai judul efek 🍦/🐠 juga."));
+    container.appendChild(secLbl);
     container.appendChild(songEditor());
   }
   function songEditor() {
@@ -548,7 +646,21 @@ const FunFX = (function () {
 .ff-gold-rays{position:absolute;left:50%;top:45%;width:230vmax;height:230vmax;transform:translate(-50%,-50%);opacity:0;background:repeating-conic-gradient(from 0deg,#ffe58a55 0deg 8deg,#0000 8deg 20deg);-webkit-mask-image:radial-gradient(circle,#000 0,#0000 55%);mask-image:radial-gradient(circle,#000 0,#0000 55%)}
 .ff-gold-stage{position:absolute;left:50%;top:45%;margin-top:-26vmin;width:min(60vmin,420px);opacity:0;transform:translate(-50%,0);text-align:center}
 .ff-buzzer-svg{width:100%;filter:drop-shadow(0 0 24px #ffd23f)}
-.ff-gold-text{margin-top:8px;font:900 clamp(26px,6.5vw,72px)/1.05 system-ui,sans-serif;letter-spacing:.04em;background:linear-gradient(180deg,#fffbe0,#ffd23f 45%,#b8860b);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:2px #6b4c06;filter:drop-shadow(0 4px 10px #0009);white-space:nowrap}
+/* book191: teks Golden Buzzer -- dulu lebar kotaknya cuma selebar piala (<=420px) + nowrap, jadi teks panjang meluber ke kanan (tidak di tengah)
+   & gradien emas cuma menutup kotak itu (sisanya transparan/tampak putih). Sekarang kotak selebar layar, teks membungkus, dan gradien emas
+   dipasang per BARIS (box-decoration-break: clone) supaya SEMUA huruf emas. */
+.ff-gold-text{width:92vw;margin:10px 0 0 calc(50% - 46vw);text-align:center;font:900 clamp(26px,6.5vw,72px)/1.12 system-ui,sans-serif;letter-spacing:.04em;white-space:normal;overflow-wrap:anywhere;filter:drop-shadow(0 4px 10px #0009)}
+.ff-gold-text span{display:inline;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:linear-gradient(180deg,#fff6b0,#ffd23f 50%,#e8b020);-webkit-background-clip:text;background-clip:text;color:#ffd23f;-webkit-text-fill-color:transparent;-webkit-text-stroke:2px #6b4c06;paint-order:stroke fill}
+/* book191: efek penenang anak */
+.ff-ic-bg{position:absolute;inset:0;background:linear-gradient(180deg,#ffe9f3,#fff6e0 60%,#e8f7ff);opacity:0}
+.ff-ic-title{position:absolute;left:4vw;right:4vw;top:3vh;text-align:center;font:800 clamp(22px,3.6vw,48px)/1.15 system-ui,sans-serif;color:#b5476f;text-shadow:0 2px 0 #fff}
+.ff-ic-stack{position:absolute;left:50%;bottom:6vh;width:30vmin;height:84vmin;transform:translateX(-50%)}
+.ff-ic-cone{position:absolute;left:0;bottom:0;width:100%;height:30vmin}
+.ff-ic-scoop{position:absolute;left:3%;width:94%;aspect-ratio:1;border-radius:50% 50% 46% 46%;box-shadow:inset -1.2vmin -1.6vmin 0 #0002,inset 1vmin 1.2vmin 0 #fff5}
+.ff-ic-count{position:absolute;left:0;right:0;bottom:1.5vh;text-align:center;font:700 clamp(16px,2.6vw,32px) system-ui,sans-serif;color:#8a5a6e}
+.ff-aq-bg{position:absolute;inset:0;background:linear-gradient(180deg,#9fdcff,#3d9be0 55%,#14507f);opacity:0}
+.ff-aq-fish{position:absolute;left:0;font-size:clamp(40px,9vmin,110px);will-change:transform;filter:drop-shadow(0 4px 6px #0003)}
+.ff-aq-bub{position:absolute;bottom:-40px;border-radius:50%;border:2px solid #ffffffaa;background:#ffffff33}
 .ff-walker{position:absolute;left:0;bottom:6px;width:clamp(90px,16vmin,150px);transform:translateX(-200px)}
 .ff-doll-svg{width:100%;display:block;overflow:visible}
 .ff-bubble{position:absolute;left:50%;bottom:100%;transform:translateX(-30%);margin-bottom:4px;background:#fff;color:#222;border:2px solid #333;border-radius:16px;padding:5px 12px;font:600 clamp(14px,2.4vmin,22px)/1.2 system-ui,sans-serif;white-space:nowrap;box-shadow:0 3px 10px #0004;animation:ffBub .9s ease-in-out infinite alternate}

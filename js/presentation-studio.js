@@ -2273,6 +2273,24 @@ const PresentationStudio = (() => {
         : '<p class="present-saved-empty">Tidak ada kidung yang cocok.</p>';
       resultsWrap.querySelectorAll(".kidung-list-item").forEach((btn) => {
         btn.addEventListener("click", () => openKidung(currentBuku, btn.dataset.no));
+        // BARU (book191, permintaan operator "kidung 4 bait langsung masuk Kumpulan Ayat semuanya, jangan satu-satu") --
+        // tombol "➕ Semua Bait" langsung di baris daftar: membuka kidung itu (mengisi currentSlides sesuai mode tampilan
+        // yang dipilih: 1 bait / 2 bait / 4 bait+koor, dst.) lalu menjalankan "➕ Semua Slide ke Kumpulan Ayat" yang sudah ada --
+        // jadi SEMUA slide kidung masuk berurutan sekaligus, termasuk pilihan kumpulan & audio latar seperti biasa.
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "display:flex; gap:4px; align-items:stretch;";
+        btn.style.flex = "1";
+        btn.parentNode.insertBefore(wrap, btn);
+        wrap.appendChild(btn);
+        const ab = document.createElement("button");
+        ab.type = "button"; ab.className = "chip-btn small";
+        ab.textContent = "➕ Semua Bait";
+        ab.title = "Masukkan SEMUA bait kidung ini sekaligus ke Kumpulan Ayat (sesuai mode tampilan bait yang dipilih)";
+        ab.addEventListener("click", async () => {
+          const ok = await openKidung(currentBuku, btn.dataset.no);
+          if (ok !== false && addAllBtn) addAllBtn.click();
+        });
+        wrap.appendChild(ab);
       });
     }
 
@@ -9459,7 +9477,7 @@ const PresentationStudio = (() => {
     markActiveShoutColor_();
     // BARU (book184) -- 🎉 Efek Layar Ria (js/fun-fx.js): tombol dibangun FunFX, dikirim ke Layar 2.
     if (typeof FunFX !== "undefined" && el("psFunFxGrid")) {
-      FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "" }));
+      FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12 }));
     }
     document.querySelectorAll("[data-shout]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.shout, color: shoutColor_ }));
