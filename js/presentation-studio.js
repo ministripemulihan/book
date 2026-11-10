@@ -9033,6 +9033,17 @@ const PresentationStudio = (() => {
     document.addEventListener("keydown", (e) => {
       const studio = el("presentStudio");
       if (!studio || studio.hidden) return;
+      // BARU (book193, permintaan operator) -- tombol cepat AMIN: F5 = bersama, F6 = pria, F7 = wanita, F8 = anak-anak.
+      // Sengaja tombol F (bukan huruf) supaya tidak pernah "keluar suara amin" waktu mengetik; berlaku bahkan saat kursor di kolom ketik.
+      // Studio sedang terbuka -> F5 TIDAK me-refresh halaman (preventDefault); untuk refresh pakai Ctrl+R atau tutup Studio dulu.
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && /^F[5-8]$/.test(e.key)) {
+        e.preventDefault();
+        if (e.repeat) return;
+        const id = { F5: "amen-all", F6: "amen-male", F7: "amen-female", F8: "amen-kids" }[e.key];
+        const qk = typeof FunFX !== "undefined" && FunFX.quick ? FunFX.quick(id) : null;
+        if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12 });
+        return;
+      }
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
       // BARU (12 Sep 2026, laporan operator "tekan P malah pause lalu

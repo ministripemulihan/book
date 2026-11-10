@@ -22,8 +22,15 @@ const FunFX = (function () {
     { id: "shush", icon: "🤫", label: "Boneka orang tua: Ssst!", song: null },
     { id: "icecream", icon: "🍦", label: "Es Krim Tenang (hadiah duduk diam)", song: null },
     { id: "aquarium", icon: "🐠", label: "Akuarium Tenang", song: null },
+    { id: "count", icon: "🔢", label: "Hitung Hewan (kuda, gajah, ayam, anak, logo)", song: null },
+    { id: "amen-all", icon: "🙏", label: "Amin bersama (F5)", song: "amen_all" },
+    { id: "amen-male", icon: "👨", label: "Amin pria (F6)", song: "amen_male" },
+    { id: "amen-female", icon: "👩", label: "Amin wanita (F7)", song: "amen_female" },
+    { id: "amen-kids", icon: "🧒", label: "Amin anak-anak (F8)", song: "amen_kids" },
+    { id: "call-lord", icon: "🙌", label: "Seru nama Tuhan", song: "call_lord" },
+    { id: "sun", icon: "☀️", label: "Matahari (kilauan, tanpa suara)", song: null },
   ];
-  const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer" };
+  const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer", amen_all: "Suara Amin Bersama (F5)", amen_male: "Suara Amin Pria (F6)", amen_female: "Suara Amin Wanita (F7)", amen_kids: "Suara Amin Anak-anak (F8)", call_lord: "Suara Seru Nama Tuhan" };
   const LS_PREFIX = "funfx_song_";
 
   let cfg = {};
@@ -126,6 +133,12 @@ const FunFX = (function () {
     src.start(c.currentTime + t0); src.stop(c.currentTime + t0 + dur + 0.05);
   }
   const SOUNDS = {
+    // book193: suara bawaan (sintesis) Amin & Seru Nama Tuhan -- dipakai kalau operator belum memasukkan suara sendiri.
+    "amen-all"() { [196, 247, 330].forEach((f) => { tone(f, 0, 0.35, "triangle", 0.08); tone(f * 0.99, 0.4, 0.8, "triangle", 0.08); }); },
+    "amen-male"() { tone(130, 0, 0.3, "triangle", 0.12); tone(110, 0.38, 0.8, "triangle", 0.12); },
+    "amen-female"() { tone(260, 0, 0.3, "triangle", 0.1); tone(220, 0.38, 0.8, "triangle", 0.1); },
+    "amen-kids"() { tone(440, 0, 0.25, "sine", 0.1); tone(392, 0.3, 0.6, "sine", 0.1); },
+    "call-lord"() { [262, 330, 392, 523].forEach((f, i) => tone(f, i * 0.25, 1.2, "sine", 0.08)); },
     party() {
       noise(0, 0.12, 0.5, 900, 0.7);                 // pop
       noise(0.05, 0.12, 0.4, 2500, 0.7);
@@ -168,7 +181,7 @@ const FunFX = (function () {
     try {
       const url = srcOverride || (effect.song ? getSongUrl(effect.song) : "");
       if (url) {
-        stopSong();
+        if (effect.id.indexOf("amen") !== 0) stopSong(); // book193: Amin singkat tidak memotong lagu/efek lain yang sedang jalan
         if (cfg.playUrl) { cfg.playUrl(normalizeUrl(url)); return; }
         songEl = new Audio(normalizeUrl(url));
         songEl.volume = 1;
@@ -447,76 +460,275 @@ const FunFX = (function () {
   //  🐠 Akuarium Tenang: ikan-ikan berenang pelan + gelembung naik, terus tampil sampai ⏹ Hentikan -- pemandangan yang
   //     menenangkan untuk ditonton (tidak ada suara/kilat).
   // ------------------------------------------------------------
-  const IC_COLORS = ["#ff9ec4", "#fff1d6", "#9be8c8", "#a9724f", "#ff6b81", "#9ec5ff"];
+  const IC_FLAVORS = ["#ff9ec4", "#fff1d6", "#9be8c8", "#a9724f", "#ff6b81", "#9ec5ff", "#ffb35c", "#b9e27a", "#c9a0f0", "#fff08a"];
+  let icUid = 0;
+  const ri = (a, b) => Math.floor(rnd(a, b + 1)); // bilangan bulat acak a..b
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  // 1 scoop berbentuk "lumer": kubah + rok bergelombang + tetesan acak; bisa 2 warna (kiri-kanan / atas-bawah); topping meses opsional.
+  function icScoopSvg(c1, c2, mode, sprinkles) {
+    const id = "icg" + (++icUid);
+    const grad = c2 ? `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" ${mode === "v" ? 'x1="0" y1="0" x2="0" y2="92" ' : 'x1="0" y1="0" x2="100" y2="0" '}><stop offset="${mode === "v" ? ".38" : ".5"}" stop-color="${c1}"/><stop offset="${mode === "v" ? ".38" : ".5"}" stop-color="${c2}"/></linearGradient>` : "";
+    const f = c2 ? `url(#${id})` : c1;
+    let drips = "";
+    const n = ri(2, 3);
+    for (let k = 0; k < n; k++) { const x = 14 + k * 28 + ri(0, 10), len = ri(16, 30); drips += `<rect x="${x}" y="58" width="9" height="${len}" rx="4.5" fill="${f}"/>`; }
+    let spr = "";
+    if (sprinkles) { const cols = ["#ff4d6d", "#4dabf7", "#ffd43b", "#51cf66", "#fff"]; for (let k = 0; k < 11; k++) { const x = ri(22, 76), y = ri(12, 44), r = ri(0, 160); spr += `<rect x="${x}" y="${y}" width="9" height="3" rx="1.5" fill="${pick(cols)}" transform="rotate(${r} ${x} ${y})"/>`; } }
+    return `<svg viewBox="0 0 100 92" aria-hidden="true"><defs>${grad}</defs>
+      <path d="M4 56 C4 22 24 4 50 4 C76 4 96 22 96 56Z" fill="${f}"/>
+      <path d="M2 54 Q2 68 14 66 Q26 66 28 57 Q36 72 48 66 Q58 63 60 57 Q70 72 82 66 Q98 64 98 54Z" fill="${f}"/>
+      ${drips}<ellipse cx="33" cy="22" rx="12" ry="6.5" fill="#fff" opacity=".38" transform="rotate(-25 33 22)"/>${spr}</svg>`;
+  }
+  function icVesselSvg(kind) {
+    if (kind === "cup") return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M6 0 H94 L82 86 Q50 100 18 86Z" fill="#fdf6ec" stroke="#d9c7ad" stroke-width="3"/><path d="M26 0 L30 90 M50 0 V96 M74 0 L70 90" stroke="#f08ca8" stroke-width="5" fill="none"/></svg>`;
+    return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M6 0 H94 L50 100Z" fill="#e8b36a" stroke="#b9823d" stroke-width="3"/><path d="M22 0 L50 62 M50 0 V100 M78 0 L50 62 M14 30 H86 M30 62 H70" stroke="#c98f45" stroke-width="2" fill="none"/></svg>`;
+  }
+  const CHERRY_SVG = `<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M20 30 C20 14 28 6 36 4" stroke="#3f7d2c" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="20" cy="36" r="14" fill="#d62839"/><ellipse cx="15" cy="31" rx="4" ry="3" fill="#fff" opacity=".55"/></svg>`;
+  const WAFER_SVG = `<svg viewBox="0 0 30 90" aria-hidden="true"><rect x="3" y="2" width="24" height="86" rx="3" fill="#efcf8e" stroke="#b98b45" stroke-width="2"/><path d="M3 24 H27 M3 46 H27 M3 68 H27 M15 2 V88" stroke="#c99a52" stroke-width="2"/></svg>`;
+
+  // ------------------------------------------------------------
+  //  🍦 Es Krim Tenang (book192): KECIL di pojok kanan bawah (setinggi boneka bengong), latar TRANSPARAN supaya tulisan di belakang tetap
+  //  terbaca. BERULANG sampai ⏹ Hentikan: tiap putaran jumlah scoop ACAK (2-7), model ACAK (cone wafel / cup bergaris; scoop lumer
+  //  1 warna atau 2 warna kiri-kanan/atas-bawah; meses; ceri; biskuit wafer kotak). Selesai 1 putaran -> "Hebat! ambil hadiahmu", lalu putaran baru.
+  // ------------------------------------------------------------
   async function iceCream(text, seconds) {
     const layer = makeLayer();
     let dead = false;
     const clean = register(layer, () => { dead = true; });
-    const total = IC_COLORS.length;
+    const W = vw(), H = vh(), vm = Math.min(W, H);
     const gap = Math.max(3, Math.min(120, Number(seconds) || 12)) * 1000;
-    const bg = document.createElement("div"); bg.className = "ff-ic-bg"; layer.appendChild(bg);
-    const title = document.createElement("div"); title.className = "ff-ic-title"; title.textContent = text || "Duduk tenang yuk… 🍦"; layer.appendChild(title);
-    const stack = document.createElement("div"); stack.className = "ff-ic-stack"; layer.appendChild(stack);
-    stack.innerHTML = `<svg class="ff-ic-cone" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M8 0 L92 0 L50 100Z" fill="#e8b36a" stroke="#b9823d" stroke-width="3"/><path d="M22 0 L50 60 M50 0 L50 100 M78 0 L50 60 M14 32 L86 32 M30 64 L70 64" stroke="#c98f45" stroke-width="2" fill="none"/></svg>`;
-    const count = document.createElement("div"); count.className = "ff-ic-count"; layer.appendChild(count);
-    animate(bg, [{ opacity: 0 }, { opacity: 1 }], { duration: 900, fill: "forwards" });
-    // ukuran dihitung dari sisi terpendek layar supaya 6 scoop + cone + judul selalu muat
-    const vm = Math.min(vw(), vh());
-    const stW = vm * 0.18;
-    stack.style.width = stW + "px";
-    stack.style.bottom = "9vh";
-    const coneEl = stack.querySelector(".ff-ic-cone");
-    const coneH = stW * 1.1;
-    coneEl.style.height = coneH + "px";
-    const scoopW = stW * 0.94;
-    for (let i = 0; i < total; i++) {
-      count.textContent = i === 0 ? "Ayo duduk tenang… es krimnya akan datang 🍦" : `${i} dari ${total} es krim — hebat, terus duduk tenang!`;
-      await sleep(i === 0 ? Math.min(gap, 4000) : gap); if (dead) return;
-      const sc = document.createElement("div");
-      sc.className = "ff-ic-scoop";
-      sc.style.background = `radial-gradient(circle at 35% 30%, #fff9, ${IC_COLORS[i]} 55%)`;
-      sc.style.bottom = (coneH - scoopW * 0.18 + i * scoopW * 0.5) + "px";
-      stack.appendChild(sc);
-      try { tone(523 + i * 66, 0, 0.5, "sine", 0.07); } catch (e) { /* suara opsional */ }
-      await animate(sc, [{ transform: `translateY(${-vh()}px)`, opacity: 0 }, { transform: "translateY(0)", opacity: 1, offset: 0.7 }, { transform: "translateY(-3%)", offset: 0.85 }, { transform: "translateY(0)" }], { duration: 1500, easing: "cubic-bezier(.3,.7,.4,1)", fill: "forwards" });
-      if (dead) return;
+    const pill = document.createElement("div"); pill.className = "ff-pill"; pill.style.bottom = "3vh"; pill.style.opacity = "0"; layer.appendChild(pill);
+    const setPill = (t, right) => { pill.textContent = t; pill.style.right = right + "px"; animate(pill, [{ opacity: 0 }, { opacity: 1 }], { duration: 400, fill: "forwards" }); };
+    while (!dead) {
+      const n = ri(2, 6);
+      const units = 1.3 + 1 + 0.46 * (n - 1) + 0.5;             // tinggi total dalam satuan lebar scoop (cone + scoop + ceri)
+      const w = Math.min(vm * 0.17, (vm * 0.40) / units);       // tinggi total <= ~40% sisi layar (kecil, kira-kira 2x tinggi boneka bengong untuk 6 scoop)
+      const coneH = w * 1.3, step = w * 0.46, scoopH = w * 0.92;
+      const box = document.createElement("div"); box.className = "ff-ic2";
+      box.style.width = w + "px"; box.style.height = (coneH + step * (n - 1) + scoopH + w * 0.6) + "px";
+      layer.appendChild(box);
+      const vessel = document.createElement("div");
+      vessel.innerHTML = icVesselSvg(Math.random() < 0.7 ? "cone" : "cup");
+      const vs = vessel.firstChild; vs.style.cssText = `left:${w * 0.04}px;bottom:0;width:${w * 0.92}px;height:${coneH}px`; box.appendChild(vs);
+      const rightPx = W * 0.03 + w + 14;
+      const flavors = shuffle(IC_FLAVORS.slice());
+      for (let i = 0; i < n; i++) {
+        setPill(i === 0 ? (text || "Duduk tenang yuk… 🍦") : `${i} dari ${n} es krim — hebat, terus duduk tenang!`, rightPx);
+        await sleep(i === 0 ? Math.min(gap, 3000) : gap); if (dead) return;
+        const two = Math.random() < 0.4;
+        const holder = document.createElement("div");
+        holder.innerHTML = icScoopSvg(flavors[i], two ? flavors[(i + 5) % flavors.length] : null, Math.random() < 0.5 ? "h" : "v", i === n - 1 && Math.random() < 0.5);
+        const sv = holder.firstChild;
+        sv.style.cssText = `left:0;bottom:${coneH - w * 0.2 + i * step}px;width:${w}px;height:${scoopH}px;z-index:${i + 1}`;
+        box.appendChild(sv);
+        try { tone(523 + i * 66, 0, 0.5, "sine", 0.06); } catch (e) { /* suara opsional */ }
+        await animate(sv, [{ transform: `translateY(${-H * 0.5}px)`, opacity: 0 }, { transform: "translateY(0)", opacity: 1, offset: 0.7 }, { transform: "translateY(-3%)", offset: 0.85 }, { transform: "translateY(0)" }], { duration: 1300, easing: "cubic-bezier(.3,.7,.4,1)", fill: "forwards" });
+        if (dead) return;
+      }
+      const topBottom = coneH - w * 0.2 + (n - 1) * step;
+      if (Math.random() < 0.6) { const c = document.createElement("div"); c.innerHTML = CHERRY_SVG; const cs = c.firstChild; cs.style.cssText = `left:${w * 0.34}px;bottom:${topBottom + scoopH * 0.74}px;width:${w * 0.32}px;height:${w * 0.42}px;z-index:99`; box.appendChild(cs); animate(cs, [{ transform: "scale(0)" }, { transform: "scale(1.2)" }, { transform: "scale(1)" }], { duration: 500 }); }
+      if (Math.random() < 0.5) { const c = document.createElement("div"); c.innerHTML = WAFER_SVG; const ws = c.firstChild; ws.style.cssText = `left:${w * 0.58}px;bottom:${topBottom + scoopH * 0.45}px;width:${w * 0.26}px;height:${w * 0.78}px;z-index:98;transform:rotate(22deg);transform-origin:50% 90%`; box.appendChild(ws); }
+      setPill("🎉 Hebat! Semua duduk tenang — ambil hadiahmu ya! 🎁", rightPx);
+      const sp = ["✨", "⭐", "💖"];
+      for (let i = 0; i < 10; i++) {
+        const e = document.createElement("div"); e.className = "ff-p"; e.textContent = pick(sp); e.style.fontSize = ri(16, 28) + "px"; layer.appendChild(e);
+        const x0 = W - w * 1.5 - rnd(0, W * 0.2);
+        animate(e, [{ transform: `translate(${x0}px,${H * 0.45}px)`, opacity: 1 }, { transform: `translate(${x0 + rnd(-40, 40)}px,${H}px)`, opacity: 0 }], { duration: rnd(3500, 6000), delay: rnd(0, 1500), easing: "ease-in", fill: "forwards" });
+      }
+      await sleep(7000); if (dead) return;
+      await animate(box, [{ opacity: 1 }, { opacity: 0 }], { duration: 900, fill: "forwards" });
+      box.remove(); pill.style.opacity = "0";
+      await sleep(1500);
     }
-    count.textContent = "";
-    title.textContent = "🎉 Hebat! Semua duduk tenang — ambil hadiahmu ya! 🎁";
-    animate(title, [{ transform: "scale(.8)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 900, easing: "ease-out" });
-    const sp = ["✨", "⭐", "💖", "🌟"];
-    for (let i = 0; i < 36; i++) {
-      const e = document.createElement("div"); e.className = "ff-p"; e.textContent = pick(sp); e.style.fontSize = rnd(20, 44) + "px"; layer.appendChild(e);
-      const x0 = rnd(0, vw()), T = rnd(5, 9);
-      animate(e, [{ transform: `translate(${x0}px,-40px)`, opacity: 1 }, { transform: `translate(${x0 + rnd(-60, 60)}px,${vh() + 40}px)`, opacity: 0.9 }], { duration: T * 1000, delay: rnd(0, 3000), easing: "linear", fill: "forwards" });
-    }
-    await sleep(15000); if (dead) return;
-    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 1200, fill: "forwards" });
     clean();
   }
+
+  // ------------------------------------------------------------
+  //  🐠 Akuarium Tenang (book192): latar TRANSPARAN, ikan kecil + gelembung kecil berenang terus (berulang sampai ⏹).
+  // ------------------------------------------------------------
   function aquarium(text) {
     const layer = makeLayer();
     register(layer);
     const W = vw(), H = vh();
-    const bg = document.createElement("div"); bg.className = "ff-aq-bg"; layer.appendChild(bg);
-    animate(bg, [{ opacity: 0 }, { opacity: 1 }], { duration: 1500, fill: "forwards" });
-    const title = document.createElement("div"); title.className = "ff-ic-title"; title.style.color = "#fff"; title.style.textShadow = "0 2px 8px #0a3a6a99";
-    title.textContent = text || "Ssst… lihat ikan-ikan berenang 🐠"; layer.appendChild(title);
-    const fishes = ["🐠", "🐟", "🐡", "🐠", "🐙", "🐢", "🐟", "🐬"];
+    const pill = document.createElement("div"); pill.className = "ff-pill"; pill.style.left = "3vw"; pill.style.bottom = "3vh";
+    pill.textContent = text || "Ssst… lihat ikan-ikan berenang 🐠"; layer.appendChild(pill);
+    animate(pill, [{ opacity: 0 }, { opacity: 1 }], { duration: 800, fill: "forwards" });
+    const fishes = shuffle(["🐠", "🐟", "🐡", "🐠", "🐙", "🐢", "🐟", "🐬", "🦀", "🐳"]).slice(0, 7);
     fishes.forEach((f, i) => {
       const el = document.createElement("div"); el.className = "ff-aq-fish"; el.textContent = f; layer.appendChild(el);
-      const y = H * (0.2 + 0.7 * (i / fishes.length)) + rnd(-20, 20), dur = rnd(20000, 36000), ltr = i % 2 === 0;
-      const x0 = ltr ? -160 : W + 60, x1 = ltr ? W + 60 : -160, flip = ltr ? " scaleX(-1)" : "";
+      const y = H * (0.12 + 0.76 * (i / fishes.length)) + rnd(-15, 15), dur = rnd(22000, 38000), ltr = Math.random() < 0.5;
+      const x0 = ltr ? -120 : W + 40, x1 = ltr ? W + 40 : -120, flip = ltr ? " scaleX(-1)" : "";
       const fr = [];
-      for (let k = 0; k <= 10; k++) { const p = k / 10; fr.push({ transform: `translate(${x0 + (x1 - x0) * p}px, ${y + Math.sin(p * 9 + i) * 22}px)${flip}` }); }
+      for (let k = 0; k <= 10; k++) { const q = k / 10; fr.push({ transform: `translate(${x0 + (x1 - x0) * q}px, ${y + Math.sin(q * 9 + i) * 18}px)${flip}` }); }
       try { el.animate(fr, { duration: dur, iterations: Infinity, delay: -rnd(0, dur), easing: "linear" }); } catch (e) { /* abaikan */ }
     });
-    for (let i = 0; i < 18; i++) {
-      const b = document.createElement("div"); b.className = "ff-aq-bub"; const sz = rnd(8, 26); b.style.width = b.style.height = sz + "px"; layer.appendChild(b);
-      const x = rnd(0, W), dur = rnd(7000, 14000);
-      try { b.animate([{ transform: `translate(${x}px,0)`, opacity: 0.9 }, { transform: `translate(${x + rnd(-40, 40)}px,${-(H + 80)}px)`, opacity: 0 }], { duration: dur, iterations: Infinity, delay: -rnd(0, dur), easing: "ease-in" }); } catch (e) { /* abaikan */ }
+    for (let i = 0; i < 12; i++) {
+      const b = document.createElement("div"); b.className = "ff-aq-bub"; const sz = rnd(6, 16); b.style.width = b.style.height = sz + "px"; layer.appendChild(b);
+      const x = rnd(0, W), dur = rnd(8000, 15000);
+      try { b.animate([{ transform: `translate(${x}px,${H + 20}px)`, opacity: 0.9 }, { transform: `translate(${x + rnd(-30, 30)}px,-30px)`, opacity: 0 }], { duration: dur, iterations: Infinity, delay: -rnd(0, dur), easing: "ease-in" }); } catch (e) { /* abaikan */ }
     }
     return Promise.resolve();
+  }
+
+  // ------------------------------------------------------------
+  //  🔢 Hitung Hewan (book192): "Coba hitung jumlahnya ya!" -> kuda, gajah, ayam, anak (cowok/cewek ACAK) dan logo pojok kiri atas
+  //  muncul satu-satu di tempat ACAK (kecil, tulisan di belakang tetap terbaca). Jumlah tiap jenis ACAK 1-8 (beda tiap kali).
+  //  Di akhir: "Sudah tahu jumlahnya?" -> tiap jenis + jumlahnya diumumkan satu per satu di bawah.
+  // ------------------------------------------------------------
+  async function countGame(text) {
+    const layer = makeLayer();
+    let dead = false;
+    const clean = register(layer, () => { dead = true; });
+    const W = vw(), H = vh(), vm = Math.min(W, H);
+    const size = Math.max(40, Math.min(84, vm * 0.085));
+    const logoEl = document.getElementById("cornerLogo");
+    const logoSrc = logoEl && logoEl.getAttribute("src") ? logoEl.src : "";
+    const boy = Math.random() < 0.5;
+    const cats = [
+      { html: "🐴", name: "kuda" }, { html: "🐘", name: "gajah" }, { html: "🐔", name: "ayam" },
+      { html: boy ? "👦" : "👧", name: boy ? "anak laki-laki" : "anak perempuan" },
+    ];
+    if (logoSrc.length > 30) cats.push({ img: logoSrc, name: "logo" });
+    let counts; do { counts = cats.map(() => ri(1, 8)); } while (new Set(counts).size < 2);
+    const mk = (c, px) => { const d = document.createElement("div"); d.className = "ff-cnt-item"; if (c.img) { const im = document.createElement("img"); im.src = c.img; im.style.width = px * 2 + "px"; im.style.height = "auto"; im.style.maxHeight = px * 1.2 + "px"; d.appendChild(im); } else { d.textContent = c.html; d.style.fontSize = px + "px"; } return d; };
+    const pill = document.createElement("div"); pill.className = "ff-pill"; pill.style.left = "50%"; pill.style.top = "3vh"; pill.style.transform = "translateX(-50%)"; layer.appendChild(pill);
+    const say = (t) => { pill.textContent = t; animate(pill, [{ opacity: 0 }, { opacity: 1 }], { duration: 400, fill: "forwards" }); };
+    say(text || "🔎 Coba hitung jumlahnya ya!");
+    await sleep(3500); if (dead) return;
+    say("👀 Hitung dalam hati… jangan bilang dulu ya!");
+    const order = [];
+    cats.forEach((c, ci) => { for (let k = 0; k < counts[ci]; k++) order.push(c); });
+    shuffle(order);
+    const placed = [];
+    for (const c of order) {
+      let x = 0, y = 0;
+      for (let t = 0; t < 60; t++) {
+        x = rnd(W * 0.03, W * 0.97 - size * 2); y = rnd(H * 0.14, H * 0.76 - size); // sisakan pita bawah untuk jawaban
+        const inText = y + size > H * 0.34 && y < H * 0.68; // pita tengah = tempat tulisan -- dihindari dulu (40 percobaan pertama), baru boleh bila penuh
+        if (inText && t < 30) continue;
+        if (placed.every((q) => Math.hypot(q.x - x, q.y - y) > size * 0.95)) break;
+      }
+      placed.push({ x, y });
+      const it = mk(c, size); it.style.left = x + "px"; it.style.top = y + "px"; layer.appendChild(it);
+      try { tone(380 + rnd(0, 320), 0, 0.15, "sine", 0.05); } catch (e) { /* suara opsional */ }
+      await animate(it, [{ transform: "scale(0) rotate(-20deg)", opacity: 0 }, { transform: "scale(1.2) rotate(6deg)", opacity: 1, offset: 0.7 }, { transform: "scale(1) rotate(0)", opacity: 1 }], { duration: 450, easing: "ease-out", fill: "forwards" });
+      if (dead) return;
+      try { it.animate([{ translate: "0 0" }, { translate: `0 ${rnd(-6, 6)}px` }, { translate: "0 0" }], { duration: rnd(2500, 4000), iterations: Infinity }); } catch (e) { /* abaikan */ }
+      await sleep(550); if (dead) return;
+    }
+    await sleep(2500); if (dead) return;
+    say("🤔 Sudah tahu jumlahnya? Ini jawabannya!");
+    await sleep(2500); if (dead) return;
+    const res = document.createElement("div"); res.className = "ff-cnt-res"; layer.appendChild(res);
+    for (let ci = 0; ci < cats.length; ci++) {
+      const chip = document.createElement("div"); chip.className = "ff-cnt-chip";
+      const ic = mk(cats[ci], 40); ic.style.position = "static"; ic.style.filter = "none"; ic.style.fontSize = "1em"; if (cats[ci].img) { ic.firstChild.style.width = "2.4em"; ic.firstChild.style.height = "auto"; ic.firstChild.style.maxHeight = "1.2em"; }
+      chip.appendChild(ic); chip.appendChild(document.createTextNode(" × " + counts[ci])); res.appendChild(chip);
+      try { tone(587 + ci * 70, 0, 0.3, "triangle", 0.07); } catch (e) { /* suara opsional */ }
+      await animate(chip, [{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.15)", opacity: 1, offset: 0.7 }, { transform: "scale(1)", opacity: 1 }], { duration: 500, fill: "forwards" });
+      await sleep(2200); if (dead) return;
+    }
+    say("🎉 Hebat! Cocok dengan hitunganmu?");
+    await sleep(15000); if (dead) return;
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 1000, fill: "forwards" });
+    clean();
+  }
+
+  // ------------------------------------------------------------
+  //  🙏 Amin (book193): 4 varian singkat -- bersama (3 orang), pria, wanita, anak-anak. Gambar kecil (sebesar boneka bengong) muncul di bawah,
+  //  mengangguk sambil berdoa + gelembung "Amin!", ~2,5 detik lalu hilang. TIDAK menghentikan efek/lagu lain; menekan lagi mengganti Amin sebelumnya.
+  //  Suara: link/berkas milik operator (Panel Efek > bagian "Suara", kunci amen_all/male/female/kids); kosong = suara sintesis bawaan.
+  // ------------------------------------------------------------
+  let amenClean = null;
+  async function amen(id) {
+    if (amenClean) amenClean();
+    const layer = makeLayer();
+    let dead = false;
+    const clean = register(layer, () => { dead = true; });
+    amenClean = clean;
+    const kids = ["👦", "👧", "🧒"];
+    const people = id === "amen-male" ? ["👨"] : id === "amen-female" ? ["👩"] : id === "amen-kids" ? [pick(kids), pick(kids)] : ["👨", "👩", pick(kids)];
+    const fig = document.createElement("div"); fig.className = "ff-amen-fig";
+    fig.style.left = rnd(vw() * 0.12, vw() * 0.7) + "px";
+    const bub = document.createElement("div"); bub.className = "ff-amen-bub"; bub.textContent = "Amin!";
+    const row = document.createElement("div"); row.className = "ff-amen-row";
+    const els = people.map((e) => { const d = document.createElement("div"); d.className = "ff-amen-p"; d.innerHTML = `<div>${e}</div><div class="ff-amen-hands">🙏</div>`; row.appendChild(d); return d; });
+    fig.appendChild(bub); fig.appendChild(row); layer.appendChild(fig);
+    await animate(fig, [{ transform: "translateY(120%)", opacity: 0 }, { transform: "translateY(-6%)", opacity: 1, offset: 0.7 }, { transform: "translateY(0)", opacity: 1 }], { duration: 380, easing: "ease-out", fill: "forwards" });
+    if (dead) return;
+    animate(bub, [{ transform: "scale(0)" }, { transform: "scale(1.15)" }, { transform: "scale(1)" }], { duration: 300, fill: "backwards" });
+    els.forEach((d, i) => animate(d, [{ transform: "rotate(0)" }, { transform: "rotate(7deg) translateY(4%)" }, { transform: "rotate(0)" }, { transform: "rotate(-6deg) translateY(3%)" }, { transform: "rotate(0)" }], { duration: 1500, delay: i * 90 }));
+    for (let i = 0; i < 6; i++) { const e = document.createElement("div"); e.className = "ff-p"; e.textContent = "✨"; e.style.fontSize = ri(16, 26) + "px"; layer.appendChild(e); const x0 = parseFloat(fig.style.left) + rnd(0, 140); animate(e, [{ transform: `translate(${x0}px,${vh() * 0.8}px)`, opacity: 1 }, { transform: `translate(${x0 + rnd(-30, 30)}px,${vh() * 0.5}px)`, opacity: 0 }], { duration: rnd(1200, 2000), delay: rnd(0, 600), fill: "forwards" }); }
+    await sleep(2200); if (dead) return;
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 450, fill: "forwards" });
+    if (amenClean === clean) amenClean = null;
+    clean();
+  }
+
+  // ------------------------------------------------------------
+  //  🙌 Seru Nama Tuhan (book193): beberapa orang (pria/wanita/tua/anak) mengangkat tangan di bawah layar, gelembung "O Tuhan Yesus!" bergantian
+  //  (kolom teks efek = kalimat serunya), cahaya keemasan lembut + kilau naik. ~9 detik. Kecil & transparan, tulisan di belakang tetap terbaca.
+  // ------------------------------------------------------------
+  async function callLord(text) {
+    const layer = makeLayer();
+    let dead = false;
+    const clean = register(layer, () => { dead = true; });
+    const W = vw(), H = vh();
+    const label = text || "O Tuhan Yesus!";
+    const glow = document.createElement("div"); glow.className = "ff-cl-glow"; layer.appendChild(glow);
+    animate(glow, [{ opacity: 0 }, { opacity: 1 }], { duration: 1200, fill: "forwards" });
+    const pool = shuffle(["👨", "👩", "👴", "👵", "🧒", "👧", "👦", "🧑"]);
+    const n = 6;
+    const els = [];
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement("div"); d.className = "ff-cl-p";
+      d.style.left = (W * (0.07 + (0.86 * i) / (n - 1)) - 40 + rnd(-12, 12)) + "px";
+      d.innerHTML = `<div class="ff-cl-hands">🙌</div><div>${pool[i]}</div>`;
+      layer.appendChild(d); els.push(d);
+      animate(d, [{ transform: "translateY(120%)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], { duration: 500, delay: i * 220, easing: "ease-out", fill: "both" });
+      try { d.firstChild.animate([{ transform: "translateY(0)" }, { transform: "translateY(-8%)" }, { transform: "translateY(0)" }], { duration: rnd(1100, 1600), iterations: Infinity, delay: 1200 + i * 120 }); } catch (e) { /* abaikan */ }
+    }
+    await sleep(1500); if (dead) return;
+    const order = shuffle(els.slice());
+    for (let k = 0; k < 4; k++) {
+      const who = order[k % order.length];
+      const b = document.createElement("div"); b.className = "ff-amen-bub"; b.textContent = label; b.style.cssText = `position:absolute;white-space:nowrap;left:${parseFloat(who.style.left) - 20}px;bottom:${vh() * 0.02 + Math.min(vw(), vh()) * 0.17}px`;
+      layer.appendChild(b);
+      b.style.left = Math.max(4, Math.min(vw() - b.offsetWidth - 4, parseFloat(who.style.left) + 40 - b.offsetWidth / 2)) + "px"; // pusatkan di atas orangnya
+      animate(b, [{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1.1)", opacity: 1, offset: 0.3 }, { transform: "scale(1)", opacity: 1, offset: 0.85 }, { transform: "scale(1)", opacity: 0 }], { duration: 2000, fill: "forwards" });
+      for (let q = 0; q < 4; q++) { const e = document.createElement("div"); e.className = "ff-p"; e.textContent = pick(["✨", "⭐", "🌟"]); e.style.fontSize = ri(16, 28) + "px"; layer.appendChild(e); const x0 = parseFloat(who.style.left) + rnd(0, 60); animate(e, [{ transform: `translate(${x0}px,${H * 0.85}px)`, opacity: 1 }, { transform: `translate(${x0 + rnd(-40, 40)}px,${H * 0.45}px)`, opacity: 0 }], { duration: rnd(1800, 2800), delay: rnd(0, 800), fill: "forwards" }); }
+      await sleep(1500); if (dead) return;
+    }
+    await sleep(1200); if (dead) return;
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 900, fill: "forwards" });
+    clean();
+  }
+
+  // ------------------------------------------------------------
+  //  ☀️ Matahari (book193): TANPA SUARA. Bagian atas layar menjadi lebih terang -- cahaya matahari bergeser pelan, sinar berayun, kilauan
+  //  berkedip -- dan tulisan tampak TIMBUL 3D keemasan (hanya warna & bayangan; isi tulisan tidak berubah). Sekilas (~10 detik) lalu kembali normal.
+  // ------------------------------------------------------------
+  async function sun() {
+    const layer = makeLayer();
+    let dead = false;
+    const clean = register(layer, () => { dead = true; document.body.classList.remove("fx-sun", "fx-sun-out"); });
+    document.body.classList.add("fx-sun");
+    const W = vw(), H = vh();
+    const glow = document.createElement("div"); glow.className = "ff-sun-glow"; layer.appendChild(glow);
+    const rays = document.createElement("div"); rays.className = "ff-sun-rays"; layer.appendChild(rays);
+    animate(glow, [{ opacity: 0 }, { opacity: 1 }], { duration: 1200, fill: "forwards" });
+    animate(rays, [{ opacity: 0 }, { opacity: 0.9 }], { duration: 1500, fill: "forwards" });
+    try { glow.animate([{ transform: "translateX(0)" }, { transform: `translateX(${W * 0.75}px)` }], { duration: 5500, direction: "alternate", iterations: Infinity, easing: "ease-in-out" }); } catch (e) { /* abaikan */ }
+    try { rays.animate([{ transform: "rotate(-5deg)" }, { transform: "rotate(5deg)" }], { duration: 4000, direction: "alternate", iterations: Infinity, easing: "ease-in-out" }); } catch (e) { /* abaikan */ }
+    for (let i = 0; i < 16; i++) {
+      const g = document.createElement("div"); g.className = "ff-sun-glint"; g.style.setProperty("--s", ri(12, 30) + "px");
+      g.style.left = rnd(0, W) + "px"; g.style.top = rnd(0, H * 0.5) + "px"; layer.appendChild(g);
+      try { g.animate([{ opacity: 0, transform: "scale(.3) rotate(0)" }, { opacity: 1, transform: "scale(1) rotate(45deg)" }, { opacity: 0, transform: "scale(.3) rotate(90deg)" }], { duration: rnd(1400, 2600), iterations: Infinity, delay: rnd(0, 2500) }); } catch (e) { /* abaikan */ }
+    }
+    await sleep(10000); if (dead) return;
+    document.body.classList.remove("fx-sun"); document.body.classList.add("fx-sun-out");
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 1200, fill: "forwards" });
+    clean();
   }
 
   // ------------------------------------------------------------
@@ -527,8 +739,11 @@ const FunFX = (function () {
     if (id === "stop") { stopAll(); return Promise.resolve(); }
     const effect = LIST.filter((e) => e.id === id)[0];
     if (!effect) return Promise.resolve();
-    stopAll();
+    if (id.indexOf("amen") !== 0) stopAll(); // book193: Amin singkat tidak menghentikan efek lain
     playSound(effect, o.src);
+    if (id.indexOf("amen") === 0) return amen(id);
+    if (id === "call-lord") return callLord(o.text);
+    if (id === "sun") return sun();
     if (id === "party-bottom") return party(false, o.text);
     if (id === "party-top") return party(true, o.text);
     if (id === "golden") return golden(o.text);
@@ -536,6 +751,7 @@ const FunFX = (function () {
     if (id === "shush") return shush();
     if (id === "icecream") return iceCream(o.text, o.seconds);
     if (id === "aquarium") return aquarium(o.text);
+    if (id === "count") return countGame(o.text);
     return Promise.resolve();
   }
 
@@ -557,7 +773,7 @@ const FunFX = (function () {
       b.type = "button"; b.className = "chip-btn small";
       b.textContent = e.icon + " " + e.label;
       b.addEventListener("click", () => {
-        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium";
+        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium" || e.id === "count" || e.id === "call-lord";
         onPick(e.id, { src: e.song ? getSongUrl(e.song) : "", text: withText ? textIn.value.trim() : "", seconds: Number(secIn.value) || 12 });
       });
       row.appendChild(b);
@@ -584,9 +800,22 @@ const FunFX = (function () {
       const inp = document.createElement("input");
       inp.type = "text"; inp.className = "ps-input"; inp.style.cssText = "flex:1; min-width:140px;";
       inp.placeholder = "Link MP3 / Google Drive (kosong = suara bawaan)";
-      inp.value = getSongUrl(k);
-      inp.addEventListener("change", () => setSongUrl(k, inp.value.trim()));
-      line.appendChild(lab); line.appendChild(inp);
+      const cur = getSongUrl(k);
+      inp.value = cur.indexOf("data:") === 0 ? "(berkas tersimpan di perangkat ini -- kosongkan untuk menghapus)" : cur;
+      inp.addEventListener("change", () => { const v = inp.value.trim(); if (v.indexOf("(berkas") === 0) return; setSongUrl(k, v); });
+      // book193 -- 📁 pilih berkas suara langsung dari komputer (disimpan di perangkat ini, <= ~1,5 MB; untuk yang lebih besar pakai link MP3/Drive).
+      const pickBtn = document.createElement("button");
+      pickBtn.type = "button"; pickBtn.className = "chip-btn small"; pickBtn.textContent = "📁 Pilih berkas"; pickBtn.title = "Pilih berkas suara (MP3/WAV/M4A) dari komputer";
+      const fileIn = document.createElement("input"); fileIn.type = "file"; fileIn.accept = "audio/*"; fileIn.style.display = "none";
+      pickBtn.addEventListener("click", () => fileIn.click());
+      fileIn.addEventListener("change", () => {
+        const f = fileIn.files && fileIn.files[0]; if (!f) return;
+        if (f.size > 1.5 * 1024 * 1024) { alert("Berkas terlalu besar (" + (f.size / 1048576).toFixed(1) + " MB). Batas ±1,5 MB supaya muat di penyimpanan browser.\nPakai berkas yang lebih pendek/kecil, atau isi kolom dengan link MP3 / Google Drive."); fileIn.value = ""; return; }
+        const rd = new FileReader();
+        rd.onload = () => { try { localStorage.setItem(LS_PREFIX + k, String(rd.result)); inp.value = "(berkas tersimpan di perangkat ini -- kosongkan untuk menghapus)"; } catch (e) { alert("Penyimpanan browser penuh -- berkas tidak tersimpan. Coba berkas yang lebih kecil atau pakai link."); } };
+        rd.readAsDataURL(f); fileIn.value = "";
+      });
+      line.appendChild(lab); line.appendChild(inp); line.appendChild(pickBtn); line.appendChild(fileIn);
       box.appendChild(line);
     });
     return box;
@@ -651,16 +880,36 @@ const FunFX = (function () {
    dipasang per BARIS (box-decoration-break: clone) supaya SEMUA huruf emas. */
 .ff-gold-text{width:92vw;margin:10px 0 0 calc(50% - 46vw);text-align:center;font:900 clamp(26px,6.5vw,72px)/1.12 system-ui,sans-serif;letter-spacing:.04em;white-space:normal;overflow-wrap:anywhere;filter:drop-shadow(0 4px 10px #0009)}
 .ff-gold-text span{display:inline;-webkit-box-decoration-break:clone;box-decoration-break:clone;background:linear-gradient(180deg,#fff6b0,#ffd23f 50%,#e8b020);-webkit-background-clip:text;background-clip:text;color:#ffd23f;-webkit-text-fill-color:transparent;-webkit-text-stroke:2px #6b4c06;paint-order:stroke fill}
-/* book191: efek penenang anak */
-.ff-ic-bg{position:absolute;inset:0;background:linear-gradient(180deg,#ffe9f3,#fff6e0 60%,#e8f7ff);opacity:0}
-.ff-ic-title{position:absolute;left:4vw;right:4vw;top:3vh;text-align:center;font:800 clamp(22px,3.6vw,48px)/1.15 system-ui,sans-serif;color:#b5476f;text-shadow:0 2px 0 #fff}
-.ff-ic-stack{position:absolute;left:50%;bottom:6vh;width:30vmin;height:84vmin;transform:translateX(-50%)}
-.ff-ic-cone{position:absolute;left:0;bottom:0;width:100%;height:30vmin}
-.ff-ic-scoop{position:absolute;left:3%;width:94%;aspect-ratio:1;border-radius:50% 50% 46% 46%;box-shadow:inset -1.2vmin -1.6vmin 0 #0002,inset 1vmin 1.2vmin 0 #fff5}
-.ff-ic-count{position:absolute;left:0;right:0;bottom:1.5vh;text-align:center;font:700 clamp(16px,2.6vw,32px) system-ui,sans-serif;color:#8a5a6e}
-.ff-aq-bg{position:absolute;inset:0;background:linear-gradient(180deg,#9fdcff,#3d9be0 55%,#14507f);opacity:0}
-.ff-aq-fish{position:absolute;left:0;font-size:clamp(40px,9vmin,110px);will-change:transform;filter:drop-shadow(0 4px 6px #0003)}
-.ff-aq-bub{position:absolute;bottom:-40px;border-radius:50%;border:2px solid #ffffffaa;background:#ffffff33}
+/* book191/192: efek penenang anak -- TRANSPARAN & KECIL (tulisan di belakang tetap terbaca) */
+.ff-pill{position:absolute;width:max-content;max-width:34vw;padding:.3em .8em;border-radius:999px;background:#ffffffd9;color:#7a3556;font:800 clamp(13px,1.8vw,22px)/1.2 system-ui,sans-serif;box-shadow:0 2px 10px #0003;text-align:center}
+.ff-ic2{position:absolute;right:3vw;bottom:2vh;pointer-events:none}
+.ff-ic2 svg{position:absolute;overflow:visible;filter:drop-shadow(0 2px 3px #0003)}
+.ff-aq-fish{position:absolute;left:0;top:0;font-size:clamp(34px,6.5vmin,72px);will-change:transform;opacity:.92;filter:drop-shadow(0 2px 4px #0003)}
+.ff-aq-bub{position:absolute;left:0;top:0;border-radius:50%;border:2px solid #ffffffcc;background:#ffffff33}
+.ff-cnt-item{position:absolute;line-height:1;opacity:.92;will-change:transform;filter:drop-shadow(0 2px 4px #0003)}
+.ff-cnt-item img{display:block;object-fit:contain}
+.ff-cnt-res{position:absolute;left:50%;bottom:2.5vh;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:10px;justify-content:center;width:max-content;max-width:94vw}
+.ff-cnt-chip{display:flex;align-items:center;gap:.3em;padding:.15em .6em;border-radius:999px;background:#ffffffe6;color:#3b2a14;font:900 clamp(18px,2.8vw,34px)/1.1 system-ui,sans-serif;box-shadow:0 2px 10px #0004}
+.ff-cnt-chip img{height:1.1em;width:auto}
+/* book193: Amin, Seru Nama Tuhan, Matahari */
+.ff-amen-fig{position:absolute;bottom:3vh;display:flex;flex-direction:column;align-items:center;will-change:transform}
+.ff-amen-row{display:flex;align-items:flex-end;gap:.08em;font-size:clamp(70px,13vmin,130px);line-height:1}
+.ff-amen-p{display:flex;flex-direction:column;align-items:center;transform-origin:50% 100%}
+.ff-amen-hands{margin-top:-.5em;font-size:.45em;line-height:1}
+.ff-amen-bub{position:relative;padding:.12em .7em;margin-bottom:.35em;border-radius:999px;background:#fffffff2;color:#6a3d1f;font:900 clamp(20px,3.2vw,40px)/1.1 system-ui,sans-serif;box-shadow:0 2px 10px #0004}
+.ff-amen-bub::after{content:"";position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:#fffffff2;transform:translateX(-50%) rotate(45deg)}
+.ff-cl-glow{position:absolute;left:0;right:0;bottom:0;height:38vh;background:radial-gradient(ellipse at 50% 100%,#ffe9a8aa,#ffd86b44 45%,transparent 72%);opacity:0}
+.ff-cl-p{position:absolute;bottom:2vh;display:flex;flex-direction:column;align-items:center;font-size:clamp(50px,9.5vmin,96px);line-height:1}
+.ff-cl-hands{font-size:.5em;margin-bottom:-.12em}
+.ff-sun-glow{position:absolute;top:-26vh;left:-20vw;width:70vw;height:80vh;background:radial-gradient(ellipse at 50% 30%,#fff7d0cc,#ffe08a66 38%,transparent 72%);mix-blend-mode:screen;opacity:0}
+.ff-sun-rays{position:absolute;left:0;right:0;top:0;height:75vh;background:repeating-conic-gradient(from -30deg at 30% -12%,#fff3b04d 0 5deg,transparent 5deg 13deg);-webkit-mask-image:linear-gradient(#000,transparent 78%);mask-image:linear-gradient(#000,transparent 78%);mix-blend-mode:screen;opacity:0}
+.ff-sun-glint{position:absolute;width:var(--s,16px);height:var(--s,16px);opacity:0;background:radial-gradient(circle,#fff 0 18%,#fff7c8aa 30%,transparent 62%);clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%)}
+body.fx-sun #text,body.fx-sun #ref,body.fx-sun #refSub{transition:color 1s,text-shadow 1s}
+body.fx-sun-out #text,body.fx-sun-out #ref,body.fx-sun-out #refSub{transition:color 1.1s,text-shadow 1.1s}
+/* teks tampak 3D (timbul keemasan) selama Matahari menyala -- isi tulisan TIDAK berubah, hanya warna & bayangan */
+body.fx-sun #text,body.fx-sun #text .verse-version-block{color:#fff0b8 !important}
+body.fx-sun #text,body.fx-sun #ref,body.fx-sun #refSub,body.fx-sun #text .verse-version-block{animation:ffSun3d 3.2s ease-in-out infinite alternate;text-shadow:.02em .02em 0 #d9a21b,.04em .04em 0 #c58f12,.06em .06em 0 #b07c0c,.08em .09em .08em #000a,0 0 .35em #ffd86b99}
+@keyframes ffSun3d{from{text-shadow:.02em .02em 0 #d9a21b,.04em .04em 0 #c58f12,.06em .06em 0 #b07c0c,.08em .09em .08em #000a,-.05em -.04em .3em #ffe9a8aa}to{text-shadow:.02em .02em 0 #e6b02a,.04em .04em 0 #d19a1a,.06em .06em 0 #bb8814,.08em .09em .08em #000a,.08em -.04em .5em #fff3c8}}
 .ff-walker{position:absolute;left:0;bottom:6px;width:clamp(90px,16vmin,150px);transform:translateX(-200px)}
 .ff-doll-svg{width:100%;display:block;overflow:visible}
 .ff-bubble{position:absolute;left:50%;bottom:100%;transform:translateX(-30%);margin-bottom:4px;background:#fff;color:#222;border:2px solid #333;border-radius:16px;padding:5px 12px;font:600 clamp(14px,2.4vmin,22px)/1.2 system-ui,sans-serif;white-space:nowrap;box-shadow:0 3px 10px #0004;animation:ffBub .9s ease-in-out infinite alternate}
@@ -709,7 +958,9 @@ const FunFX = (function () {
 @media (prefers-reduced-motion:reduce){.ff-walking .ff-leg-l,.ff-walking .ff-leg-r,.ff-bengong .ff-w-head{animation:none}}
 `;
 
-  return { LIST, play, stopAll, configure, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
+    // book193: dipakai tombol cepat F5-F8 di Studio -- mengembalikan {name, src} untuk dikirim ke Layar 2.
+  function quick(id) { const e = LIST.filter((x) => x.id === id)[0]; return e ? { name: e.id, src: e.song ? getSongUrl(e.song) : "" } : null; }
+  return { LIST, quick, play, stopAll, configure, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
 })();
 
 if (typeof window !== "undefined") {
