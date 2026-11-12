@@ -298,9 +298,19 @@ const PresentationStudio = (() => {
   // (js/shortcuts.js) supaya bisa dilihat & diganti lewat ikon ⚙️ di bar atas Studio. Bawaan memakai Alt+Shift+huruf (bukan F5 --
   // F5 = refresh browser, dan bukan huruf polos -- supaya tidak pernah menyala sendiri waktu mengetik).
   // ------------------------------------------------------------
+  // BARU (book195) -- SATU perintah "hentikan semuanya": semua efek layar (Amin, Matahari, tulisan timbul, es krim, dst) + suara berkas + lagu efek
+  // + efek suara + bel di Layar 2. Dipakai tombol "⏹ HENTIKAN SEMUA" (Panel Efek), tombol merah di bar atas Studio, dan pintasan keyboard "fx-stop".
+  // (Audio Latar / YouTube / video TIDAK ikut dihentikan -- itu punya tombol sendiri.)
+  window.__psStopAllFx = function () {
+    rawPost({ type: "funfx", name: "stop" });   // Layar 2: FunFX.stopAll() -> layer efek + lagu + SoundFX.stopAllPlayback()
+    rawPost({ type: "bell", action: "stop" });  // bel (Timer/Bel Cepat)
+  };
   (function registerEffectShortcuts_() {
+    const topStop = el("psFxStopTop");
+    if (topStop) topStop.addEventListener("click", () => window.__psStopAllFx());
     if (!window.PSShortcuts || typeof FunFX === "undefined") return;
-    const send = (id) => { if (id === "stop") { rawPost({ type: "funfx", name: "stop" }); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12 }); };
+    if (topStop) topStop.addEventListener("mouseenter", () => { topStop.title = "Hentikan SEMUA efek, suara, lagu & bel di Layar 2 (pintasan: " + window.PSShortcuts.pretty(window.PSShortcuts.getCombo("fx-stop")) + ")"; });
+    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined }); };
     [
       ["fx-amen-all", "Amin bersama (suara + gambar)", "amen-all", "alt+shift+z"],
       ["fx-amen-male", "Amin pria", "amen-male", "alt+shift+x"],
@@ -311,7 +321,7 @@ const PresentationStudio = (() => {
       ["fx-word-amen", "Tulisan AMIN timbul besar (silau 3D)", "word-amen", "alt+shift+a"],
       ["fx-word-haleluya", "Tulisan HALELUYA timbul besar (silau 3D)", "word-haleluya", "alt+shift+h"],
       ["fx-word-lord", "Tulisan O TUHAN YESUS timbul besar (silau 3D)", "word-lord", "alt+shift+o"],
-      ["fx-stop", "Hentikan semua efek layar", "stop", "alt+shift+q"],
+      ["fx-stop", "⏹ HENTIKAN SEMUA efek, suara, lagu & bel", "stop", "alt+shift+q"],
     ].forEach(([id, label, fx, def]) => window.PSShortcuts.registerAction({ id, group: "Efek Layar", label, def, run: () => send(fx) }));
   })();
   // Dipakai wireSlideDisplayModeControls_() supaya klik tombol
@@ -9500,7 +9510,10 @@ const PresentationStudio = (() => {
     markActiveShoutColor_();
     // BARU (book184) -- 🎉 Efek Layar Ria (js/fun-fx.js): tombol dibangun FunFX, dikirim ke Layar 2.
     if (typeof FunFX !== "undefined" && el("psFunFxGrid")) {
-      FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12 }));
+      FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => {
+        if (name === "stop") { window.__psStopAllFx(); return; } // book195: Hentikan = semua efek + suara + lagu + bel
+        rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12, wstyle: typeof FunFX.getWordStyle === "function" ? FunFX.getWordStyle() : undefined });
+      });
     }
     document.querySelectorAll("[data-shout]").forEach((btn) => {
       btn.addEventListener("click", () => rawPost({ type: "shout", text: btn.dataset.shout, color: shoutColor_ }));

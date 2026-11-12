@@ -88,7 +88,8 @@ const FunFX = (function () {
     running.push(clean);
     return clean;
   }
-  function stopAll() { running.slice().forEach((f) => f()); stopSong(); }
+  // book195: ikut menghentikan SEMUA suara berkas yang sedang bunyi (Amin, Seru Nama Tuhan, lagu efek, efek suara) lewat cfg.stopAudio (SoundFX.stopAllPlayback).
+  function stopAll() { running.slice().forEach((f) => f()); stopSong(); try { if (cfg.stopAudio) cfg.stopAudio(); } catch (e) { /* abaikan */ } }
 
   // ------------------------------------------------------------
   //  Audio (disintesis) + lagu kustom
@@ -171,6 +172,14 @@ const FunFX = (function () {
   function stopSong() {
     if (songEl) { try { songEl.pause(); } catch (e) { /* abaikan */ } songEl = null; }
   }
+  // book195 -- batas durasi putar per suara (detik; 0 = putar penuh). Suara "Amin" bawaan dipotong 8 detik supaya berkas panjang (mis. 3 menit)
+  // tidak terus bunyi; bisa diubah di kolom "✂️ potong" tiap baris suara.
+  const MAX_DEFAULT = { amen_all: 8, amen_male: 8, amen_female: 8, amen_kids: 8, call_lord: 12 };
+  function getSongMax(song) {
+    try { const v = localStorage.getItem(LS_PREFIX + "max_" + song); if (v !== null && v !== "") return Math.max(0, Number(v) || 0); } catch (e) { /* abaikan */ }
+    return MAX_DEFAULT[song] || 0;
+  }
+  function setSongMax(song, n) { try { localStorage.setItem(LS_PREFIX + "max_" + song, String(Math.max(0, Number(n) || 0))); } catch (e) { /* abaikan */ } }
   function getSongUrl(song) { try { return localStorage.getItem(LS_PREFIX + song) || ""; } catch (e) { return ""; } }
   function setSongUrl(song, url) {
     try { if (url) localStorage.setItem(LS_PREFIX + song, url); else localStorage.removeItem(LS_PREFIX + song); } catch (e) { /* abaikan */ }
@@ -185,9 +194,11 @@ const FunFX = (function () {
       const url = srcOverride || (effect.song ? getSongUrl(effect.song) : "");
       if (url) {
         if (effect.id.indexOf("amen") !== 0) stopSong(); // book193: Amin singkat tidak memotong lagu/efek lain yang sedang jalan
-        if (cfg.playUrl) { cfg.playUrl(normalizeUrl(url)); return; }
+        if (cfg.playUrl) { cfg.playUrl(normalizeUrl(url), { maxSec: effect.song ? getSongMax(effect.song) : 0 }); return; }
         songEl = new Audio(normalizeUrl(url));
         songEl.volume = 1;
+        const mx = effect.song ? getSongMax(effect.song) : 0;
+        if (mx > 0) { const el = songEl; setTimeout(() => { try { el.pause(); } catch (e) { /* abaikan */ } }, mx * 1000); }
         const p = songEl.play();
         if (p && p.catch) p.catch(() => {});
         return;
@@ -743,13 +754,31 @@ const FunFX = (function () {
   //   (2) lapisan SILAU 3D: kata timbul bertumpuk bayangan + kilat cahaya yang menyapu (seperti efek Matahari), samar tapi terlihat
   //       juga di latar gelap. Tanpa suara. ~5 detik. Kolom teks efek (Studio) bisa mengganti katanya.
   // ------------------------------------------------------------
+  // book195 -- gaya tulisan timbul bisa diatur operator: warna tiap kata, font, jumlah kedip (bawaan 3), tahan sampai Hentikan.
+  function hexMix(h, to, k) {
+    const p = (x) => parseInt(x, 16), a = /^#?([0-9a-f]{6})$/i.exec(String(h || ""));
+    if (!a) return h;
+    const c = a[1], t = /^#?([0-9a-f]{6})$/i.exec(to)[1];
+    const m = (i) => Math.round(p(c.substr(i, 2)) * (1 - k) + p(t.substr(i, 2)) * k).toString(16).padStart(2, "0");
+    return "#" + m(0) + m(2) + m(4);
+  }
+  const WORD_DEFAULT_COLOR = { "word-amen": "#ffc83d", "word-haleluya": "#7fd0ff", "word-lord": "#ff9d8a" };
+  function getWordStyle() {
+    let o = {}; try { o = JSON.parse(localStorage.getItem(LS_PREFIX + "wordstyle") || "{}") || {}; } catch (e) { o = {}; }
+    return { colors: Object.assign({}, WORD_DEFAULT_COLOR, o.colors || {}), font: o.font || "", blinks: Math.max(1, Math.min(9, Number(o.blinks) || 3)), hold: !!o.hold };
+  }
+  function setWordStyle(st) { try { localStorage.setItem(LS_PREFIX + "wordstyle", JSON.stringify(st)); } catch (e) { /* abaikan */ } }
   const WORDS = {
     "word-amen": { t: "AMIN", a: "#fff3b0", b: "#ffc83d", c: "#e08a00", sh: "#b36b00", glow: "#ffd23f" },
     "word-haleluya": { t: "HALELUYA", a: "#e8f8ff", b: "#7fd0ff", c: "#2f8fe0", sh: "#1d5fa8", glow: "#8fd8ff" },
     "word-lord": { t: "O TUHAN YESUS", a: "#ffe3dc", b: "#ff9d8a", c: "#e0584a", sh: "#a8332a", glow: "#ffb3a3" },
   };
-  async function wordGlow(id, text) {
-    const P = WORDS[id]; if (!P) return;
+  async function wordGlow(id, text, wst) {
+    let P = WORDS[id]; if (!P) return;
+    const st = wst || getWordStyle();
+    const base = (st.colors && st.colors[id]) || WORD_DEFAULT_COLOR[id];
+    P = Object.assign({}, P, { a: hexMix(base, "#ffffff", 0.6), b: base, c: hexMix(base, "#000000", 0.25), sh: hexMix(base, "#000000", 0.5), glow: hexMix(base, "#ffffff", 0.25) });
+    const FAM = st.font ? st.font + ',"Arial Black","Impact",system-ui,sans-serif' : '"Arial Black","Impact",system-ui,sans-serif';
     const word = String(text || P.t).toUpperCase().trim();
     const W = vw(), H = vh();
     let lines = [word];
@@ -757,7 +786,8 @@ const FunFX = (function () {
       let best = -1; for (let i = 0; i < word.length; i++) if (word[i] === " " && (best < 0 || Math.abs(i - word.length / 2) < Math.abs(best - word.length / 2))) best = i;
       if (best > 0) lines = [word.slice(0, best), word.slice(best + 1)];
     }
-    const FONT = '900 100px/1.02 "Arial Black","Impact",system-ui,sans-serif';
+    try { if (st.font && document.fonts && document.fonts.load) await Promise.race([document.fonts.load("900 100px " + st.font), sleep(1200)]); } catch (e) { /* font tidak ada -- pakai cadangan */ }
+    const FONT = "900 100px/1.02 " + FAM;
     const probe = document.createElement("span"); probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;letter-spacing:.04em;font:${FONT}`; document.body.appendChild(probe);
     let maxW = 1; lines.forEach((l) => { probe.textContent = l; maxW = Math.max(maxW, probe.getBoundingClientRect().width); }); probe.remove();
     const fs = Math.max(30, Math.min((W * 0.9) / maxW * 100, (H * 0.55) / (lines.length * 1.02)));
@@ -766,7 +796,7 @@ const FunFX = (function () {
     let dead = false;
     const c1 = register(tint, () => { dead = true; });
     const c2 = register(glare);
-    const mk = (layer, css) => { const d = document.createElement("div"); d.style.cssText = `position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;letter-spacing:.04em;font:900 ${fs}px/1.02 "Arial Black","Impact",system-ui,sans-serif;${css}`; d.innerHTML = lines.map(esc).join("<br>"); layer.appendChild(d); return d; };
+    const mk = (layer, css) => { const d = document.createElement("div"); d.style.cssText = `position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;letter-spacing:.04em;font:900 ${fs}px/1.02 ${FAM};${css}`; d.innerHTML = lines.map(esc).join("<br>"); layer.appendChild(d); return d; };
     mk(tint, `background:linear-gradient(180deg,${P.a},${P.b} 50%,${P.c});-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${P.b}`);
     const ex = mk(glare, `color:transparent;text-shadow:.012em .012em 0 ${P.b}cc,.024em .024em 0 ${P.c}cc,.036em .036em 0 ${P.sh}cc,.06em .07em .06em #0008;filter:drop-shadow(0 0 .05em ${P.glow})`);
     const sh = mk(glare, `background:linear-gradient(105deg,transparent 38%,#fff 50%,transparent 62%) 130% 0/300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent`);
@@ -776,8 +806,8 @@ const FunFX = (function () {
     animate(tint.firstChild, [{ transform: "translate(-50%,-50%) scale(.94)" }, { transform: "translate(-50%,-50%) scale(1.02)" }, { transform: "translate(-50%,-50%) scale(1)" }], { duration: 900, easing: "ease-out" });
     const sweep = () => { try { sh.animate([{ backgroundPosition: "130% 0" }, { backgroundPosition: "-30% 0" }], { duration: 1500, easing: "ease-in-out" }); } catch (e) { /* abaikan */ } };
     await sleep(500); if (dead) return;
-    sweep(); await sleep(1900); if (dead) return;
-    sweep(); await sleep(1700); if (dead) return;
+    for (let i = 0; i < st.blinks; i++) { sweep(); await sleep(1750); if (dead) return; } // kedip (kilat menyapu) sebanyak N kali, bawaan 3
+    if (st.hold) return; // "tahan": tetap tampil sampai ⏹ Hentikan (atau efek lain)
     await Promise.all([animate(tint, [{ opacity: 1 }, { opacity: 0 }], { duration: 800, fill: "forwards" }), animate(glare, [{ opacity: 0.6 }, { opacity: 0 }], { duration: 800, fill: "forwards" })]);
     c1(); c2();
   }
@@ -794,7 +824,7 @@ const FunFX = (function () {
     playSound(effect, o.src);
     if (id.indexOf("amen") === 0) return amen(id);
     if (id === "call-lord") return callLord(o.text);
-    if (id.indexOf("word-") === 0) return wordGlow(id, o.text);
+    if (id.indexOf("word-") === 0) return wordGlow(id, o.text, o.wstyle);
     if (id === "sun") return sun();
     if (id === "party-bottom") return party(false, o.text);
     if (id === "party-top") return party(true, o.text);
@@ -831,15 +861,55 @@ const FunFX = (function () {
       row.appendChild(b);
     });
     const stop = document.createElement("button");
-    stop.type = "button"; stop.className = "chip-btn small"; stop.textContent = "⏹ Hentikan";
+    stop.type = "button"; stop.className = "chip-btn"; stop.textContent = "⏹ HENTIKAN SEMUA (efek, suara, lagu, bel)";
+    stop.title = "Hentikan seketika semua efek layar + suara + lagu efek + bel di Layar 2";
+    stop.style.cssText = "width:100%; margin:0 0 8px; padding:8px 10px; font-weight:800; background:#c0392b; color:#fff; border:1px solid #922b21; border-radius:10px;";
     stop.addEventListener("click", () => onPick("stop", {}));
-    row.appendChild(stop);
+    container.appendChild(stop);
     container.appendChild(row);
     container.appendChild(textIn);
     const secLbl = document.createElement("div"); secLbl.className = "ps-pointer-hint"; secLbl.appendChild(secIn); secLbl.appendChild(document.createTextNode("detik per scoop (🍦 Es Krim Tenang, 6 scoop). Teks di atas dipakai sebagai judul efek 🍦/🐠 juga."));
     container.appendChild(secLbl);
+    container.appendChild(wordStyleEditor());
     container.appendChild(songEditor());
   }
+  // book195 -- pengaturan "Tulisan Timbul": warna tiap kata, font, jumlah kedip, tahan sampai Hentikan.
+  function wordStyleEditor() {
+    const box = document.createElement("div"); box.className = "ff-wordstyle"; box.style.cssText = "margin:10px 0; padding:8px; border:1px solid #e0cf9f; border-radius:10px; background:#fffaf0;";
+    const st = getWordStyle();
+    const save = () => setWordStyle(st);
+    const h = document.createElement("div"); h.style.cssText = "font-weight:800; margin-bottom:6px;"; h.textContent = "🎨 Gaya Tulisan Timbul (AMIN / HALELUYA / O TUHAN YESUS)"; box.appendChild(h);
+    const r1 = document.createElement("div"); r1.style.cssText = "display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:6px;";
+    [["word-amen", "AMIN"], ["word-haleluya", "HALELUYA"], ["word-lord", "O TUHAN YESUS"]].forEach(([id, lab]) => {
+      const w = document.createElement("label"); w.style.cssText = "display:flex; gap:4px; align-items:center; font-size:.85em;";
+      const c = document.createElement("input"); c.type = "color"; c.value = st.colors[id]; c.style.cssText = "width:34px; height:26px; padding:0; border:1px solid #c9a95a;";
+      c.addEventListener("input", () => { st.colors[id] = c.value; save(); });
+      w.appendChild(c); w.appendChild(document.createTextNode(" " + lab)); r1.appendChild(w);
+    });
+    const rs = document.createElement("button"); rs.type = "button"; rs.className = "chip-btn small"; rs.textContent = "↺ warna bawaan";
+    rs.addEventListener("click", () => { st.colors = Object.assign({}, WORD_DEFAULT_COLOR); save(); box.replaceWith(wordStyleEditor()); });
+    r1.appendChild(rs); box.appendChild(r1);
+    const r2 = document.createElement("div"); r2.style.cssText = "display:flex; gap:10px; flex-wrap:wrap; align-items:center;";
+    const fl = document.createElement("label"); fl.style.cssText = "font-size:.85em;"; fl.textContent = "Font: ";
+    const fs = document.createElement("select"); fs.className = "columns-lang-select"; fs.style.cssText = "max-width:230px;";
+    const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "Tebal bawaan (Arial Black / Impact)"; o0.style.fontFamily = "Arial Black, Impact, sans-serif"; fs.appendChild(o0);
+    const src = document.getElementById("psFontSelect");
+    if (src) Array.from(src.options).forEach((o) => { const op = document.createElement("option"); op.value = o.value; op.textContent = o.textContent; op.style.fontFamily = o.value; fs.appendChild(op); });
+    fs.value = st.font || ""; fs.style.fontFamily = st.font || "";
+    fs.addEventListener("change", () => { st.font = fs.value; fs.style.fontFamily = fs.value || ""; save(); });
+    fl.appendChild(fs); r2.appendChild(fl);
+    const bl = document.createElement("label"); bl.style.cssText = "font-size:.85em;"; bl.textContent = "Kedip: ";
+    const bn = document.createElement("input"); bn.type = "number"; bn.min = "1"; bn.max = "9"; bn.value = String(st.blinks); bn.className = "ps-input"; bn.style.cssText = "width:56px;";
+    bn.addEventListener("change", () => { st.blinks = Math.max(1, Math.min(9, Number(bn.value) || 3)); bn.value = String(st.blinks); save(); });
+    bl.appendChild(bn); bl.appendChild(document.createTextNode(" kali")); r2.appendChild(bl);
+    const hl = document.createElement("label"); hl.style.cssText = "font-size:.85em; display:flex; gap:4px; align-items:center;";
+    const hc = document.createElement("input"); hc.type = "checkbox"; hc.checked = !!st.hold;
+    hc.addEventListener("change", () => { st.hold = hc.checked; save(); });
+    hl.appendChild(hc); hl.appendChild(document.createTextNode(" tahan sampai Hentikan")); r2.appendChild(hl);
+    box.appendChild(r2);
+    return box;
+  }
+
   function songEditor() {
     const box = document.createElement("div");
     box.className = "ff-songs";
@@ -867,8 +937,35 @@ const FunFX = (function () {
         rd.onload = () => { try { localStorage.setItem(LS_PREFIX + k, String(rd.result)); inp.value = "(berkas tersimpan di perangkat ini -- kosongkan untuk menghapus)"; } catch (e) { alert("Penyimpanan browser penuh -- berkas tidak tersimpan. Coba berkas yang lebih kecil atau pakai link."); } };
         rd.readAsDataURL(f); fileIn.value = "";
       });
-      line.appendChild(lab); line.appendChild(inp); line.appendChild(pickBtn); line.appendChild(fileIn);
+      // book195 -- info DURASI suara yang sudah dimasukkan + batas potong otomatis.
+      const dur = document.createElement("span"); dur.style.cssText = "font-size:.8em; min-width:70px; color:#6b5a3a;";
+      const mx = document.createElement("input"); mx.type = "number"; mx.min = "0"; mx.max = "600"; mx.className = "ps-input"; mx.style.cssText = "width:58px;";
+      mx.value = String(getSongMax(k)); mx.title = "Potong otomatis setelah N detik (0 = putar penuh). Mencegah suara panjang terus bunyi.";
+      mx.addEventListener("change", () => { setSongMax(k, mx.value); refreshDur(); });
+      const mxLab = document.createElement("span"); mxLab.style.cssText = "font-size:.8em;"; mxLab.textContent = "✂️ potong di (dtk):";
+      function fmt(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
+      let durToken = 0;
+      function refreshDur() {
+        const url = getSongUrl(k); const my = ++durToken;
+        if (!url) { dur.textContent = "⏱ — (suara bawaan)"; dur.style.color = "#6b5a3a"; return; }
+        dur.textContent = "⏱ …";
+        let a; try { a = new Audio(); a.preload = "metadata"; } catch (e) { dur.textContent = "⏱ ?"; return; }
+        const done = (txt, warn) => { if (my !== durToken) return; dur.textContent = txt; dur.style.color = warn ? "#b34700" : "#6b5a3a"; };
+        const t = setTimeout(() => done("⏱ ? (tidak terbaca)"), 9000);
+        a.addEventListener("loadedmetadata", () => {
+          clearTimeout(t);
+          const d = a.duration; if (!isFinite(d)) { done("⏱ ?"); return; }
+          const m = getSongMax(k);
+          done("⏱ " + fmt(d) + (m > 0 && d > m ? " → dipotong " + m + " dtk" : ""), d > 30 && !(m > 0));
+        });
+        a.addEventListener("error", () => { clearTimeout(t); done("⏱ ? (tidak terbaca)"); });
+        a.src = normalizeUrl(url);
+      }
+      inp.addEventListener("change", refreshDur);
+      fileIn.addEventListener("change", () => setTimeout(refreshDur, 600));
+      line.appendChild(lab); line.appendChild(inp); line.appendChild(pickBtn); line.appendChild(fileIn); line.appendChild(dur); line.appendChild(mxLab); line.appendChild(mx);
       box.appendChild(line);
+      refreshDur();
     });
     return box;
   }
@@ -1012,7 +1109,7 @@ body.fx-sun #text,body.fx-sun #ref,body.fx-sun #refSub,body.fx-sun #text .verse-
 
     // book193: dipakai tombol cepat F5-F8 di Studio -- mengembalikan {name, src} untuk dikirim ke Layar 2.
   function quick(id) { const e = LIST.filter((x) => x.id === id)[0]; return e ? { name: e.id, src: e.song ? getSongUrl(e.song) : "" } : null; }
-  return { LIST, quick, play, stopAll, configure, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
+  return { LIST, quick, play, stopAll, configure, getWordStyle, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
 })();
 
 if (typeof window !== "undefined") {
