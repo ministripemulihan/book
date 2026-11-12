@@ -73,7 +73,8 @@
 // js/presentation-studio.js, js/presentation.js, js/collections.js, js/app.js).
 // DINAIKKAN LAGI (19 Sep 2026 -- Audio Latar dipindah ke js/bg-audio.js BARU, dimuat sebelum
 // js/presentation-studio.js di index.html).
-const CACHE_NAME = "book-vp-shell-v112"; // v112 (book193: Amin F5-F8, Seru Nama Tuhan, Matahari)
+const CACHE_NAME = "book-vp-shell-v113"; // v113 (book194: pusat pintasan js/shortcuts.js + dialog, tulisan timbul AMIN/HALELUYA/O TUHAN YESUS)
+// v112 (book193: Amin F5-F8, Seru Nama Tuhan, Matahari)
 // v111 (book192: efek penenang transparan & kecil, berulang; Hitung Hewan)
 // v110 (book191: Golden Buzzer teks emas penuh, Es Krim Tenang, Akuarium Tenang, tombol Semua Bait kidung)
 // v109 (book190: Auto Full, video lokal & file ke Kumpulan, template Acara Zoom)
