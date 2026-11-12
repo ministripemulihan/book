@@ -292,6 +292,28 @@ const PresentationStudio = (() => {
     Presentation.postRaw(payload);
     syncMonitorVideoForPayload_(payload); // BARU (10 Sep 2026, lanjutan) -- lihat catatan di fungsi ini
   }
+
+  // ------------------------------------------------------------
+  // BARU (book194) -- pintasan keyboard EFEK LAYAR (Amin, Seru Nama Tuhan, Matahari, tulisan timbul). Didaftarkan ke pusat pintasan
+  // (js/shortcuts.js) supaya bisa dilihat & diganti lewat ikon ⚙️ di bar atas Studio. Bawaan memakai Alt+Shift+huruf (bukan F5 --
+  // F5 = refresh browser, dan bukan huruf polos -- supaya tidak pernah menyala sendiri waktu mengetik).
+  // ------------------------------------------------------------
+  (function registerEffectShortcuts_() {
+    if (!window.PSShortcuts || typeof FunFX === "undefined") return;
+    const send = (id) => { if (id === "stop") { rawPost({ type: "funfx", name: "stop" }); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12 }); };
+    [
+      ["fx-amen-all", "Amin bersama (suara + gambar)", "amen-all", "alt+shift+z"],
+      ["fx-amen-male", "Amin pria", "amen-male", "alt+shift+x"],
+      ["fx-amen-female", "Amin wanita", "amen-female", "alt+shift+c"],
+      ["fx-amen-kids", "Amin anak-anak", "amen-kids", "alt+shift+v"],
+      ["fx-call-lord", "Seru nama Tuhan (🙌 O Tuhan Yesus!)", "call-lord", "alt+shift+l"],
+      ["fx-sun", "Matahari: kilauan + tulisan 3D (tanpa suara)", "sun", "alt+shift+s"],
+      ["fx-word-amen", "Tulisan AMIN timbul besar (silau 3D)", "word-amen", "alt+shift+a"],
+      ["fx-word-haleluya", "Tulisan HALELUYA timbul besar (silau 3D)", "word-haleluya", "alt+shift+h"],
+      ["fx-word-lord", "Tulisan O TUHAN YESUS timbul besar (silau 3D)", "word-lord", "alt+shift+o"],
+      ["fx-stop", "Hentikan semua efek layar", "stop", "alt+shift+q"],
+    ].forEach(([id, label, fx, def]) => window.PSShortcuts.registerAction({ id, group: "Efek Layar", label, def, run: () => send(fx) }));
+  })();
   // Dipakai wireSlideDisplayModeControls_() supaya klik tombol
   // Asli/Sesuai Lebar/Zoom langsung terlihat di slide yang SEDANG
   // tayang (bukan cuma berlaku utk slide berikutnya).
@@ -8758,6 +8780,7 @@ const PresentationStudio = (() => {
     { id: "m10", label: "🎬 Kamera Full + Subtitle Atas", camLayout: "subtitle", videoTextOverlay: true, camSubtitleTop: true },
     { id: "m11", label: "⭕ Kamera Full, Teks Bulat", camLayout: "textbubble", videoTextOverlay: false },
   ];
+  window.__psModePresets = () => loadModePresets_(); // book194: dipakai js/shortcuts.js untuk menampilkan nama Mode Cepat
   function loadModePresets_() {
     try {
       const raw = localStorage.getItem(MODE_PRESETS_KEY);
@@ -9033,17 +9056,6 @@ const PresentationStudio = (() => {
     document.addEventListener("keydown", (e) => {
       const studio = el("presentStudio");
       if (!studio || studio.hidden) return;
-      // BARU (book193, permintaan operator) -- tombol cepat AMIN: F5 = bersama, F6 = pria, F7 = wanita, F8 = anak-anak.
-      // Sengaja tombol F (bukan huruf) supaya tidak pernah "keluar suara amin" waktu mengetik; berlaku bahkan saat kursor di kolom ketik.
-      // Studio sedang terbuka -> F5 TIDAK me-refresh halaman (preventDefault); untuk refresh pakai Ctrl+R atau tutup Studio dulu.
-      if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && /^F[5-8]$/.test(e.key)) {
-        e.preventDefault();
-        if (e.repeat) return;
-        const id = { F5: "amen-all", F6: "amen-male", F7: "amen-female", F8: "amen-kids" }[e.key];
-        const qk = typeof FunFX !== "undefined" && FunFX.quick ? FunFX.quick(id) : null;
-        if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12 });
-        return;
-      }
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
       // BARU (12 Sep 2026, laporan operator "tekan P malah pause lalu

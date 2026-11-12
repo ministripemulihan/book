@@ -23,14 +23,17 @@ const FunFX = (function () {
     { id: "icecream", icon: "🍦", label: "Es Krim Tenang (hadiah duduk diam)", song: null },
     { id: "aquarium", icon: "🐠", label: "Akuarium Tenang", song: null },
     { id: "count", icon: "🔢", label: "Hitung Hewan (kuda, gajah, ayam, anak, logo)", song: null },
-    { id: "amen-all", icon: "🙏", label: "Amin bersama (F5)", song: "amen_all" },
-    { id: "amen-male", icon: "👨", label: "Amin pria (F6)", song: "amen_male" },
-    { id: "amen-female", icon: "👩", label: "Amin wanita (F7)", song: "amen_female" },
-    { id: "amen-kids", icon: "🧒", label: "Amin anak-anak (F8)", song: "amen_kids" },
+    { id: "amen-all", icon: "🙏", label: "Amin bersama", song: "amen_all" },
+    { id: "amen-male", icon: "👨", label: "Amin pria", song: "amen_male" },
+    { id: "amen-female", icon: "👩", label: "Amin wanita", song: "amen_female" },
+    { id: "amen-kids", icon: "🧒", label: "Amin anak-anak", song: "amen_kids" },
     { id: "call-lord", icon: "🙌", label: "Seru nama Tuhan", song: "call_lord" },
     { id: "sun", icon: "☀️", label: "Matahari (kilauan, tanpa suara)", song: null },
+    { id: "word-amen", icon: "✨", label: "Tulisan AMIN timbul (silau 3D)", song: null },
+    { id: "word-haleluya", icon: "✨", label: "Tulisan HALELUYA timbul (silau 3D)", song: null },
+    { id: "word-lord", icon: "✨", label: "Tulisan O TUHAN YESUS timbul (silau 3D)", song: null },
   ];
-  const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer", amen_all: "Suara Amin Bersama (F5)", amen_male: "Suara Amin Pria (F6)", amen_female: "Suara Amin Wanita (F7)", amen_kids: "Suara Amin Anak-anak (F8)", call_lord: "Suara Seru Nama Tuhan" };
+  const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer", amen_all: "Suara Amin Bersama", amen_male: "Suara Amin Pria", amen_female: "Suara Amin Wanita", amen_kids: "Suara Amin Anak-anak", call_lord: "Suara Seru Nama Tuhan" };
   const LS_PREFIX = "funfx_song_";
 
   let cfg = {};
@@ -710,6 +713,7 @@ const FunFX = (function () {
   // ------------------------------------------------------------
   async function sun() {
     const layer = makeLayer();
+    layer.style.mixBlendMode = "screen"; // book194: benar-benar MENERANGKAN isi layar (ayat/kidung/PDF/YouTube) di belakangnya
     let dead = false;
     const clean = register(layer, () => { dead = true; document.body.classList.remove("fx-sun", "fx-sun-out"); });
     document.body.classList.add("fx-sun");
@@ -732,6 +736,53 @@ const FunFX = (function () {
   }
 
   // ------------------------------------------------------------
+  //  ✨ Tulisan TIMBUL (book194): kata besar (AMIN / HALELUYA / O TUHAN YESUS) yang menumpang DI ATAS isi layar apa pun -- ayat, kidung, PDF,
+  //  video YouTube -- tanpa menutupinya:
+  //   (1) lapisan WARNA (mix-blend-mode: multiply): huruf-huruf yang kena bentuk kata itu berubah warna (putih -> emas/biru/merah muda),
+  //       sehingga kalau dibaca tampak tulisan besar "AMIN" dari perbedaan warna, sementara tulisan aslinya tetap terbaca;
+  //   (2) lapisan SILAU 3D: kata timbul bertumpuk bayangan + kilat cahaya yang menyapu (seperti efek Matahari), samar tapi terlihat
+  //       juga di latar gelap. Tanpa suara. ~5 detik. Kolom teks efek (Studio) bisa mengganti katanya.
+  // ------------------------------------------------------------
+  const WORDS = {
+    "word-amen": { t: "AMIN", a: "#fff3b0", b: "#ffc83d", c: "#e08a00", sh: "#b36b00", glow: "#ffd23f" },
+    "word-haleluya": { t: "HALELUYA", a: "#e8f8ff", b: "#7fd0ff", c: "#2f8fe0", sh: "#1d5fa8", glow: "#8fd8ff" },
+    "word-lord": { t: "O TUHAN YESUS", a: "#ffe3dc", b: "#ff9d8a", c: "#e0584a", sh: "#a8332a", glow: "#ffb3a3" },
+  };
+  async function wordGlow(id, text) {
+    const P = WORDS[id]; if (!P) return;
+    const word = String(text || P.t).toUpperCase().trim();
+    const W = vw(), H = vh();
+    let lines = [word];
+    if (word.length > 8 && word.indexOf(" ") > 0) { // dua baris di spasi yang paling dekat tengah
+      let best = -1; for (let i = 0; i < word.length; i++) if (word[i] === " " && (best < 0 || Math.abs(i - word.length / 2) < Math.abs(best - word.length / 2))) best = i;
+      if (best > 0) lines = [word.slice(0, best), word.slice(best + 1)];
+    }
+    const FONT = '900 100px/1.02 "Arial Black","Impact",system-ui,sans-serif';
+    const probe = document.createElement("span"); probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;letter-spacing:.04em;font:${FONT}`; document.body.appendChild(probe);
+    let maxW = 1; lines.forEach((l) => { probe.textContent = l; maxW = Math.max(maxW, probe.getBoundingClientRect().width); }); probe.remove();
+    const fs = Math.max(30, Math.min((W * 0.9) / maxW * 100, (H * 0.55) / (lines.length * 1.02)));
+    const tint = makeLayer(); tint.style.mixBlendMode = "multiply"; tint.style.opacity = "0";
+    const glare = makeLayer(); glare.style.opacity = "0";
+    let dead = false;
+    const c1 = register(tint, () => { dead = true; });
+    const c2 = register(glare);
+    const mk = (layer, css) => { const d = document.createElement("div"); d.style.cssText = `position:absolute;left:50%;top:47%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;letter-spacing:.04em;font:900 ${fs}px/1.02 "Arial Black","Impact",system-ui,sans-serif;${css}`; d.innerHTML = lines.map(esc).join("<br>"); layer.appendChild(d); return d; };
+    mk(tint, `background:linear-gradient(180deg,${P.a},${P.b} 50%,${P.c});-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:${P.b}`);
+    const ex = mk(glare, `color:transparent;text-shadow:.012em .012em 0 ${P.b}cc,.024em .024em 0 ${P.c}cc,.036em .036em 0 ${P.sh}cc,.06em .07em .06em #0008;filter:drop-shadow(0 0 .05em ${P.glow})`);
+    const sh = mk(glare, `background:linear-gradient(105deg,transparent 38%,#fff 50%,transparent 62%) 130% 0/300% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent`);
+    animate(tint, [{ opacity: 0 }, { opacity: 1 }], { duration: 500, fill: "forwards" });
+    animate(glare, [{ opacity: 0 }, { opacity: 0.6 }], { duration: 500, fill: "forwards" });
+    [ex, sh].forEach((el) => animate(el, [{ transform: "translate(-50%,-50%) scale(.94)" }, { transform: "translate(-50%,-50%) scale(1.02)" }, { transform: "translate(-50%,-50%) scale(1)" }], { duration: 900, easing: "ease-out" }));
+    animate(tint.firstChild, [{ transform: "translate(-50%,-50%) scale(.94)" }, { transform: "translate(-50%,-50%) scale(1.02)" }, { transform: "translate(-50%,-50%) scale(1)" }], { duration: 900, easing: "ease-out" });
+    const sweep = () => { try { sh.animate([{ backgroundPosition: "130% 0" }, { backgroundPosition: "-30% 0" }], { duration: 1500, easing: "ease-in-out" }); } catch (e) { /* abaikan */ } };
+    await sleep(500); if (dead) return;
+    sweep(); await sleep(1900); if (dead) return;
+    sweep(); await sleep(1700); if (dead) return;
+    await Promise.all([animate(tint, [{ opacity: 1 }, { opacity: 0 }], { duration: 800, fill: "forwards" }), animate(glare, [{ opacity: 0.6 }, { opacity: 0 }], { duration: 800, fill: "forwards" })]);
+    c1(); c2();
+  }
+
+  // ------------------------------------------------------------
   //  API
   // ------------------------------------------------------------
   function play(id, opts) {
@@ -743,6 +794,7 @@ const FunFX = (function () {
     playSound(effect, o.src);
     if (id.indexOf("amen") === 0) return amen(id);
     if (id === "call-lord") return callLord(o.text);
+    if (id.indexOf("word-") === 0) return wordGlow(id, o.text);
     if (id === "sun") return sun();
     if (id === "party-bottom") return party(false, o.text);
     if (id === "party-top") return party(true, o.text);
@@ -773,7 +825,7 @@ const FunFX = (function () {
       b.type = "button"; b.className = "chip-btn small";
       b.textContent = e.icon + " " + e.label;
       b.addEventListener("click", () => {
-        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium" || e.id === "count" || e.id === "call-lord";
+        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium" || e.id === "count" || e.id === "call-lord" || e.id.indexOf("word-") === 0;
         onPick(e.id, { src: e.song ? getSongUrl(e.song) : "", text: withText ? textIn.value.trim() : "", seconds: Number(secIn.value) || 12 });
       });
       row.appendChild(b);
