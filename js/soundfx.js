@@ -339,7 +339,7 @@ const SoundFX = (() => {
     }
     return audioBufferCache_[src];
   }
-  function playExternalAudio_(src) {
+  function playExternalAudio_(src, opts) {
     try {
       const a = new Audio(src);
       a.volume = externalMuted_ ? 0 : 1;
@@ -348,13 +348,23 @@ const SoundFX = (() => {
         const i = activeExternalAudios_.indexOf(a);
         if (i !== -1) activeExternalAudios_.splice(i, 1);
       };
+      // BARU (book195) -- opts.maxSec: potong otomatis setelah N detik (mis. suara "Amin" yang berkasnya ternyata 3 menit)
+      if (opts && opts.maxSec > 0) setTimeout(() => { try { a.pause(); } catch (e) { /* abaikan */ } cleanup(); }, opts.maxSec * 1000);
       a.addEventListener("ended", cleanup);
       a.addEventListener("error", cleanup);
       a.play().catch(() => cleanup()); // diamkan -- efek suara TIDAK BOLEH sampai mengganggu UI kalau gagal
     } catch (e) { /* diamkan, sama alasannya */ }
   }
-  function playAudioFile_(src) {
-    if (isExternalUrl_(src)) { playExternalAudio_(src); return; }
+  // BARU (book195) -- sumber audio berkas (buffer) yang sedang bunyi, supaya bisa dihentikan (stopAllPlayback) / dipotong (opts.maxSec).
+  const activeBufferSources_ = [];
+  function stopAllPlayback() {
+    activeExternalAudios_.slice().forEach((a) => { try { a.pause(); } catch (e) { /* abaikan */ } });
+    activeExternalAudios_.length = 0;
+    activeBufferSources_.slice().forEach((n) => { try { n.stop(); } catch (e) { /* abaikan */ } });
+    activeBufferSources_.length = 0;
+  }
+  function playAudioFile_(src, opts) {
+    if (isExternalUrl_(src)) { playExternalAudio_(src, opts); return; }
     loadAudioBuffer_(src)
       .then((buffer) => {
         try {
@@ -362,7 +372,10 @@ const SoundFX = (() => {
           const src_ = c.createBufferSource();
           src_.buffer = buffer;
           src_.connect(destination_()); // sama-sama lewat gain "M" mute Layar 2
+          activeBufferSources_.push(src_);
+          src_.onended = () => { const i = activeBufferSources_.indexOf(src_); if (i !== -1) activeBufferSources_.splice(i, 1); };
           src_.start(0);
+          if (opts && opts.maxSec > 0) { try { src_.stop(c.currentTime + opts.maxSec); } catch (e) { /* abaikan */ } }
         } catch (e) { /* diamkan -- efek suara TIDAK BOLEH sampai mengganggu UI kalau gagal */ }
       })
       .catch((e) => {
@@ -674,5 +687,5 @@ const SoundFX = (() => {
     return out;
   }
 
-  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted, bellChoices };
+  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, stopAllPlayback, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted, bellChoices };
 })();
