@@ -970,6 +970,7 @@ const MediaLibrary = (() => {
       document.addEventListener("webkitfullscreenchange", onFsChange);
       // Esc: keluar dari mode layar penuh dulu; kalau tidak sedang penuh, tutup pemutar.
       document.addEventListener("keydown", (e) => {
+        // SHORTCUT: Esc = tutup pemutar Pustaka Media (keluar layar penuh dulu). Tetap (tidak ada di ⚙️).
         if (e.key !== "Escape" || ov.hidden) return;
         if (ov.classList.contains("ml-player-full")) exitPlayerFullscreen_(); else closePlayerOverlay_();
       });
@@ -3181,6 +3182,7 @@ const MediaLibrary = (() => {
     const overlay = el_("mediaLibraryOverlay");
     if (overlay) overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
     document.addEventListener("keydown", (e) => {
+      // SHORTCUT: Esc = tutup Pustaka Media. Tetap (tidak ada di ⚙️).
       if (e.key !== "Escape") return;
       // 2 Okt 2026: kalau jendela pemutar sedang terbuka, Esc hanya untuk
       // pemutar (keluar layar penuh / tutup pemutar) -- bukan menutup panel

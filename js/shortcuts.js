@@ -1,5 +1,7 @@
 // =====================================================================
 // js/shortcuts.js  (BARU book194, permintaan operator)
+// ★ CARI KATA "SHORTCUT" (Ctrl+F / Ctrl+Shift+F di editor) di seluruh proyek: setiap pintasan keyboard diberi komentar "// SHORTCUT: ..." + "// SHORTCUT-GANTI: ..." (cara mengganti manual).
+//   SHORTCUT-DAFTAR = daftar bawaan di berkas ini; SHORTCUT-DAFTAR-EFEK = daftar efek di js/presentation-studio.js.
 // SATU tempat untuk SEMUA pintasan keyboard Studio Presentasi + dialog pengaturannya (ikon ⚙️ di bar atas Studio).
 //
 //  * Daftar BAWAAN ada di bagian "DAFTAR PINTASAN BAWAAN" di bawah (cari tulisan itu) -- itu "tempat mengganti manual" kalau mau
@@ -17,6 +19,7 @@
   "use strict";
   if (window.PSShortcuts) return;
 
+  // SHORTCUT: pilihan operator dari dialog ⚙️ disimpan di localStorage "ps_shortcuts_v1" (hapus kunci ini = kembali ke semua bawaan).
   const LS_KEY = "ps_shortcuts_v1";
   const SYNTH = "__psSynth";
   const ACTIONS = [];
@@ -48,6 +51,7 @@
     return t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || !!(a && a.isContentEditable);
   }
   // Kombinasi yang dipakai browser sendiri -- tidak boleh dipakai (F5 = refresh dll). Dipakai juga menolak Esc (penutup dialog).
+  // SHORTCUT: daftar kombinasi yang DITOLAK karena dipakai browser (F5 = refresh dll). Tambah/kurangi di sini bila perlu.
   const RESERVED = new Set(["f5", "ctrl+f5", "ctrl+r", "ctrl+shift+r", "f11", "f12", "f1", "ctrl+w", "ctrl+t", "ctrl+n", "ctrl+shift+n", "ctrl+shift+t", "ctrl+shift+w", "ctrl+tab", "ctrl+l", "alt+f4", "alt+arrowleft", "alt+arrowright", "ctrl+p", "ctrl+s", "ctrl+f", "ctrl+h", "ctrl+j", "ctrl+u", "ctrl+d", "escape", "tab", "enter"]);
 
   // ---------- penyimpanan ----------
@@ -229,19 +233,31 @@
   //  def = kombinasi bawaan; legacy = kombinasi yang dikenali logika lama (sama dengan def).
   //  Formatnya: huruf kecil, digabung "+" dengan urutan ctrl, alt, shift, meta, tombol  (mis. "alt+shift+z", "ctrl+z", "p", "arrowright")
   // =====================================================================
+  // SHORTCUT-DAFTAR: DAFTAR PINTASAN BAWAAN (lama). Tiap baris LEG(id, grup, nama di ⚙️, kombinasi bawaan, keterangan).
+  // SHORTCUT-GANTI: kombinasi di baris ini = yang dikenali logika lama di js/presentation-studio.js (cari "SHORTCUT:" di sana). Kalau mengganti manual, ubah di KEDUA tempat. Cara mudah: ⚙️ di Studio.
   const LEG = (id, group, label, def, extra) => registerAction({ id, group, label, def, legacy: def, extra });
+  // SHORTCUT: → = slide berikutnya (alias ↓ PageDown tetap).
   LEG("next", "Navigasi Slide", "Slide berikutnya (Kumpulan Ayat / playlist)", "arrowright", "↓ dan PageDown tetap ikut");
+  // SHORTCUT: ← = slide sebelumnya (alias ↑ PageUp tetap).
   LEG("prev", "Navigasi Slide", "Slide sebelumnya", "arrowleft", "↑ dan PageUp tetap ikut");
+  // SHORTCUT: P = Play/Pause YouTube.
   LEG("yt-playpause", "YouTube & Suara", "Play / Pause video YouTube", "p");
+  // SHORTCUT: M = Mute YouTube + hentikan bel.
   LEG("yt-mute", "YouTube & Suara", "Mute / suarakan YouTube + hentikan bel", "m");
+  // SHORTCUT: Alt+C = CC YouTube.
   LEG("yt-captions", "YouTube & Suara", "Tulisan (CC) YouTube nyala/mati", "alt+c");
+  // SHORTCUT: Alt+H = scrollbar Studio.
   LEG("scrollbars", "Tampilan", "Sembunyikan / tampilkan scrollbar", "alt+h");
   for (let n = 1; n <= 9; n++) {
+    // SHORTCUT: 1..9 = Mode Cepat ke-N.
     registerAction({ id: "mode-" + n, group: "Mode Cepat (tata letak)", label: "Mode Cepat ke-" + n, def: String(n), legacy: String(n),
       labelFn: () => { try { const f = window.__psModePresets; const p = f && f()[n - 1]; return "Mode Cepat ke-" + n + (p && p.label ? " — " + p.label : ""); } catch (e) { return "Mode Cepat ke-" + n; } } });
   }
+  // SHORTCUT: Alt+1..9 = Bel Cepat ke-N.
   for (let n = 1; n <= 9; n++) registerAction({ id: "bell-" + n, group: "Bel Cepat", label: "Bel Cepat ke-" + n, def: "alt+" + n, legacy: "alt+" + n });
+  // SHORTCUT: Ctrl+Z = Undo coretan.
   LEG("pen-undo", "Coretan (Pen)", "Urungkan coretan (Undo) -- saat Pen/Penghapus aktif", "ctrl+z");
+  // SHORTCUT: Ctrl+Y = Redo coretan.
   LEG("pen-redo", "Coretan (Pen)", "Ulangi coretan (Redo)", "ctrl+y");
 
   window.PSShortcuts = { registerAction, open, close, comboOf, pretty, getCombo: (id) => { const a = ACTIONS.find((x) => x.id === id); return a ? bindingOf(a) : ""; }, actions: ACTIONS, rebuild };

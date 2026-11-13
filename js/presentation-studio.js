@@ -306,12 +306,16 @@ const PresentationStudio = (() => {
     rawPost({ type: "bell", action: "stop" });  // bel (Timer/Bel Cepat)
   };
   (function registerEffectShortcuts_() {
+    // SHORTCUT: tombol merah "⏹ Stop Efek" (bar atas Studio) = sama dengan pintasan "fx-stop" (bawaan Alt+Shift+Q) = hentikan SEMUA efek, suara, lagu, bel di Layar 2.
     const topStop = el("psFxStopTop");
     if (topStop) topStop.addEventListener("click", () => window.__psStopAllFx());
     if (!window.PSShortcuts || typeof FunFX === "undefined") return;
     if (topStop) topStop.addEventListener("mouseenter", () => { topStop.title = "Hentikan SEMUA efek, suara, lagu & bel di Layar 2 (pintasan: " + window.PSShortcuts.pretty(window.PSShortcuts.getCombo("fx-stop")) + ")"; });
-    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined }); };
+    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined, apos: FunFX.getAmenPos ? FunFX.getAmenPos() : undefined }); };
     [
+      // SHORTCUT-DAFTAR-EFEK: tiap baris = [id, nama di dialog ⚙️, id efek, kombinasi BAWAAN]. Format kombinasi: huruf kecil digabung "+", urutan ctrl, alt, shift, meta, tombol (mis. "alt+shift+z", "ctrl+1", "f9").
+      // SHORTCUT-GANTI: ubah teks kombinasi (elemen ke-4) di baris di bawah. Pintasan efek TIDAK memakai logika lama, jadi cukup diubah di sini (atau lewat ⚙️). Hindari F5/Ctrl+R/Ctrl+W (dipakai browser).
+      // SHORTCUT: Z/X/C/V = Amin bersama/pria/wanita/anak · L = Seru nama Tuhan · S = Matahari · A/H/O = tulisan timbul AMIN/HALELUYA/O TUHAN YESUS · Q = HENTIKAN SEMUA  (semuanya dengan Alt+Shift).
       ["fx-amen-all", "Amin bersama (suara + gambar)", "amen-all", "alt+shift+z"],
       ["fx-amen-male", "Amin pria", "amen-male", "alt+shift+x"],
       ["fx-amen-female", "Amin wanita", "amen-female", "alt+shift+c"],
@@ -1583,6 +1587,7 @@ const PresentationStudio = (() => {
         resolve(result);
       }
       function onKeydown(e) {
+        // SHORTCUT: Esc = batalkan kotak konfirmasi ini. TETAP (tidak bisa diganti di ⚙️).
         if (e.key === "Escape") cleanup(false);
         // SENGAJA Enter TIDAK dipetakan ke "Ya, Hapus" di sini -- fokus
         // sudah ada di tombol "Tidak, Batalkan" (lihat noBtn.focus() di
@@ -2233,6 +2238,8 @@ const PresentationStudio = (() => {
       if (!studio || studio.hidden) return;
       const tag = (document.activeElement && document.activeElement.tagName) || "";
       if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+      // SHORTCUT: → / ↓ / PageDown = SLIDE BERIKUTNYA (Kumpulan Ayat/playlist); ← / ↑ / PageUp = SLIDE SEBELUMNYA (juga dipakai clicker presentasi).
+      // SHORTCUT-GANTI: ubah di DUA tempat -- (1) angka/huruf di baris kode di bawah ini, (2) `def`/`legacy` entri id "next / prev" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Cara mudah tanpa menyentuh kode: tombol ⚙️ di bar atas Studio.  (↓ PageDown ↑ PageUp adalah alias tetap, tidak ada di ⚙️).
       if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); playlistNext(); }
       else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") { e.preventDefault(); playlistPrev(); }
     });
@@ -8958,6 +8965,7 @@ const PresentationStudio = (() => {
     // juga menutup -- pola sama seperti overlay konfirmasi lain di app ini.
     overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.hidden = true; });
     document.addEventListener("keydown", (e) => {
+      // SHORTCUT: Esc = tutup Menu Cepat (overlay). TETAP (tidak bisa diganti di ⚙️).
       if (!overlay.hidden && e.key === "Escape") overlay.hidden = true;
     });
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- 4 tombol statis di bawah
@@ -9111,6 +9119,8 @@ const PresentationStudio = (() => {
       // memakai huruf "H" polos utk Menu Cepat q-w-e-r-t-y-u-i-o-p (lihat
       // rencana sebelumnya). Lihat toggleScrollbarVisibility_() &
       // body.ps-scrollbars-hidden (css/style.css).
+      // SHORTCUT: Alt+H = sembunyikan/tampilkan scrollbar Studio.
+      // SHORTCUT-GANTI: ubah di DUA tempat -- (1) angka/huruf di baris kode di bawah ini, (2) `def`/`legacy` entri id "scrollbars" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Cara mudah tanpa menyentuh kode: tombol ⚙️ di bar atas Studio.
       if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "h" || e.key === "H")) {
         e.preventDefault();
         toggleScrollbarVisibility_();
@@ -9136,6 +9146,8 @@ const PresentationStudio = (() => {
       //      (aman, tidak menimbulkan efek apa pun).
       // Ini SENGAJA dipisah dari blok angka 1-9 di bawah (bukan angka,
       // tidak perlu Number.isInteger dst).
+      // SHORTCUT: M (huruf polos) = Mute/suarakan YouTube di Layar 2 + hentikan bel. Tidak aktif saat mengetik di kolom isian.
+      // SHORTCUT-GANTI: ubah di DUA tempat -- (1) angka/huruf di baris kode di bawah ini, (2) `def`/`legacy` entri id "yt-mute" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Cara mudah tanpa menyentuh kode: tombol ⚙️ di bar atas Studio.
       if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "m" || e.key === "M")) {
         e.preventDefault();
         const muteBtn = el("psYtMuteBtn");
@@ -9153,6 +9165,8 @@ const PresentationStudio = (() => {
       // tombol yang bersangkutan tidak melakukan apa-apa (sudah dijaga
       // sendiri oleh sendYtCommand()/present.html) -- aman ditekan
       // kapan saja.
+      // SHORTCUT: P (huruf polos) = Play / Pause video YouTube di Layar 2. Tidak aktif saat mengetik.
+      // SHORTCUT-GANTI: ubah di DUA tempat -- (1) angka/huruf di baris kode di bawah ini, (2) `def`/`legacy` entri id "yt-playpause" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Cara mudah tanpa menyentuh kode: tombol ⚙️ di bar atas Studio.
       if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "p" || e.key === "P")) {
         e.preventDefault();
         if (typeof window.toggleYtPlayPause_ === "function") window.toggleYtPlayPause_();
@@ -9163,11 +9177,15 @@ const PresentationStudio = (() => {
       // Caption bawaan YouTube, numpang logika toggleYtCaptions_()
       // (lihat dekat buildYoutubeEmbedUrl() di atas) -- 1 fungsi yang
       // sama dipakai baik oleh tombol "📝 Teks" maupun pintasan ini.
+      // SHORTCUT: Alt+C = tulisan (CC / caption) YouTube nyala/mati.
+      // SHORTCUT-GANTI: ubah di DUA tempat -- (1) angka/huruf di baris kode di bawah ini, (2) `def`/`legacy` entri id "yt-captions" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Cara mudah tanpa menyentuh kode: tombol ⚙️ di bar atas Studio.
       if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "c" || e.key === "C")) {
         e.preventDefault();
         toggleYtCaptions_();
         return;
       }
+      // SHORTCUT: tombol 1-9 (polos) = MODE CEPAT ke-1..9 (tata letak/preset: kamera, video, dst).  Alt+1..Alt+9 = BEL CEPAT ke-1..9.
+      // SHORTCUT-GANTI: id "mode-1".."mode-9" dan "bell-1".."bell-9" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Nama presetnya diatur di tab "Mode Cepat" Studio, bukan di sini.
       const n = Number(e.key);
       if (!Number.isInteger(n) || n < 1 || n > 9) return;
       if (e.altKey) {
@@ -9512,7 +9530,12 @@ const PresentationStudio = (() => {
     if (typeof FunFX !== "undefined" && el("psFunFxGrid")) {
       FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => {
         if (name === "stop") { window.__psStopAllFx(); return; } // book195: Hentikan = semua efek + suara + lagu + bel
-        rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12, wstyle: typeof FunFX.getWordStyle === "function" ? FunFX.getWordStyle() : undefined });
+        if (name === "ping") { // book196: cek versi berkas yang termuat di Layar 2
+          window.__psFxPingWait = setTimeout(() => { if (FunFX.showStatus) FunFX.showStatus("⚠️ Layar 2 tidak menjawab: present.html di Layar 2 masih versi lama (belum di-upload / masih cache), atau Layar 2 belum dibuka. Upload ulang semua berkas lalu muat ulang Layar 2 dengan Ctrl+Shift+R.", false); }, 2500);
+          rawPost({ type: "funfx", name: "ping" });
+          return;
+        }
+        rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12, wstyle: typeof FunFX.getWordStyle === "function" ? FunFX.getWordStyle() : undefined, apos: typeof FunFX.getAmenPos === "function" ? FunFX.getAmenPos() : undefined });
       });
     }
     document.querySelectorAll("[data-shout]").forEach((btn) => {
@@ -12574,6 +12597,8 @@ const PresentationStudio = (() => {
       if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = String(e.key || "").toLowerCase();
+      // SHORTCUT: Ctrl+Z = urungkan coretan (Undo);  Ctrl+Y atau Ctrl+Shift+Z = ulangi (Redo). Hanya saat alat Pen/Penghapus aktif di Studio.
+      // SHORTCUT-GANTI: ubah di DUA tempat -- (1) angka/huruf di baris kode di bawah ini, (2) `def`/`legacy` entri id "pen-undo / pen-redo" di js/shortcuts.js (cari: SHORTCUT-DAFTAR). Cara mudah tanpa menyentuh kode: tombol ⚙️ di bar atas Studio.
       if (k === "z" && !e.shiftKey) { e.preventDefault(); doPenUndo_(); }
       else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); doPenRedo_(); }
     });
@@ -13692,6 +13717,16 @@ const PresentationStudio = (() => {
       // SAMA yang sudah dipakai wirePlaylistKeyNav() (panah papan ketik di
       // jendela Studio sendiri) di atas file ini, jadi perilakunya identik
       // (tidak berbuat apa-apa kalau belum ada playlist aktif).
+      if (data.source === "bibleAppPresenter" && data.type === "funfx_pong") { // book196: jawaban "Cek versi Layar 2"
+        clearTimeout(window.__psFxPingWait);
+        const inf = data.info || {};
+        const want = typeof FunFX !== "undefined" ? FunFX.BUILD : "?";
+        const bad = [];
+        if (inf.build !== want) bad.push("js/fun-fx.js di Layar 2 build \"" + inf.build + "\" (Studio build \"" + want + "\")");
+        if (!inf.stopAudio || !inf.maxSec) bad.push("js/soundfx.js di Layar 2 masih versi lama (belum ada Stop/potong suara)");
+        if (typeof FunFX !== "undefined" && FunFX.showStatus) FunFX.showStatus(bad.length ? "⚠️ Layar 2 belum versi terbaru: " + bad.join("; ") + ". Upload berkasnya lalu muat ulang Layar 2 dengan Ctrl+Shift+R." : "✅ Layar 2 sudah versi terbaru (build " + inf.build + "): Stop & potong suara aktif.", !bad.length);
+        return;
+      }
       if (data.source === "bibleAppPresenter" && data.type === "present_nav_key") {
         if (data.dir === "next") playlistNext();
         else if (data.dir === "prev") playlistPrev();

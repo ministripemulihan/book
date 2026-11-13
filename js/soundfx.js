@@ -687,5 +687,5 @@ const SoundFX = (() => {
     return out;
   }
 
-  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, stopAllPlayback, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted, bellChoices };
+  return { LIST: SOUND_FX_LIST, configure, play, playUrl: playAudioFile_, stopAllPlayback, maxSecSupport: true, renderButtons, renderDownloadList, downloadOne, predownloadAll, setMuted, bellChoices };
 })();
