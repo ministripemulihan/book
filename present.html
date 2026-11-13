@@ -3818,6 +3818,7 @@
       getAudioContext: () => (audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)()),
       getDestination: getEffectsMasterGain_,
       playUrl: (typeof SoundFX !== "undefined" && SoundFX.playUrl) ? SoundFX.playUrl : null,
+      stopAudio: (typeof SoundFX !== "undefined" && SoundFX.stopAllPlayback) ? SoundFX.stopAllPlayback : null, // book195: tombol Hentikan juga mematikan suara
     });
   }
 
@@ -5643,6 +5644,7 @@
   // (lihat catatan panjang CSS #quiz9JudgeBar di atas).
   document.addEventListener("mousemove", () => { if (!quiz9JudgeBarEl.hidden) q9ShowJudgeBar_(); });
   document.addEventListener("keydown", (e) => {
+    // SHORTCUT: H = tampilkan kembali bar juri Kuis 9 Kotak di Layar 2 (hanya saat bar tersembunyi). Tetap (tidak ada di ⚙️).
     if ((e.key === "h" || e.key === "H") && !quiz9JudgeBarEl.hidden) q9ShowJudgeBar_();
   });
 
@@ -5906,6 +5908,7 @@
   surveiUndoBtn2.addEventListener("click", () => svSendAction_("undo"));
   document.addEventListener("mousemove", () => { if (!surveiActionBarEl.hidden) svShowActionBar_(); });
   document.addEventListener("keydown", (e) => {
+    // SHORTCUT: H = tampilkan kembali bar aksi Survei Membuktikan di Layar 2. Tetap (tidak ada di ⚙️).
     if ((e.key === "h" || e.key === "H") && !surveiActionBarEl.hidden) svShowActionBar_();
   });
 
@@ -7338,7 +7341,19 @@
     // (js/presentation-studio.js).
     if (data.type === "shout") { playShout_(data.text, data.color); return; }
     // BARU (book184) -- 🎉 Efek Layar Ria (js/fun-fx.js), dikirim dari tab Efek Studio.
-    if (data.type === "funfx") { if (typeof FunFX !== "undefined") FunFX.play(data.name, { src: data.src, text: data.text, seconds: data.seconds }); return; }
+    // BARU (book196) -- "Cek versi Layar 2": Studio mengirim funfx/ping; Layar 2 membalas versi berkas yang BENAR-BENAR termuat di jendela ini,
+    // supaya ketahuan kalau ada berkas (present.html / js/fun-fx.js / js/soundfx.js) yang belum terpasang/masih cache lama.
+    if (data.type === "funfx" && data.name === "ping") {
+      try {
+        window.opener && window.opener.postMessage({ source: "bibleAppPresenter", type: "funfx_pong", info: {
+          build: (typeof FunFX !== "undefined" && FunFX.BUILD) || "lama",
+          stopAudio: !!(typeof SoundFX !== "undefined" && SoundFX.stopAllPlayback),
+          maxSec: !!(typeof SoundFX !== "undefined" && SoundFX.maxSecSupport),
+        } }, location.origin);
+      } catch (e) { /* abaikan */ }
+      return;
+    }
+    if (data.type === "funfx") { if (typeof FunFX !== "undefined") FunFX.play(data.name, { src: data.src, text: data.text, seconds: data.seconds, wstyle: data.wstyle, apos: data.apos }); return; }
     // BARU (10 Sep 2026, sesi ke-12) -- lihat catatan panjang
     // setEffectsMuted_()/getEffectsMasterGain_() dekat beep() di atas --
     // dikirim bareng tombol/pintasan "M" Mute di Studio
@@ -8552,6 +8567,7 @@
     // Ctrl+Z / Ctrl+Y selagi mode Pen/Penghapus lokal ini aktif; Esc = keluar
     // dari mode (seperti PowerPoint) -- Esc sekali lagi menutup toolbar.
     document.addEventListener("keydown", (e) => {
+      // SHORTCUT: Esc = matikan alat Penunjuk / Pen / Penghapus di Layar 2. Tetap (tidak ada di ⚙️).
       if (e.key === "Escape") {
         // setActive_(false) di dalam applyMode_("off") sudah otomatis
         // mengembalikan Zoom Layar ke 100% (resetZoom_()) kalau sedang
@@ -8566,6 +8582,8 @@
       // (dikirim lewat sendNavKey_(), diterima js/presentation-studio.js
       // sebagai "present_nav_key" -> playlistNext()/playlistPrev(), PERSIS
       // pintasan panah atas/bawah yang sudah ada di jendela Studio).
+      // SHORTCUT: panah di Layar 2 = (a) saat Zoom Layar terkunci: menggeser gambar yang di-zoom; (b) selain itu: ↑/← = slide sebelumnya, ↓/→ = slide berikutnya (diteruskan ke Studio lewat sendNavKey_).
+      // SHORTCUT-GANTI: kunci yang diteruskan ke Studio ada di 2 baris "sendNavKey_" di bawah; tombolnya dijalankan oleh logika "next/prev" di Studio (lihat js/shortcuts.js, cari SHORTCUT-DAFTAR).
       if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
         const tag = (e.target && e.target.tagName) || "";
         if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
@@ -8588,6 +8606,7 @@
       if (/INPUT|TEXTAREA/.test(tag)) return;
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = String(e.key || "").toLowerCase();
+      // SHORTCUT: Ctrl+Z = Undo coretan di Layar 2;  Ctrl+Y / Ctrl+Shift+Z = Redo. Tetap (tidak ada di ⚙️).
       if (k === "z" && !e.shiftKey) { e.preventDefault(); doUndo_(); }
       else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); doRedo_(); }
     });
