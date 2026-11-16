@@ -864,6 +864,21 @@ function moveItemToPosition(username, id, index, newIndex) {
   _pushCollectionRemote(username, id, col);
   return true;
 }
+// BARU (book198, permintaan operator) -- DUPLIKAT persis item di index, disisipkan TEPAT SESUDAHNYA. Mengembalikan index item baru (index + 1)
+// atau -1 kalau gagal. Salinannya dalam (JSON) -- mengubah salah satunya tidak memengaruhi yang lain.
+function duplicateItemInCollection(username, id, index) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col || !col.items[index]) return -1;
+  const copy = JSON.parse(JSON.stringify(col.items[index]));
+  if (copy.addedAt) copy.addedAt = new Date().toISOString();
+  col.items.splice(index + 1, 0, copy);
+  _migrateCollection(col);
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return index + 1;
+}
 function moveItemToStart(username, id, index) {
   return moveItemToPosition(username, id, index, 0);
 }

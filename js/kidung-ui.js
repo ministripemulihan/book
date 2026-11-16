@@ -47,7 +47,17 @@ let kidungCurrentBuku = "Kidung";
 // Bawaan `false` (belum dilipat -- SAMA seperti perilaku sebelum
 // perbaikan ini, supaya tidak ada perubahan tampilan mendadak bagi yang
 // belum pernah menyentuh toolbar ini sama sekali di sesi berjalan).
-let _kidungToolbarCollapsed = false;
+// book199 (laporan operator: di HP, hasil cari nomor kidung "belum muncul" padahal sudah -- TERTUTUP toolbar bawah yang terbuka): di layar HP
+// (<= 640px, tempat toolbar ini menempel & menutupi layar) toolbar kini TERLIPAT sejak awal. Pilihan operator (buka/lipat) disimpan di
+// localStorage "kidung_toolbar_collapsed_v1" ("1" lipat / "0" buka) dan dipakai seterusnya; di komputer tetap terbuka seperti dulu.
+let _kidungToolbarCollapsed = (function () {
+  try {
+    const v = localStorage.getItem("kidung_toolbar_collapsed_v1");
+    if (v === "1") return true;
+    if (v === "0") return false;
+    return !!(window.matchMedia && window.matchMedia("(max-width: 640px)").matches);
+  } catch (e) { return false; }
+})();
 
 // FIX (20 Agu 2026) — bug "Kidung No. 95 tidak ditemukan" di HP padahal
 // di komputer ketemu: data Kidung di IndexedDB tiap perangkat SEBELUMNYA
@@ -91,6 +101,7 @@ function setupKidungReaderKeyNav(prevBtn, nextBtn) {
     // pindah kidung.
     const tag = (document.activeElement && document.activeElement.tagName) || "";
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    // SHORTCUT (aplikasi utama, pembaca Kidung): ← / → = kidung sebelumnya/berikutnya. Tetap (tidak ada di ⚙️ Studio).
     if (e.key === "ArrowLeft") {
       if (!prevBtn.disabled) { e.preventDefault(); prevBtn.click(); }
     } else if (e.key === "ArrowRight") {
@@ -853,6 +864,8 @@ async function openKidungReader(buku, no) {
 }
 
 function renderKidungReader(meta, baits) {
+  // book199: catat kidung yang sedang dibuka untuk 📖 Pindah Cepat (js/quickjump.js): tombol ◀ ▶ & "Terakhir dibuka".
+  try { window.__kidungNow = { buku: meta.buku, no: meta.noKidung, judul: meta.judul || "" }; if (window.QuickJump && window.QuickJump.noteKidung) window.QuickJump.noteKidung(window.__kidungNow); } catch (e) { /* abaikan */ }
   const panel = el("kidungPanel");
   if (!panel) return;
   panel.innerHTML = "";
@@ -1740,6 +1753,7 @@ function buildKidungToolbar(meta, baits, bodyEl) {
     // dibuka lewat swipe/panah/tombol) ikut status ini, bukan selalu
     // balik ke "terbuka".
     _kidungToolbarCollapsed = collapsed;
+    try { localStorage.setItem("kidung_toolbar_collapsed_v1", collapsed ? "1" : "0"); } catch (e) { /* abaikan */ } // book199
     toggleBtn.querySelector(".kidung-toolbar-toggle-arrow").textContent = collapsed ? "^" : "v";
   });
   wrap.appendChild(toggleBtn);

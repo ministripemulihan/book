@@ -549,6 +549,14 @@ async function openKidungByKeypad(buku, noRaw) {
 // Format nomor untuk TAMPILAN saja (bukan untuk disimpan/dicari) --
 // keputusan final: Kidung selalu 3 digit dengan nol di depan (No. 095),
 // Suplemen TANPA nol di depan (apa adanya, mis. No. 200).
+// book188 -- kode singkat buku + nomor untuk daftar kidung (mis. "K365", "S200", "Y7"); buku yang tidak
+// dikenal jatuh ke "NamaBuku nomor". Sama dengan peta SHORT di js/kidung-ref.js.
+function kidungShortLabel(buku, no) {
+  const SHORT = { "kidung": "K", "suplemen": "S", "supplemen": "S", "kidung anak": "KA", "tambahan": "T", "young people": "Y", "anak-anak": "A" };
+  const code = SHORT[String(buku || "Kidung").trim().toLowerCase()];
+  const n = formatKidungNo(buku, no);
+  return code ? code + n : String(buku || "").trim() + " " + n;
+}
 function formatKidungNo(buku, no) {
   const n = String(no || "").trim();
   if (buku === "Kidung") return n.padStart(3, "0");

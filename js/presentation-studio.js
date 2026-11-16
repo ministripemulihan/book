@@ -311,11 +311,11 @@ const PresentationStudio = (() => {
     if (topStop) topStop.addEventListener("click", () => window.__psStopAllFx());
     if (!window.PSShortcuts || typeof FunFX === "undefined") return;
     if (topStop) topStop.addEventListener("mouseenter", () => { topStop.title = "Hentikan SEMUA efek, suara, lagu & bel di Layar 2 (pintasan: " + window.PSShortcuts.pretty(window.PSShortcuts.getCombo("fx-stop")) + ")"; });
-    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: "", seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined, apos: FunFX.getAmenPos ? FunFX.getAmenPos() : undefined }); };
+    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; let txt = ""; if (id === "word-custom") { txt = (FunFX.getText && FunFX.getText()) || prompt("Tulisan timbul apa?") || ""; if (!txt.trim()) return; } if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: txt, seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined, apos: FunFX.getAmenPos ? FunFX.getAmenPos() : undefined }); };
     [
       // SHORTCUT-DAFTAR-EFEK: tiap baris = [id, nama di dialog ⚙️, id efek, kombinasi BAWAAN]. Format kombinasi: huruf kecil digabung "+", urutan ctrl, alt, shift, meta, tombol (mis. "alt+shift+z", "ctrl+1", "f9").
       // SHORTCUT-GANTI: ubah teks kombinasi (elemen ke-4) di baris di bawah. Pintasan efek TIDAK memakai logika lama, jadi cukup diubah di sini (atau lewat ⚙️). Hindari F5/Ctrl+R/Ctrl+W (dipakai browser).
-      // SHORTCUT: Z/X/C/V = Amin bersama/pria/wanita/anak · L = Seru nama Tuhan · S = Matahari · A/H/O = tulisan timbul AMIN/HALELUYA/O TUHAN YESUS · Q = HENTIKAN SEMUA  (semuanya dengan Alt+Shift).
+      // SHORTCUT: Z/X/C/V = Amin bersama/pria/wanita/anak · L = Seru nama Tuhan · S = Matahari · A/H/O/P = tulisan timbul AMIN/HALELUYA/O TUHAN YESUS/PUJI TUHAN · U = tulisan CUSTOM (isi dari kolom teks Panel Efek) · N = tutup pita pengumuman · Q = HENTIKAN SEMUA  (semuanya dengan Alt+Shift).
       ["fx-amen-all", "Amin bersama (suara + gambar)", "amen-all", "alt+shift+z"],
       ["fx-amen-male", "Amin pria", "amen-male", "alt+shift+x"],
       ["fx-amen-female", "Amin wanita", "amen-female", "alt+shift+c"],
@@ -325,8 +325,12 @@ const PresentationStudio = (() => {
       ["fx-word-amen", "Tulisan AMIN timbul besar (silau 3D)", "word-amen", "alt+shift+a"],
       ["fx-word-haleluya", "Tulisan HALELUYA timbul besar (silau 3D)", "word-haleluya", "alt+shift+h"],
       ["fx-word-lord", "Tulisan O TUHAN YESUS timbul besar (silau 3D)", "word-lord", "alt+shift+o"],
+      ["fx-word-puji", "Tulisan PUJI TUHAN timbul besar (silau 3D)", "word-puji", "alt+shift+p"],
+      ["fx-word-custom", "Tulisan CUSTOM timbul (isi dari kolom teks Panel Efek)", "word-custom", "alt+shift+u"],
       ["fx-stop", "⏹ HENTIKAN SEMUA efek, suara, lagu & bel", "stop", "alt+shift+q"],
     ].forEach(([id, label, fx, def]) => window.PSShortcuts.registerAction({ id, group: "Efek Layar", label, def, run: () => send(fx) }));
+    // SHORTCUT: Alt+Shift+N = tutup pita pengumuman (tumpuk / sisakan ruang) di Layar 2 dan kembalikan ukuran layar. SHORTCUT-GANTI: ubah teks kombinasi di bawah ini (atau lewat ⚙️).
+    window.PSShortcuts.registerAction({ id: "ann-close", group: "Efek Layar", label: "Tutup pita pengumuman (tumpuk / sisakan ruang)", def: "alt+shift+n", run: () => rawPost({ type: "annoverlay", show: false }) });
   })();
   // Dipakai wireSlideDisplayModeControls_() supaya klik tombol
   // Asli/Sesuai Lebar/Zoom langsung terlihat di slide yang SEDANG
@@ -1151,6 +1155,45 @@ const PresentationStudio = (() => {
         setActivePlaylist(items, i, col.name);
         sendGenericItemLive(items[i]);
       });
+      // BARU (book198, permintaan operator) -- NOMOR urut tiap item + "↪️ Pindah…" (pindah ke SEBELUM nomor yang diketik) + "⧉ Duplikat"
+      // (salinan persis disisipkan TEPAT SESUDAH item ini, lalu langsung tayang di Layar 2 dan jadi slide aktif).
+      (function addRowTools_() {
+        const bodyEl = row.querySelector(".ps-verse-row-body");
+        if (bodyEl && !bodyEl.querySelector(".ps-verse-no")) {
+          const nEl = document.createElement("span");
+          nEl.className = "ps-verse-no"; nEl.textContent = (i + 1) + ".";
+          nEl.style.cssText = "font-weight:800; min-width:2.4em; display:inline-block; color:#8a5a00;";
+          bodyEl.insertBefore(nEl, bodyEl.firstChild);
+        }
+        const delBox = row.querySelector(".ps-verse-row-del");
+        if (!delBox) return;
+        const mvBtn = document.createElement("button");
+        mvBtn.type = "button"; mvBtn.className = "chip-btn small"; mvBtn.textContent = "↪️ Pindah…";
+        mvBtn.title = "Pindahkan item ini ke SEBELUM nomor yang Anda ketik";
+        const dupBtn = document.createElement("button");
+        dupBtn.type = "button"; dupBtn.className = "chip-btn small"; dupBtn.textContent = "⧉ Duplikat";
+        dupBtn.title = "Salin persis item ini, disisipkan tepat sesudahnya, lalu langsung tayang di Layar 2";
+        delBox.insertBefore(dupBtn, delBox.firstChild); delBox.insertBefore(mvBtn, delBox.firstChild);
+        mvBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const total = items.length;
+          const ans = prompt("Item no. " + (i + 1) + " dipindah ke SEBELUM nomor berapa?\n(1 - " + total + "; isi " + (total + 1) + " = paling akhir)", String(Math.max(1, i)));
+          if (ans === null) return;
+          const n = parseInt(ans, 10);
+          if (!(n >= 1)) return;
+          const target = n > total ? total - 1 : (n - 1 > i ? n - 2 : n - 1); // indeks akhir item setelah dipindah
+          if (target === i) return;
+          if (moveItemToPosition(username, sel.value, i, target)) { activePlaylist = null; renderCollectionSelect(); }
+        });
+        dupBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const ni = duplicateItemInCollection(username, sel.value, i);
+          if (ni < 0) return;
+          renderCollectionSelect();
+          const items2 = ((loadCollections(username)[sel.value]) || {}).items || [];
+          if (items2[ni]) { setActivePlaylist(items2, ni, col.name); sendGenericItemLive(items2[ni]); highlightActivePlaylistRow(); }
+        });
+      })();
       // "🎧 Audio Latar"/"🎧 Ganti" -- buka dialog pasang/ganti/lepas link.
       row.querySelector("[data-bgaudio-edit]").addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1977,6 +2020,7 @@ const PresentationStudio = (() => {
   // sesudahnya selalu terasa 1 alur yang sama, bukan 2 perilaku beda.
   function sendGenericItemLive(it) {
     if (!it || typeof Presentation === "undefined") return;
+    if (window.__annOvFromCollection && !(it.type === "announcement")) { window.__annOvFromCollection = false; rawPost({ type: "annoverlay", show: false }); } // book198: pita dari kumpulan ditutup saat pindah ke slide lain
     LVQ.token++; LVQ.pending = null; // book190 -- pindah slide membatalkan video lokal yang sedang "menunggu panah"
     // BARU (18 Sep 2026, permintaan operator "checklist mainkan lagu
     // otomatis begitu masuk slide, entah mp3 unggahan/mp4/YouTube")
@@ -2031,6 +2075,12 @@ const PresentationStudio = (() => {
       clearMonitorVideo_();
     } else if (it.type === "announcement") {
       const txt = (it.title ? it.title + "\n\n" : "") + (it.text || "");
+      const ovp = window.__psAnnOv ? window.__psAnnOv.read() : { mode: "replace" };
+      if (ovp.mode !== "replace") { // book198: pengumuman dari Kumpulan Ayat juga bisa tampil sebagai pita (tumpuk / sisakan ruang)
+        rawPost({ type: "annoverlay", show: true, text: txt, pos: ovp.pos, mode: ovp.mode, bg: ovp.bg, alpha: ovp.alpha, color: ovp.color, maxH: ovp.maxH, align: "center" });
+        window.__annOvFromCollection = true;
+        return;
+      }
       Presentation.sendFreeText(txt);
       renderStudioPreview({ type: "text", text: txt });
       clearMonitorVideo_();
@@ -3495,12 +3545,37 @@ const PresentationStudio = (() => {
         // "📺 Tayangkan sekarang" di sebelahnya, atau klik itemnya di Kumpulan Ayat.
       });
     }
+    // BARU (book198, permintaan operator) -- CARA TAMPIL pengumuman: Ganti layar (lama) / Tumpuk / Sisakan ruang, posisi Atas/Tengah/Bawah, warna.
+    // Pengaturan disimpan (localStorage "ps_ann_overlay_v1") & dipakai juga saat item Pengumuman di Kumpulan Ayat ditayangkan.
+    const ANN_OV_KEY = "ps_ann_overlay_v1";
+    const annOvIds = { mode: "psAnnMode", pos: "psAnnPos", maxH: "psAnnMaxH", bg: "psAnnBg", alpha: "psAnnAlpha", fg: "psAnnFg" };
+    function annOvLoad_() { try { return JSON.parse(localStorage.getItem(ANN_OV_KEY) || "{}") || {}; } catch (e) { return {}; } }
+    function annOvRead_() {
+      const o = Object.assign({ mode: "replace", pos: "top", maxH: "30", bg: "#b31b1b", alpha: "90", fg: "#ffffff" }, annOvLoad_());
+      return { mode: o.mode, pos: o.pos, maxH: Number(o.maxH) || 30, bg: o.bg, alpha: (Number(o.alpha) || 90) / 100, color: o.fg };
+    }
+    window.__psAnnOv = { read: annOvRead_ };
+    (function initAnnOvUi_() {
+      const o = Object.assign({ mode: "replace", pos: "top", maxH: "30", bg: "#b31b1b", alpha: "90", fg: "#ffffff" }, annOvLoad_());
+      Object.keys(annOvIds).forEach((k) => {
+        const c = el(annOvIds[k]); if (!c) return;
+        c.value = o[k];
+        c.addEventListener("change", () => { const cur = annOvLoad_(); cur[k] = c.value; try { localStorage.setItem(ANN_OV_KEY, JSON.stringify(cur)); } catch (e) { /* abaikan */ } });
+        c.addEventListener("input", () => { const cur = annOvLoad_(); cur[k] = c.value; try { localStorage.setItem(ANN_OV_KEY, JSON.stringify(cur)); } catch (e) { /* abaikan */ } });
+      });
+      if (el("psAnnCloseOv")) el("psAnnCloseOv").addEventListener("click", () => rawPost({ type: "annoverlay", show: false }));
+    })();
     if (el("psAnnShowBtn")) {
       el("psAnnShowBtn").addEventListener("click", () => {
         const title = (el("psAnnTitle") && el("psAnnTitle").value.trim()) || "";
         const body = (el("psAnnBody") && el("psAnnBody").value.trim()) || "";
         if (!title && !body) return;
         const full = title ? `${title}\n\n${body}` : body;
+        const ov = annOvRead_();
+        if (ov.mode !== "replace") { // book198: pita tumpuk / sisakan ruang -- isi layar TIDAK diganti
+          rawPost({ type: "annoverlay", show: true, text: full, pos: ov.pos, mode: ov.mode, bg: ov.bg, alpha: ov.alpha, color: ov.color, maxH: ov.maxH, align: psAnnAlign_ === "justify" ? "center" : psAnnAlign_ });
+          return;
+        }
         post({ type: "text", text: full, align: psAnnAlign_, annTitle: title, annBody: body });
       });
     }
@@ -8797,6 +8872,7 @@ const PresentationStudio = (() => {
     { id: "m10", label: "🎬 Kamera Full + Subtitle Atas", camLayout: "subtitle", videoTextOverlay: true, camSubtitleTop: true },
     { id: "m11", label: "⭕ Kamera Full, Teks Bulat", camLayout: "textbubble", videoTextOverlay: false },
   ];
+  window.__psRenderCollections = () => renderCollectionSelect(); // book198: kait uji (tests/studio-collection-tools.jsdom.test.js)
   window.__psModePresets = () => loadModePresets_(); // book194: dipakai js/shortcuts.js untuk menampilkan nama Mode Cepat
   function loadModePresets_() {
     try {
@@ -9530,6 +9606,7 @@ const PresentationStudio = (() => {
     if (typeof FunFX !== "undefined" && el("psFunFxGrid")) {
       FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => {
         if (name === "stop") { window.__psStopAllFx(); return; } // book195: Hentikan = semua efek + suara + lagu + bel
+        if (name === "word-custom" && !(o && o.text)) { const t = prompt("Tulisan timbul apa? (mis. Puji Tuhan, Selamat Natal)"); if (!t || !t.trim()) return; o = Object.assign({}, o, { text: t.trim() }); } // book198
         if (name === "ping") { // book196: cek versi berkas yang termuat di Layar 2
           window.__psFxPingWait = setTimeout(() => { if (FunFX.showStatus) FunFX.showStatus("⚠️ Layar 2 tidak menjawab: present.html di Layar 2 masih versi lama (belum di-upload / masih cache), atau Layar 2 belum dibuka. Upload ulang semua berkas lalu muat ulang Layar 2 dengan Ctrl+Shift+R.", false); }, 2500);
           rawPost({ type: "funfx", name: "ping" });
@@ -12803,7 +12880,7 @@ const PresentationStudio = (() => {
   // konten apa pun yang sedang tayang. Bawaan mati (cornerClockOn:
   // false) supaya operator yang belum pernah menyentuh fiturnya tidak
   // tiba-tiba melihat jam baru muncul di Layar 2.
-  const DEFAULT_STAGE_THEME = { slideAnim: "none", swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false, autoFit: true, refSubScale: 1, refSubFont: "" };
+  const DEFAULT_STAGE_THEME = { slideAnim: "none", swatch: "gelap", font: "'Merriweather', Georgia, serif", bgColor: "#05070c", ink: "#f5f2e8", scale: 1, lineHeight: 1.35, contentScale: 1, kidungGap: 1, koorLabelScale: 1.6, kidungNoColor: true, refScale: 1.5, refColor: "", bold: false, timerScale: 1, timerStyle: "classic", timerClockColor: "", timerClockPos: "center", timerClockStroke: "", timerClockStrokeWidth: 3, camLayout: "full", camSplitPct: 42, camBubbleSize: 200, videoTextOverlay: false, camSplitReverseTB: false, camSubtitleTop: false, bubblePos: "br", textBubbleSize: 420, cornerClockOn: false, cornerClockPos: "top-left", centerClockOn: false, autoFit: true, refSubScale: 1, refSubFont: "", kidungAlign: "center" };
   // BARU (book185) -- 🎞️ Animasi Pindah Slide di Layar 2. Pilihan disimpan di
   // theme.slideAnim (none | book | shrink | right | up | left | down | plane),
   // dikirim ke present.html lewat pesan "theme" yang sama dengan pengaturan
@@ -12897,6 +12974,7 @@ const PresentationStudio = (() => {
     if (el("psRefSubScale")) el("psRefSubScale").value = String(Math.round((theme.refSubScale || 1) * 100));
     if (el("psRefSubScaleValue")) el("psRefSubScaleValue").value = Math.round((theme.refSubScale || 1) * 100);
     if (el("psRefSubFont")) el("psRefSubFont").value = theme.refSubFont || "";
+    if (el("psKidungAlign")) el("psKidungAlign").value = theme.kidungAlign || "center"; // book198
     markSlideAnimButtons_(theme.slideAnim); // BARU (book185)
     // BARU (v54) -- pulihkan ukuran & warna tulisan nama kitab (Layar 2).
     if (el("psRefScale")) el("psRefScale").value = String(Math.round((theme.refScale || 1.5) * 100));
@@ -13018,7 +13096,7 @@ const PresentationStudio = (() => {
     // berubah sampai sesuatu yang lain memicu kirim ulang. Ditambahkan
     // di sini, sekalian dengan 2 toggle orientasi baru (camSplitReverseTB,
     // camSubtitleTop) supaya ketiganya konsisten benar-benar live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim, autoFit: theme.autoFit, refSubScale: theme.refSubScale, refSubFont: theme.refSubFont } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, stageTransparent: theme.stageTransparent, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim, autoFit: theme.autoFit, refSubScale: theme.refSubScale, refSubFont: theme.refSubFont, kidungAlign: theme.kidungAlign } });
   }
 
   function saveAndSendTheme(partial) {
@@ -13042,7 +13120,7 @@ const PresentationStudio = (() => {
     // PERBAIKAN (9 Sep 2026, sesi ke-9) -- lihat catatan panjang di
     // applyThemeToStudioPreview()/rawPost pertama di atas soal
     // `camSplitReverse` yang sebelumnya tidak ikut terkirim live.
-    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim, autoFit: theme.autoFit, refSubScale: theme.refSubScale, refSubFont: theme.refSubFont } });
+    rawPost({ type: "theme", theme: { font: theme.font, bgColor: theme.bgColor, ink: theme.ink, scale: theme.scale, lineHeight: theme.lineHeight, contentScale: theme.contentScale, bold: theme.bold, timerScale: theme.timerScale, timerStyle: theme.timerStyle, timerClockColor: theme.timerClockColor, timerClockPos: theme.timerClockPos, timerClockStroke: theme.timerClockStroke, timerClockStrokeWidth: theme.timerClockStrokeWidth, camLayout: theme.camLayout, camSplitPct: theme.camSplitPct, camBubbleSize: theme.camBubbleSize, videoTextOverlay: theme.videoTextOverlay, camSplitReverse: theme.camSplitReverse, camSplitReverseTB: theme.camSplitReverseTB, camSubtitleTop: theme.camSubtitleTop, bubblePos: theme.bubblePos, bubbleAvoid: theme.bubbleAvoid, textBubbleSize: theme.textBubbleSize, cornerClockOn: theme.cornerClockOn, cornerClockPos: theme.cornerClockPos, centerClockOn: theme.centerClockOn, kidungGap: theme.kidungGap, koorLabelScale: theme.koorLabelScale, kidungNoColor: theme.kidungNoColor, refScale: theme.refScale, refColor: theme.refColor, slideAnim: theme.slideAnim, autoFit: theme.autoFit, refSubScale: theme.refSubScale, refSubFont: theme.refSubFont, kidungAlign: theme.kidungAlign } });
   }
 
   // BARU -- "terapkan tema kiriman": dipanggil dari js/collections.js
@@ -13145,6 +13223,7 @@ const PresentationStudio = (() => {
       if (el("psRefSubScaleValue")) el("psRefSubScaleValue").value = pct;
       saveAndSendTheme({ refSubScale: pct / 100 });
     }
+    if (el("psKidungAlign")) el("psKidungAlign").addEventListener("change", () => saveAndSendTheme({ kidungAlign: el("psKidungAlign").value })); // book198
     if (el("psRefSubScale")) el("psRefSubScale").addEventListener("input", applyInfoScale);
     if (el("psRefSubScaleDec")) el("psRefSubScaleDec").addEventListener("click", () => { el("psRefSubScale").value = Math.max(50, Number(el("psRefSubScale").value) - 10); applyInfoScale(); });
     if (el("psRefSubScaleInc")) el("psRefSubScaleInc").addEventListener("click", () => { el("psRefSubScale").value = Math.min(400, Number(el("psRefSubScale").value) + 10); applyInfoScale(); });

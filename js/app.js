@@ -3698,6 +3698,7 @@ function wireColumnPaneFullscreenEsc() {
   if (_paneFullscreenEscWired) return;
   _paneFullscreenEscWired = true;
   document.addEventListener("keydown", (e) => {
+    // SHORTCUT: Esc = tutup panel baca layar penuh (kolom pembaca). Tetap (tidak ada di ⚙️).
     if (e.key !== "Escape") return;
     const openPane = document.querySelector(".reader-col-pane.pane-fullscreen");
     if (openPane) closeColumnPaneFullscreen(openPane);
@@ -6158,6 +6159,7 @@ function showSimpleDialog(title, bodyBuilderFn, onConfirm, confirmLabel) {
   overlay.appendChild(box);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSimpleDialog(); });
   document.addEventListener("keydown", function escHandler(e) {
+    // SHORTCUT: Esc = tutup kotak dialog sederhana. Tetap (tidak ada di ⚙️).
     if (e.key === "Escape") { closeSimpleDialog(); document.removeEventListener("keydown", escHandler); }
   });
   document.body.appendChild(overlay);
@@ -8757,6 +8759,7 @@ function openCollectionFullscreen(col, startIndex) {
     // Tombol panah kiri/kanan SELALU aktif -- ini juga yang dipakai oleh
     // kebanyakan "clicker"/pointer presentasi nirkabel (mis. Logitech dkk),
     // karena alat itu meniru tombol panah kiri/kanan di papan ketik.
+    // SHORTCUT (aplikasi utama, Mode Layar Penuh Kumpulan): ← / → = slide sebelumnya/berikutnya (juga clicker); PageUp/PageDown/↑/↓/Spasi = sama; Esc = tutup. Tetap (tidak ada di ⚙️ Studio).
     if (e.key === "ArrowLeft") { goPrev(); return; }
     if (e.key === "ArrowRight") { goNext(); return; }
     if (e.key === "Escape") { closeOverlay(); return; }
@@ -10082,11 +10085,20 @@ function initFullscreenControl() {
     return;
   }
 
+  // BARU (book199, laporan operator: layar HITAM ±3 dtk saat masuk layar penuh di HP). Dua hal:
+  //  (1) UKUR: waktu klik -> layar penuh sistem aktif (sys) -> gambar pertama tampil (paint); disimpan di localStorage "reader_fs_last"
+  //      dan, kalau total > 1,5 dtk, muncul petunjuk (maks 2x) -- supaya jelas apakah lambatnya di Android/Chrome (sys) atau di halaman (paint).
+  //  (2) MODE CEPAT: localStorage "reader_fs_mode" = "css" (diatur dari tombol 📖 > "Layar penuh: ⚡ Cepat") -> ⛶ hanya menyalakan mode baca penuh
+  //      (body.reader-clean, header & toolbar tersembunyi) SEGERA, TANPA Fullscreen API sistem -- tidak ada layar hitam peralihan.
+  //      Hanya berlaku bila mode baca penuh tersedia (HP/layar sempit/sentuh); di komputer tetap layar penuh biasa.
+  let fsT0 = 0;
   btn.addEventListener("click", () => {
     const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
     if (!inFs && !isReaderClean()) {
+      const cssOnly = (function () { try { return localStorage.getItem("reader_fs_mode") === "css" && readerCleanEligible(); } catch (e) { return false; } })();
+      fsT0 = cssOnly ? 0 : performance.now();
       if (readerCleanEligible()) setReaderClean(true);
-      if (requestFn) {
+      if (requestFn && !cssOnly) {
         try { const p = requestFn.call(document.documentElement); if (p && p.catch) p.catch(() => {}); } catch (e) { /* mode CSS tetap jalan */ }
       }
     } else {
@@ -10099,6 +10111,18 @@ function initFullscreenControl() {
     const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     const active = !!fsEl;
     if (fsEl === document.documentElement) ourFs = true;
+    if (active && fsT0) { // book199: ukur lama masuk layar penuh sistem (lihat catatan di atas)
+      const t1 = performance.now(), t0 = fsT0; fsT0 = 0;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const sys = Math.round(t1 - t0), paint = Math.round(performance.now() - t1);
+        try { localStorage.setItem("reader_fs_last", JSON.stringify({ sys, paint, at: Date.now() })); } catch (e) { /* abaikan */ }
+        let n = 0; try { n = Number(localStorage.getItem("reader_fs_hint_n") || 0); } catch (e) { /* abaikan */ }
+        if (sys + paint > 1500 && n < 2 && window.QuickJump && window.QuickJump.toast) {
+          try { localStorage.setItem("reader_fs_hint_n", String(n + 1)); } catch (e) { /* abaikan */ }
+          window.QuickJump.toast("⏱ Layar penuh sistem butuh " + ((sys + paint) / 1000).toFixed(1) + " dtk di perangkat ini (sistem " + (sys / 1000).toFixed(1) + " + gambar " + (paint / 1000).toFixed(1) + "). Ketuk 📖 lalu pilih \"Layar penuh: ⚡ Cepat\" untuk masuk instan tanpa layar hitam.", 9000);
+        }
+      }));
+    }
     // keluar dari layar penuh (gestur sistem/Esc) -> mode baca penuh ikut berakhir
     if (!active && ourFs) { ourFs = false; setReaderClean(false); }
     syncFullscreenBtn();
