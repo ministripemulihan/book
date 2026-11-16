@@ -1532,6 +1532,28 @@
             <button type="button" class="ps-ann-icon-btn" data-icon="😄" title="Lucu">😄</button>
             <button type="button" class="ps-ann-icon-btn" data-icon="👍" title="Jempol">👍</button>
           </div>
+          <!-- BARU (book198, permintaan operator) -- CARA TAMPIL pengumuman: ganti layar (seperti biasa) / tumpuk di atas isi layar / sisakan ruang (isi layar diperkecil),
+               di posisi Atas / Tengah / Bawah, dengan warna latar & warna teks. Lihat sendAnnOverlay_() (js/presentation-studio.js) & annOverlayShow_() (present.html). -->
+          <div class="ps-field-label">📌 Cara Tampil Pengumuman</div>
+          <div class="ps-btn-row">
+            <select id="psAnnMode" class="columns-lang-select" title="Ganti layar = seperti biasa. Tumpuk = pita di atas isi layar. Sisakan ruang = isi layar diperkecil (hanya Atas/Bawah)">
+              <option value="replace">🖥️ Ganti layar (seperti biasa)</option>
+              <option value="stack">📌 Tumpuk di atas isi layar</option>
+              <option value="shrink">↕️ Sisakan ruang (layar lain diperkecil)</option>
+            </select>
+            <select id="psAnnPos" class="columns-lang-select" title="Posisi pita pengumuman (Tengah selalu ditumpuk)">
+              <option value="top">⬆️ Atas</option><option value="mid">⏺️ Tengah</option><option value="bottom">⬇️ Bawah</option>
+            </select>
+            <select id="psAnnMaxH" class="columns-lang-select" title="Tinggi pita maksimal (% tinggi layar)">
+              <option value="20">tinggi 20%</option><option value="25">tinggi 25%</option><option value="30" selected>tinggi 30%</option><option value="40">tinggi 40%</option><option value="50">tinggi 50%</option>
+            </select>
+          </div>
+          <div class="ps-btn-row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+            <label>Warna latar <input type="color" id="psAnnBg" value="#b31b1b" /></label>
+            <label>Transparan <input type="range" id="psAnnAlpha" min="20" max="100" value="90" style="width:90px" /></label>
+            <label>Warna teks <input type="color" id="psAnnFg" value="#ffffff" /></label>
+            <button type="button" id="psAnnCloseOv" class="chip-btn small" title="Tutup pita pengumuman di Layar 2 & kembalikan ukuran layar">✖ Tutup pita pengumuman</button>
+          </div>
           <div class="ps-btn-row">
             <button type="button" id="psAnnClearBtn" class="chip-btn small">🗑️ Hapus Isi</button>
             <button type="button" id="psAnnInsertBtn" class="chip-btn small">➕ Sisipkan ke Kumpulan Ayat</button>
@@ -3014,6 +3036,11 @@
           <div class="ps-btn-row">
             <select id="psRefSubFont" class="columns-lang-select"><option value="">Sama dengan huruf utama</option></select>
           </div>
+          <!-- BARU (book198) -- rata teks syair kidung di Layar 2 -->
+          <div class="ps-field-label">📐 Rata Teks Syair Kidung</div>
+          <div class="ps-btn-row">
+            <select id="psKidungAlign" class="columns-lang-select"><option value="center">Tengah (bawaan)</option><option value="left">Kiri</option><option value="right">Kanan</option></select>
+          </div>
           <!-- BARU (v54, 15 Okt 2026, permintaan operator) -- ukuran & warna
                tulisan NAMA KITAB (mis. "Wahyu 2:5") di Layar 2. Lihat
                wireRefLook() (js/presentation-studio.js) & #ref.ref-verse
@@ -4403,6 +4430,7 @@
   <script src="js/pinyin-ruby.js?v=20261017b"></script>
   <script src="js/tts-sync.js?v=20261017b"></script>
   <script src="js/app.js?v=20261018b181"></script>
+  <script src="js/quickjump.js?v=20261112a199"></script> <!-- book199: 📖 pindah kitab cepat + pilihan layar penuh Cepat/Sistem -->
   <script src="js/sync-checklist.js?v=20261016a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->

@@ -73,7 +73,9 @@
 // js/presentation-studio.js, js/presentation.js, js/collections.js, js/app.js).
 // DINAIKKAN LAGI (19 Sep 2026 -- Audio Latar dipindah ke js/bg-audio.js BARU, dimuat sebelum
 // js/presentation-studio.js di index.html).
-const CACHE_NAME = "book-vp-shell-v116"; // v116 (book197: tanda // SHORTCUT di semua pintasan)
+const CACHE_NAME = "book-vp-shell-v118"; // v118 (book199: 📖 pindah kitab/kidung cepat, layar penuh Cepat, toolbar kidung terlipat di HP)
+// v117 (book198: nomor/pindah/duplikat kumpulan, pita pengumuman, PUJI TUHAN+CUSTOM, header kidung satu baris)
+// v116 (book197: tanda // SHORTCUT di semua pintasan)
 // v115 (book196: Cek versi Layar 2, potong format menit:detik, posisi Amin acak/kunci)
 // v114 (book195: Hentikan SEMUA efek+suara+bel, potong durasi suara, info durasi, gaya tulisan timbul)
 // v113 (book194: pusat pintasan js/shortcuts.js + dialog, tulisan timbul AMIN/HALELUYA/O TUHAN YESUS)

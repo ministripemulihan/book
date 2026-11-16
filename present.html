@@ -6419,6 +6419,7 @@
     if (typeof theme.autoFit === "boolean") { autoFitOn_ = theme.autoFit; if (document.body) document.body.classList.toggle("auto-fit-on", autoFitOn_); }
     if (typeof theme.refSubScale === "number" && theme.refSubScale > 0) root.setProperty("--p-refsub-scale", theme.refSubScale);
     if (typeof theme.refSubFont === "string") { if (theme.refSubFont) root.setProperty("--p-refsub-font", theme.refSubFont); else root.removeProperty("--p-refsub-font"); }
+    if (typeof theme.kidungAlign === "string" && /^(center|left|right)$/.test(theme.kidungAlign)) { kidungAlign_ = theme.kidungAlign; if (fitKind_ === "kidung") textEl.style.textAlign = kidungAlign_; }
     if (typeof scheduleFit_ === "function") scheduleFit_();
     if (theme.bgColor) {
       root.setProperty("--p-bg", theme.bgColor);
@@ -6916,6 +6917,7 @@
   // Dipakai ulang tiap kali: ganti slide, ganti tema/ukuran, ubah ukuran jendela, font selesai dimuat.
   // ============================================================
   let autoFitOn_ = true;
+  let kidungAlign_ = "center"; // book198: rata teks syair kidung (theme.kidungAlign)
   let fitKind_ = null;
   let fitTimer_ = 0;
   const FIT_MIN = 0.2;
@@ -6958,6 +6960,7 @@
     fitTimer_ = setTimeout(() => { fitTimer_ = 0; try { fitMainText_(); } catch (e) {} }, 60);
   }
   window.addEventListener("resize", scheduleFit_);
+  window.addEventListener("resize", () => { if (annOvEl_ && window.__lastAnnOv) annOverlayShow_(window.__lastAnnOv); }); // book198: pita ikut menyesuaikan ukuran jendela
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFit_);
 
   function showMain(kind, data) {
@@ -7221,19 +7224,18 @@
       // supaya jemaat langsung tahu bagian mana yang koor.
       refEl.hidden = !data.ref;
       // book188 -- jaga-jaga huruf depan dobel ("KKidung", "SSuplemen", "YYoung People") -> tampil 1x.
-      refEl.textContent = String(data.ref || "").replace(/^([A-Za-z])\1(?=[a-z]{2})/i, "$1");
-      // BARU (4 Sep 2026) -- baris kecil kedua "Pengarang Birama (N Bait)"
-      // (mis. "Witness Lee B 4/4 (7 Bait)", contoh mockup yang diminta
-      // operator) -- disusun dari 3 field terpisah yang dikirim
-      // Presentation.sendKidung() (js/presentation.js), bagian yang
-      // kosong (mis. birama belum diisi di Sheet) otomatis dilewati
-      // supaya tidak ada spasi ganda/baris aneh.
-      let kidungSub = "";
-      if (data.pengarang && String(data.pengarang).trim()) kidungSub += String(data.pengarang).trim();
-      if (data.birama && String(data.birama).trim()) kidungSub += (kidungSub ? " " : "") + String(data.birama).trim();
-      if (data.jumlahBait) kidungSub += (kidungSub ? " " : "") + "(" + data.jumlahBait + " Bait)";
-      refSubEl.hidden = !kidungSub;
-      refSubEl.textContent = kidungSub;
+      // book198 -- HEADER KIDUNG SATU BARIS (permintaan operator): "K157 - Judul - Pengarang - Birama - 6 bait" lalu syair.
+      // Dulu pengarang/birama/jumlah bait ada di baris kecil terpisah (huruf kecil, ikut hilang kalau kosong). Sekarang semuanya
+      // digabung di baris judul (ukuran huruf judul, bisa diatur lewat "Ukuran Tulisan Nama Kitab" & Auto Full); bagian yang kosong dilewati.
+      const kidungTitle_ = String(data.ref || "").replace(/^([A-Za-z])\1(?=[a-z]{2})/i, "$1").trim();
+      const kidungParts_ = [kidungTitle_];
+      if (data.pengarang && String(data.pengarang).trim()) kidungParts_.push(String(data.pengarang).trim());
+      if (data.birama && String(data.birama).trim()) kidungParts_.push(String(data.birama).trim());
+      if (Number(data.jumlahBait) > 0 && !/\bbait\b/i.test(kidungTitle_)) kidungParts_.push(Number(data.jumlahBait) + " bait");
+      // tiap bagian tidak boleh terpecah ("B 4/4" tetap utuh); baris hanya boleh patah di tanda " - "
+      refEl.innerHTML = kidungParts_.filter(Boolean).map((t) => '<span style="white-space:nowrap">' + String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])) + "</span>").join(" - ");
+      refSubEl.hidden = true; // baris kecil lama tidak dipakai lagi untuk kidung
+      refSubEl.textContent = "";
       const escKidung = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       const baitLineHtml = (b) => `<div class="kidung-bait-line">${b.noBait ? `<span class="kidung-no">${escKidung(b.noBait)}.</span> ` : ""}${escKidung(b.teks || "").replace(/\n/g, "<br>")}</div>`;
       const koorBlockHtml = data.koorTeks
@@ -7251,10 +7253,62 @@
         textHtml = baits.map(baitLineHtml).join("") + koorBlockHtml;
       }
       textEl.innerHTML = textHtml;
+      textEl.style.textAlign = kidungAlign_; // book198: rata teks kidung (Tengah bawaan / Kiri / Kanan)
     }
     if (fitKind_) { try { fitMainText_(); } catch (e) {} scheduleFit_(); } // book190 Auto Full (langsung + sekali lagi sesudah font/tata letak settle)
     stageEl.classList.add("fade-in");
     if (stageEl.getAttribute("data-anim") === "plane") flyPaperPlane_(); // BARU (book185)
+  }
+
+  // ============================================================
+  // BARU (book198, permintaan operator) -- PENGUMUMAN TUMPUK / SISAKAN RUANG.
+  // Pengumuman biasa MENGGANTI isi layar. Mode ini menampilkannya sebagai pita berwarna di ATAS/TENGAH/BAWAH layar tanpa mengganti isi:
+  //   mode "stack"  = pita DITUMPUK di atas isi layar apa pun (ayat, kidung, PDF, YouTube, kamera);
+  //   mode "shrink" = isi layar diperkecil (seperti mengecilkan jendela) supaya pita punya ruang sendiri -- hanya untuk posisi Atas/Bawah
+  //                   (posisi Tengah selalu ditumpuk). Ukuran huruf otomatis dicocokkan dengan tinggi pita.
+  // Dikirim Studio: {type:"annoverlay", show, text, pos:"top|mid|bottom", mode:"stack|shrink", bg, alpha, color, maxH, align}.
+  // show:false = tutup pita & kembalikan ukuran layar.
+  // ============================================================
+  let annOvEl_ = null;
+  function annOverlayHide_() {
+    if (annOvEl_) { annOvEl_.remove(); annOvEl_ = null; }
+    const b = document.body;
+    b.style.transform = ""; b.style.transformOrigin = ""; b.style.transition = "";
+  }
+  function annOverlayShow_(d) {
+    window.__lastAnnOv = d;
+    annOverlayHide_();
+    const text = String(d.text || "").trim();
+    if (!text) return;
+    const vh = window.innerHeight, vw = window.innerWidth;
+    const pos = d.pos === "top" || d.pos === "bottom" ? d.pos : "mid";
+    const mode = d.mode === "shrink" && pos !== "mid" ? "shrink" : "stack";
+    const maxHpct = Math.max(10, Math.min(60, Number(d.maxH) || 30));
+    const maxH = vh * maxHpct / 100;
+    const hex = /^#[0-9a-f]{6}$/i.test(d.bg || "") ? d.bg : "#000000";
+    const al = Math.max(0, Math.min(1, d.alpha === undefined ? 0.8 : Number(d.alpha)));
+    const rgb = [1, 3, 5].map((i) => parseInt(hex.substr(i, 2), 16)).join(",");
+    const el = document.createElement("div");
+    el.id = "annOverlay";
+    el.style.cssText = `position:fixed;left:0;right:0;z-index:5000;pointer-events:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:1.2vh 3vw;overflow:hidden;background:rgba(${rgb},${al});color:${/^#[0-9a-f]{6}$/i.test(d.color || "") ? d.color : "#ffffff"};font-family:var(--p-font);font-weight:700;line-height:1.2;white-space:pre-wrap;text-align:${/^(left|right|center)$/.test(d.align || "") ? d.align : "center"};text-shadow:0 2px 6px rgba(0,0,0,.35);${mode === "shrink" ? "height:" + maxH + "px;" : "max-height:" + maxH + "px;"}${pos === "top" ? "top:0;" : pos === "bottom" ? "bottom:0;" : "top:50%;transform:translateY(-50%);"}`;
+    const inner = document.createElement("div");
+    inner.style.cssText = "max-width:94vw;";
+    inner.textContent = text;
+    el.appendChild(inner);
+    document.documentElement.appendChild(el);
+    annOvEl_ = el;
+    // font terbesar yang masih muat di tinggi pita
+    let fs = Math.min(maxH * 0.55, vw * 0.09);
+    const limit = maxH - vh * 0.024;
+    for (let i = 0; i < 40 && fs > 12; i++) { inner.style.fontSize = fs + "px"; if (inner.scrollHeight <= limit && inner.scrollWidth <= vw * 0.94 + 1) break; fs *= 0.93; }
+    inner.style.fontSize = fs + "px";
+    if (mode === "shrink") {
+      const s = 1 - maxHpct / 100;
+      const b = document.body;
+      b.style.transition = "transform .35s ease";
+      b.style.transformOrigin = pos === "top" ? "50% 100%" : "50% 0%";
+      b.style.transform = "scale(" + s + ")";
+    }
   }
 
   // BARU (book185) -- pesawat kertas kecil melintas saat pindah slide (animasi "plane").
@@ -7516,6 +7570,8 @@
     // yang diminta) -- cuma hilang kalau operator menekan tombolnya lagi
     // dari Studio (rawPost({type:"focusmode", on:false})).
     // BARU (18 Okt 2026, book178) -- 🖼️ Logo Pojok Kiri Atas: {type:"cornerlogo", on, size(vw 5-40), opacity(0.1-1)}.
+    // BARU (book198) -- pita pengumuman tumpuk/sisakan ruang (lihat annOverlayShow_()).
+    if (data.type === "annoverlay") { if (data.show === false) annOverlayHide_(); else annOverlayShow_(data); return; }
     if (data.type === "cornerlogo") {
       var clEl = document.getElementById("cornerLogo");
       if (clEl) {
