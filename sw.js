@@ -73,7 +73,9 @@
 // js/presentation-studio.js, js/presentation.js, js/collections.js, js/app.js).
 // DINAIKKAN LAGI (19 Sep 2026 -- Audio Latar dipindah ke js/bg-audio.js BARU, dimuat sebelum
 // js/presentation-studio.js di index.html).
-const CACHE_NAME = "book-vp-shell-v118"; // v118 (book199: 📖 pindah kitab/kidung cepat, layar penuh Cepat, toolbar kidung terlipat di HP)
+const CACHE_NAME = "book-vp-shell-v120"; // v120 (book201: efek kendaraan kereta api/kereta kuda/mobil/helikopter/pesawat/balon udara + suara bisa di-mute)
+// v119 (book200: SoundCloud link dibersihkan, 🎧 Musik Latar mudah, pintasan kolom YouTube)
+// v118 (book199: 📖 pindah kitab/kidung cepat, layar penuh Cepat, toolbar kidung terlipat di HP)
 // v117 (book198: nomor/pindah/duplikat kumpulan, pita pengumuman, PUJI TUHAN+CUSTOM, header kidung satu baris)
 // v116 (book197: tanda // SHORTCUT di semua pintasan)
 // v115 (book196: Cek versi Layar 2, potong format menit:detik, posisi Amin acak/kunci)

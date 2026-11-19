@@ -1057,6 +1057,9 @@
         <button type="button" id="psOpenMonitorBtn" class="chip-btn small" title="Buka jendela ke-3 (monitor.html) khusus pembicara -- menampilkan Sekarang/Selanjutnya dari Kumpulan Ayat">🖥️③ Monitor Pembicara</button>
         <!-- BARU (book194) -- pengaturan pintasan keyboard (js/shortcuts.js): daftar semua pintasan + ganti sesuai selera -->
         <!-- SHORTCUT: tombol merah Stop Efek (pintasan "fx-stop") dan tombol ⚙️ di bawah ini = pusat pengaturan SEMUA pintasan keyboard Studio (js/shortcuts.js). Cari "SHORTCUT" di berkas js untuk melihat/mengganti manual. -->
+        <!-- BARU (book200) -- 🎧 Musik Latar (cara mudah): link YouTube/SoundCloud/MP3 atau berkas musik, tanpa visual; ⏹ kecil = hentikan cepat -->
+        <button type="button" id="psMusicBtn" class="chip-btn small" title="Musik latar (suara saja): tempel link YouTube / SoundCloud / MP3 atau pilih berkas, lalu Putar. Tanpa video.">🎧 Musik</button>
+        <button type="button" id="psMusicStopTop" class="chip-btn small" hidden title="Hentikan musik latar">⏹</button>
         <button type="button" id="psFxStopTop" class="chip-btn small" style="background:#c0392b;color:#fff;border-color:#922b21;font-weight:700" title="Hentikan SEMUA efek, suara, lagu & bel di Layar 2">⏹ Stop Efek</button>
         <button type="button" id="psShortcutBtn" class="chip-btn small" title="Pengaturan pintasan keyboard (ganti sesuai selera)">⚙️</button>
         <button type="button" id="psCloseStudioBtn" class="chip-btn small">✖️ Tutup Studio</button>
@@ -4424,6 +4427,7 @@
        digantikan tab "🎆 Layar Publik" di dalam media-library.js. -->
   <script src="js/favorites.js?v=20260911a"></script>
   <script src="js/media-bibleref.js?v=20261016b"></script>
+  <script src="js/sclink.js?v=20261112a200"></script> <!-- book200: pembersih/penerjemah link SoundCloud (dipakai media-library.js & app.js) -->
   <script src="js/media-library.js?v=20261022a184"></script>
   <script src="js/signup.js?v=20260818b"></script>
   <script src="js/adminbell.js?v=20261022a183"></script>

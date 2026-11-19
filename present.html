@@ -6756,6 +6756,17 @@
   // "soundcloud.com/artis/judul" biasa yang SUDAH bekerja sebelumnya tetap
   // jalan seperti biasa, tidak ikut rusak oleh perbaikan ini.
   async function resolveSoundCloudSrc(trackUrl, autoplay) {
+    // book200: bersihkan link SEBELUM ke widget -- ambil link pertama dari teks (hasil Bagikan HP), m./www. -> soundcloud.com, buang ?si= & utm_*
+    try {
+      const m0 = /https?:\/\/[^\s<>"']+/i.exec(String(trackUrl || ""));
+      if (m0) {
+        const u0 = new URL(m0[0].replace(/[)\].,;:!?]+$/, ""));
+        if (/^(m|mobile|www|open)\.soundcloud\.com$/i.test(u0.hostname)) u0.hostname = "soundcloud.com";
+        Array.from(u0.searchParams.keys()).forEach((k) => { if (/^(si|utm_[a-z]+|ref|app|fbclid|p|c|gclid)$/i.test(k)) u0.searchParams.delete(k); });
+        u0.hash = "";
+        trackUrl = u0.toString().replace(/\/$/, "");
+      }
+    } catch (e) { /* pakai apa adanya */ }
     const paramsTail = "&auto_play=" + (autoplay === false ? "false" : "true") +
       "&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
     try {
@@ -7407,7 +7418,7 @@
       } catch (e) { /* abaikan */ }
       return;
     }
-    if (data.type === "funfx") { if (typeof FunFX !== "undefined") FunFX.play(data.name, { src: data.src, text: data.text, seconds: data.seconds, wstyle: data.wstyle, apos: data.apos }); return; }
+    if (data.type === "funfx") { if (typeof FunFX !== "undefined") FunFX.play(data.name, { src: data.src, text: data.text, seconds: data.seconds, wstyle: data.wstyle, apos: data.apos, vopt: data.vopt, mute: data.mute }); return; }
     // BARU (10 Sep 2026, sesi ke-12) -- lihat catatan panjang
     // setEffectsMuted_()/getEffectsMasterGain_() dekat beep() di atas --
     // dikirim bareng tombol/pintasan "M" Mute di Studio
