@@ -82,6 +82,8 @@ body.reader-clean #quickJumpFab:active,#quickJumpFab:active{opacity:1}
 #quickJump .qj-foot{padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--rule,#e3d8bb);font-size:13px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 #quickJump .qj-chip{padding:6px 10px;border-radius:999px;border:1px solid var(--rule,#cdbf9a);background:#fff;cursor:pointer;font-size:13px;color:inherit}
 #quickJump .qj-chip.on{background:#b8860b;color:#fff;border-color:#8a640a;font-weight:700}
+#qjFsChip{position:fixed;left:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:46;display:flex;gap:6px;align-items:center;max-width:calc(100vw - 84px);flex-wrap:wrap}
+#qjFsChip button{border:1.5px solid #8a640a;background:rgba(255,248,226,.95);color:#2b2418;border-radius:999px;padding:7px 12px;font:700 13px system-ui,sans-serif;box-shadow:0 2px 10px #0004}
 #qjToast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:100060;max-width:90vw;background:#2b2b2b;color:#fff;padding:10px 14px;border-radius:12px;font:600 14px/1.35 system-ui,sans-serif;box-shadow:0 4px 16px #0006;text-align:center}
 `;
     document.head.appendChild(st);
@@ -233,7 +235,40 @@ body.reader-clean #quickJumpFab:active,#quickJumpFab:active{opacity:1}
   }
   function close() { if (overlay) { overlay.remove(); overlay = null; } syncFab(); }
 
+  // ------------------------------------------------------------
+  // book200 (laporan operator: "kenapa mode full screen masih bisa tampil address link yang paling atas"):
+  // Bilah alamat Chrome hanya hilang total kalau (a) layar penuh SISTEM aktif, atau (b) aplikasi dipasang di layar utama (PWA).
+  // Mode "⚡ Cepat" TIDAK memakai layar penuh sistem (supaya tanpa layar hitam), dan layar penuh sistem bisa berakhir sendiri (mis. setelah
+  // pemutar video layar penuh / geser dari atas). Jadi saat mode baca-penuh nyala TAPI bilah alamat kelihatan, muncul tombol kecil:
+  //   [⛶ Sembunyikan bilah alamat] (layar penuh sistem sekali ketuk)   [📲 Pasang aplikasi] (hilang total, tanpa layar hitam)   [✕]
+  // Terdeteksi dari selisih tinggi layar fisik vs tinggi halaman (> 90px = ada bilah browser).
+  // ------------------------------------------------------------
+  const CHIP_DISMISS = "qj_fschip_dismissed";
+  function isStandalone() { try { return matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || navigator.standalone === true; } catch (e) { return false; } }
+  function isMobileUi() { try { return matchMedia("(pointer: coarse)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent); } catch (e) { return false; } }
+  function browserBarVisible() {
+    try { const full = matchMedia("(orientation: portrait)").matches ? screen.height : screen.width; return full - window.innerHeight > 90; } catch (e) { return false; }
+  }
+  function inSystemFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function syncChip() {
+    let chip = $("qjFsChip");
+    const need = isMobileUi() && document.body.classList.contains("reader-clean") && !inSystemFs() && !isStandalone() && browserBarVisible() && !sessionStorage.getItem(CHIP_DISMISS) && !overlay;
+    if (!need) { if (chip) chip.remove(); return; }
+    if (chip) return;
+    ensureStyle();
+    chip = document.createElement("div"); chip.id = "qjFsChip";
+    chip.innerHTML = '<button type="button" data-a="fs">⛶ Sembunyikan bilah alamat</button><button type="button" data-a="pwa">📲 Pasang aplikasi</button><button type="button" data-a="x" aria-label="Tutup">✕</button>';
+    document.body.appendChild(chip);
+    chip.addEventListener("click", (e) => {
+      const a = e.target && e.target.getAttribute && e.target.getAttribute("data-a");
+      if (a === "x") { try { sessionStorage.setItem(CHIP_DISMISS, "1"); } catch (er) { /* abaikan */ } chip.remove(); }
+      else if (a === "fs") { const el = document.documentElement; const f = el.requestFullscreen || el.webkitRequestFullscreen; if (f) { try { const p = f.call(el, { navigationUI: "hide" }); if (p && p.catch) p.catch(() => toast("Browser menolak layar penuh. Coba pasang aplikasi (📲).", 5000)); } catch (er) { toast("Browser menolak layar penuh. Coba pasang aplikasi (📲).", 5000); } } else toast("Browser ini tidak mendukung layar penuh. Pasang aplikasi (📲) untuk menghilangkan bilah alamat.", 6000); }
+      else if (a === "pwa") { const b = $("pwaInstallBtn"); if (b) b.click(); toast("Untuk menghilangkan bilah alamat sepenuhnya: menu Chrome ⋮ → \"Instal aplikasi\" / \"Tambahkan ke layar utama\", lalu buka dari ikon di layar utama.", 9000); }
+    });
+  }
+
   function syncFab() {
+    syncChip();
     if (!fab) return;
     fab.classList.toggle("show", (readerOpen() || kidungActive()) && !overlay);
   }
@@ -249,10 +284,12 @@ body.reader-clean #quickJumpFab:active,#quickJumpFab:active{opacity:1}
     if (kp && typeof MutationObserver === "function") new MutationObserver(syncFab).observe(kp, { attributes: true, attributeFilter: ["hidden"] });
     new MutationObserver(syncFab).observe(document.body, { attributes: true, attributeFilter: ["class"] });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && overlay) { e.preventDefault(); e.stopPropagation(); close(); syncFab(); } }, true);
+    ["fullscreenchange", "webkitfullscreenchange", "reader-clean-change"].forEach((ev) => document.addEventListener(ev, () => setTimeout(syncFab, 150)));
+    window.addEventListener("resize", () => setTimeout(syncFab, 150));
     setInterval(syncFab, 1500); // jaring pengaman (mis. pembaca dibuka tanpa mengubah atribut yang diamati)
     syncFab();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 
-  window.QuickJump = { open, close, toast, parseDirect, noteKidung, FS_KEY };
+  window.QuickJump = { open, close, toast, parseDirect, noteKidung, syncChip, FS_KEY };
 })();

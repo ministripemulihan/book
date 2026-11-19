@@ -311,7 +311,7 @@ const PresentationStudio = (() => {
     if (topStop) topStop.addEventListener("click", () => window.__psStopAllFx());
     if (!window.PSShortcuts || typeof FunFX === "undefined") return;
     if (topStop) topStop.addEventListener("mouseenter", () => { topStop.title = "Hentikan SEMUA efek, suara, lagu & bel di Layar 2 (pintasan: " + window.PSShortcuts.pretty(window.PSShortcuts.getCombo("fx-stop")) + ")"; });
-    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; let txt = ""; if (id === "word-custom") { txt = (FunFX.getText && FunFX.getText()) || prompt("Tulisan timbul apa?") || ""; if (!txt.trim()) return; } if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: txt, seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined, apos: FunFX.getAmenPos ? FunFX.getAmenPos() : undefined }); };
+    const send = (id) => { if (id === "stop") { window.__psStopAllFx(); return; } const qk = FunFX.quick ? FunFX.quick(id) : null; let txt = ""; if (id === "word-custom") { txt = (FunFX.getText && FunFX.getText()) || prompt("Tulisan timbul apa?") || ""; if (!txt.trim()) return; } if (qk) rawPost({ type: "funfx", name: qk.name, src: qk.src, text: txt, seconds: 12, wstyle: FunFX.getWordStyle ? FunFX.getWordStyle() : undefined, apos: FunFX.getAmenPos ? FunFX.getAmenPos() : undefined, vopt: FunFX.getVehicleOpts ? FunFX.getVehicleOpts() : undefined }); };
     [
       // SHORTCUT-DAFTAR-EFEK: tiap baris = [id, nama di dialog ⚙️, id efek, kombinasi BAWAAN]. Format kombinasi: huruf kecil digabung "+", urutan ctrl, alt, shift, meta, tombol (mis. "alt+shift+z", "ctrl+1", "f9").
       // SHORTCUT-GANTI: ubah teks kombinasi (elemen ke-4) di baris di bawah. Pintasan efek TIDAK memakai logika lama, jadi cukup diubah di sini (atau lewat ⚙️). Hindari F5/Ctrl+R/Ctrl+W (dipakai browser).
@@ -327,8 +327,17 @@ const PresentationStudio = (() => {
       ["fx-word-lord", "Tulisan O TUHAN YESUS timbul besar (silau 3D)", "word-lord", "alt+shift+o"],
       ["fx-word-puji", "Tulisan PUJI TUHAN timbul besar (silau 3D)", "word-puji", "alt+shift+p"],
       ["fx-word-custom", "Tulisan CUSTOM timbul (isi dari kolom teks Panel Efek)", "word-custom", "alt+shift+u"],
+      ["fx-veh-train", "🚂 Kereta api berasap (Berjalan bersama Yesus)", "veh-train", "alt+shift+4"],
+      ["fx-veh-carriage", "🐴 Kereta kuda (Berjalan bersama Yesus)", "veh-carriage", "alt+shift+5"],
+      ["fx-veh-car", "🚗 Mobil (Berjalan bersama Yesus)", "veh-car", "alt+shift+6"],
+      ["fx-veh-heli", "🚁 Helikopter (Terbang bersama Tuhan Yesus)", "veh-heli", "alt+shift+7"],
+      ["fx-veh-plane", "✈️ Pesawat terbang (Terbang bersama Tuhan Yesus)", "veh-plane", "alt+shift+8"],
+      ["fx-veh-balloon", "🎈 Balon udara (Terbang bersama Tuhan Yesus)", "veh-balloon", "alt+shift+9"],
       ["fx-stop", "⏹ HENTIKAN SEMUA efek, suara, lagu & bel", "stop", "alt+shift+q"],
     ].forEach(([id, label, fx, def]) => window.PSShortcuts.registerAction({ id, group: "Efek Layar", label, def, run: () => send(fx) }));
+    // SHORTCUT: Alt+Shift+4..9 = kereta api / kereta kuda / mobil / helikopter / pesawat / balon udara · Alt+Shift+0 = MUTE / UNMUTE suara kendaraan (bawaan: suara NYALA).
+    // SHORTCUT-GANTI: ubah teks kombinasi di baris "fx-veh-*" di atas dan di baris "fx-vmute" di bawah (atau lewat ⚙️).
+    window.PSShortcuts.registerAction({ id: "fx-vmute", group: "Efek Layar", label: "🔇/🔊 Mute atau nyalakan suara kendaraan (langsung)", def: "alt+shift+0", run: () => { const nx = localStorage.getItem("funfx_song_vmuted") !== "1"; try { localStorage.setItem("funfx_song_vmuted", nx ? "1" : "0"); } catch (e) { /* abaikan */ } rawPost({ type: "funfx", name: "vmute", mute: nx }); } });
     // SHORTCUT: Alt+Shift+N = tutup pita pengumuman (tumpuk / sisakan ruang) di Layar 2 dan kembalikan ukuran layar. SHORTCUT-GANTI: ubah teks kombinasi di bawah ini (atau lewat ⚙️).
     window.PSShortcuts.registerAction({ id: "ann-close", group: "Efek Layar", label: "Tutup pita pengumuman (tumpuk / sisakan ruang)", def: "alt+shift+n", run: () => rawPost({ type: "annoverlay", show: false }) });
   })();
@@ -521,6 +530,174 @@ const PresentationStudio = (() => {
     syncArmForItem_ = () => {},
   } = BG.fn;
   const BG_STATE_TEXT_ = BG.BG_STATE_TEXT_; // teks + ikon tiap status (dipakai kotak status di panel Kidung)
+
+  // ------------------------------------------------------------
+  // BARU (book200, permintaan operator: "menjalankan YouTube/musik di latar belakang bingung -- buat yang mudah, dan bisa MENGHAPUS
+  // YouTube/berkas musik yang berjalan di latar, tidak perlu visual") -- 🎧 MUSIK LATAR (cara mudah).
+  // Dulu satu-satunya jalan: buka Kidung dulu (panel Audio Latar baru muncul), atau pasang 🎧 per slide lalu atur mode panah. Sekarang
+  // satu tombol "🎧 Musik" di bar atas Studio -> kotak kecil: tempel link YouTube / SoundCloud / MP3 ATAU pilih berkas dari perangkat ->
+  // ▶ Putar. Hanya SUARA (YouTube dimuat tersembunyi di Layar 2 -- tidak ada gambar). ⏯ Jeda/Lanjut, ⏹ Hentikan (bisa diputar lagi dari awal),
+  // 🗑 Hapus (berhenti + dilupakan; berkas upload boleh ikut dihapus dari perangkat). Daftar "Tadi diputar" untuk memutar ulang cepat.
+  // Memakai SALURAN AUDIO LATAR YANG SAMA (satu audio sekali waktu) -- jadi tetap selaras dengan 🎧 per slide & panel Kidung.
+  // Pintasan: "music-panel" (buka kotak) & "music-stop" (hentikan) -- lihat js/shortcuts.js / ⚙️.
+  // ------------------------------------------------------------
+  (function initQuickMusic_() {
+    const REC_KEY = "ps_music_recent_v1";
+    const loadRec = () => { try { const a = JSON.parse(localStorage.getItem(REC_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    const saveRec = (a) => { try { localStorage.setItem(REC_KEY, JSON.stringify(a.slice(0, 10))); } catch (e) { /* abaikan */ } };
+    const rememberRec = (r) => saveRec([r].concat(loadRec().filter((x) => x.url !== r.url)));
+    const user = () => (typeof currentUser !== "undefined" && currentUser) ? currentUser : "tamu";
+    const lib = () => window.BgAudioLibrary || null;
+    let overlay = null, timer = null;
+
+    function ensureStyle() {
+      if (document.getElementById("psMusicStyle")) return;
+      const st = document.createElement("style"); st.id = "psMusicStyle";
+      st.textContent = `
+#psMusicOverlay{position:fixed;inset:0;z-index:100020;background:#000a;display:flex;align-items:center;justify-content:center;padding:12px}
+#psMusicOverlay .psm-panel{width:min(560px,100%);max-height:92vh;overflow:auto;background:#fffaf0;color:#3b2a14;border-radius:14px;box-shadow:0 10px 40px #0008;padding:14px 16px;font:14px/1.4 system-ui,sans-serif}
+#psMusicOverlay .psm-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+#psMusicOverlay .psm-head b{font-size:17px;flex:1}
+#psMusicOverlay .psm-steps{margin:6px 0 10px;padding-left:18px;font-size:12.5px;color:#6b5a3a}
+#psMusicOverlay .psm-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+#psMusicOverlay input[type=text]{flex:1;min-width:150px;padding:8px 10px;border:1px solid #c9a95a;border-radius:8px;font-size:14px}
+#psMusicOverlay .psm-btn{padding:8px 12px;border-radius:9px;border:1px solid #b8860b;background:#fff3d6;cursor:pointer;font-weight:700;color:#3b2a14}
+#psMusicOverlay .psm-btn.pri{background:#b8860b;color:#fff}
+#psMusicOverlay .psm-btn.red{background:#c0392b;color:#fff;border-color:#922b21}
+#psMusicOverlay .psm-now{margin:10px 0;padding:10px 12px;border-radius:10px;background:#1b1b1b;color:#eee;border-left:6px solid #777;font-weight:700}
+#psMusicOverlay .psm-now[data-k=playing]{border-left-color:#2ecc71}#psMusicOverlay .psm-now[data-k=connecting],#psMusicOverlay .psm-now[data-k=loaded]{border-left-color:#3b82f6}
+#psMusicOverlay .psm-now[data-k=paused]{border-left-color:#f1c40f}#psMusicOverlay .psm-now[data-k=error]{border-left-color:#e74c3c}
+#psMusicOverlay .psm-lab{margin:12px 0 4px;font-size:12px;font-weight:800;color:#8a5a00;text-transform:uppercase;letter-spacing:.04em}
+#psMusicOverlay .psm-rec{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px dashed #ead9b5}
+#psMusicOverlay .psm-rec span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`;
+      document.head.appendChild(st);
+    }
+
+    function nowText_() {
+      if (BG.isFallback) return ["k", "none", "⚠️ Audio Latar nonaktif: berkas js/bg-audio.js belum termuat/versinya tidak cocok."];
+      const stt = bgNowState_();
+      const t = (BG_STATE_TEXT_ && BG_STATE_TEXT_[stt.key]) || ["⚪", stt.key];
+      const lab = stt.key === "none" ? "Belum ada musik latar. Tempel link atau pilih berkas di atas." : (stt.label || "");
+      return [stt.key, stt.key, (stt.key === "none" ? "⚪ " : t[0] + " ") + (stt.key === "none" ? lab : t[1] + (lab ? " — " + lab : "")) + (stt.guess ? " (perkiraan)" : "") + (stt.message ? " — " + stt.message : "")];
+    }
+    function refresh_() {
+      if (!overlay) return;
+      const [, k, txt] = nowText_();
+      const now = overlay.querySelector(".psm-now"); now.setAttribute("data-k", k); now.textContent = txt;
+      const running = k === "playing" || k === "connecting";
+      const toggle = overlay.querySelector('[data-a="toggle"]'); if (toggle) toggle.textContent = running ? "⏸ Jeda" : "▶ Putar / Lanjut";
+      const has = !!BG.shared;
+      ["toggle", "stop", "forget", "loop"].forEach((a) => { const b = overlay.querySelector('[data-a="' + a + '"]'); if (b) b.disabled = !has; });
+      const loop = overlay.querySelector('[data-a="loop"]'); if (loop) loop.textContent = BG.shared && BG.shared.loop ? "🔁 Ulang: NYALA" : "🔁 Ulang: mati";
+      syncTop_();
+    }
+    function syncTop_() {
+      const stopTop = el("psMusicStopTop"), btn = el("psMusicBtn");
+      const has = !!BG.shared;
+      if (stopTop) stopTop.hidden = !has;
+      if (btn) { const k = BG.isFallback ? "none" : bgNowState_().key; btn.textContent = (k === "playing" || k === "connecting") ? "🎧 Musik ▶" : "🎧 Musik"; }
+    }
+    function renderRecent_() {
+      if (!overlay) return;
+      const box = overlay.querySelector(".psm-list"); box.innerHTML = "";
+      const rec = loadRec();
+      if (!rec.length) { box.textContent = "Belum ada."; return; }
+      rec.forEach((r) => {
+        const row = document.createElement("div"); row.className = "psm-rec";
+        const sp = document.createElement("span"); sp.textContent = (r.kind === "yt" ? "📺 " : r.kind === "sc" ? "☁️ " : r.upload ? "📁 " : "🎵 ") + (r.label || r.url); sp.title = r.url;
+        const pb = document.createElement("button"); pb.type = "button"; pb.className = "psm-btn"; pb.textContent = "▶"; pb.title = "Putar lagi";
+        pb.addEventListener("click", () => playLoaded_(r.kind, r.url, r.label, !!(overlay.querySelector('[data-a="loopchk"]') || {}).checked));
+        const xb = document.createElement("button"); xb.type = "button"; xb.className = "psm-btn"; xb.textContent = "✕"; xb.title = r.upload ? "Hapus dari daftar DAN dari perangkat" : "Hapus dari daftar";
+        xb.addEventListener("click", async () => {
+          if (r.upload && lib() && r.id) { if (!confirm("Hapus berkas \"" + (r.label || "musik") + "\" dari perangkat ini juga?")) return; try { await lib().remove(user(), r.id); } catch (e) { /* abaikan */ } if (BG.shared && BG.shared.url === r.url) controlSharedBgAudio_("stop", { silent: true }); }
+          saveRec(loadRec().filter((x) => x.url !== r.url)); renderRecent_(); refresh_();
+        });
+        row.appendChild(sp); row.appendChild(pb); row.appendChild(xb); box.appendChild(row);
+      });
+    }
+
+    // muat + putar: memakai saluran Audio Latar yang sama (loadSharedBgAudio_ lalu "play", seperti startBgForItem_)
+    function playLoaded_(kind, url, label, loop, extra) {
+      if (BG.isFallback) { alert("Audio Latar nonaktif: berkas js/bg-audio.js belum termuat. Upload ulang semua berkas lalu muat ulang dengan Ctrl+Shift+R."); return false; }
+      loadSharedBgAudio_(kind, url, label || "Musik latar", !!loop);
+      if (!BG.shared || BG.shared.url !== url) return false; // gagal dimuat (mis. link YouTube tidak dikenali) -- pesan sudah muncul
+      controlSharedBgAudio_("play");
+      rememberRec(Object.assign({ kind, url, label: label || "" }, extra || {}));
+      renderRecent_(); refresh_();
+      return true;
+    }
+    function playLink_() {
+      const inp = overlay.querySelector('[data-a="link"]');
+      let url = String(inp.value || "").trim();
+      if (!url) { inp.focus(); return; }
+      const m = /https?:\/\/[^\s<>"']+/i.exec(url);
+      if (!m) { alert("Itu bukan link. Tempel link YouTube / SoundCloud / MP3 yang diawali https:// — atau pilih berkas lewat tombol 📁."); inp.focus(); return; }
+      url = m[0].replace(/[)\].,;:!?]+$/, "");
+      const kind = guessBgKindFromUrl_(url);
+      let label = kind === "yt" ? "YouTube" : kind === "sc" ? "SoundCloud" : decodeURIComponent((url.split("?")[0].split("/").pop() || "MP3")).slice(0, 40);
+      if (kind === "sc" && window.SCLink) url = window.SCLink.clean(url) || url;
+      if (playLoaded_(kind, url, label, overlay.querySelector('[data-a="loopchk"]').checked)) inp.value = "";
+    }
+    async function pickFile_(file) {
+      if (!file) return;
+      if (!lib()) { alert("Pustaka berkas audio (js/bg-audio-library.js) belum termuat."); return; }
+      try {
+        const entry = await lib().add(user(), file, {});
+        playLoaded_("mp3", lib().uploadUrl(entry.id), entry.name, overlay && overlay.querySelector('[data-a="loopchk"]').checked, { upload: true, id: entry.id });
+      } catch (e) { alert((e && e.message) || "Gagal memuat berkas musik."); }
+    }
+    function forget_() {
+      const sh = BG.shared; if (!sh) return;
+      const r = loadRec().find((x) => x.url === sh.url);
+      controlSharedBgAudio_("stop", { silent: true }); // tanpa keep = berhenti + dilupakan (saluran dikosongkan)
+      if (r && r.upload && lib() && r.id && confirm("Berkas \"" + (r.label || "musik") + "\" ini tersimpan di perangkat. Hapus juga dari perangkat?")) {
+        lib().remove(user(), r.id).catch(() => {}); saveRec(loadRec().filter((x) => x.url !== r.url));
+      }
+      renderRecent_(); refresh_();
+    }
+    function close_() { if (overlay) { overlay.remove(); overlay = null; } if (timer) { clearInterval(timer); timer = null; } syncTop_(); }
+    function open_() {
+      if (overlay) return;
+      ensureStyle();
+      overlay = document.createElement("div"); overlay.id = "psMusicOverlay";
+      overlay.innerHTML = `<div class="psm-panel" role="dialog" aria-label="Musik Latar">
+        <div class="psm-head"><b>🎧 Musik Latar</b><button type="button" class="psm-btn" data-a="close" aria-label="Tutup">✕</button></div>
+        <div style="font-size:12.5px;color:#6b5a3a">Hanya SUARA di belakang layar — tidak ada gambar/video yang tampil.</div>
+        <ol class="psm-steps"><li>Tempel link <b>YouTube / SoundCloud / MP3</b> — <i>atau</i> pilih berkas musik dari perangkat.</li><li>Tekan <b>▶ Putar</b>.</li><li><b>⏹ Hentikan</b> = berhenti (bisa diputar lagi dari awal). <b>🗑 Hapus</b> = berhenti &amp; dilupakan.</li></ol>
+        <div class="psm-row"><input type="text" data-a="link" placeholder="Tempel link YouTube / SoundCloud / MP3 di sini" /><button type="button" class="psm-btn pri" data-a="playlink">▶ Putar</button></div>
+        <div class="psm-row"><button type="button" class="psm-btn" data-a="pickfile">📁 Pilih berkas musik…</button><input type="file" data-a="file" accept="audio/*" hidden /><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" data-a="loopchk" /> 🔁 ulang terus</label></div>
+        <div class="psm-now" data-k="none" role="status" aria-live="polite"></div>
+        <div class="psm-row"><button type="button" class="psm-btn pri" data-a="toggle">▶ Putar / Lanjut</button><button type="button" class="psm-btn" data-a="stop">⏹ Hentikan</button><button type="button" class="psm-btn red" data-a="forget">🗑 Hapus</button><button type="button" class="psm-btn" data-a="loop">🔁 Ulang: mati</button></div>
+        <div class="psm-lab">Tadi diputar</div><div class="psm-list"></div></div>`;
+      document.body.appendChild(overlay);
+      const q = (a) => overlay.querySelector('[data-a="' + a + '"]');
+      q("close").addEventListener("click", close_);
+      overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) close_(); });
+      q("playlink").addEventListener("click", playLink_);
+      q("link").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); playLink_(); } });
+      q("pickfile").addEventListener("click", () => q("file").click());
+      q("file").addEventListener("change", () => { const f = q("file").files && q("file").files[0]; q("file").value = ""; pickFile_(f); });
+      q("toggle").addEventListener("click", () => { toggleBgPlayPause_(); setTimeout(refresh_, 200); });
+      q("stop").addEventListener("click", () => { controlSharedBgAudio_("stop", { keep: true }); refresh_(); });
+      q("forget").addEventListener("click", forget_);
+      q("loop").addEventListener("click", () => { controlSharedBgAudio_("toggleloop"); setTimeout(refresh_, 200); });
+      renderRecent_(); refresh_();
+      timer = setInterval(refresh_, 1200);
+      setTimeout(() => { try { q("link").focus(); } catch (e) { /* abaikan */ } }, 50);
+    }
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && overlay) { e.preventDefault(); e.stopPropagation(); close_(); } }, true);
+    const btn = el("psMusicBtn"); if (btn) btn.addEventListener("click", open_);
+    const stopTop = el("psMusicStopTop");
+    if (stopTop) stopTop.addEventListener("click", () => { if (BG.shared) controlSharedBgAudio_("stop", { keep: true }); syncTop_(); });
+    setInterval(syncTop_, 2000);
+    window.__psMusic = { open: open_, close: close_, stop: () => { if (BG.shared) controlSharedBgAudio_("stop", { keep: true }); syncTop_(); }, playLoaded: playLoaded_ };
+    // SHORTCUT: pintasan "music-panel" (bawaan Alt+Shift+M = buka kotak Musik Latar) & "music-stop" (bawaan Alt+Shift+K = hentikan musik latar).
+    // SHORTCUT-GANTI: ubah teks kombinasi di dua baris di bawah (atau lewat ⚙️).
+    if (window.PSShortcuts) {
+      window.PSShortcuts.registerAction({ id: "music-panel", group: "Efek Layar", label: "Buka kotak 🎧 Musik Latar (YouTube / MP3 di belakang layar)", def: "alt+shift+m", run: () => open_() });
+      window.PSShortcuts.registerAction({ id: "music-stop", group: "Efek Layar", label: "⏹ Hentikan musik latar", def: "alt+shift+k", run: () => window.__psMusic.stop() });
+    }
+  })();
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -7860,6 +8037,25 @@ const PresentationStudio = (() => {
     applyYtView_();
     updateYtFilterBadge_();
 
+    // BARU (book200, permintaan operator) -- PINTASAN KOLOM PANEL YOUTUBE: ganti 1 -> 2 -> 3 -> 1 kolom (sama dengan tombol ↔ di toolbar YouTube),
+    // atau langsung ke 1 / 2 / 3 kolom. Ikut membuka tab ▶️ YouTube kalau belum aktif (tingkat lebar hanya terlihat di tab itu).
+    // SHORTCUT: Alt+Shift+Y = ganti kolom 1→2→3→1 · Alt+Shift+1 / 2 / 3 = langsung 1 / 2 / 3 kolom panel YouTube.
+    // SHORTCUT-GANTI: ubah teks kombinasi (parameter ke-4 tiap baris) di daftar di bawah, atau lewat ⚙️ di Studio.
+    window.__psYtCols = {
+      get: () => ytView_.wide + 1,
+      set: (n) => { ytView_.wide = Math.max(0, Math.min(2, (Number(n) || 1) - 1)); applyYtView_(); saveYtView_(); },
+      cycle: () => { ytView_.wide = (ytView_.wide + 1) % 3; applyYtView_(); saveYtView_(); },
+    };
+    if (window.PSShortcuts) {
+      const showYtTab_ = () => { const tb = document.querySelector('[data-ps-mid-tab="youtube"]'); if (tb && !tb.classList.contains("active")) tb.click(); };
+      [
+        ["yt-cols-cycle", "Panel YouTube: ganti kolom 1 → 2 → 3 → 1", "alt+shift+y", () => window.__psYtCols.cycle()],
+        ["yt-cols-1", "Panel YouTube: langsung 1 kolom", "alt+shift+1", () => window.__psYtCols.set(1)],
+        ["yt-cols-2", "Panel YouTube: langsung 2 kolom (tengah + kanan menyatu)", "alt+shift+2", () => window.__psYtCols.set(2)],
+        ["yt-cols-3", "Panel YouTube: langsung 3 kolom (kiri + tengah + kanan menyatu)", "alt+shift+3", () => window.__psYtCols.set(3)],
+      ].forEach(([id, label, def, fn]) => window.PSShortcuts.registerAction({ id, group: "Panel YouTube", label, def, run: () => { showYtTab_(); fn(); } }));
+    }
+
     // BARU (28 Sep 2026) -- daftar ditampilkan BERTAHAP (60 per halaman) supaya
     // ratusan video tidak dirender sekaligus; tombol "Tampilkan lagi" menambah
     // baris tanpa menggambar ulang / melompatkan scroll. Ganti filter atau
@@ -9606,13 +9802,14 @@ const PresentationStudio = (() => {
     if (typeof FunFX !== "undefined" && el("psFunFxGrid")) {
       FunFX.renderStudioControls(el("psFunFxGrid"), (name, o) => {
         if (name === "stop") { window.__psStopAllFx(); return; } // book195: Hentikan = semua efek + suara + lagu + bel
+        if (name === "vmute") { rawPost({ type: "funfx", name: "vmute", mute: !!(o && o.mute) }); return; } // book201: mute/unmute suara kendaraan langsung
         if (name === "word-custom" && !(o && o.text)) { const t = prompt("Tulisan timbul apa? (mis. Puji Tuhan, Selamat Natal)"); if (!t || !t.trim()) return; o = Object.assign({}, o, { text: t.trim() }); } // book198
         if (name === "ping") { // book196: cek versi berkas yang termuat di Layar 2
           window.__psFxPingWait = setTimeout(() => { if (FunFX.showStatus) FunFX.showStatus("⚠️ Layar 2 tidak menjawab: present.html di Layar 2 masih versi lama (belum di-upload / masih cache), atau Layar 2 belum dibuka. Upload ulang semua berkas lalu muat ulang Layar 2 dengan Ctrl+Shift+R.", false); }, 2500);
           rawPost({ type: "funfx", name: "ping" });
           return;
         }
-        rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12, wstyle: typeof FunFX.getWordStyle === "function" ? FunFX.getWordStyle() : undefined, apos: typeof FunFX.getAmenPos === "function" ? FunFX.getAmenPos() : undefined });
+        rawPost({ type: "funfx", name, src: (o && o.src) || "", text: (o && o.text) || "", seconds: (o && o.seconds) || 12, wstyle: typeof FunFX.getWordStyle === "function" ? FunFX.getWordStyle() : undefined, apos: typeof FunFX.getAmenPos === "function" ? FunFX.getAmenPos() : undefined, vopt: typeof FunFX.getVehicleOpts === "function" ? FunFX.getVehicleOpts() : undefined });
       });
     }
     document.querySelectorAll("[data-shout]").forEach((btn) => {

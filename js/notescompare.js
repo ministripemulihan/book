@@ -27,7 +27,7 @@ const NotesCompare = (function () {
   };
   const KIND_SEVERITY = { "kosong-id": 1, "kosong-en": 1, "bahasa-salah": 1, "pendek-id": 2, "jumlah-beda": 2, "rujukan-beda": 3, "panjang-id": 3 };
 
-  let state = { flagged: [], summary: null, filterKind: "__all__", filterBook: "", scanned: false };
+  let state = { flagged: [], summary: null, filterKind: "__all__", filterBook: "", scanned: false, limit: 200 };
 
   function esc_(s) {
     return typeof escapeHtml === "function"
@@ -35,12 +35,19 @@ const NotesCompare = (function () {
       : String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
   function plain_(html) {
-    return String(html || "")
+    const t = String(html || "")
       .replace(/<\/p>/gi, "\n")
       .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/g, " ")
       .replace(/[ \t]+/g, " ")
       .trim();
+    return isPlaceholder_(t) ? "" : t;
+  }
+  // BARU (book183): teks pengisi seperti "Tidak ada catatan" / "-" dianggap
+  // KOSONG, bukan notes sungguhan. Tanpa ini, Bilangan 1:1 yang notes
+  // Indonesia-nya cuma berisi pengisi tidak dihitung "kosong".
+  function isPlaceholder_(t) {
+    return /^(tidak ada (catatan|notes?)|belum ada (catatan|notes?)|no notes?|n\/a|[-–—.]+)\.?$/i.test(String(t || "").trim());
   }
   function entryCount_(html) {
     if (typeof parseFootnoteEntries !== "function") return 0;
@@ -180,7 +187,7 @@ const NotesCompare = (function () {
       wrap.appendChild(p);
       return;
     }
-    const shown = list.slice(0, 200);
+    const shown = list.slice(0, state.limit);
     const table = document.createElement("table");
     table.className = "log-table";
     table.innerHTML = "<thead><tr><th>Ayat</th><th>Temuan</th><th>Cuplikan Indonesia</th><th>Cuplikan Inggris</th><th></th></tr></thead><tbody>" +
@@ -195,7 +202,12 @@ const NotesCompare = (function () {
     if (list.length > shown.length) {
       const n = document.createElement("p");
       n.className = "media-empty";
-      n.textContent = `Menampilkan ${shown.length} dari ${list.length}. Persempit dengan filter, atau simpan CSV untuk semuanya.`;
+      n.textContent = `Menampilkan ${shown.length} dari ${list.length}. `;
+      const more = document.createElement("button");
+      more.type = "button"; more.className = "chip-btn small";
+      more.textContent = "Tampilkan 200 lagi";
+      more.addEventListener("click", () => { state.limit += 200; renderResults_(wrap); });
+      n.appendChild(more);
       wrap.appendChild(n);
     }
     table.querySelectorAll("tbody tr").forEach((tr, i) => {
@@ -209,6 +221,77 @@ const NotesCompare = (function () {
     wrap._csvList = list;
   }
 
+  // ------------------------------------------------------------
+  // BARU (book183) -- 🔎 CEK 1 AYAT (administrator). Ketik mis. "Bilangan 1:1":
+  // tampilkan notes Indonesia & Inggris berdampingan per entri, apakah data
+  // ayatnya ADA di perangkat ini, dan hasil pemeriksaan otomatis (kenapa
+  // ditandai / kenapa lolos). Tidak perlu pindai semua ayat dulu.
+  // ------------------------------------------------------------
+  function findVerseRecs_(bookNumber, chapter, verse) {
+    const out = { rvind: null, rveng: null, ind: 0, eng: 0 };
+    const src = typeof bibleData !== "undefined" ? bibleData : [];
+    for (let i = 0; i < src.length; i++) {
+      const v = src[i];
+      if (v.lang === "rvind") out.ind++; else if (v.lang === "rveng") out.eng++;
+      if ((v.lang === "rvind" || v.lang === "rveng") && Number(v.bookNumber) === bookNumber && Number(v.chapter) === chapter && Number(v.verse) === verse) {
+        out[v.lang] = v;
+      }
+    }
+    return out;
+  }
+  function entryList_(html) {
+    if (typeof parseFootnoteEntries !== "function") return [];
+    return parseFootnoteEntries(html).map((e) => plain_((e.parts || []).map((x) => "<p>" + x + "</p>").join("")));
+  }
+  function checkOneVerse_(query, out) {
+    out.innerHTML = "";
+    const add = (html, cls) => { const d = document.createElement("div"); if (cls) d.className = cls; d.innerHTML = html; out.appendChild(d); return d; };
+    const ref = typeof parseReference === "function" ? parseReference(query) : null;
+    if (!ref || !ref.verseStart) { add('<p class="media-empty">Tulis seperti: <b>Bilangan 1:1</b></p>'); return; }
+    const recs = findVerseRecs_(ref.book.num, ref.chapter, ref.verseStart);
+    const title = `${esc_(ref.book.name)} ${ref.chapter}:${ref.verseStart}`;
+    if (!recs.ind || !recs.eng) {
+      add(`<p class="media-empty"><b>${title}</b> — data belum lengkap di perangkat ini: Indonesia (Recovery) ${recs.ind} baris, Inggris (Recovery) ${recs.eng} baris. ` +
+        `Unduh dulu lewat ⋮ → Unduh Data Alkitab.</p>`);
+      if (!recs.ind && !recs.eng) return;
+    }
+    const idNote = recs.rvind ? recs.rvind.note || "" : "";
+    const enNote = recs.rveng ? recs.rveng.note || "" : "";
+    const lines = [];
+    lines.push(`Baris ayat Indonesia: <b>${recs.rvind ? "ada" : "TIDAK ADA"}</b> · Inggris: <b>${recs.rveng ? "ada" : "TIDAK ADA"}</b>`);
+    lines.push(`Notes Indonesia: <b>${plain_(idNote).length}</b> huruf, ${entryCount_(idNote)} entri · Notes Inggris: <b>${plain_(enNote).length}</b> huruf, ${entryCount_(enNote)} entri`);
+    const kinds = classify_(idNote, enNote);
+    lines.push(kinds.length
+      ? "Hasil: <b>DITANDAI</b> — " + kinds.map((k) => `${esc_(KIND_LABEL[k.kind])} (${esc_(k.detail)})`).join("; ")
+      : (plain_(idNote) || plain_(enNote)
+        ? "Hasil: <b>lolos</b> — panjang, jumlah entri, dan angka rujukan masih dianggap mirip. Kalau isinya tetap terlihat salah, bandingkan manual di bawah (pemeriksa otomatis tidak membaca makna)."
+        : "Hasil: kedua notes kosong, jadi tidak ada yang dibandingkan."));
+    add(`<p><b>${title}</b></p><p class="log-count">${lines.join("<br>")}</p>`);
+    const a = entryList_(idNote), b = entryList_(enNote);
+    const n = Math.max(a.length, b.length);
+    if (n) {
+      let rows = "";
+      for (let i = 0; i < n; i++) {
+        const ra = a[i] ? [...refNumbers_(a[i])] : [], rb = b[i] ? [...refNumbers_(b[i])] : [];
+        const same = ra.filter((x) => rb.indexOf(x) !== -1).length;
+        rows += `<tr><td>${i + 1}</td><td class="lc-snippet">${a[i] ? esc_(a[i]) : "<em>(tidak ada)</em>"}</td>` +
+          `<td class="lc-snippet">${b[i] ? esc_(b[i]) : "<em>(tidak ada)</em>"}</td>` +
+          `<td><small>angka rujukan sama ${same} dari ${Math.max(ra.length, rb.length)}</small></td></tr>`;
+      }
+      add(`<div class="log-table-wrap"><table class="log-table"><thead><tr><th>#</th><th>Indonesia</th><th>Inggris</th><th>Rujukan</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+    } else if (plain_(idNote) || plain_(enNote)) {
+      add(`<div class="log-table-wrap"><table class="log-table"><thead><tr><th>Indonesia</th><th>Inggris</th></tr></thead><tbody><tr><td class="lc-snippet">${esc_(plain_(idNote)) || "<em>(kosong)</em>"}</td><td class="lc-snippet">${esc_(plain_(enNote)) || "<em>(kosong)</em>"}</td></tr></tbody></table></div>`);
+    }
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "chip-btn small"; btn.textContent = "Buka ayat ini";
+    btn.addEventListener("click", () => {
+      if (typeof currentLang !== "undefined") currentLang = "rvind";
+      if (typeof langSelectEl === "function" && langSelectEl()) langSelectEl().value = "rvind";
+      if (typeof renderChapter === "function") renderChapter(ref.book.num, ref.chapter, ref.verseStart);
+    });
+    out.appendChild(btn);
+  }
+
   // Dipanggil dari renderLangCheckPanel() (js/langcheck.js). Mengembalikan blok UI siap pasang.
   function buildSection() {
     const box = document.createElement("div");
@@ -218,6 +301,11 @@ const NotesCompare = (function () {
       <p class="media-empty">Mencari ayat yang notes-nya <b>kosong di satu bahasa</b> atau <b>jauh berbeda</b> panjang, jumlah entri, dan angka rujukannya.
       Tidak diterjemahkan — hanya info ayat mana yang perlu dicek di Google Sheet. Heuristik, bukan 100% akurat.</p>
       <div class="log-controls">
+        <label>🔎 Cek 1 ayat: <input type="text" class="nc-one" placeholder="mis. Bilangan 1:1" /></label>
+        <button type="button" class="chip-btn nc-one-btn">Cek</button>
+      </div>
+      <div class="log-table-wrap nc-one-out"></div>
+      <div class="log-controls">
         <button type="button" class="chip-btn primary nc-scan">🔍 Bandingkan Notes</button>
         <label>Temuan: <select class="columns-lang-select nc-kind"><option value="__all__">Semua</option>${Object.keys(KIND_LABEL).map((k) => `<option value="${k}">${esc_(KIND_LABEL[k])}</option>`).join("")}</select></label>
         <label>Cari ayat: <input type="text" class="nc-book" placeholder="mis. Bilangan" /></label>
@@ -225,6 +313,10 @@ const NotesCompare = (function () {
       </div>
       <div class="log-table-wrap nc-results"><p class="media-empty">Tekan "🔍 Bandingkan Notes" untuk memulai.</p></div>`;
     const wrap = box.querySelector(".nc-results");
+    const oneIn = box.querySelector(".nc-one"), oneOut = box.querySelector(".nc-one-out");
+    const runOne = () => checkOneVerse_(oneIn.value, oneOut);
+    box.querySelector(".nc-one-btn").addEventListener("click", runOne);
+    oneIn.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); runOne(); } });
     const kindSel = box.querySelector(".nc-kind");
     kindSel.value = state.filterKind;
     if (state.scanned) renderResults_(wrap);

@@ -32,6 +32,14 @@ const FunFX = (function () {
     { id: "word-amen", icon: "✨", label: "Tulisan AMIN timbul (silau 3D)", song: null },
     { id: "word-haleluya", icon: "✨", label: "Tulisan HALELUYA timbul (silau 3D)", song: null },
     { id: "word-lord", icon: "✨", label: "Tulisan O TUHAN YESUS timbul (silau 3D)", song: null },
+    { id: "word-puji", icon: "✨", label: "Tulisan PUJI TUHAN timbul (silau 3D)", song: null },
+    { id: "word-custom", icon: "✨", label: "Tulisan CUSTOM timbul (ketik di kolom teks)", song: null },
+    { id: "veh-train", icon: "🚂", label: "Kereta api berasap (Berjalan bersama Yesus)", song: null },
+    { id: "veh-carriage", icon: "🐴", label: "Kereta kuda (Berjalan bersama Yesus)", song: null },
+    { id: "veh-car", icon: "🚗", label: "Mobil (Berjalan bersama Yesus)", song: null },
+    { id: "veh-heli", icon: "🚁", label: "Helikopter (Terbang bersama Tuhan Yesus)", song: null },
+    { id: "veh-plane", icon: "✈️", label: "Pesawat terbang (Terbang bersama Tuhan Yesus)", song: null },
+    { id: "veh-balloon", icon: "🎈", label: "Balon udara (Terbang bersama Tuhan Yesus)", song: null },
   ];
   const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer", amen_all: "Suara Amin Bersama", amen_male: "Suara Amin Pria", amen_female: "Suara Amin Wanita", amen_kids: "Suara Amin Anak-anak", call_lord: "Suara Seru Nama Tuhan" };
   const LS_PREFIX = "funfx_song_";
@@ -174,12 +182,15 @@ const FunFX = (function () {
   }
   // book195 -- batas durasi putar per suara (detik; 0 = putar penuh). Suara "Amin" bawaan dipotong 8 detik supaya berkas panjang (mis. 3 menit)
   // tidak terus bunyi; bisa diubah di kolom "✂️ potong" tiap baris suara.
+  const BUILD = "196"; // dipakai "Cek versi Layar 2" (Studio membandingkan dengan versi yang termuat di Layar 2)
   const MAX_DEFAULT = { amen_all: 8, amen_male: 8, amen_female: 8, amen_kids: 8, call_lord: 12 };
   function getSongMax(song) {
     try { const v = localStorage.getItem(LS_PREFIX + "max_" + song); if (v !== null && v !== "") return Math.max(0, Number(v) || 0); } catch (e) { /* abaikan */ }
     return MAX_DEFAULT[song] || 0;
   }
-  function setSongMax(song, n) { try { localStorage.setItem(LS_PREFIX + "max_" + song, String(Math.max(0, Number(n) || 0))); } catch (e) { /* abaikan */ } }
+  // Bisa diisi detik ("90") atau menit:detik ("1:30").
+  function parseSecs(v) { v = String(v || "").trim(); const m = /^(\d+):(\d{1,2})$/.exec(v); return m ? Number(m[1]) * 60 + Number(m[2]) : Math.max(0, Number(v.replace(",", ".")) || 0); }
+  function setSongMax(song, n) { try { localStorage.setItem(LS_PREFIX + "max_" + song, String(Math.max(0, parseSecs(n)))); } catch (e) { /* abaikan */ } }
   function getSongUrl(song) { try { return localStorage.getItem(LS_PREFIX + song) || ""; } catch (e) { return ""; } }
   function setSongUrl(song, url) {
     try { if (url) localStorage.setItem(LS_PREFIX + song, url); else localStorage.removeItem(LS_PREFIX + song); } catch (e) { /* abaikan */ }
@@ -654,7 +665,17 @@ const FunFX = (function () {
   //  Suara: link/berkas milik operator (Panel Efek > bagian "Suara", kunci amen_all/male/female/kids); kosong = suara sintesis bawaan.
   // ------------------------------------------------------------
   let amenClean = null;
-  async function amen(id) {
+  // book196 -- posisi gambar Amin: acak tiap kali (bawaan) / TERKUNCI (acak sekali lalu tetap di situ) / kiri / tengah / kanan.
+  function getAmenPos() { try { const o = JSON.parse(localStorage.getItem(LS_PREFIX + "amenpos") || "{}") || {}; return { mode: o.mode || "random", x: typeof o.x === "number" ? o.x : null }; } catch (e) { return { mode: "random", x: null }; } }
+  function setAmenPos(o) { try { localStorage.setItem(LS_PREFIX + "amenpos", JSON.stringify(o)); } catch (e) { /* abaikan */ } }
+  function amenX(optMode) {
+    const cur = getAmenPos(), mode = (optMode && optMode.mode) || cur.mode;
+    const FIX = { left: 0.12, center: 0.42, right: 0.7 };
+    if (FIX[mode] !== undefined) return FIX[mode];
+    if (mode === "locked") { if (cur.x === null) { cur.x = rnd(0.12, 0.7); cur.mode = "locked"; setAmenPos(cur); } return cur.x; }
+    return rnd(0.12, 0.7);
+  }
+  async function amen(id, apos) {
     if (amenClean) amenClean();
     const layer = makeLayer();
     let dead = false;
@@ -663,7 +684,7 @@ const FunFX = (function () {
     const kids = ["👦", "👧", "🧒"];
     const people = id === "amen-male" ? ["👨"] : id === "amen-female" ? ["👩"] : id === "amen-kids" ? [pick(kids), pick(kids)] : ["👨", "👩", pick(kids)];
     const fig = document.createElement("div"); fig.className = "ff-amen-fig";
-    fig.style.left = rnd(vw() * 0.12, vw() * 0.7) + "px";
+    fig.style.left = (amenX(apos) * vw()) + "px";
     const bub = document.createElement("div"); bub.className = "ff-amen-bub"; bub.textContent = "Amin!";
     const row = document.createElement("div"); row.className = "ff-amen-row";
     const els = people.map((e) => { const d = document.createElement("div"); d.className = "ff-amen-p"; d.innerHTML = `<div>${e}</div><div class="ff-amen-hands">🙏</div>`; row.appendChild(d); return d; });
@@ -762,16 +783,18 @@ const FunFX = (function () {
     const m = (i) => Math.round(p(c.substr(i, 2)) * (1 - k) + p(t.substr(i, 2)) * k).toString(16).padStart(2, "0");
     return "#" + m(0) + m(2) + m(4);
   }
-  const WORD_DEFAULT_COLOR = { "word-amen": "#ffc83d", "word-haleluya": "#7fd0ff", "word-lord": "#ff9d8a" };
+  const WORD_DEFAULT_COLOR = { "word-amen": "#ffc83d", "word-haleluya": "#7fd0ff", "word-lord": "#ff9d8a", "word-puji": "#7ee8a2", "word-custom": "#c9a0ff" };
   function getWordStyle() {
     let o = {}; try { o = JSON.parse(localStorage.getItem(LS_PREFIX + "wordstyle") || "{}") || {}; } catch (e) { o = {}; }
-    return { colors: Object.assign({}, WORD_DEFAULT_COLOR, o.colors || {}), font: o.font || "", blinks: Math.max(1, Math.min(9, Number(o.blinks) || 3)), hold: !!o.hold };
+    return { colors: Object.assign({}, WORD_DEFAULT_COLOR, o.colors || {}), font: o.font || "", blinks: Math.max(1, Math.min(9, Number(o.blinks) || 3)), hold: !!o.hold, size: Math.max(30, Math.min(100, Number(o.size) || 100)) };
   }
   function setWordStyle(st) { try { localStorage.setItem(LS_PREFIX + "wordstyle", JSON.stringify(st)); } catch (e) { /* abaikan */ } }
   const WORDS = {
     "word-amen": { t: "AMIN", a: "#fff3b0", b: "#ffc83d", c: "#e08a00", sh: "#b36b00", glow: "#ffd23f" },
     "word-haleluya": { t: "HALELUYA", a: "#e8f8ff", b: "#7fd0ff", c: "#2f8fe0", sh: "#1d5fa8", glow: "#8fd8ff" },
     "word-lord": { t: "O TUHAN YESUS", a: "#ffe3dc", b: "#ff9d8a", c: "#e0584a", sh: "#a8332a", glow: "#ffb3a3" },
+    "word-puji": { t: "PUJI TUHAN", a: "#e6ffef", b: "#7ee8a2", c: "#2fae62", sh: "#1b7040", glow: "#9af0bb" },
+    "word-custom": { t: "", a: "#f1e6ff", b: "#c9a0ff", c: "#8a52d6", sh: "#5a2f9c", glow: "#d9baff" },
   };
   async function wordGlow(id, text, wst) {
     let P = WORDS[id]; if (!P) return;
@@ -780,6 +803,7 @@ const FunFX = (function () {
     P = Object.assign({}, P, { a: hexMix(base, "#ffffff", 0.6), b: base, c: hexMix(base, "#000000", 0.25), sh: hexMix(base, "#000000", 0.5), glow: hexMix(base, "#ffffff", 0.25) });
     const FAM = st.font ? st.font + ',"Arial Black","Impact",system-ui,sans-serif' : '"Arial Black","Impact",system-ui,sans-serif';
     const word = String(text || P.t).toUpperCase().trim();
+    if (!word) return; // CUSTOM tanpa tulisan: tidak ada yang ditampilkan
     const W = vw(), H = vh();
     let lines = [word];
     if (word.length > 8 && word.indexOf(" ") > 0) { // dua baris di spasi yang paling dekat tengah
@@ -790,7 +814,7 @@ const FunFX = (function () {
     const FONT = "900 100px/1.02 " + FAM;
     const probe = document.createElement("span"); probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;letter-spacing:.04em;font:${FONT}`; document.body.appendChild(probe);
     let maxW = 1; lines.forEach((l) => { probe.textContent = l; maxW = Math.max(maxW, probe.getBoundingClientRect().width); }); probe.remove();
-    const fs = Math.max(30, Math.min((W * 0.9) / maxW * 100, (H * 0.55) / (lines.length * 1.02)));
+    const fs = Math.max(24, Math.min((W * 0.9) / maxW * 100, (H * 0.55) / (lines.length * 1.02)) * ((st.size || 100) / 100)); // book198: ukuran 30-100% dari yang paling besar yang muat
     const tint = makeLayer(); tint.style.mixBlendMode = "multiply"; tint.style.opacity = "0";
     const glare = makeLayer(); glare.style.opacity = "0";
     let dead = false;
@@ -813,18 +837,220 @@ const FunFX = (function () {
   }
 
   // ------------------------------------------------------------
+  //  🚂🐴🚗🚁✈️🎈 KENDARAAN (book201, permintaan operator)
+  //  Di darat: kereta api (berasap), kereta kuda, mobil -- berjalan dari KIRI ke kanan lalu BALIK (bolak-balik) di dasar layar dengan tulisan
+  //  "Berjalan bersama Yesus". Di udara: helikopter, pesawat (menarik spanduk), balon udara -- mulai dari KANAN, bolak-balik, tulisan
+  //  "Terbang bersama Tuhan Yesus". Kolom teks Panel Efek bisa mengganti tulisannya. Suara kendaraan disintesis (tanpa berkas), ikut bergeser kiri-kanan
+  //  (stereo) & mengeras saat lewat tengah; bisa di-MUTE per kendaraan dan sekaligus (bawaan: suara NYALA). Kecil & transparan -- tulisan di belakang
+  //  tetap terbaca. Opsi (jumlah lintasan, kecepatan, terus sampai Hentikan, suara per kendaraan) di Panel Efek > "🚂 Kendaraan".
+  // ------------------------------------------------------------
+  const VEH_KEY = "vehicle";
+  const VEH_KINDS = ["train", "carriage", "car", "heli", "plane", "balloon"];
+  const VEH_LABEL = { train: "Kereta api", carriage: "Kereta kuda", car: "Mobil", heli: "Helikopter", plane: "Pesawat", balloon: "Balon udara" };
+  function getVehicleOpts() {
+    let o = {}; try { o = JSON.parse(localStorage.getItem(LS_PREFIX + VEH_KEY) || "{}") || {}; } catch (e) { o = {}; }
+    const sound = {}; VEH_KINDS.forEach((k) => { sound[k] = !(o.sound && o.sound[k] === false); }); // bawaan: SEMUA suara nyala
+    let muted = false; try { muted = localStorage.getItem(LS_PREFIX + "vmuted") === "1"; } catch (e) { muted = false; }
+    return { sound, trips: Math.max(1, Math.min(8, Number(o.trips) || 2)), speed: /^(slow|mid|fast)$/.test(o.speed) ? o.speed : "mid", loop: !!o.loop, muted };
+  }
+  function setVehicleOpts(o) { try { localStorage.setItem(LS_PREFIX + VEH_KEY, JSON.stringify({ sound: o.sound, trips: o.trips, speed: o.speed, loop: !!o.loop })); } catch (e) { /* abaikan */ } }
+
+  // --- suara: satu "master" supaya bisa di-mute langsung (setVMute) ---
+  let vMaster = null, vMuted = false, vNoiseBuf = null;
+  function vMasterNode() {
+    const c = ctx();
+    if (!vMaster) { vMaster = c.createGain(); vMaster.connect(dest()); }
+    vMaster.gain.value = vMuted ? 0 : 1;
+    return vMaster;
+  }
+  function setVMute(on) {
+    vMuted = !!on;
+    try { localStorage.setItem(LS_PREFIX + "vmuted", vMuted ? "1" : "0"); } catch (e) { /* abaikan */ }
+    try { if (vMaster) vMaster.gain.value = vMuted ? 0 : 1; } catch (e) { /* abaikan */ }
+  }
+  function noiseBuf(c) {
+    if (vNoiseBuf && vNoiseBuf.sampleRate === c.sampleRate) return vNoiseBuf;
+    const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    vNoiseBuf = b; return b;
+  }
+  // 1 letupan derau berfilter (chug / clip-clop / whoosh)
+  function vBurst(c, bus, t, dur, vol, freq, q, type) {
+    const src = c.createBufferSource(); src.buffer = noiseBuf(c);
+    const f = c.createBiquadFilter(); f.type = type || "bandpass"; f.frequency.value = freq; f.Q.value = q || 0.8;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + Math.min(0.02, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(bus);
+    src.start(t, Math.random() * 1.2, dur + 0.05);
+  }
+  function vThud(c, bus, t, freq, dur, vol) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * 0.6), t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function startVehicleSound(kind) {
+    const c = ctx();
+    const bus = c.createGain(); bus.gain.value = 0.6;
+    let pan = null; try { pan = c.createStereoPanner ? c.createStereoPanner() : null; } catch (e) { pan = null; }
+    if (pan) { bus.connect(pan); pan.connect(vMasterNode()); } else bus.connect(vMasterNode());
+    const stops = [];
+    const loopNoise = (freq, type, vol, q) => { const s = c.createBufferSource(); s.buffer = noiseBuf(c); s.loop = true; const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 0.7; const g = c.createGain(); g.gain.value = vol; s.connect(f); f.connect(g); g.connect(bus); s.start(); stops.push(() => { try { s.stop(); } catch (e) { /* abaikan */ } }); return { f, g }; };
+    const loopOsc = (type, freq, lp, vol) => { const o = c.createOscillator(); o.type = type; o.frequency.value = freq; const f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp; const g = c.createGain(); g.gain.value = vol; o.connect(f); f.connect(g); g.connect(bus); o.start(); stops.push(() => { try { o.stop(); } catch (e) { /* abaikan */ } }); return { o, g }; };
+    let next = c.currentTime + 0.05, step = 0, interval = 0, pattern = null, eng = null;
+    if (kind === "train") { interval = 0.3125; pattern = (t, n) => { vBurst(c, bus, t, 0.1, 0.55, 450, 0.7); vThud(c, bus, t, 68, 0.12, 0.5); if (n % 4 === 3) vBurst(c, bus, t + 0.13, 0.2, 0.22, 3000, 0.8); }; }
+    else if (kind === "carriage") { interval = 0.58; pattern = (t) => { [[0, 2200, 900], [0.14, 1200, 520], [0.29, 2200, 900], [0.43, 1200, 520]].forEach(([d, f, th]) => { vBurst(c, bus, t + d, 0.05, 0.5, f, 1.2); vThud(c, bus, t + d, th * 0.4, 0.05, 0.35); }); }; }
+    else if (kind === "heli") { interval = 0.0909; pattern = (t) => { vBurst(c, bus, t, 0.07, 0.55, 350, 0.7, "lowpass"); vThud(c, bus, t, 52, 0.08, 0.4); }; loopNoise(900, "bandpass", 0.05, 0.6); }
+    else if (kind === "balloon") { interval = 3.2; pattern = (t) => { vBurst(c, bus, t, 1.1, 0.3, 1100, 0.6); }; loopNoise(400, "lowpass", 0.03, 0.5); }
+    else if (kind === "car") { eng = loopOsc("sawtooth", 58, 320, 0.2); const e2 = loopOsc("square", 29, 200, 0.1); stops.push(() => {}); eng.o2 = e2.o; }
+    else if (kind === "plane") { loopNoise(700, "lowpass", 0.22, 0.5); eng = loopOsc("sawtooth", 95, 260, 0.08); }
+    const timer = setInterval(() => {
+      if (!pattern) return;
+      while (next < c.currentTime + 0.3) { pattern(next, step++); next += interval; }
+    }, 90);
+    function whistle() { // peluit kereta / klakson mobil
+      const t = c.currentTime;
+      if (kind === "train") {
+        [740, 932].forEach((fq) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "sawtooth"; o.frequency.setValueAtTime(fq, t); lp.type = "lowpass"; lp.frequency.value = 2400;
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.08); g.gain.setValueAtTime(0.16, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+          o.connect(lp); lp.connect(g); g.connect(bus); o.start(t); o.stop(t + 1.2); });
+      } else if (kind === "car") {
+        [0, 0.28].forEach((d) => { [440, 554].forEach((fq) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "square"; o.frequency.value = fq; lp.type = "lowpass"; lp.frequency.value = 1500;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.12, t + d + 0.02); g.gain.setValueAtTime(0.12, t + d + 0.16); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2);
+          o.connect(lp); lp.connect(g); g.connect(bus); o.start(t + d); o.stop(t + d + 0.25); }); });
+      }
+    }
+    return {
+      honk: whistle,
+      update(panV, near) {
+        try { if (pan) pan.pan.value = panV; bus.gain.value = 0.25 + 0.75 * near; if (eng) { eng.o.frequency.value = (kind === "car" ? 52 : 90) + 22 * near; } } catch (e) { /* abaikan */ }
+      },
+      stop() { clearInterval(timer); stops.forEach((f) => f()); try { bus.disconnect(); if (pan) pan.disconnect(); } catch (e) { /* abaikan */ } },
+    };
+  }
+
+  // --- gambar (SVG sederhana) ---
+  const SVG_WHEEL = (x, y, r, color) => `<g transform="translate(${x} ${y})"><g class="ff-vw"><circle r="${r}" fill="${color || "#4a4a4a"}" stroke="#b5b5b5" stroke-width="1.5"/><circle r="${r * 0.36}" fill="#9a9a9a"/><path d="M${-r + 2} 0H${r - 2}M0 ${-r + 2}V${r - 2}M${-r * 0.7} ${-r * 0.7}L${r * 0.7} ${r * 0.7}M${r * 0.7} ${-r * 0.7}L${-r * 0.7} ${r * 0.7}" stroke="#bdbdbd" stroke-width="1.6"/></g></g>`;
+  const VEHICLES = {
+    train: { ratio: 100 / 330, wf: 0.5, ground: true, label: "Berjalan bersama Yesus", anchor: [53.5, 8], smoke: "train",
+      svg: `<svg viewBox="0 0 330 100" aria-hidden="true"><rect x="4" y="24" width="98" height="48" rx="6" fill="#3b6ea8"/><rect x="4" y="64" width="98" height="8" fill="#274b76"/>${[12, 40, 68].map((x) => `<rect x="${x}" y="32" width="20" height="16" rx="2" fill="#dff1ff"/>`).join("")}<rect x="102" y="52" width="12" height="4" fill="#c9c9c9"/><rect x="112" y="40" width="84" height="32" rx="6" fill="#b3261e"/><rect x="112" y="24" width="32" height="48" rx="4" fill="#8f1d17"/><rect x="118" y="30" width="18" height="14" rx="2" fill="#dff1ff"/><rect x="108" y="20" width="40" height="6" rx="3" fill="#6a6a6a"/><rect x="170" y="22" width="12" height="20" fill="#6a6a6a"/><path d="M165 22h22l-3-9h-16z" fill="#6a6a6a"/><circle cx="154" cy="40" r="7" fill="#c8a24a"/><path d="M196 72l24 0-13-22h-11z" fill="#9a9a9a"/><circle cx="196" cy="52" r="5" fill="#ffe27a"/>${SVG_WHEEL(128, 78, 14)}${SVG_WHEEL(164, 78, 14)}${SVG_WHEEL(30, 78, 10)}${SVG_WHEEL(80, 78, 10)}${SVG_WHEEL(190, 82, 8)}</svg>` },
+    carriage: { ratio: 110 / 300, wf: 0.4, ground: true, label: "Berjalan bersama Yesus", anchor: [88, 78], smoke: "dust",
+      svg: `<svg viewBox="0 0 300 110" aria-hidden="true"><path d="M14 38h132l-12-20h-108z" fill="#4e2410"/><rect x="20" y="40" width="120" height="38" fill="#7a3b1e"/><rect x="34" y="48" width="24" height="18" fill="#f3e6c4"/><rect x="72" y="48" width="24" height="18" fill="#f3e6c4"/><rect x="140" y="62" width="76" height="4" fill="#4e2410"/>${SVG_WHEEL(52, 90, 18, "#5a4630")}${SVG_WHEEL(118, 90, 18, "#5a4630")}<ellipse cx="228" cy="64" rx="34" ry="19" fill="#8b5a2b"/><path d="M250 52L272 24l14 6-18 28z" fill="#8b5a2b"/><path d="M272 24l24 8-5 11-20-7z" fill="#7a4d22"/><path d="M262 28l-10 6 6 10z" fill="#3a2410"/><path d="M196 60q-16 8-12 30" stroke="#3a2410" stroke-width="5" fill="none" stroke-linecap="round"/>${[[210, 78], [220, 80], [240, 80], [250, 78]].map(([x, y], i) => `<rect class="ff-leg ${i % 2 ? "b" : "a"}" x="${x}" y="${y}" width="6" height="26" rx="3" fill="#6d431d"/>`).join("")}</svg>` },
+    car: { ratio: 90 / 220, wf: 0.32, ground: true, label: "Berjalan bersama Yesus", anchor: [6, 70], smoke: "car",
+      svg: `<svg viewBox="0 0 220 90" aria-hidden="true"><path d="M10 58q0-14 14-16l24-4q10-18 30-20h50q18 2 28 20l26 6q12 4 12 14v14h-184z" fill="#d94a3d"/><path d="M62 40q8-14 22-16h44q14 2 22 16z" fill="#bfe4ff"/><path d="M104 24v16" stroke="#d94a3d" stroke-width="3"/><rect x="190" y="52" width="14" height="8" rx="3" fill="#ffe27a"/><rect x="8" y="56" width="10" height="8" rx="3" fill="#ffb199"/>${SVG_WHEEL(54, 74, 16)}${SVG_WHEEL(160, 74, 16)}</svg>` },
+    heli: { ratio: 100 / 220, wf: 0.36, ground: false, label: "Terbang bersama Tuhan Yesus", banner: true,
+      svg: `<svg viewBox="0 0 220 100" aria-hidden="true"><rect class="ff-rotor" x="30" y="14" width="150" height="5" rx="2.5" fill="#c9c9c9"/><rect x="102" y="18" width="5" height="14" fill="#c9c9c9"/><ellipse cx="104" cy="56" rx="50" ry="26" fill="#2f6fb3"/><path d="M118 40q22 0 34 14l-34 8z" fill="#bfe4ff"/><rect x="144" y="52" width="66" height="8" rx="4" fill="#2f6fb3"/><path d="M200 54l12-20 6 4-6 18z" fill="#245a93"/><circle class="ff-prop" cx="212" cy="46" r="9" fill="none" stroke="#c9c9c9" stroke-width="2.5" stroke-dasharray="6 4"/><path d="M70 86h74M82 80v8M132 80v8" stroke="#c9c9c9" stroke-width="4" stroke-linecap="round"/></svg>` },
+    plane: { ratio: 100 / 250, wf: 0.4, ground: false, label: "Terbang bersama Tuhan Yesus", banner: true,
+      svg: `<svg viewBox="0 0 250 100" aria-hidden="true"><path d="M8 52q4-18 40-20h120q40 2 56 18-16 18-56 18h-120q-36-2-40-16z" fill="#f4f4f4" stroke="#bbb" stroke-width="2"/><path d="M8 52l-4-26 30 8z" fill="#e0e0e0"/><path d="M84 50L52 6l24-2 52 44z" fill="#c8362b"/><path d="M92 62L60 94l24 2 48-30z" fill="#c8362b"/>${[70, 98, 126, 154, 182].map((x) => `<circle cx="${x}" cy="46" r="6" fill="#bfe4ff"/>`).join("")}<ellipse class="ff-prop" cx="246" cy="52" rx="3.5" ry="20" fill="#9a9a9a"/></svg>` },
+    balloon: { ratio: 180 / 140, wf: 0.2, ground: false, label: "Terbang bersama Tuhan Yesus", hang: true,
+      svg: `<svg viewBox="0 0 140 180" aria-hidden="true"><path d="M70 6C30 6 8 36 8 68c0 28 22 46 40 58h44c18-12 40-30 40-58C132 36 110 6 70 6z" fill="#e9573f"/><path d="M70 6C52 14 40 38 40 68c0 22 10 42 18 58h24c8-16 18-36 18-58 0-30-12-54-30-62z" fill="#ffd23f"/><path d="M70 6C62 22 58 44 58 68c0 22 4 42 8 58h8c4-16 8-36 8-58 0-24-4-46-12-62z" fill="#3b82c4"/><path d="M48 126l14 34M92 126l-14 34M70 126v34" stroke="#6b4a2a" stroke-width="2"/><rect x="52" y="158" width="36" height="20" rx="3" fill="#a8743a"/></svg>` },
+  };
+
+  async function vehicle(id, text, vopt) {
+    const kind = { "veh-train": "train", "veh-carriage": "carriage", "veh-car": "car", "veh-heli": "heli", "veh-plane": "plane", "veh-balloon": "balloon" }[id];
+    const D = VEHICLES[kind]; if (!D) return;
+    const st = Object.assign({}, getVehicleOpts(), vopt || {});
+    if (vopt && vopt.sound) st.sound = Object.assign({}, getVehicleOpts().sound, vopt.sound);
+    const layer = makeLayer();
+    let dead = false; const cleanups = [];
+    const clean = register(layer, () => { dead = true; cleanups.forEach((f) => { try { f(); } catch (e) { /* abaikan */ } }); });
+    const W = vw(), H = vh(), vm = Math.min(W, H);
+    const vwPx = vm * D.wf, vhPx = vwPx * D.ratio;
+    let roomIn = 0, roomOut = 0; // ruang di luar layar supaya tulisan ikut masuk/keluar utuh -- dihitung dari lebar tulisan (di bawah)
+    const label = String(text || D.label).trim() || D.label;
+    const startDir = D.ground ? 1 : -1;
+    const topPx = D.ground ? null : (kind === "balloon" ? H * 0.06 : kind === "heli" ? H * 0.2 : H * 0.12);
+    const mover = document.createElement("div");
+    mover.className = "ff-v-mover";
+    mover.style.cssText = `position:absolute;left:0;width:${vwPx}px;${D.ground ? "bottom:3vh;" : "top:" + topPx + "px;"}will-change:transform;`;
+    const dirBox = document.createElement("div"); dirBox.className = "ff-v-dir"; dirBox.style.cssText = "position:relative;width:100%;";
+    // dirBox = pembalik arah (scaleX); bobBox di dalamnya = goyangan naik-turun (animasi terpisah supaya tidak menimpa pembalik arah)
+    dirBox.innerHTML = `<div class="ff-v-bob" style="position:relative">` + D.svg + (D.anchor ? `<span class="ff-v-anchor" style="position:absolute;left:${D.anchor[0]}%;top:${D.anchor[1]}%;width:1px;height:1px"></span>` : "") + `</div>`;
+    const lab = document.createElement("div"); lab.className = "ff-v-label"; lab.textContent = label;
+    mover.appendChild(dirBox); mover.appendChild(lab); layer.appendChild(mover);
+    { const lw = lab.offsetWidth || 0; const sym = Math.max(0, (lw - vwPx) / 2) + 8; roomIn = D.banner ? 0 : sym; roomOut = D.banner ? lw + 24 : sym; } // spanduk ada DI BELAKANG kendaraan: tidak perlu ruang saat masuk, perlu saat keluar
+    const svgEl = dirBox.querySelector("svg"); if (svgEl) svgEl.style.cssText = "display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 3px 4px #0004)";
+    const place = (dir) => { // posisi tulisan menurut arah jalan
+      lab.style.cssText = "";
+      if (D.ground) lab.style.cssText = "position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:6px;";
+      else if (D.hang) lab.style.cssText = "position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:16px;";
+      else lab.style.cssText = `position:absolute;top:30%;${dir > 0 ? "right:100%;margin-right:10px;" : "left:100%;margin-left:10px;"}`;
+      lab.classList.toggle("rope", !!D.banner);
+    };
+    // animasi roda / baling-baling / kaki kuda
+    dirBox.querySelectorAll(".ff-vw").forEach((w) => { try { w.animate([{ transform: "rotate(0)" }, { transform: "rotate(360deg)" }], { duration: kind === "train" ? 700 : 520, iterations: Infinity }); } catch (e) { /* abaikan */ } });
+    dirBox.querySelectorAll(".ff-rotor").forEach((r) => { try { r.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(.12)" }, { transform: "scaleX(1)" }], { duration: 160, iterations: Infinity }); } catch (e) { /* abaikan */ } });
+    dirBox.querySelectorAll(".ff-prop").forEach((r) => { try { r.animate([{ transform: "scaleY(1)" }, { transform: "scaleY(.2)" }, { transform: "scaleY(1)" }], { duration: 90, iterations: Infinity }); } catch (e) { /* abaikan */ } });
+    dirBox.querySelectorAll(".ff-leg").forEach((l) => { try { l.animate([{ transform: "rotate(-22deg)" }, { transform: "rotate(22deg)" }], { duration: 280, direction: "alternate", iterations: Infinity, delay: l.classList.contains("b") ? -280 : 0 }); } catch (e) { /* abaikan */ } });
+    try { dirBox.firstChild.animate(D.ground ? [{ transform: "translateY(0)" }, { transform: "translateY(-2px)" }, { transform: "translateY(0)" }] : [{ transform: "translateY(-8px)" }, { transform: "translateY(8px)" }], D.ground ? { duration: 140, iterations: Infinity } : { duration: 1900, direction: "alternate", iterations: Infinity, easing: "ease-in-out" }); } catch (e) { /* abaikan */ }
+    // suara
+    setVMute(st.muted); // bawaan tidak di-mute
+    let snd = null;
+    if (st.sound && st.sound[kind] !== false) { try { snd = startVehicleSound(kind); cleanups.push(() => snd.stop()); } catch (e) { snd = null; } }
+    // asap / debu
+    let smokeTimer = null;
+    if (D.smoke) {
+      const anchor = dirBox.querySelector(".ff-v-anchor");
+      smokeTimer = setInterval(() => {
+        if (!anchor || dead) return;
+        const r = anchor.getBoundingClientRect();
+        const big = D.smoke === "train", dust = D.smoke === "dust";
+        const p = document.createElement("div"); p.className = "ff-p";
+        const sz = big ? rnd(16, 30) : dust ? rnd(8, 16) : rnd(7, 12);
+        p.style.cssText = `width:${sz}px;height:${sz}px;border-radius:50%;background:${dust ? "rgba(190,160,110,.65)" : "rgba(235,235,235,.8)"};left:0;top:0;`;
+        layer.appendChild(p);
+        const dx = (cur.dir > 0 ? -1 : 1) * (big ? rnd(30, 90) : rnd(20, 50));
+        const dy = big ? -rnd(70, 130) : dust ? -rnd(6, 16) : -rnd(10, 26);
+        try { p.animate([{ transform: `translate(${r.left}px,${r.top}px) scale(.5)`, opacity: 0.9 }, { transform: `translate(${r.left + dx}px,${r.top + dy}px) scale(${big ? 2.4 : 1.8})`, opacity: 0 }], { duration: big ? 1900 : 1100, easing: "ease-out", fill: "forwards" }).finished.then(() => p.remove()).catch(() => p.remove()); } catch (e) { p.remove(); }
+      }, D.smoke === "train" ? 170 : D.smoke === "dust" ? 220 : 380);
+      cleanups.push(() => clearInterval(smokeTimer));
+    }
+    // posisi -> stereo & kerasnya suara
+    const cur = { dir: startDir };
+    let raf = 0;
+    const tickPos = () => {
+      if (dead) return;
+      const r = mover.getBoundingClientRect(), cx = r.left + r.width / 2;
+      if (snd) snd.update(Math.max(-1, Math.min(1, (cx / W) * 2 - 1)) * 0.85, 1 - Math.min(1, Math.abs(cx - W / 2) / (W / 2 + vwPx)));
+      raf = requestAnimationFrame(tickPos);
+    };
+    raf = requestAnimationFrame(tickPos); cleanups.push(() => cancelAnimationFrame(raf));
+    // lintasan bolak-balik
+    const speed = { slow: W / 8, mid: W / 5.5, fast: W / 3.5 }[st.speed] || W / 5.5;
+    const total = st.loop ? Infinity : Math.max(1, st.trips);
+    for (let i = 0; i < total && !dead; i++) {
+      const dir = startDir * (i % 2 ? -1 : 1);
+      cur.dir = dir;
+      dirBox.style.transform = dir > 0 ? "scaleX(1)" : "scaleX(-1)";
+      place(dir);
+      const x0 = dir > 0 ? -vwPx - roomIn : W + roomIn, x1 = dir > 0 ? W + roomOut : -vwPx - roomOut;
+      const dur = Math.abs(x1 - x0) / speed * 1000;
+      if (snd) snd.honk();
+      const a = mover.animate([{ transform: `translateX(${x0}px)` }, { transform: `translateX(${x1}px)` }], { duration: dur, easing: "linear", fill: "forwards" });
+      try { await a.finished; } catch (e) { return; }
+      if (dead) return;
+      await sleep(250);
+    }
+    if (dead) return;
+    await animate(layer, [{ opacity: 1 }, { opacity: 0 }], { duration: 500, fill: "forwards" });
+    clean();
+  }
+
+  // ------------------------------------------------------------
   //  API
   // ------------------------------------------------------------
   function play(id, opts) {
     const o = opts || {};
     if (id === "stop") { stopAll(); return Promise.resolve(); }
     const effect = LIST.filter((e) => e.id === id)[0];
+    if (id === "vmute") { setVMute(!!o.mute); return Promise.resolve(); } // book201: mute/unmute suara kendaraan secara langsung (tidak menghentikan efek)
     if (!effect) return Promise.resolve();
     if (id.indexOf("amen") !== 0) stopAll(); // book193: Amin singkat tidak menghentikan efek lain
     playSound(effect, o.src);
-    if (id.indexOf("amen") === 0) return amen(id);
+    if (id.indexOf("amen") === 0) return amen(id, o.apos);
     if (id === "call-lord") return callLord(o.text);
     if (id.indexOf("word-") === 0) return wordGlow(id, o.text, o.wstyle);
+    if (id.indexOf("veh-") === 0) return vehicle(id, o.text, o.vopt);
     if (id === "sun") return sun();
     if (id === "party-bottom") return party(false, o.text);
     if (id === "party-top") return party(true, o.text);
@@ -838,12 +1064,14 @@ const FunFX = (function () {
   }
 
   // Tombol untuk Studio: onPick(id, {src, text}) dipanggil saat tombol ditekan.
+  let lastTextIn = null; // book198: kolom teks Panel Efek (dipakai pintasan tulisan CUSTOM)
   function renderStudioControls(container, onPick) {
     if (!container) return;
     container.innerHTML = "";
     const row = document.createElement("div");
     row.className = "ps-btn-row";
     const textIn = document.createElement("input");
+    lastTextIn = textIn;
     textIn.type = "text"; textIn.className = "ps-input"; textIn.placeholder = "Teks di layar (opsional), mis. Selamat Ulang Tahun!";
     textIn.style.cssText = "width:100%; margin:6px 0;";
     const secIn = document.createElement("input");
@@ -855,7 +1083,7 @@ const FunFX = (function () {
       b.type = "button"; b.className = "chip-btn small";
       b.textContent = e.icon + " " + e.label;
       b.addEventListener("click", () => {
-        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium" || e.id === "count" || e.id === "call-lord" || e.id.indexOf("word-") === 0;
+        const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium" || e.id === "count" || e.id === "call-lord" || e.id.indexOf("word-") === 0 || e.id.indexOf("veh-") === 0;
         onPick(e.id, { src: e.song ? getSongUrl(e.song) : "", text: withText ? textIn.value.trim() : "", seconds: Number(secIn.value) || 12 });
       });
       row.appendChild(b);
@@ -870,17 +1098,74 @@ const FunFX = (function () {
     container.appendChild(textIn);
     const secLbl = document.createElement("div"); secLbl.className = "ps-pointer-hint"; secLbl.appendChild(secIn); secLbl.appendChild(document.createTextNode("detik per scoop (🍦 Es Krim Tenang, 6 scoop). Teks di atas dipakai sebagai judul efek 🍦/🐠 juga."));
     container.appendChild(secLbl);
+    container.appendChild(vehicleEditor(onPick));
+    container.appendChild(amenPosEditor(onPick));
     container.appendChild(wordStyleEditor());
     container.appendChild(songEditor());
+  }
+  // book201 -- pengaturan kendaraan: suara per kendaraan (bawaan NYALA), mute cepat, jumlah lintasan, kecepatan, terus sampai Hentikan.
+  function vehicleEditor(onPick) {
+    const box = document.createElement("div"); box.style.cssText = "margin:10px 0; padding:8px; border:1px solid #e0cf9f; border-radius:10px; background:#fffaf0;";
+    const st = getVehicleOpts();
+    const save = () => setVehicleOpts(st);
+    const h = document.createElement("div"); h.style.cssText = "font-weight:800; margin-bottom:6px;"; h.textContent = "🚂 Kendaraan (Berjalan / Terbang bersama Yesus)"; box.appendChild(h);
+    const r1 = document.createElement("div"); r1.style.cssText = "display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:6px; font-size:.85em;";
+    const lab1 = document.createElement("span"); lab1.textContent = "🔊 Suara:"; r1.appendChild(lab1);
+    VEH_KINDS.forEach((k) => {
+      const l = document.createElement("label"); l.style.cssText = "display:flex; gap:3px; align-items:center;";
+      const c = document.createElement("input"); c.type = "checkbox"; c.checked = st.sound[k] !== false;
+      c.addEventListener("change", () => { st.sound[k] = c.checked; save(); });
+      l.appendChild(c); l.appendChild(document.createTextNode(VEH_LABEL[k])); r1.appendChild(l);
+    });
+    box.appendChild(r1);
+    const r2 = document.createElement("div"); r2.style.cssText = "display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:.85em;";
+    const mute = document.createElement("button"); mute.type = "button"; mute.className = "chip-btn small";
+    const paint = () => { const m = getVehicleOpts().muted; mute.textContent = m ? "🔇 Suara kendaraan: MATI (klik = nyalakan)" : "🔊 Suara kendaraan: NYALA (klik = mute)"; };
+    mute.addEventListener("click", () => { const nx = !getVehicleOpts().muted; setVMute(nx); onPick("vmute", { mute: nx }); paint(); });
+    paint(); r2.appendChild(mute);
+    const sp = document.createElement("select"); sp.className = "columns-lang-select";
+    [["slow", "Pelan"], ["mid", "Sedang"], ["fast", "Cepat"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = "Kecepatan: " + l; sp.appendChild(o); });
+    sp.value = st.speed; sp.addEventListener("change", () => { st.speed = sp.value; save(); }); r2.appendChild(sp);
+    const tl = document.createElement("label"); tl.textContent = "Lintasan: ";
+    const tn = document.createElement("input"); tn.type = "number"; tn.min = "1"; tn.max = "8"; tn.value = String(st.trips); tn.className = "ps-input"; tn.style.cssText = "width:54px;";
+    tn.title = "Jumlah lintasan: 2 = pergi lalu pulang (bolak-balik)";
+    tn.addEventListener("change", () => { st.trips = Math.max(1, Math.min(8, Number(tn.value) || 2)); tn.value = String(st.trips); save(); });
+    tl.appendChild(tn); r2.appendChild(tl);
+    const ll = document.createElement("label"); ll.style.cssText = "display:flex; gap:3px; align-items:center;";
+    const lc = document.createElement("input"); lc.type = "checkbox"; lc.checked = !!st.loop; lc.addEventListener("change", () => { st.loop = lc.checked; save(); });
+    ll.appendChild(lc); ll.appendChild(document.createTextNode("terus bolak-balik sampai Hentikan")); r2.appendChild(ll);
+    box.appendChild(r2);
+    return box;
+  }
+  // book196 -- posisi gambar Amin + "Cek versi Layar 2".
+  let statusEl = null;
+  function showStatus(t, good) { if (statusEl) { statusEl.textContent = t; statusEl.style.color = good ? "#1b6b28" : "#b34700"; } }
+  function amenPosEditor(onPick) {
+    const box = document.createElement("div"); box.style.cssText = "margin:10px 0; padding:8px; border:1px solid #e0cf9f; border-radius:10px; background:#fffaf0;";
+    const h = document.createElement("div"); h.style.cssText = "font-weight:800; margin-bottom:6px;"; h.textContent = "🙏 Posisi gambar Amin"; box.appendChild(h);
+    const row = document.createElement("div"); row.style.cssText = "display:flex; gap:8px; flex-wrap:wrap; align-items:center;";
+    const sel = document.createElement("select"); sel.className = "columns-lang-select";
+    [["random", "🎲 Acak tiap kali"], ["locked", "📍 Kunci: acak sekali lalu tetap di situ"], ["left", "⬅️ Kiri"], ["center", "⏺️ Tengah"], ["right", "➡️ Kanan"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.appendChild(o); });
+    sel.value = getAmenPos().mode;
+    sel.addEventListener("change", () => { const c = getAmenPos(); c.mode = sel.value; if (sel.value !== "locked") c.x = null; setAmenPos(c); });
+    const re = document.createElement("button"); re.type = "button"; re.className = "chip-btn small"; re.textContent = "🎲 Acak posisi baru";
+    re.title = "Pilih posisi acak yang baru (dipakai bila mode Kunci)"; re.addEventListener("click", () => { const c = getAmenPos(); c.x = rnd(0.12, 0.7); setAmenPos(c); });
+    row.appendChild(sel); row.appendChild(re); box.appendChild(row);
+    const chk = document.createElement("div"); chk.style.cssText = "margin-top:8px;";
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip-btn small"; b.textContent = "🩺 Cek versi Layar 2";
+    b.title = "Memastikan Layar 2 memuat berkas terbaru (Stop & potong suara)"; b.addEventListener("click", () => { showStatus("Menunggu jawaban Layar 2…", true); onPick("ping", {}); });
+    statusEl = document.createElement("div"); statusEl.style.cssText = "font-size:.85em; margin-top:4px;";
+    chk.appendChild(b); chk.appendChild(statusEl); box.appendChild(chk); box.__chk = chk;
+    return box;
   }
   // book195 -- pengaturan "Tulisan Timbul": warna tiap kata, font, jumlah kedip, tahan sampai Hentikan.
   function wordStyleEditor() {
     const box = document.createElement("div"); box.className = "ff-wordstyle"; box.style.cssText = "margin:10px 0; padding:8px; border:1px solid #e0cf9f; border-radius:10px; background:#fffaf0;";
     const st = getWordStyle();
     const save = () => setWordStyle(st);
-    const h = document.createElement("div"); h.style.cssText = "font-weight:800; margin-bottom:6px;"; h.textContent = "🎨 Gaya Tulisan Timbul (AMIN / HALELUYA / O TUHAN YESUS)"; box.appendChild(h);
+    const h = document.createElement("div"); h.style.cssText = "font-weight:800; margin-bottom:6px;"; h.textContent = "🎨 Gaya Tulisan Timbul (AMIN / HALELUYA / O TUHAN YESUS / PUJI TUHAN / CUSTOM)"; box.appendChild(h);
     const r1 = document.createElement("div"); r1.style.cssText = "display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:6px;";
-    [["word-amen", "AMIN"], ["word-haleluya", "HALELUYA"], ["word-lord", "O TUHAN YESUS"]].forEach(([id, lab]) => {
+    [["word-amen", "AMIN"], ["word-haleluya", "HALELUYA"], ["word-lord", "O TUHAN YESUS"], ["word-puji", "PUJI TUHAN"], ["word-custom", "CUSTOM"]].forEach(([id, lab]) => {
       const w = document.createElement("label"); w.style.cssText = "display:flex; gap:4px; align-items:center; font-size:.85em;";
       const c = document.createElement("input"); c.type = "color"; c.value = st.colors[id]; c.style.cssText = "width:34px; height:26px; padding:0; border:1px solid #c9a95a;";
       c.addEventListener("input", () => { st.colors[id] = c.value; save(); });
@@ -906,6 +1191,12 @@ const FunFX = (function () {
     const hc = document.createElement("input"); hc.type = "checkbox"; hc.checked = !!st.hold;
     hc.addEventListener("change", () => { st.hold = hc.checked; save(); });
     hl.appendChild(hc); hl.appendChild(document.createTextNode(" tahan sampai Hentikan")); r2.appendChild(hl);
+    // book198 -- ukuran tulisan timbul (30-100% dari ukuran terbesar yang muat di layar)
+    const sl = document.createElement("label"); sl.style.cssText = "font-size:.85em; display:flex; gap:4px; align-items:center;"; sl.appendChild(document.createTextNode("Ukuran: "));
+    const sr = document.createElement("input"); sr.type = "range"; sr.min = "30"; sr.max = "100"; sr.value = String(st.size); sr.style.width = "110px";
+    const sv = document.createElement("span"); sv.textContent = st.size + "%";
+    sr.addEventListener("input", () => { st.size = Number(sr.value); sv.textContent = st.size + "%"; save(); });
+    sl.appendChild(sr); sl.appendChild(sv); r2.appendChild(sl);
     box.appendChild(r2);
     return box;
   }
@@ -939,10 +1230,12 @@ const FunFX = (function () {
       });
       // book195 -- info DURASI suara yang sudah dimasukkan + batas potong otomatis.
       const dur = document.createElement("span"); dur.style.cssText = "font-size:.8em; min-width:70px; color:#6b5a3a;";
-      const mx = document.createElement("input"); mx.type = "number"; mx.min = "0"; mx.max = "600"; mx.className = "ps-input"; mx.style.cssText = "width:58px;";
-      mx.value = String(getSongMax(k)); mx.title = "Potong otomatis setelah N detik (0 = putar penuh). Mencegah suara panjang terus bunyi.";
-      mx.addEventListener("change", () => { setSongMax(k, mx.value); refreshDur(); });
-      const mxLab = document.createElement("span"); mxLab.style.cssText = "font-size:.8em;"; mxLab.textContent = "✂️ potong di (dtk):";
+      const mx = document.createElement("input"); mx.type = "text"; mx.className = "ps-input"; mx.style.cssText = "width:64px;";
+      mx.value = String(getSongMax(k)); mx.title = "Potong otomatis setelah ... DETIK. Boleh ditulis 90 atau 1:30 (menit:detik). 0 = putar penuh.";
+      const mxHint = document.createElement("span"); mxHint.style.cssText = "font-size:.8em; color:#6b5a3a;";
+      const showMx = () => { const n = getSongMax(k); mx.value = String(n); mxHint.textContent = n > 0 ? "detik (= " + fmt(n) + ")" : "detik (0 = putar penuh)"; };
+      mx.addEventListener("change", () => { setSongMax(k, mx.value); showMx(); refreshDur(); });
+      const mxLab = document.createElement("span"); mxLab.style.cssText = "font-size:.8em;"; mxLab.textContent = "✂️ potong di:";
       function fmt(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
       let durToken = 0;
       function refreshDur() {
@@ -963,8 +1256,9 @@ const FunFX = (function () {
       }
       inp.addEventListener("change", refreshDur);
       fileIn.addEventListener("change", () => setTimeout(refreshDur, 600));
-      line.appendChild(lab); line.appendChild(inp); line.appendChild(pickBtn); line.appendChild(fileIn); line.appendChild(dur); line.appendChild(mxLab); line.appendChild(mx);
+      line.appendChild(lab); line.appendChild(inp); line.appendChild(pickBtn); line.appendChild(fileIn); line.appendChild(dur); line.appendChild(mxLab); line.appendChild(mx); line.appendChild(mxHint);
       box.appendChild(line);
+      showMx();
       refreshDur();
     });
     return box;
@@ -1040,6 +1334,11 @@ const FunFX = (function () {
 .ff-cnt-res{position:absolute;left:50%;bottom:2.5vh;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:10px;justify-content:center;width:max-content;max-width:94vw}
 .ff-cnt-chip{display:flex;align-items:center;gap:.3em;padding:.15em .6em;border-radius:999px;background:#ffffffe6;color:#3b2a14;font:900 clamp(18px,2.8vw,34px)/1.1 system-ui,sans-serif;box-shadow:0 2px 10px #0004}
 .ff-cnt-chip img{height:1.1em;width:auto}
+/* book201: kendaraan */
+.ff-vw,.ff-rotor,.ff-prop{transform-box:fill-box;transform-origin:50% 50%}
+.ff-leg{transform-box:fill-box;transform-origin:50% 0%}
+.ff-v-label{padding:.25em .8em;border-radius:999px;background:#fffffff0;color:#6a3d1f;font:900 clamp(15px,2.6vw,30px)/1.15 system-ui,sans-serif;white-space:nowrap;box-shadow:0 2px 10px #0004}
+.ff-v-label.rope::after{content:"";position:absolute;top:50%;width:12px;height:2px;background:#6b4a2a}
 /* book193: Amin, Seru Nama Tuhan, Matahari */
 .ff-amen-fig{position:absolute;bottom:3vh;display:flex;flex-direction:column;align-items:center;will-change:transform}
 .ff-amen-row{display:flex;align-items:flex-end;gap:.08em;font-size:clamp(70px,13vmin,130px);line-height:1}
@@ -1109,7 +1408,7 @@ body.fx-sun #text,body.fx-sun #ref,body.fx-sun #refSub,body.fx-sun #text .verse-
 
     // book193: dipakai tombol cepat F5-F8 di Studio -- mengembalikan {name, src} untuk dikirim ke Layar 2.
   function quick(id) { const e = LIST.filter((x) => x.id === id)[0]; return e ? { name: e.id, src: e.song ? getSongUrl(e.song) : "" } : null; }
-  return { LIST, quick, play, stopAll, configure, getWordStyle, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
+  return { LIST, BUILD, quick, play, stopAll, configure, getVehicleOpts, getWordStyle, getText: () => (lastTextIn ? lastTextIn.value.trim() : ""), getAmenPos, showStatus, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
 })();
 
 if (typeof window !== "undefined") {
