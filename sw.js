@@ -73,7 +73,8 @@
 // js/presentation-studio.js, js/presentation.js, js/collections.js, js/app.js).
 // DINAIKKAN LAGI (19 Sep 2026 -- Audio Latar dipindah ke js/bg-audio.js BARU, dimuat sebelum
 // js/presentation-studio.js di index.html).
-const CACHE_NAME = "book-vp-shell-v120"; // v120 (book201: efek kendaraan kereta api/kereta kuda/mobil/helikopter/pesawat/balon udara + suara bisa di-mute)
+const CACHE_NAME = "book-vp-shell-v123"; // v123 (book204: header kidung urut no - judul - birama - pengarang - jumlah bait di pratinjau Studio & saat disimpan ke Kumpulan Ayat -- js/presentation-studio.js, js/kidung-ui.js, sw.js). Sebelumnya v122 (book203: tulisan CUSTOM tersimpan + tombol pensil, info lintasan -- js/fun-fx.js, js/presentation-studio.js, sw.js). Sebelumnya v121 (book202: SoundCloud tahan &amp;/URN + detail teknis, kereta 5 gerbong, helikopter hadap depan, header kidung urut baru)
+// v120 (book201: efek kendaraan kereta api/kereta kuda/mobil/helikopter/pesawat/balon udara + suara bisa di-mute)
 // v119 (book200: SoundCloud link dibersihkan, 🎧 Musik Latar mudah, pintasan kolom YouTube)
 // v118 (book199: 📖 pindah kitab/kidung cepat, layar penuh Cepat, toolbar kidung terlipat di HP)
 // v117 (book198: nomor/pindah/duplikat kumpulan, pita pengumuman, PUJI TUHAN+CUSTOM, header kidung satu baris)
