@@ -2955,6 +2955,7 @@
        custom sendiri. Dimuat di sini (bukan cuma di index.html) karena
        Layar 2 ini jendela TERPISAH -- perlu akses CONFIG-nya sendiri. -->
   <script src="js/config.js"></script>
+  <script src="js/sclink.js?v=20261121a205"></script> <!-- book205: penerjemah link SoundCloud (alias/cache/oEmbed/Apps Script) -->
   <!-- BARU (21 Sep 2026) -- mesin riwayat coretan bersama (Undo/Redo, Pen/Penghapus), dipakai js/presentation-studio.js DAN halaman ini -->
   <script src="js/ink-engine.js?v=20260926b"></script>
   <!-- BARU (10 Sep 2026, sesi ke-13) -- js/soundfx.js: SATU SUMBER
@@ -6755,6 +6756,13 @@
   // FALLBACK ke cara lama (link ditempel apa adanya) supaya link
   // "soundcloud.com/artis/judul" biasa yang SUDAH bekerja sebelumnya tetap
   // jalan seperti biasa, tidak ikut rusak oleh perbaikan ini.
+  // book205 -- isi bilah SoundCloud (iframe) kalau link tidak bisa diterjemahkan: petunjuk singkat + tombol buka di SoundCloud.
+  function scFailDoc_() {
+    const f = window.__lastScFail || {};
+    const open = (window.SCLink && window.SCLink.extract(f.url || "")) || "";
+    const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    return '<body style="margin:0;font:13px/1.4 Arial,sans-serif;padding:10px;color:#222;background:#fff">🎧 <b>Lagu SoundCloud belum bisa diputar.</b><br>Link pendek tidak bisa diterjemahkan. Pakai link lengkap (soundcloud.com/artis/judul) di Sheet atau daftarkan di <i>SOUNDCLOUD_ALIASES</i> (js/config.js).' + (open ? '<br><a target="_blank" rel="noopener" href="' + esc(open) + '">Buka di SoundCloud</a>' : '') + '</body>';
+  }
   async function resolveSoundCloudSrc(trackUrl, autoplay) {
     // book200: bersihkan link SEBELUM ke widget -- ambil link pertama dari teks (hasil Bagikan HP), m./www. -> soundcloud.com, buang ?si= & utm_*
     try {
@@ -6769,6 +6777,16 @@
     } catch (e) { /* pakai apa adanya */ }
     const paramsTail = "&auto_play=" + (autoplay === false ? "false" : "true") +
       "&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+    // book205 -- LAPIS UTAMA: js/sclink.js (alias CONFIG.SOUNDCLOUD_ALIASES -> cache perangkat -> oEmbed -> Apps Script). Link lengkap tidak
+    // perlu jaringan sama sekali. Link PENDEK yang tetap gagal diterjemahkan TIDAK lagi dilempar ke widget (itulah penyebab pesan
+    // "You have not provided a valid SoundCloud URL" & tombol Play tidak jalan) -> dikembalikan "" supaya pemanggil menampilkan petunjuk.
+    if (window.SCLink && window.SCLink.resolve) {
+      try {
+        const r = await window.SCLink.resolve(trackUrl);
+        if (r.ok) return window.SCLink.playerSrc(r.url, paramsTail);
+        if (r.short) { try { console.warn("[SoundCloud] link pendek tidak bisa diterjemahkan:", r.reason, r.debug); } catch (e) {} window.__lastScFail = r; return ""; }
+      } catch (e) { /* lanjut ke cara lama di bawah */ }
+    }
     try {
       const oembedUrl = "https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl);
       const res = await fetch(oembedUrl);
@@ -7200,7 +7218,10 @@
       if (data.trackUrl) {
         scEl.hidden = false;
         scEl.src = ""; // kosongkan dulu -- diisi async oleh resolveSoundCloudSrc() di bawah
+        scEl.removeAttribute("srcdoc");
         resolveSoundCloudSrc(data.trackUrl, data.autoplay).then(function (src) {
+          if (!src) { scEl.srcdoc = scFailDoc_(); return; } // book205: tampilkan petunjuk, bukan pesan error widget
+          scEl.removeAttribute("srcdoc");
           scEl.src = src;
         });
       }
@@ -7803,6 +7824,7 @@
       scBgUrl = data.trackUrl;
       resolveSoundCloudSrc(data.trackUrl, false).then(function (src) {
         if (myToken !== scBgToken) return; // sudah ada perintah muat/kosongkan yang lebih baru
+        if (!src) { try { console.warn("[SoundCloud latar] link tidak bisa diterjemahkan", window.__lastScFail); } catch (e) {} return; } // book205: jangan pasang widget dengan link pendek yang ditolak
         scBgEl.src = src;
       });
       return;
