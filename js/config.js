@@ -108,6 +108,12 @@ const CONFIG = {
   // Kosongkan untuk mematikan menu "🎵 Pustaka Media" (menggantikan
   // js/effectpreview.js & tab "Playlist Video" lama di Studio Presentasi).
   MEDIA_LIBRARY_APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbx3CHI1_akP3M5ImcNFKRh6cfA6rcD95qilPz3_aQQ9CcAVao07sgQRyftnIOtXVno3/exec",
+  // book205 -- DAFTAR ALIAS link pendek SoundCloud -> link lengkap. Dipakai kalau penerjemahan otomatis (oEmbed) gagal di browser,
+  // sehingga lagu TETAP bisa Play (tanpa internet pun jalan). Kunci = kode di ujung link pendek (on.soundcloud.com/<kode>), nilai = link lengkap lagunya.
+  // Cara menambah: buka link pendeknya di browser, salin alamat lengkap yang muncul (soundcloud.com/artis/judul), tambahkan satu baris di bawah.
+  SOUNDCLOUD_ALIASES: {
+    "84tzhvUudINChl9788": "https://soundcloud.com/robbin-tanzil/hidup-gereja", // Hidup Gereja (KidungRef Y1)
+  },
   // Sheet baru: https://docs.google.com/spreadsheets/d/13p5RpQwY3I9rXDBEQ4DQ1EXw4XJvQ-Z2bDYuOZ473I0/edit?gid=0
   // Sheet YouTube LAMA (sumber migrasi manual, TIDAK dihapus): https://docs.google.com/spreadsheets/d/1UdMQ3JZkeXr8KYwVNW8cmipp0B9oH2FYLwudTFxqR0g/edit?gid=0
 

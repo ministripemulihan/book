@@ -89,6 +89,34 @@
     return /^https?:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(inner) ? inner : ""; // dipercaya apa adanya (jangan dinormalkan: bentuk URN harus utuh)
   }
 
+  // book205 -- 3 lapis TAMBAHAN supaya link pendek tetap bisa diputar walau penerjemahan oEmbed dari browser gagal
+  // (laporan operator: on.soundcloud.com/... tidak mau Play, widget menampilkan "You have not provided a valid SoundCloud URL"):
+  //   (1) ALIAS manual  : CONFIG.SOUNDCLOUD_ALIASES = { "<kode link pendek>": "https://soundcloud.com/artis/judul" } (js/config.js) -- tanpa internet, tanpa server;
+  //   (2) CACHE perangkat: hasil terjemahan yang pernah berhasil disimpan di localStorage -> berikutnya langsung, bahkan offline;
+  //   (3) Apps Script   : CONFIG.MEDIA_LIBRARY_APPS_SCRIPT_URL ?type=sc_resolve&url=... (server yang mengikuti pengalihan; tidak kena aturan CORS browser).
+  const CACHE_KEY = "sc_resolved_v1";
+  // CONFIG dideklarasikan "const" di js/config.js (bukan properti window) -> dibaca lewat nama global, bukan root.CONFIG.
+  function cfg() { try { return (typeof CONFIG !== "undefined" && CONFIG) || root.CONFIG || null; } catch (e) { return root.CONFIG || null; } }
+  function shortKey(url) { try { return new URL(url).pathname.split("/").filter(Boolean).pop() || ""; } catch (e) { return ""; } }
+  function readCache() { try { return JSON.parse(root.localStorage.getItem(CACHE_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  function writeCache(url, track) { try { const c = readCache(); c[url] = track; root.localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (e) { /* abaikan */ } }
+  function aliasFor(url) {
+    const A = cfg() && cfg().SOUNDCLOUD_ALIASES;
+    if (!A) return "";
+    const key = shortKey(url);
+    const hit = A[url] || A[url.replace(/^https:\/\//, "")] || (key && A[key]) || "";
+    return hit ? clean(hit) : "";
+  }
+  async function resolveViaAppsScript(url, ms) {
+    const base = cfg() && cfg().MEDIA_LIBRARY_APPS_SCRIPT_URL;
+    if (!base || String(base).indexOf("http") !== 0) return "";
+    const j = await fetchJsonWithTimeout(base + (base.indexOf("?") < 0 ? "?" : "&") + "type=sc_resolve&url=" + encodeURIComponent(url), ms);
+    const t = j && j.ok && j.url ? clean(j.url) : "";
+    return t && looksPlayable(t) ? t : "";
+  }
+  // URL untuk iframe widget dari link lengkap hasil resolve() (parameter url= di-encode SEKALI di sini).
+  function playerSrc(trackUrl, tail) { return "https://w.soundcloud.com/player/?url=" + encodeURIComponent(trackUrl) + (tail || ""); }
+
   // -> { ok, url, reason, short, debug }   url = link lengkap siap dipasang ke widget (kalau ok)
   async function resolve(raw, opts) {
     const timeoutMs = (opts && opts.timeoutMs) || 8000;
@@ -97,16 +125,24 @@
     if (!isShort(url)) {
       return looksPlayable(url) ? { ok: true, url, reason: "", short: false } : { ok: false, url, reason: "bukan-lagu", short: false, debug: "bentuk link tidak dikenali: " + url };
     }
+    const al = aliasFor(url);
+    if (al && looksPlayable(al)) return { ok: true, url: al, reason: "", short: true, via: "alias" };
+    const cached = readCache()[url];
+    if (cached && looksPlayable(cached)) return { ok: true, url: cached, reason: "", short: true, via: "cache" };
     if (typeof navigator !== "undefined" && navigator.onLine === false) return { ok: false, url, reason: "offline", short: true, debug: "navigator.onLine = false" };
-    let json = null;
+    let why = "";
     try {
-      json = await fetchJsonWithTimeout("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(url), timeoutMs);
-    } catch (e) {
-      return { ok: false, url, reason: (typeof navigator !== "undefined" && navigator.onLine === false) ? "offline" : "gagal-jaringan", short: true, debug: "oEmbed gagal: " + (e && e.message ? e.message : e) };
-    }
-    const track = trackFromOembed(json);
-    if (track) return { ok: true, url: track, reason: "", short: true };
-    return { ok: false, url, reason: "tidak-diterjemahkan", short: true, debug: "oEmbed menjawab tetapi tanpa link lagu. html=" + String((json && json.html) || "(kosong)").slice(0, 220) };
+      const json = await fetchJsonWithTimeout("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(url), timeoutMs);
+      const track = trackFromOembed(json);
+      if (track) { writeCache(url, track); return { ok: true, url: track, reason: "", short: true, via: "oembed" }; }
+      why = "oEmbed menjawab tetapi tanpa link lagu. html=" + String((json && json.html) || "(kosong)").slice(0, 220);
+    } catch (e) { why = "oEmbed gagal: " + (e && e.message ? e.message : e); }
+    try {
+      const t = await resolveViaAppsScript(url, timeoutMs);
+      if (t) { writeCache(url, t); return { ok: true, url: t, reason: "", short: true, via: "appsscript" }; }
+      why += " | Apps Script: tidak ada jawaban/ belum dipasang";
+    } catch (e) { why += " | Apps Script gagal: " + (e && e.message ? e.message : e); }
+    return { ok: false, url, reason: /oEmbed gagal/.test(why) ? ((typeof navigator !== "undefined" && navigator.onLine === false) ? "offline" : "gagal-jaringan") : "tidak-diterjemahkan", short: true, debug: why };
   }
 
   // Teks petunjuk untuk pengguna (bahasa Indonesia) menurut alasan gagal.
@@ -116,9 +152,9 @@
       case "bukan-lagu": return "Link ini bukan halaman lagu SoundCloud (bentuk yang benar: soundcloud.com/nama-artis/judul-lagu).";
       case "offline": return "Link pendek SoundCloud (on.soundcloud.com) perlu internet untuk diterjemahkan ke link lengkap, dan perangkat sedang offline.";
       case "gagal-jaringan": return "Link pendek SoundCloud (on.soundcloud.com) gagal diterjemahkan ke link lengkap (jaringan lambat / diblokir).";
-      default: return "Link SoundCloud ini tidak bisa diterjemahkan ke link lengkap.";
+      default: return "Link SoundCloud ini tidak bisa diterjemahkan ke link lengkap. Solusi: pakai link LENGKAP (soundcloud.com/nama-artis/judul-lagu) di Sheet, atau daftarkan di CONFIG.SOUNDCLOUD_ALIASES (js/config.js).";
     }
   }
 
-  root.SCLink = { extract, clean, isShort, looksPlayable, resolve, explain, trackFromOembed };
+  root.SCLink = { extract, clean, isShort, looksPlayable, resolve, explain, trackFromOembed, playerSrc, aliasFor };
 })(typeof window !== "undefined" ? window : globalThis);

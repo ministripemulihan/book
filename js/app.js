@@ -7075,6 +7075,8 @@ function isEmbeddableCollectionItem(it) {
 async function resolveSoundCloudSrcForCollection(trackUrl) {
   if (window.SCLink) trackUrl = window.SCLink.clean(trackUrl) || trackUrl; // book200: bersihkan link (teks Bagikan, m.soundcloud.com, ?si=...) sebelum ke widget
   const paramsTail = "&auto_play=false&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+  // book205 -- lapis utama js/sclink.js (alias -> cache -> oEmbed -> Apps Script); gagal -> cara lama di bawah
+  if (window.SCLink && window.SCLink.resolve) { try { const r = await window.SCLink.resolve(trackUrl); if (r.ok) return window.SCLink.playerSrc(r.url, paramsTail); } catch (e) { /* lanjut */ } }
   try {
     const oembedUrl = "https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl);
     const res = await fetch(oembedUrl);
@@ -7894,6 +7896,8 @@ function openCollectionFullscreen(col, startIndex) {
   async function resolveScBgSrcFs_(trackUrl) {
     if (window.SCLink) trackUrl = window.SCLink.clean(trackUrl) || trackUrl; // book200
     const tail = "&auto_play=true&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
+    // book205 -- lapis utama js/sclink.js (alias -> cache -> oEmbed -> Apps Script); gagal -> cara lama di bawah
+    if (window.SCLink && window.SCLink.resolve) { try { const r = await window.SCLink.resolve(trackUrl); if (r.ok) return window.SCLink.playerSrc(r.url, tail); } catch (e) { /* lanjut */ } }
     try {
       const res = await fetch("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl));
       if (res.ok) {
