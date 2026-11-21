@@ -542,7 +542,7 @@ const Presentation = (() => {
   // di atas -- supaya toggle nyala/mati badge ini TIDAK menimpa
   // `lastPayload` (yang harus tetap berisi ayat/kidung/dst yang
   // sesungguhnya sedang tayang).
-  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear", "sc_bg", "sc_bg_control", "sc_bg_clear", "focusmode", "vpos", "cornerlogo"];
+  const OVERLAY_TYPES = ["theme", "warta", "footnote", "msgmid", "timer", "stopwatch", "pointer", "pen", "magnify", "yt_control", "sc_control", "yt_bg", "yt_bg_control", "yt_bg_clear", "yt_bg_armed", "mp3_bg", "mp3_bg_control", "mp3_bg_clear", "sc_bg", "sc_bg_control", "sc_bg_clear", "focusmode", "vpos", "cornerlogo", "annoverlay"];
   function postRaw(payload) {
     if (!isTwoScreenMode()) return;
     if (payload.type === "cornerlogo") lastCornerLogo_ = payload; // book178

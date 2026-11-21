@@ -851,7 +851,7 @@ const FunFX = (function () {
     let o = {}; try { o = JSON.parse(localStorage.getItem(LS_PREFIX + VEH_KEY) || "{}") || {}; } catch (e) { o = {}; }
     const sound = {}; VEH_KINDS.forEach((k) => { sound[k] = !(o.sound && o.sound[k] === false); }); // bawaan: SEMUA suara nyala
     let muted = false; try { muted = localStorage.getItem(LS_PREFIX + "vmuted") === "1"; } catch (e) { muted = false; }
-    return { sound, trips: Math.max(1, Math.min(8, Number(o.trips) || 2)), speed: /^(slow|mid|fast)$/.test(o.speed) ? o.speed : "mid", loop: !!o.loop, muted };
+    return { sound, trips: Math.max(1, Math.min(8, Math.round(Number(o.trips)) || (o.trips === 0 || o.trips === "0" ? 1 : 2))), speed: /^(slow|mid|fast)$/.test(o.speed) ? o.speed : "mid", loop: !!o.loop, muted };
   }
   function setVehicleOpts(o) { try { localStorage.setItem(LS_PREFIX + VEH_KEY, JSON.stringify({ sound: o.sound, trips: o.trips, speed: o.speed, loop: !!o.loop })); } catch (e) { /* abaikan */ } }
 
@@ -932,14 +932,14 @@ const FunFX = (function () {
   // --- gambar (SVG sederhana) ---
   const SVG_WHEEL = (x, y, r, color) => `<g transform="translate(${x} ${y})"><g class="ff-vw"><circle r="${r}" fill="${color || "#4a4a4a"}" stroke="#b5b5b5" stroke-width="1.5"/><circle r="${r * 0.36}" fill="#9a9a9a"/><path d="M${-r + 2} 0H${r - 2}M0 ${-r + 2}V${r - 2}M${-r * 0.7} ${-r * 0.7}L${r * 0.7} ${r * 0.7}M${r * 0.7} ${-r * 0.7}L${-r * 0.7} ${r * 0.7}" stroke="#bdbdbd" stroke-width="1.6"/></g></g>`;
   const VEHICLES = {
-    train: { ratio: 100 / 330, wf: 0.5, ground: true, label: "Berjalan bersama Yesus", anchor: [53.5, 8], smoke: "train",
-      svg: `<svg viewBox="0 0 330 100" aria-hidden="true"><rect x="4" y="24" width="98" height="48" rx="6" fill="#3b6ea8"/><rect x="4" y="64" width="98" height="8" fill="#274b76"/>${[12, 40, 68].map((x) => `<rect x="${x}" y="32" width="20" height="16" rx="2" fill="#dff1ff"/>`).join("")}<rect x="102" y="52" width="12" height="4" fill="#c9c9c9"/><rect x="112" y="40" width="84" height="32" rx="6" fill="#b3261e"/><rect x="112" y="24" width="32" height="48" rx="4" fill="#8f1d17"/><rect x="118" y="30" width="18" height="14" rx="2" fill="#dff1ff"/><rect x="108" y="20" width="40" height="6" rx="3" fill="#6a6a6a"/><rect x="170" y="22" width="12" height="20" fill="#6a6a6a"/><path d="M165 22h22l-3-9h-16z" fill="#6a6a6a"/><circle cx="154" cy="40" r="7" fill="#c8a24a"/><path d="M196 72l24 0-13-22h-11z" fill="#9a9a9a"/><circle cx="196" cy="52" r="5" fill="#ffe27a"/>${SVG_WHEEL(128, 78, 14)}${SVG_WHEEL(164, 78, 14)}${SVG_WHEEL(30, 78, 10)}${SVG_WHEEL(80, 78, 10)}${SVG_WHEEL(190, 82, 8)}</svg>` },
+    train: { ratio: 100 / 664, wf: 1.0, ground: true, label: "Berjalan bersama Yesus", anchor: [91.6, 10], smoke: "train", // book202: lokomotif + 5 GERBONG
+      svg: `<svg viewBox="0 0 664 100" aria-hidden="true">${[0, 1, 2, 3, 4].map((i) => `<g transform="translate(${i * 108} 0)"><rect x="4" y="24" width="98" height="48" rx="6" fill="${["#3b6ea8", "#2f8f6b", "#c98a2b", "#7a4fa3", "#3b6ea8"][i]}"/><rect x="4" y="64" width="98" height="8" fill="#00000040"/>${[12, 40, 68].map((x) => `<rect x="${x}" y="32" width="20" height="16" rx="2" fill="#dff1ff"/>`).join("")}<rect x="102" y="52" width="8" height="4" fill="#bdbdbd"/>${SVG_WHEEL(26, 78, 10)}${SVG_WHEEL(82, 78, 10)}</g>`).join("")}<g transform="translate(548 0)"><rect x="0" y="40" width="84" height="32" rx="6" fill="#b3261e"/><rect x="0" y="24" width="32" height="48" rx="4" fill="#8f1d17"/><rect x="6" y="30" width="18" height="14" rx="2" fill="#dff1ff"/><rect x="-4" y="20" width="40" height="6" rx="3" fill="#6a6a6a"/><rect x="58" y="22" width="12" height="20" fill="#6a6a6a"/><path d="M53 22h22l-3-9h-16z" fill="#6a6a6a"/><circle cx="42" cy="40" r="7" fill="#c8a24a"/><path d="M84 72l24 0-13-22h-11z" fill="#9a9a9a"/><circle cx="84" cy="52" r="5" fill="#ffe27a"/>${SVG_WHEEL(16, 78, 14)}${SVG_WHEEL(52, 78, 14)}${SVG_WHEEL(78, 82, 8)}</g></svg>` },
     carriage: { ratio: 110 / 300, wf: 0.4, ground: true, label: "Berjalan bersama Yesus", anchor: [88, 78], smoke: "dust",
       svg: `<svg viewBox="0 0 300 110" aria-hidden="true"><path d="M14 38h132l-12-20h-108z" fill="#4e2410"/><rect x="20" y="40" width="120" height="38" fill="#7a3b1e"/><rect x="34" y="48" width="24" height="18" fill="#f3e6c4"/><rect x="72" y="48" width="24" height="18" fill="#f3e6c4"/><rect x="140" y="62" width="76" height="4" fill="#4e2410"/>${SVG_WHEEL(52, 90, 18, "#5a4630")}${SVG_WHEEL(118, 90, 18, "#5a4630")}<ellipse cx="228" cy="64" rx="34" ry="19" fill="#8b5a2b"/><path d="M250 52L272 24l14 6-18 28z" fill="#8b5a2b"/><path d="M272 24l24 8-5 11-20-7z" fill="#7a4d22"/><path d="M262 28l-10 6 6 10z" fill="#3a2410"/><path d="M196 60q-16 8-12 30" stroke="#3a2410" stroke-width="5" fill="none" stroke-linecap="round"/>${[[210, 78], [220, 80], [240, 80], [250, 78]].map(([x, y], i) => `<rect class="ff-leg ${i % 2 ? "b" : "a"}" x="${x}" y="${y}" width="6" height="26" rx="3" fill="#6d431d"/>`).join("")}</svg>` },
     car: { ratio: 90 / 220, wf: 0.32, ground: true, label: "Berjalan bersama Yesus", anchor: [6, 70], smoke: "car",
       svg: `<svg viewBox="0 0 220 90" aria-hidden="true"><path d="M10 58q0-14 14-16l24-4q10-18 30-20h50q18 2 28 20l26 6q12 4 12 14v14h-184z" fill="#d94a3d"/><path d="M62 40q8-14 22-16h44q14 2 22 16z" fill="#bfe4ff"/><path d="M104 24v16" stroke="#d94a3d" stroke-width="3"/><rect x="190" y="52" width="14" height="8" rx="3" fill="#ffe27a"/><rect x="8" y="56" width="10" height="8" rx="3" fill="#ffb199"/>${SVG_WHEEL(54, 74, 16)}${SVG_WHEEL(160, 74, 16)}</svg>` },
     heli: { ratio: 100 / 220, wf: 0.36, ground: false, label: "Terbang bersama Tuhan Yesus", banner: true,
-      svg: `<svg viewBox="0 0 220 100" aria-hidden="true"><rect class="ff-rotor" x="30" y="14" width="150" height="5" rx="2.5" fill="#c9c9c9"/><rect x="102" y="18" width="5" height="14" fill="#c9c9c9"/><ellipse cx="104" cy="56" rx="50" ry="26" fill="#2f6fb3"/><path d="M118 40q22 0 34 14l-34 8z" fill="#bfe4ff"/><rect x="144" y="52" width="66" height="8" rx="4" fill="#2f6fb3"/><path d="M200 54l12-20 6 4-6 18z" fill="#245a93"/><circle class="ff-prop" cx="212" cy="46" r="9" fill="none" stroke="#c9c9c9" stroke-width="2.5" stroke-dasharray="6 4"/><path d="M70 86h74M82 80v8M132 80v8" stroke="#c9c9c9" stroke-width="4" stroke-linecap="round"/></svg>` },
+      svg: `<svg viewBox="0 0 220 100" aria-hidden="true"><g transform="translate(220 0) scale(-1 1)"><rect class="ff-rotor" x="30" y="14" width="150" height="5" rx="2.5" fill="#c9c9c9"/><rect x="102" y="18" width="5" height="14" fill="#c9c9c9"/><ellipse cx="104" cy="56" rx="50" ry="26" fill="#2f6fb3"/><path d="M118 40q22 0 34 14l-34 8z" fill="#bfe4ff"/><rect x="144" y="52" width="66" height="8" rx="4" fill="#2f6fb3"/><path d="M200 54l12-20 6 4-6 18z" fill="#245a93"/><circle class="ff-prop" cx="212" cy="46" r="9" fill="none" stroke="#c9c9c9" stroke-width="2.5" stroke-dasharray="6 4"/><path d="M70 86h74M82 80v8M132 80v8" stroke="#c9c9c9" stroke-width="4" stroke-linecap="round"/></g></svg>` },
     plane: { ratio: 100 / 250, wf: 0.4, ground: false, label: "Terbang bersama Tuhan Yesus", banner: true,
       svg: `<svg viewBox="0 0 250 100" aria-hidden="true"><path d="M8 52q4-18 40-20h120q40 2 56 18-16 18-56 18h-120q-36-2-40-16z" fill="#f4f4f4" stroke="#bbb" stroke-width="2"/><path d="M8 52l-4-26 30 8z" fill="#e0e0e0"/><path d="M84 50L52 6l24-2 52 44z" fill="#c8362b"/><path d="M92 62L60 94l24 2 48-30z" fill="#c8362b"/>${[70, 98, 126, 154, 182].map((x) => `<circle cx="${x}" cy="46" r="6" fill="#bfe4ff"/>`).join("")}<ellipse class="ff-prop" cx="246" cy="52" rx="3.5" ry="20" fill="#9a9a9a"/></svg>` },
     balloon: { ratio: 180 / 140, wf: 0.2, ground: false, label: "Terbang bersama Tuhan Yesus", hang: true,
@@ -1064,6 +1064,16 @@ const FunFX = (function () {
   }
 
   // Tombol untuk Studio: onPick(id, {src, text}) dipanggil saat tombol ditekan.
+  // book203 -- tulisan CUSTOM tersimpan: sekali diketik, tombol langsung tayang; ubah lewat tombol ✏️.
+  const CUSTOM_WORD_KEY = LS_PREFIX + "custom_word_v1";
+  const customWord = {
+    get() { try { return (localStorage.getItem(CUSTOM_WORD_KEY) || "").trim(); } catch (e) { return ""; } },
+    set(t) { try { localStorage.setItem(CUSTOM_WORD_KEY, String(t || "").trim()); } catch (e) { /* abaikan */ } if (customWord.onChange) customWord.onChange(); },
+    ask() { const cur = customWord.get(); const t = prompt("Tulisan timbul apa? (mis. Puji Tuhan, Selamat Natal)", cur); if (t === null) return ""; if (!t.trim()) return ""; customWord.set(t); return t.trim(); },
+    // dipakai tombol: ada tersimpan -> langsung; belum ada -> kolom teks Panel Efek, kalau kosong tanya dulu
+    resolve(fieldText) { const c = customWord.get(); if (c) return c; if (fieldText && fieldText.trim()) { customWord.set(fieldText); return fieldText.trim(); } return customWord.ask(); },
+    onChange: null,
+  };
   let lastTextIn = null; // book198: kolom teks Panel Efek (dipakai pintasan tulisan CUSTOM)
   function renderStudioControls(container, onPick) {
     if (!container) return;
@@ -1074,6 +1084,7 @@ const FunFX = (function () {
     lastTextIn = textIn;
     textIn.type = "text"; textIn.className = "ps-input"; textIn.placeholder = "Teks di layar (opsional), mis. Selamat Ulang Tahun!";
     textIn.style.cssText = "width:100%; margin:6px 0;";
+    let customBtn = null;
     const secIn = document.createElement("input");
     secIn.type = "number"; secIn.min = "3"; secIn.max = "120"; secIn.value = "12"; secIn.className = "ps-input";
     secIn.title = "Es Krim Tenang: berapa DETIK jeda tiap scoop es krim (6 scoop total)";
@@ -1082,12 +1093,21 @@ const FunFX = (function () {
       const b = document.createElement("button");
       b.type = "button"; b.className = "chip-btn small";
       b.textContent = e.icon + " " + e.label;
+      if (e.id === "word-custom") customBtn = b;
       b.addEventListener("click", () => {
+        if (e.id === "word-custom") { const t = customWord.resolve(textIn.value); if (!t) return; onPick(e.id, { src: "", text: t, seconds: 12 }); return; }
         const withText = e.id === "golden" || e.id.indexOf("party") === 0 || e.id === "icecream" || e.id === "aquarium" || e.id === "count" || e.id === "call-lord" || e.id.indexOf("word-") === 0 || e.id.indexOf("veh-") === 0;
         onPick(e.id, { src: e.song ? getSongUrl(e.song) : "", text: withText ? textIn.value.trim() : "", seconds: Number(secIn.value) || 12 });
       });
       row.appendChild(b);
+      if (e.id === "word-custom") {
+        const pen = document.createElement("button"); pen.type = "button"; pen.className = "chip-btn small"; pen.textContent = "✏️"; pen.title = "Ganti isi tulisan CUSTOM (tombol di sebelah kiri langsung menayangkan tulisan tersimpan)";
+        pen.addEventListener("click", () => { customWord.ask(); });
+        row.appendChild(pen);
+      }
     });
+    const paintCustom = () => { if (!customBtn) return; const c = customWord.get(); customBtn.textContent = "✨ Tulisan CUSTOM: " + (c ? "“" + c + "”" : "(belum diisi, klik ✏️)"); };
+    customWord.onChange = paintCustom; paintCustom();
     const stop = document.createElement("button");
     stop.type = "button"; stop.className = "chip-btn"; stop.textContent = "⏹ HENTIKAN SEMUA (efek, suara, lagu, bel)";
     stop.title = "Hentikan seketika semua efek layar + suara + lagu efek + bel di Layar 2";
@@ -1129,8 +1149,12 @@ const FunFX = (function () {
     const tl = document.createElement("label"); tl.textContent = "Lintasan: ";
     const tn = document.createElement("input"); tn.type = "number"; tn.min = "1"; tn.max = "8"; tn.value = String(st.trips); tn.className = "ps-input"; tn.style.cssText = "width:54px;";
     tn.title = "Jumlah lintasan: 2 = pergi lalu pulang (bolak-balik)";
-    tn.addEventListener("change", () => { st.trips = Math.max(1, Math.min(8, Number(tn.value) || 2)); tn.value = String(st.trips); save(); });
+    tn.addEventListener("change", () => { const raw = Number(tn.value); st.trips = Math.max(1, Math.min(8, Math.round(raw) || (raw === 0 ? 1 : 2))); tn.value = String(st.trips); save(); tnInfo.textContent = (raw > 8) ? "Maksimal 8, otomatis jadi 8." : (raw < 1 ? "Minimal 1, otomatis jadi 1." : ""); });
     tl.appendChild(tn); r2.appendChild(tl);
+    const tnInfo = document.createElement("span"); tnInfo.style.cssText = "color:#b34700; font-size:.9em;"; r2.appendChild(tnInfo);
+    const tnHelp = document.createElement("div"); tnHelp.style.cssText = "flex-basis:100%; font-size:.85em; color:#6a5a3a;";
+    tnHelp.textContent = "Lintasan = berapa kali kendaraan melintasi layar (1 lintasan = sekali lewat dari satu sisi ke sisi seberang). 1 = sekali lewat saja; 2 = pergi lalu pulang (bawaan); 3 = pergi-pulang-pergi; dst. Boleh diisi 1 sampai 8 (0 jadi 1, lebih dari 8 jadi 8). Mau terus tanpa batas? Centang \"terus bolak-balik sampai Hentikan\".";
+    r2.appendChild(tnHelp);
     const ll = document.createElement("label"); ll.style.cssText = "display:flex; gap:3px; align-items:center;";
     const lc = document.createElement("input"); lc.type = "checkbox"; lc.checked = !!st.loop; lc.addEventListener("change", () => { st.loop = lc.checked; save(); });
     ll.appendChild(lc); ll.appendChild(document.createTextNode("terus bolak-balik sampai Hentikan")); r2.appendChild(ll);
@@ -1408,7 +1432,7 @@ body.fx-sun #text,body.fx-sun #ref,body.fx-sun #refSub,body.fx-sun #text .verse-
 
     // book193: dipakai tombol cepat F5-F8 di Studio -- mengembalikan {name, src} untuk dikirim ke Layar 2.
   function quick(id) { const e = LIST.filter((x) => x.id === id)[0]; return e ? { name: e.id, src: e.song ? getSongUrl(e.song) : "" } : null; }
-  return { LIST, BUILD, quick, play, stopAll, configure, getVehicleOpts, getWordStyle, getText: () => (lastTextIn ? lastTextIn.value.trim() : ""), getAmenPos, showStatus, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
+  return { LIST, BUILD, quick, play, stopAll, configure, getVehicleOpts, getWordStyle, customWord, getText: () => (lastTextIn ? lastTextIn.value.trim() : ""), getAmenPos, showStatus, renderStudioControls, mountMediaLibraryLauncher, getSongUrl, setSongUrl };
 })();
 
 if (typeof window !== "undefined") {

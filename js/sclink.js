@@ -55,7 +55,8 @@
   function looksPlayable(url) {
     let u; try { u = new URL(url); } catch (e) { return false; }
     const host = u.hostname.toLowerCase();
-    if (host === "api.soundcloud.com") return /^\/(tracks|playlists|users)\/\d+/.test(u.pathname);
+    // angka biasa (/tracks/123) ATAU bentuk URN yang kini dipakai SoundCloud (/tracks/soundcloud%3Atracks%3A123 atau soundcloud:tracks:123)
+    if (host === "api.soundcloud.com") return /^\/(tracks|playlists|users)\/((soundcloud(%3A|:)(tracks|playlists|users)(%3A|:))?)\d+/i.test(u.pathname);
     if (host !== "soundcloud.com") return false;
     if (NOT_TRACK.test(u.pathname)) return false;
     return u.pathname.split("/").filter(Boolean).length >= 1;
@@ -78,26 +79,34 @@
     } finally { clearTimeout(timer); }
   }
 
-  // -> { ok, url, reason, short }   url = link lengkap siap dipasang ke widget (kalau ok)
+  // Ambil link lagu dari jawaban oEmbed. Tahan terhadap: "&amp;" di dalam html, bentuk URN, urutan parameter berbeda.
+  function trackFromOembed(json) {
+    const html = String((json && json.html) || "").replace(/&amp;/g, "&");
+    let inner = "";
+    const sm = /src="([^"]+)"/.exec(html);
+    if (sm) { try { inner = new URL(sm[1]).searchParams.get("url") || ""; } catch (e) { inner = ""; } }
+    if (!inner) { const m = /[?&]url=([^&"]+)/.exec(html); if (m) { try { inner = decodeURIComponent(m[1]); } catch (e) { inner = m[1]; } } }
+    return /^https?:\/\/([a-z0-9-]+\.)*soundcloud\.com\//i.test(inner) ? inner : ""; // dipercaya apa adanya (jangan dinormalkan: bentuk URN harus utuh)
+  }
+
+  // -> { ok, url, reason, short, debug }   url = link lengkap siap dipasang ke widget (kalau ok)
   async function resolve(raw, opts) {
     const timeoutMs = (opts && opts.timeoutMs) || 8000;
     const url = clean(raw);
-    if (!url) return { ok: false, url: "", reason: "kosong", short: false };
+    if (!url) return { ok: false, url: "", reason: "kosong", short: false, debug: "link kosong / tidak ada alamat di teks" };
     if (!isShort(url)) {
-      return looksPlayable(url) ? { ok: true, url, reason: "", short: false } : { ok: false, url, reason: "bukan-lagu", short: false };
+      return looksPlayable(url) ? { ok: true, url, reason: "", short: false } : { ok: false, url, reason: "bukan-lagu", short: false, debug: "bentuk link tidak dikenali: " + url };
     }
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return { ok: false, url, reason: "offline", short: true };
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return { ok: false, url, reason: "offline", short: true, debug: "navigator.onLine = false" };
+    let json = null;
     try {
-      const json = await fetchJsonWithTimeout("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(url), timeoutMs);
-      const m = /[?&]url=([^&"]+)/.exec((json && json.html) || "");
-      if (m && m[1]) {
-        const full = clean(decodeURIComponent(m[1]));
-        if (full && looksPlayable(full)) return { ok: true, url: full, reason: "", short: true };
-      }
-      return { ok: false, url, reason: "tidak-diterjemahkan", short: true };
+      json = await fetchJsonWithTimeout("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(url), timeoutMs);
     } catch (e) {
-      return { ok: false, url, reason: (typeof navigator !== "undefined" && navigator.onLine === false) ? "offline" : "gagal-jaringan", short: true };
+      return { ok: false, url, reason: (typeof navigator !== "undefined" && navigator.onLine === false) ? "offline" : "gagal-jaringan", short: true, debug: "oEmbed gagal: " + (e && e.message ? e.message : e) };
     }
+    const track = trackFromOembed(json);
+    if (track) return { ok: true, url: track, reason: "", short: true };
+    return { ok: false, url, reason: "tidak-diterjemahkan", short: true, debug: "oEmbed menjawab tetapi tanpa link lagu. html=" + String((json && json.html) || "(kosong)").slice(0, 220) };
   }
 
   // Teks petunjuk untuk pengguna (bahasa Indonesia) menurut alasan gagal.
@@ -111,5 +120,5 @@
     }
   }
 
-  root.SCLink = { extract, clean, isShort, looksPlayable, resolve, explain };
+  root.SCLink = { extract, clean, isShort, looksPlayable, resolve, explain, trackFromOembed };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -7073,6 +7073,7 @@ function isEmbeddableCollectionItem(it) {
 // biasanya memblokirnya diam-diam pula), operator/jemaat menekan ▶️ pada
 // widgetnya sendiri kalau mau memutar.
 async function resolveSoundCloudSrcForCollection(trackUrl) {
+  if (window.SCLink) trackUrl = window.SCLink.clean(trackUrl) || trackUrl; // book200: bersihkan link (teks Bagikan, m.soundcloud.com, ?si=...) sebelum ke widget
   const paramsTail = "&auto_play=false&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
   try {
     const oembedUrl = "https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl);
@@ -7081,6 +7082,7 @@ async function resolveSoundCloudSrcForCollection(trackUrl) {
       const json = await res.json();
       const html = (json && json.html) || "";
       const srcMatch = /src="([^"]+)"/.exec(html);
+      if (srcMatch) srcMatch[1] = srcMatch[1].replace(/&amp;/g, "&"); // book202: jawaban oEmbed bisa memakai "&amp;" -- dinormalkan dulu supaya parameter url= tetap terbaca
       if (srcMatch && srcMatch[1]) {
         const urlParamMatch = /[?&]url=([^&]+)/.exec(srcMatch[1]);
         if (urlParamMatch && urlParamMatch[1]) return "https://w.soundcloud.com/player/?url=" + urlParamMatch[1] + paramsTail;
@@ -7890,12 +7892,14 @@ function openCollectionFullscreen(col, startIndex) {
   // tidak ada "ulang terus" di mode ini -- lagu langsung berhenti saat
   // pindah slide / ⏹, dan main 1x.
   async function resolveScBgSrcFs_(trackUrl) {
+    if (window.SCLink) trackUrl = window.SCLink.clean(trackUrl) || trackUrl; // book200
     const tail = "&auto_play=true&color=%23d8b45c&show_user=true&visual=false&buying=false&sharing=false&download=false";
     try {
       const res = await fetch("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(trackUrl));
       if (res.ok) {
         const json = await res.json();
         const m = /src="([^"]+)"/.exec((json && json.html) || "");
+        if (m) m[1] = m[1].replace(/&amp;/g, "&"); // book202: jawaban oEmbed bisa memakai "&amp;" -- dinormalkan dulu supaya parameter url= tetap terbaca
         if (m && m[1]) {
           const u = /[?&]url=([^&]+)/.exec(m[1]);
           if (u && u[1]) return "https://w.soundcloud.com/player/?url=" + u[1] + tail;
