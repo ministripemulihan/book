@@ -40,6 +40,12 @@ const FunFX = (function () {
     { id: "veh-heli", icon: "🚁", label: "Helikopter (Terbang bersama Tuhan Yesus)", song: null },
     { id: "veh-plane", icon: "✈️", label: "Pesawat terbang (Terbang bersama Tuhan Yesus)", song: null },
     { id: "veh-balloon", icon: "🎈", label: "Balon udara (Terbang bersama Tuhan Yesus)", song: null },
+    { id: "veh-minibus", icon: "🚙", label: "Minibus hijau (Berjalan bersama Yesus)", song: null },
+    { id: "veh-motor", icon: "🏍️", label: "Sepeda motor (Berjalan bersama Yesus)", song: null },
+    { id: "veh-bus", icon: "🚌", label: "Bus biru (Berjalan bersama Yesus)", song: null },
+    { id: "veh-ship", icon: "🚢", label: "Kapal laut putih (Berlayar bersama Yesus)", song: null },
+    { id: "veh-becak", icon: "🛺", label: "Becak (Berjalan bersama Yesus)", song: null },
+    { id: "veh-bike", icon: "🚲", label: "Sepeda (Berjalan bersama Yesus)", song: null },
   ];
   const SONG_LABEL = { party: "Lagu Pesta", golden: "Lagu Golden Buzzer", amen_all: "Suara Amin Bersama", amen_male: "Suara Amin Pria", amen_female: "Suara Amin Wanita", amen_kids: "Suara Amin Anak-anak", call_lord: "Suara Seru Nama Tuhan" };
   const LS_PREFIX = "funfx_song_";
@@ -845,8 +851,8 @@ const FunFX = (function () {
   //  tetap terbaca. Opsi (jumlah lintasan, kecepatan, terus sampai Hentikan, suara per kendaraan) di Panel Efek > "🚂 Kendaraan".
   // ------------------------------------------------------------
   const VEH_KEY = "vehicle";
-  const VEH_KINDS = ["train", "carriage", "car", "heli", "plane", "balloon"];
-  const VEH_LABEL = { train: "Kereta api", carriage: "Kereta kuda", car: "Mobil", heli: "Helikopter", plane: "Pesawat", balloon: "Balon udara" };
+  const VEH_KINDS = ["train", "carriage", "car", "heli", "plane", "balloon", "minibus", "motor", "bus", "ship", "becak", "bike"]; // book206: + minibus hijau, motor, bus biru, kapal laut, becak, sepeda
+  const VEH_LABEL = { train: "Kereta api", carriage: "Kereta kuda", car: "Mobil", heli: "Helikopter", plane: "Pesawat", balloon: "Balon udara", minibus: "Minibus", motor: "Motor", bus: "Bus", ship: "Kapal laut", becak: "Becak", bike: "Sepeda" };
   function getVehicleOpts() {
     let o = {}; try { o = JSON.parse(localStorage.getItem(LS_PREFIX + VEH_KEY) || "{}") || {}; } catch (e) { o = {}; }
     const sound = {}; VEH_KINDS.forEach((k) => { sound[k] = !(o.sound && o.sound[k] === false); }); // bawaan: SEMUA suara nyala
@@ -904,6 +910,13 @@ const FunFX = (function () {
     else if (kind === "balloon") { interval = 3.2; pattern = (t) => { vBurst(c, bus, t, 1.1, 0.3, 1100, 0.6); }; loopNoise(400, "lowpass", 0.03, 0.5); }
     else if (kind === "car") { eng = loopOsc("sawtooth", 58, 320, 0.2); const e2 = loopOsc("square", 29, 200, 0.1); stops.push(() => {}); eng.o2 = e2.o; }
     else if (kind === "plane") { loopNoise(700, "lowpass", 0.22, 0.5); eng = loopOsc("sawtooth", 95, 260, 0.08); }
+    // book206: suara kendaraan baru
+    else if (kind === "minibus") { eng = loopOsc("sawtooth", 46, 280, 0.2); const e2 = loopOsc("square", 23, 180, 0.12); eng.o2 = e2.o; }
+    else if (kind === "motor") { interval = 0.11; pattern = (t) => { vBurst(c, bus, t, 0.06, 0.4, 260, 0.9, "lowpass"); vThud(c, bus, t, 90, 0.05, 0.28); }; eng = loopOsc("sawtooth", 130, 520, 0.07); }
+    else if (kind === "bus") { eng = loopOsc("sawtooth", 38, 240, 0.24); const e2 = loopOsc("square", 19, 160, 0.14); eng.o2 = e2.o; loopNoise(300, "lowpass", 0.04, 0.5); }
+    else if (kind === "ship") { interval = 0.9; pattern = (t) => { vThud(c, bus, t, 46, 0.4, 0.4); }; loopNoise(500, "lowpass", 0.05, 0.4); eng = loopOsc("sawtooth", 34, 150, 0.1); }
+    else if (kind === "becak") { interval = 0.16; pattern = (t, n) => { vBurst(c, bus, t, 0.03, 0.35, 3200, 2.2, "bandpass"); if (n % 2 === 0) vBurst(c, bus, t, 0.05, 0.12, 900, 0.8); }; }
+    else if (kind === "bike") { interval = 0.14; pattern = (t) => { vBurst(c, bus, t, 0.025, 0.3, 3800, 2.5, "bandpass"); }; loopNoise(1500, "bandpass", 0.015, 0.6); }
     const timer = setInterval(() => {
       if (!pattern) return;
       while (next < c.currentTime + 0.3) { pattern(next, step++); next += interval; }
@@ -914,7 +927,23 @@ const FunFX = (function () {
         [740, 932].forEach((fq) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "sawtooth"; o.frequency.setValueAtTime(fq, t); lp.type = "lowpass"; lp.frequency.value = 2400;
           g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.08); g.gain.setValueAtTime(0.16, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
           o.connect(lp); lp.connect(g); g.connect(bus); o.start(t); o.stop(t + 1.2); });
-      } else if (kind === "car") {
+      } else if (kind === "bike" || kind === "becak") { // book206: bel sepeda "kring-kring"
+        [0, 0.16, 0.32].forEach((d) => { [2093, 2637].forEach((fq) => { const o = c.createOscillator(), g = c.createGain(); o.type = "sine"; o.frequency.value = fq;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.13, t + d + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.28);
+          o.connect(g); g.connect(bus); o.start(t + d); o.stop(t + d + 0.3); }); });
+      } else if (kind === "ship") { // book206: sirine kapal (nada rendah panjang)
+        [[98, 0], [147, 0]].forEach(([fq, d]) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "sawtooth"; o.frequency.setValueAtTime(fq, t + d); lp.type = "lowpass"; lp.frequency.value = 700;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.22, t + d + 0.15); g.gain.setValueAtTime(0.22, t + d + 1.6); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 2.3);
+          o.connect(lp); lp.connect(g); g.connect(bus); o.start(t + d); o.stop(t + d + 2.4); });
+      } else if (kind === "bus") { // book206: klakson bus (2 nada, lebih berat dari mobil)
+        [0, 0.5].forEach((d) => { [262, 330].forEach((fq) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "square"; o.frequency.value = fq; lp.type = "lowpass"; lp.frequency.value = 1100;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.14, t + d + 0.03); g.gain.setValueAtTime(0.14, t + d + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.38);
+          o.connect(lp); lp.connect(g); g.connect(bus); o.start(t + d); o.stop(t + d + 0.42); }); });
+      } else if (kind === "motor") { // book206: klakson motor "tin-tin"
+        [0, 0.2].forEach((d) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "square"; o.frequency.value = 700; lp.type = "lowpass"; lp.frequency.value = 2000;
+          g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.1, t + d + 0.02); g.gain.setValueAtTime(0.1, t + d + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.14);
+          o.connect(lp); lp.connect(g); g.connect(bus); o.start(t + d); o.stop(t + d + 0.18); });
+      } else if (kind === "car" || kind === "minibus") {
         [0, 0.28].forEach((d) => { [440, 554].forEach((fq) => { const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(); o.type = "square"; o.frequency.value = fq; lp.type = "lowpass"; lp.frequency.value = 1500;
           g.gain.setValueAtTime(0.0001, t + d); g.gain.exponentialRampToValueAtTime(0.12, t + d + 0.02); g.gain.setValueAtTime(0.12, t + d + 0.16); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2);
           o.connect(lp); lp.connect(g); g.connect(bus); o.start(t + d); o.stop(t + d + 0.25); }); });
@@ -923,7 +952,7 @@ const FunFX = (function () {
     return {
       honk: whistle,
       update(panV, near) {
-        try { if (pan) pan.pan.value = panV; bus.gain.value = 0.25 + 0.75 * near; if (eng) { eng.o.frequency.value = (kind === "car" ? 52 : 90) + 22 * near; } } catch (e) { /* abaikan */ }
+        try { if (pan) pan.pan.value = panV; bus.gain.value = 0.25 + 0.75 * near; if (eng) { const base = { car: 52, minibus: 42, bus: 34, ship: 32, motor: 120 }[kind] || 90; eng.o.frequency.value = base + (kind === "ship" ? 3 : kind === "motor" ? 40 : 22) * near; } } catch (e) { /* abaikan */ }
       },
       stop() { clearInterval(timer); stops.forEach((f) => f()); try { bus.disconnect(); if (pan) pan.disconnect(); } catch (e) { /* abaikan */ } },
     };
@@ -944,10 +973,22 @@ const FunFX = (function () {
       svg: `<svg viewBox="0 0 250 100" aria-hidden="true"><path d="M8 52q4-18 40-20h120q40 2 56 18-16 18-56 18h-120q-36-2-40-16z" fill="#f4f4f4" stroke="#bbb" stroke-width="2"/><path d="M8 52l-4-26 30 8z" fill="#e0e0e0"/><path d="M84 50L52 6l24-2 52 44z" fill="#c8362b"/><path d="M92 62L60 94l24 2 48-30z" fill="#c8362b"/>${[70, 98, 126, 154, 182].map((x) => `<circle cx="${x}" cy="46" r="6" fill="#bfe4ff"/>`).join("")}<ellipse class="ff-prop" cx="246" cy="52" rx="3.5" ry="20" fill="#9a9a9a"/></svg>` },
     balloon: { ratio: 180 / 140, wf: 0.2, ground: false, label: "Terbang bersama Tuhan Yesus", hang: true,
       svg: `<svg viewBox="0 0 140 180" aria-hidden="true"><path d="M70 6C30 6 8 36 8 68c0 28 22 46 40 58h44c18-12 40-30 40-58C132 36 110 6 70 6z" fill="#e9573f"/><path d="M70 6C52 14 40 38 40 68c0 22 10 42 18 58h24c8-16 18-36 18-58 0-30-12-54-30-62z" fill="#ffd23f"/><path d="M70 6C62 22 58 44 58 68c0 22 4 42 8 58h8c4-16 8-36 8-58 0-24-4-46-12-62z" fill="#3b82c4"/><path d="M48 126l14 34M92 126l-14 34M70 126v34" stroke="#6b4a2a" stroke-width="2"/><rect x="52" y="158" width="36" height="20" rx="3" fill="#a8743a"/></svg>` },
+    minibus: { ratio: 92 / 240, wf: 0.34, ground: true, label: "Berjalan bersama Yesus", anchor: [3, 74], smoke: "car", // book206: minibus hijau (mirip Isuzu Panther)
+      svg: `<svg viewBox="0 0 240 92" aria-hidden="true"><path d="M10 70V30q0-8 10-8h126l30 24h48q8 0 8 10v14z" fill="#1f7a5a"/><rect x="26" y="17" width="112" height="4" rx="2" fill="#555"/><path d="M22 30h40v16H22zM68 30h40v16H68zM114 30h30l16 16h-46z" fill="#cfe9ff"/><path d="M66 28v42M112 28v42" stroke="#14513b" stroke-width="2"/><rect x="26" y="52" width="10" height="3" rx="1.5" fill="#14513b"/><rect x="72" y="52" width="10" height="3" rx="1.5" fill="#14513b"/><rect x="215" y="50" width="13" height="8" rx="3" fill="#ffe27a"/><rect x="222" y="60" width="10" height="6" fill="#2b2b2b"/><rect x="8" y="64" width="224" height="8" rx="3" fill="#14402f"/><circle cx="62" cy="72" r="21" fill="#0e2a20"/><circle cx="184" cy="72" r="21" fill="#0e2a20"/>${SVG_WHEEL(62, 72, 17)}${SVG_WHEEL(184, 72, 17)}</svg>` },
+    motor: { ratio: 116 / 200, wf: 0.28, ground: true, label: "Berjalan bersama Yesus", anchor: [8, 82], smoke: "car", // book206: sepeda motor skutik biru-ungu-merah
+      svg: `<svg viewBox="0 0 200 116" aria-hidden="true"><path d="M30 90L78 100V106L30 98z" fill="#2b2b2b"/><path d="M24 82Q28 54 60 50L96 48L108 68L100 92L62 94Z" fill="#2c6fc4"/><path d="M34 50Q62 38 102 44L98 54Q62 52 36 60Z" fill="#1c1c1c"/><path d="M94 62L126 76L132 98L98 96Z" fill="#d92b3a"/><path d="M118 60L136 30L150 34L142 80L124 80Z" fill="#5b3fa8"/><path d="M136 70Q152 60 170 76L166 82Q152 72 140 80Z" fill="#2c6fc4"/><path d="M146 36L152 94" stroke="#8a8a8a" stroke-width="5" stroke-linecap="round"/><path d="M134 30L130 14L148 11" stroke="#222" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M146 38l14 4-2 8-14-4z" fill="#ffe27a"/><circle cx="148" cy="11" r="3.5" fill="#222"/>${SVG_WHEEL(48, 94, 20, "#222")}${SVG_WHEEL(152, 94, 20, "#222")}<circle cx="48" cy="94" r="8" fill="#d92b3a"/><circle cx="152" cy="94" r="8" fill="#d92b3a"/></svg>` },
+    bus: { ratio: 106 / 360, wf: 0.5, ground: true, label: "Berjalan bersama Yesus", anchor: [1.5, 76], smoke: "car", // book206: bus biru
+      svg: `<svg viewBox="0 0 360 106" aria-hidden="true"><rect x="6" y="12" width="348" height="68" rx="10" fill="#1f63c9"/><path d="M6 52H354v8H6z" fill="#f2c21b"/><path d="M6 62H354v5H6z" fill="#e04a3a"/><rect x="22" y="22" width="40" height="24" rx="3" fill="#cfe9ff"/><rect x="68" y="22" width="40" height="24" rx="3" fill="#cfe9ff"/><rect x="114" y="22" width="40" height="24" rx="3" fill="#cfe9ff"/><rect x="160" y="22" width="40" height="24" rx="3" fill="#cfe9ff"/><rect x="206" y="22" width="40" height="24" rx="3" fill="#cfe9ff"/><rect x="256" y="20" width="28" height="56" rx="3" fill="#164a99"/><rect x="260" y="24" width="20" height="26" rx="2" fill="#cfe9ff"/><path d="M294 20h50q8 0 10 12v22h-60z" fill="#bfe4ff"/><path d="M294 20v34" stroke="#1f63c9" stroke-width="3"/><rect x="342" y="60" width="12" height="9" rx="3" fill="#ffe27a"/><rect x="4" y="76" width="352" height="8" rx="3" fill="#123a78"/><circle cx="80" cy="84" r="21" fill="#0c2b5c"/><circle cx="262" cy="84" r="21" fill="#0c2b5c"/>${SVG_WHEEL(80, 84, 17)}${SVG_WHEEL(262, 84, 17)}</svg>` },
+    ship: { ratio: 146 / 400, wf: 0.6, ground: true, ship: true, spd: 0.75, label: "Berlayar bersama Yesus", anchor: [76, 8], smoke: "ship", // book206: kapal laut putih (kapal pesiar)
+      svg: `<svg viewBox="0 0 400 146" aria-hidden="true"><circle cx="196" cy="22" r="9" fill="#f4f4f4" stroke="#cfcfcf"/><circle cx="168" cy="26" r="7" fill="#f4f4f4" stroke="#cfcfcf"/><rect x="286" y="12" width="34" height="40" rx="8" fill="#ececec" stroke="#cfcfcf"/><rect x="286" y="22" width="34" height="7" fill="#1aa3a3"/><rect x="108" y="32" width="176" height="20" rx="3" fill="#fafafa" stroke="#d6d6d6"/><rect x="72" y="50" width="248" height="22" rx="3" fill="#fafafa" stroke="#d6d6d6"/><rect x="40" y="70" width="312" height="22" rx="3" fill="#fafafa" stroke="#d6d6d6"/><rect x="108" y="46" width="176" height="3" fill="#1aa3a3"/><rect x="72" y="66" width="248" height="3" fill="#1aa3a3"/>${Array.from({ length: 14 }, (_, i) => `<rect x="${118 + i * 12}" y="38" width="8" height="6" rx="1" fill="#8fbbd9"/>`).join("")}${Array.from({ length: 19 }, (_, i) => `<rect x="${82 + i * 12.5}" y="56" width="8" height="6" rx="1" fill="#8fbbd9"/>`).join("")}${Array.from({ length: 6 }, (_, i) => `<rect x="${122 + i * 40}" y="80" width="26" height="9" rx="4.5" fill="#f08a24"/>`).join("")}<path d="M6 92H388Q396 92 392 98L362 126H38Q16 112 6 92z" fill="#fdfdfd" stroke="#d6d6d6"/><path d="M16 106H382L372 116H26z" fill="#1aa3a3" opacity=".9"/>${Array.from({ length: 24 }, (_, i) => `<circle cx="${34 + i * 14.5}" cy="99" r="2.4" fill="#8fbbd9"/>`).join("")}<path d="M0 128q10-8 20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0V146H0z" fill="#2f89d0"/><path d="M0 136q10-6 20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0t20 0V146H0z" fill="#1f6fb5"/></svg>` },
+    becak: { ratio: 128 / 250, wf: 0.3, ground: true, spd: 0.7, label: "Berjalan bersama Yesus", // book206: becak (penumpang di depan, pengayuh di belakang)
+      svg: `<svg viewBox="0 0 250 128" aria-hidden="true"><path d="M112 58Q116 22 170 18L212 24L206 58z" fill="#2b2b2b"/><path d="M112 58Q118 34 170 30" stroke="#555" stroke-width="2" fill="none"/><path d="M118 58H206L222 96H108z" fill="#2a7fc0"/><path d="M122 62H170L176 90H116z" fill="#c0602d"/><path d="M178 66H206L214 88H184z" fill="#e8c27a"/><path d="M62 100L100 92" stroke="#2a7fc0" stroke-width="5" stroke-linecap="round"/><path d="M100 50V94" stroke="#2a7fc0" stroke-width="5" stroke-linecap="round"/><path d="M94 48H108" stroke="#222" stroke-width="5" stroke-linecap="round"/><path d="M64 64L66 100" stroke="#2a7fc0" stroke-width="4"/><rect x="54" y="58" width="22" height="6" rx="3" fill="#222"/><circle cx="64" cy="36" r="8" fill="#e8b88a"/><path d="M52 56q0-18 12-20t14 10l8 12-10 8-6-6-8 4z" fill="#e8793a"/><rect class="ff-leg a" x="66" y="60" width="8" height="38" rx="4" fill="#3b4a8c"/><rect class="ff-leg b" x="66" y="60" width="8" height="38" rx="4" fill="#2f3b73"/><circle cx="84" cy="102" r="6" fill="#999"/>${SVG_WHEEL(60, 102, 22, "#222")}${SVG_WHEEL(190, 102, 22, "#222")}</svg>` },
+    bike: { ratio: 126 / 200, wf: 0.24, ground: true, spd: 0.85, label: "Berjalan bersama Yesus", // book206: sepeda BMX merah-kuning
+      svg: `<svg viewBox="0 0 200 126" aria-hidden="true"><path d="M44 96L72 56L136 52L84 94zM72 56L84 94M72 56L44 96M84 94L44 96" stroke="#a8222f" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M136 52L156 96" stroke="#f2b705" stroke-width="6" stroke-linecap="round"/><path d="M136 52L132 34" stroke="#222" stroke-width="5" stroke-linecap="round"/><path d="M118 30H148" stroke="#222" stroke-width="5" stroke-linecap="round"/><rect x="58" y="50" width="26" height="7" rx="3.5" fill="#222"/>${SVG_WHEEL(44, 96, 28, "#2a2a2a")}${SVG_WHEEL(156, 96, 28, "#2a2a2a")}<circle cx="84" cy="94" r="9" fill="#bdbdbd" stroke="#777" stroke-width="2"/><g transform="translate(84 94)"><g class="ff-vw"><path d="M0-15V15" stroke="#777" stroke-width="4" stroke-linecap="round"/><rect x="-6" y="-19" width="12" height="5" rx="2" fill="#222"/><rect x="-6" y="14" width="12" height="5" rx="2" fill="#222"/></g></g></svg>` },
   };
 
   async function vehicle(id, text, vopt) {
-    const kind = { "veh-train": "train", "veh-carriage": "carriage", "veh-car": "car", "veh-heli": "heli", "veh-plane": "plane", "veh-balloon": "balloon" }[id];
+    const kind = { "veh-train": "train", "veh-carriage": "carriage", "veh-car": "car", "veh-heli": "heli", "veh-plane": "plane", "veh-balloon": "balloon", "veh-minibus": "minibus", "veh-motor": "motor", "veh-bus": "bus", "veh-ship": "ship", "veh-becak": "becak", "veh-bike": "bike" }[id];
     const D = VEHICLES[kind]; if (!D) return;
     const st = Object.assign({}, getVehicleOpts(), vopt || {});
     if (vopt && vopt.sound) st.sound = Object.assign({}, getVehicleOpts().sound, vopt.sound);
@@ -982,7 +1023,7 @@ const FunFX = (function () {
     dirBox.querySelectorAll(".ff-rotor").forEach((r) => { try { r.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(.12)" }, { transform: "scaleX(1)" }], { duration: 160, iterations: Infinity }); } catch (e) { /* abaikan */ } });
     dirBox.querySelectorAll(".ff-prop").forEach((r) => { try { r.animate([{ transform: "scaleY(1)" }, { transform: "scaleY(.2)" }, { transform: "scaleY(1)" }], { duration: 90, iterations: Infinity }); } catch (e) { /* abaikan */ } });
     dirBox.querySelectorAll(".ff-leg").forEach((l) => { try { l.animate([{ transform: "rotate(-22deg)" }, { transform: "rotate(22deg)" }], { duration: 280, direction: "alternate", iterations: Infinity, delay: l.classList.contains("b") ? -280 : 0 }); } catch (e) { /* abaikan */ } });
-    try { dirBox.firstChild.animate(D.ground ? [{ transform: "translateY(0)" }, { transform: "translateY(-2px)" }, { transform: "translateY(0)" }] : [{ transform: "translateY(-8px)" }, { transform: "translateY(8px)" }], D.ground ? { duration: 140, iterations: Infinity } : { duration: 1900, direction: "alternate", iterations: Infinity, easing: "ease-in-out" }); } catch (e) { /* abaikan */ }
+    try { dirBox.firstChild.animate(D.ship ? [{ transform: "translateY(-3px) rotate(-.6deg)" }, { transform: "translateY(3px) rotate(.6deg)" }] : D.ground ? [{ transform: "translateY(0)" }, { transform: "translateY(-2px)" }, { transform: "translateY(0)" }] : [{ transform: "translateY(-8px)" }, { transform: "translateY(8px)" }], D.ship ? { duration: 1700, direction: "alternate", iterations: Infinity, easing: "ease-in-out" } : D.ground ? { duration: 140, iterations: Infinity } : { duration: 1900, direction: "alternate", iterations: Infinity, easing: "ease-in-out" }); } catch (e) { /* abaikan */ }
     // suara
     setVMute(st.muted); // bawaan tidak di-mute
     let snd = null;
@@ -994,7 +1035,7 @@ const FunFX = (function () {
       smokeTimer = setInterval(() => {
         if (!anchor || dead) return;
         const r = anchor.getBoundingClientRect();
-        const big = D.smoke === "train", dust = D.smoke === "dust";
+        const big = D.smoke === "train" || D.smoke === "ship", dust = D.smoke === "dust";
         const p = document.createElement("div"); p.className = "ff-p";
         const sz = big ? rnd(16, 30) : dust ? rnd(8, 16) : rnd(7, 12);
         p.style.cssText = `width:${sz}px;height:${sz}px;border-radius:50%;background:${dust ? "rgba(190,160,110,.65)" : "rgba(235,235,235,.8)"};left:0;top:0;`;
@@ -1002,7 +1043,7 @@ const FunFX = (function () {
         const dx = (cur.dir > 0 ? -1 : 1) * (big ? rnd(30, 90) : rnd(20, 50));
         const dy = big ? -rnd(70, 130) : dust ? -rnd(6, 16) : -rnd(10, 26);
         try { p.animate([{ transform: `translate(${r.left}px,${r.top}px) scale(.5)`, opacity: 0.9 }, { transform: `translate(${r.left + dx}px,${r.top + dy}px) scale(${big ? 2.4 : 1.8})`, opacity: 0 }], { duration: big ? 1900 : 1100, easing: "ease-out", fill: "forwards" }).finished.then(() => p.remove()).catch(() => p.remove()); } catch (e) { p.remove(); }
-      }, D.smoke === "train" ? 170 : D.smoke === "dust" ? 220 : 380);
+      }, D.smoke === "train" ? 170 : D.smoke === "ship" ? 360 : D.smoke === "dust" ? 220 : 380);
       cleanups.push(() => clearInterval(smokeTimer));
     }
     // posisi -> stereo & kerasnya suara
@@ -1016,7 +1057,7 @@ const FunFX = (function () {
     };
     raf = requestAnimationFrame(tickPos); cleanups.push(() => cancelAnimationFrame(raf));
     // lintasan bolak-balik
-    const speed = { slow: W / 8, mid: W / 5.5, fast: W / 3.5 }[st.speed] || W / 5.5;
+    const speed = ({ slow: W / 8, mid: W / 5.5, fast: W / 3.5 }[st.speed] || W / 5.5) * (D.spd || 1); // book206: kapal/becak/sepeda sedikit lebih pelan
     const total = st.loop ? Infinity : Math.max(1, st.trips);
     for (let i = 0; i < total && !dead; i++) {
       const dir = startDir * (i % 2 ? -1 : 1);

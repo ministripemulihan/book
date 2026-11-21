@@ -333,9 +333,15 @@ const PresentationStudio = (() => {
       ["fx-veh-heli", "🚁 Helikopter (Terbang bersama Tuhan Yesus)", "veh-heli", "alt+shift+7"],
       ["fx-veh-plane", "✈️ Pesawat terbang (Terbang bersama Tuhan Yesus)", "veh-plane", "alt+shift+8"],
       ["fx-veh-balloon", "🎈 Balon udara (Terbang bersama Tuhan Yesus)", "veh-balloon", "alt+shift+9"],
+      ["fx-veh-minibus", "🚙 Minibus hijau (Berjalan bersama Yesus)", "veh-minibus", "alt+shift+i"],
+      ["fx-veh-motor", "🏍️ Sepeda motor (Berjalan bersama Yesus)", "veh-motor", "alt+shift+t"],
+      ["fx-veh-bus", "🚌 Bus biru (Berjalan bersama Yesus)", "veh-bus", "alt+shift+b"],
+      ["fx-veh-ship", "🚢 Kapal laut putih (Berlayar bersama Yesus)", "veh-ship", "alt+shift+f"],
+      ["fx-veh-becak", "🛺 Becak (Berjalan bersama Yesus)", "veh-becak", "alt+shift+e"],
+      ["fx-veh-bike", "🚲 Sepeda (Berjalan bersama Yesus)", "veh-bike", "alt+shift+d"],
       ["fx-stop", "⏹ HENTIKAN SEMUA efek, suara, lagu & bel", "stop", "alt+shift+q"],
     ].forEach(([id, label, fx, def]) => window.PSShortcuts.registerAction({ id, group: "Efek Layar", label, def, run: () => send(fx) }));
-    // SHORTCUT: Alt+Shift+4..9 = kereta api / kereta kuda / mobil / helikopter / pesawat / balon udara · Alt+Shift+0 = MUTE / UNMUTE suara kendaraan (bawaan: suara NYALA).
+    // SHORTCUT: Alt+Shift+4..9 = kereta api / kereta kuda / mobil / helikopter / pesawat / balon udara · book206: Alt+Shift+I/T/B/F/E/D = minibus hijau / motor / bus biru / kapal laut / becak / sepeda · Alt+Shift+0 = MUTE / UNMUTE suara kendaraan (bawaan: suara NYALA).
     // SHORTCUT-GANTI: ubah teks kombinasi di baris "fx-veh-*" di atas dan di baris "fx-vmute" di bawah (atau lewat ⚙️).
     window.PSShortcuts.registerAction({ id: "fx-vmute", group: "Efek Layar", label: "🔇/🔊 Mute atau nyalakan suara kendaraan (langsung)", def: "alt+shift+0", run: () => { const nx = localStorage.getItem("funfx_song_vmuted") !== "1"; try { localStorage.setItem("funfx_song_vmuted", nx ? "1" : "0"); } catch (e) { /* abaikan */ } rawPost({ type: "funfx", name: "vmute", mute: nx }); } });
     // SHORTCUT: Alt+Shift+N = tutup pita pengumuman (tumpuk / sisakan ruang) di Layar 2 dan kembalikan ukuran layar. SHORTCUT-GANTI: ubah teks kombinasi di bawah ini (atau lewat ⚙️).
