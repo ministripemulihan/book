@@ -1384,6 +1384,8 @@ function handleAddKidungToCollection(meta, baits) {
         title: meta.judul || "",
         bait: s.baits,
         koorTeks: s.koorTeks,
+        ikon: meta.ikon || "",
+        pengarang: meta.pengarang || "", birama: meta.birama || "", jumlahBait: meta.jumlahBait || 0, // book204 -- header kidung
       });
     });
     if (typeof logActivity === "function") logActivity("Simpan Kidung ke Kumpulan Ayat");

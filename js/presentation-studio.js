@@ -933,13 +933,12 @@ const PresentationStudio = (() => {
       // Pratinjau mini kidung di kotak "Tayang" Studio -- meniru persis
       // yang tampil di Layar 2 (lihat #kidungStage di present.html):
       // bait apa adanya + baris koor disorot kuning kalau ada.
-      const refHtml = payload.ref ? `<div class="present-preview-ref">${escapeHtml(payload.ref)}</div>` : "";
-      // BARU (4 Sep 2026) -- baris kecil kedua (pengarang + birama +
-      // jumlah bait), sama persis susunannya dengan yang dibangun di
-      // present.html (showMain() kind "kidung") supaya pratinjau Studio
-      // benar-benar mencerminkan apa yang tayang di Layar 2.
-      const subText = kidungSubLine(payload.pengarang, payload.birama, payload.jumlahBait);
-      const subHtml = subText ? `<div class="present-preview-ref" style="font-size:0.65em; opacity:0.8; text-transform:none; letter-spacing:normal;">${escapeHtml(subText)}</div>` : "";
+      // book204 -- HEADER SATU BARIS, sama persis dengan Layar 2 (present.html showMain() kind "kidung"):
+      // no - judul - birama - pengarang - jumlah bait (bagian kosong dilewati).
+      const subText = kidungSubLine(payload.pengarang, payload.birama, payload.jumlahBait, payload.ref);
+      const headerText = [payload.ref || "", subText].filter(Boolean).join(" - ");
+      const refHtml = headerText ? `<div class="present-preview-ref">${escapeHtml(headerText)}</div>` : "";
+      const subHtml = "";
       // BARU (13 Sep 2026, permintaan operator) -- pratinjau mini ini
       // sekarang ikut mencerminkan 2 hal baru di Layar 2 (lihat showMain()
       // kind "kidung" di present.html untuk versi lengkapnya): (1) cuma
@@ -2032,12 +2031,14 @@ const PresentationStudio = (() => {
   // jumlahBait, tapi kita pakai fungsi yang SAMA di sini supaya
   // pratinjau selalu 1:1 sama persis). Bagian yang kosong (mis. birama
   // belum diisi di Sheet) otomatis dilewati, tidak ada spasi ganda aneh.
-  function kidungSubLine(pengarang, birama, jumlahBait) {
-    let s = "";
-    if (pengarang && String(pengarang).trim()) s += String(pengarang).trim();
-    if (birama && String(birama).trim()) s += (s ? " " : "") + String(birama).trim();
-    if (jumlahBait) s += (s ? " " : "") + "(" + jumlahBait + " Bait)";
-    return s;
+  function kidungSubLine(pengarang, birama, jumlahBait, titleText) {
+    // book204 -- URUTAN BARU (permintaan operator): no - judul - BIRAMA - PENGARANG - jumlah bait.
+    // Bagian "no - judul" sudah ada di payload.ref; fungsi ini menyusun sisanya (dipisah " - "), bagian kosong dilewati.
+    const parts = [];
+    if (birama && String(birama).trim()) parts.push(String(birama).trim());
+    if (pengarang && String(pengarang).trim()) parts.push(String(pengarang).trim());
+    if (Number(jumlahBait) > 0 && !/\bbait\b/i.test(String(titleText || ""))) parts.push(Number(jumlahBait) + " bait");
+    return parts.join(" - ");
   }
 
   // PERBAIKAN (26 Sep 2026, laporan operator "kumpulan ayat sudah benar,
@@ -3149,6 +3150,8 @@ const PresentationStudio = (() => {
             buku: currentMeta.buku, kidungNo: currentMeta.noKidung, title: currentMeta.judul,
             ikon: currentMeta.ikon || "", bait: slide.baits, koorTeks: slide.koorTeks,
             koorMid: !!slide.koorMid, // BARU (13 Sep 2026) -- lihat catatan "Koor di tengah" di atas
+            // book204 -- header kidung (no - judul - birama - pengarang - jumlah bait) butuh 3 field ini juga saat tayang dari Kumpulan Ayat
+            pengarang: currentMeta.pengarang || "", birama: currentMeta.birama || "", jumlahBait: currentMeta.jumlahBait || 0,
             bgAudio: idx === 0 ? pendingAttachLink_ : null,
           });
         });
