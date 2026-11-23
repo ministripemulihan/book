@@ -1710,6 +1710,8 @@ function updateLevelGatedMenus() {
   if (el("logViewerBtn")) el("logViewerBtn").hidden = !isAdministrator();
   // BARU (21 Sep 2026) -- ✏️ Riwayat Edit Ayat, khusus administrator (js/bible-edit.js)
   if (el("bibleEditMenuBtn")) el("bibleEditMenuBtn").hidden = !isAdministrator();
+  // BARU (22 Nov 2026) -- 📥 Usulan Revisi (admin) / 📮 Usulan Saya (pengguna login lain), js/revisi.js
+  try { if (typeof Revisi !== "undefined") Revisi.syncMenuLabel(); } catch (e) { /* menu usulan tidak wajib */ }
   if (el("monitorBtn")) el("monitorBtn").hidden = !hasAnyLevel();
   // aiChatBtn: untuk TAMU jangan disembunyikan sama sekali -- biar tetap
   // kelihatan tapi "diabu-abukan" (lihat GUEST_GATED_MENU_IDS di bawah,
@@ -2774,6 +2776,17 @@ function buildInlineNoteCardEl(v, block, sourceVerses) {
     label.className = "note-modal-label";
     label.textContent = "📝 Catatan pada ayat ini";
     adminWrap.appendChild(label);
+    // BARU (22 Nov 2026) -- 📝 usulkan perbaikan catatan kaki (semua pengguna login; disetujui administrator, js/bible-edit.js)
+    if (typeof BibleEdit !== "undefined" && BibleEdit.canRequestNote && BibleEdit.canRequestNote(v)) {
+      const fixBtn = document.createElement("button");
+      fixBtn.type = "button";
+      fixBtn.className = "chip-btn small inline-note-fix-btn";
+      fixBtn.textContent = "📝 Usulkan perbaikan catatan";
+      fixBtn.title = "Catatan ini keliru? Kirim usulan perbaikan ke administrator";
+      fixBtn.addEventListener("click", (e) => { e.stopPropagation(); BibleEdit.openNoteRequest(v); });
+      label.appendChild(document.createTextNode(" "));
+      label.appendChild(fixBtn);
+    }
     const adminText = document.createElement("div");
     adminText.className = "note-modal-admin-text";
     // buildFootnoteEntriesHtml() (js/footnotes.js) membungkus tiap entri
@@ -6959,6 +6972,7 @@ function collectionItemRef(it) {
 // lihat js/presentation-studio.js untuk versi Studio 2 Layarnya).
 function collectionItemBodyText(it) {
   if (it.type === "verse") {
+    if (it.textOverride) return it.textOverride; // BARU (22 Nov 2026) -- teks hasil edit di Kumpulan Ayat
     // BARU (v56) -- item multi-bahasa: tampilkan semua bahasa (IND lalu ENG dst) per ayat.
     const ml = resolveMultiLangVerseItem_(it);
     if (ml) return ml.plainText;
@@ -8706,6 +8720,25 @@ function openCollectionFullscreen(col, startIndex) {
     }
     overlay.appendChild(box);
 
+    // BARU (23 Nov 2026, permintaan operator) -- tombol ⭐ Favorit / 🔗 Tautan (diatur di Kumpulan Ayat Studio,
+    // js/collections.js resolveItemLinks): ketuk untuk loncat ke slide favorit (mis. Home / Kidung / Pengumuman).
+    if (typeof resolveItemLinks === "function") {
+      const fsLinks = resolveItemLinks(col.items, idx, !!col.favBar);
+      if (fsLinks.length) {
+        const bar = document.createElement("div");
+        bar.className = "collection-fs-links";
+        fsLinks.forEach((l) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "chip-btn";
+          b.textContent = "🔗 " + l.label;
+          b.addEventListener("click", () => { stopCollectionVersePlayback(); idx = l.index; render(); });
+          bar.appendChild(b);
+        });
+        overlay.appendChild(bar);
+      }
+    }
+
     // BARU (17 Sep 2026) -- baris Sebelumnya/Selanjutnya besar di BAWAH
     // ini sekarang HANYA dibuat utk item biasa (ayat/teks/kidung/
     // pengumuman) -- untuk video/gambar (isVisualEmbed) tombolnya sudah
@@ -9748,6 +9781,7 @@ function hideAllPanels() {
   // BARU (21 Sep 2026) -- panel Penanda Saya & Riwayat Edit Ayat (dibuat dinamis)
   if (el("annoPanel")) el("annoPanel").hidden = true;
   if (el("bibleEditPanel")) el("bibleEditPanel").hidden = true;
+  if (el("revisiPanel")) el("revisiPanel").hidden = true;
 }
 function showEmptyState() {
   hideAllPanels();
@@ -11965,4 +11999,5 @@ document.addEventListener("DOMContentLoaded", () => {
   // BARU (21 Sep 2026) -- 🖍️ Penanda berkategori & ✏️ Edit Ayat Administrator
   safeInit_("Anno", () => { if (typeof Anno !== "undefined") Anno.init(); });
   safeInit_("BibleEdit", () => { if (typeof BibleEdit !== "undefined") BibleEdit.init(); });
+  safeInit_("Revisi", () => { if (typeof Revisi !== "undefined") Revisi.init(); });
 });

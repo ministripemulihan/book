@@ -766,6 +766,126 @@ function updateAnnouncementInCollection(username, id, index, text, title) {
   return true;
 }
 
+// ======================================================================
+// BARU (23 Nov 2026, permintaan operator) -- ⭐ FAVORIT & 🔗 TAUTAN antar slide di Kumpulan Ayat,
+// supaya 1 orang bisa menjalankan ibadah dari 1 layar (Layar 2 / present.html atau Mode Layar
+// Penuh) cukup dengan mengetuk tombol di layar: mis. slide Home punya tombol "Kidung" & "Pengumuman",
+// slide kidung punya tombol "Kembali ke Home".
+//   it.favName   = nama favorit slide ini (unik di 1 kumpulan), mis. "Home"
+//   it.links     = [{ label, to }]  -- tombol yang tampil di layar saat slide ini tayang;
+//                  `to` = favName slide tujuan (nama, BUKAN nomor urut, supaya tetap benar
+//                  walau item dipindah-pindah)
+//   col.favBar   = true -> SEMUA favorit tampil sebagai tombol di semua slide kumpulan ini
+// ======================================================================
+function _favKey(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
+
+function findFavIndex(items, name) {
+  const k = _favKey(name);
+  if (!k || !Array.isArray(items)) return -1;
+  for (let i = 0; i < items.length; i++) if (items[i] && _favKey(items[i].favName) === k) return i;
+  return -1;
+}
+
+// Tombol yang harus tampil saat items[idx] tayang -> [{ label, name, index }]
+function resolveItemLinks(items, idx, favBar) {
+  const out = [];
+  if (!Array.isArray(items) || !items[idx]) return out;
+  const seen = new Set();
+  (items[idx].links || []).forEach((l) => {
+    const ti = findFavIndex(items, l && l.to);
+    if (ti < 0 || ti === idx || seen.has(ti)) return;
+    seen.add(ti);
+    out.push({ label: String((l.label || items[ti].favName) || "").trim(), name: items[ti].favName, index: ti });
+  });
+  if (favBar) {
+    items.forEach((x, i) => {
+      if (!x || !x.favName || i === idx || seen.has(i)) return;
+      seen.add(i);
+      out.push({ label: x.favName, name: x.favName, index: i });
+    });
+  }
+  return out;
+}
+
+function setItemFavName(username, id, index, name) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  const it = col && col.items[index];
+  if (!it) return { ok: false, error: "Item tidak ditemukan." };
+  const nm = String(name == null ? "" : name).replace(/\s+/g, " ").trim().slice(0, 40);
+  if (nm) {
+    const other = findFavIndex(col.items, nm);
+    if (other >= 0 && other !== index) return { ok: false, error: "Nama favorit \"" + nm + "\" sudah dipakai item no. " + (other + 1) + ". Pakai nama lain." };
+    it.favName = nm;
+  } else {
+    delete it.favName;
+  }
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return { ok: true, name: nm };
+}
+
+function setItemLinks(username, id, index, links, favBar) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  const it = col && col.items[index];
+  if (!it) return false;
+  const clean = [];
+  (Array.isArray(links) ? links : []).forEach((l) => {
+    const to = String(l && l.to != null ? l.to : "").replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!to) return;
+    clean.push({ label: String(l.label || "").replace(/\s+/g, " ").trim().slice(0, 40), to });
+  });
+  if (clean.length) it.links = clean.slice(0, 12); else delete it.links;
+  if (favBar !== undefined && favBar !== null) { if (favBar) col.favBar = true; else delete col.favBar; }
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+
+// BARU (22 Nov 2026, permintaan operator "edit langsung di Kumpulan Ayat, jangan harus ubah di luar
+// dulu lalu tambah lalu pindah lalu hapus yang lama") -- ubah teks bait/koor item "kidung" yang SUDAH
+// ada di Kumpulan Ayat. Item kidung menyimpan SNAPSHOT teks (bait[] + koorTeks), jadi cukup menimpa
+// snapshot itu; posisi item, audio latar, dsb. tidak berubah. baitTexts = array teks baru, urutannya
+// sama dengan it.bait. koorTeks null = tidak diubah.
+function updateKidungItemInCollection(username, id, index, baitTexts, koorTeks) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  const it = col && col.items[index];
+  if (!it || it.type !== "kidung") return false;
+  if (Array.isArray(it.bait) && Array.isArray(baitTexts)) {
+    it.bait.forEach((b, k) => { if (typeof baitTexts[k] === "string") b.teks = baitTexts[k].replace(/\r\n?/g, "\n").trim(); });
+  }
+  if (koorTeks !== null && koorTeks !== undefined && it.koorTeks) it.koorTeks = String(koorTeks).replace(/\r\n?/g, "\n").trim();
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+
+// BARU (22 Nov 2026) -- ubah teks tayang item "verse" di Kumpulan Ayat TANPA mengubah Alkitab-nya
+// (hanya item ini). textOverride = teks yang ditayangkan; textOverrideSrc = bentuk suntingan (boleh
+// memuat tanda [[1a]]) supaya dialog bisa dibuka lagi. display === null -> kembali ke teks asli Alkitab.
+function updateVerseTextInCollection(username, id, index, display, src) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  const it = col && col.items[index];
+  if (!it || it.type !== "verse") return false;
+  if (display === null || display === undefined) {
+    delete it.textOverride;
+    delete it.textOverrideSrc;
+  } else {
+    it.textOverride = String(display).replace(/\r\n?/g, "\n").trim();
+    it.textOverrideSrc = String(src == null ? display : src).replace(/\r\n?/g, "\n").trim();
+  }
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
+}
+
 // BARU (4 Sep 2026, permintaan operator) -- kidung yang ditambahkan lewat
 // "➕ Semua" (addAllBtn, lihat wireKidungTab() di js/presentation-studio.js)
 // tersimpan sebagai BANYAK item TERPISAH di kumpulan (1 item per bait/
@@ -872,6 +992,7 @@ function duplicateItemInCollection(username, id, index) {
   if (!col || !col.items[index]) return -1;
   const copy = JSON.parse(JSON.stringify(col.items[index]));
   if (copy.addedAt) copy.addedAt = new Date().toISOString();
+  delete copy.favName; // nama favorit harus unik -- salinan tidak ikut mewarisinya
   col.items.splice(index + 1, 0, copy);
   _migrateCollection(col);
   col.updatedAt = new Date().toISOString();

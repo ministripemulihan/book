@@ -1180,6 +1180,216 @@ const PresentationStudio = (() => {
   // Collection/moveItemToStart/moveItemToEnd di js/collections.js) yang
   // dipakai panel Kumpulan Ayat biasa, jadi hasilnya juga otomatis
   // berlaku di Mode Layar Penuh 1 monitor.
+  // ------------------------------------------------------------------
+  //  BARU (22 Nov 2026, permintaan operator) -- ✏️ Edit item kidung/ayat langsung di Kumpulan Ayat.
+  //  Menimpa SNAPSHOT teks item itu saja (posisi, audio latar, dll. tidak berubah). Kotak
+  //  "📮 Kirim juga usulan ke pusat" (js/revisi.js) meneruskan perbaikan yang sama ke tab
+  //  Revisi_Kidung / Revisi_Ayat untuk disetujui administrator -> Sheet asli ikut benar.
+  // ------------------------------------------------------------------
+  function stripFootMarks_(t) { return String(t || "").replace(/\[\[[^\]\[]{1,12}\]\]/g, "").replace(/[ \t]{2,}/g, " "); }
+
+  function dlgLabel_(box, text) {
+    const l = document.createElement("div");
+    l.style.cssText = "font-weight:600; margin:10px 0 4px;";
+    l.textContent = text;
+    box.appendChild(l);
+  }
+
+  // ------------------------------------------------------------------
+  //  BARU (23 Nov 2026) -- dialog ⭐ Favorit & 🔗 Tautan (data: js/collections.js)
+  // ------------------------------------------------------------------
+  function editFavNameDialog_(it, idx, username, colId) {
+    let inp = null;
+    showSimpleDialog("⭐ Nama favorit slide no. " + (idx + 1), (box) => {
+      const hint = document.createElement("p");
+      hint.className = "simple-dialog-hint";
+      hint.textContent = "Beri nama pendek (mis. Home, Kidung, Pengumuman) supaya slide ini bisa dituju dari tombol tautan di layar. Kosongkan untuk menghapus nama. Nama tidak ikut berubah walau urutan slide dipindah.";
+      box.appendChild(hint);
+      inp = document.createElement("input");
+      inp.type = "text"; inp.maxLength = 40; inp.className = "columns-lang-select";
+      inp.style.cssText = "width:100%;";
+      inp.value = it.favName || "";
+      inp.placeholder = "Home";
+      box.appendChild(inp);
+      setTimeout(() => inp.focus(), 30);
+      return () => ({ name: inp.value });
+    }, (val) => {
+      const r = setItemFavName(username, colId, idx, val.name);
+      if (!r.ok) { alert(r.error); return; }
+      renderCollectionSelect();
+      resyncActivePlaylistAfterFavEdit_(username, colId);
+    }, "Simpan");
+  }
+
+  function editLinksDialog_(it, idx, username, colId) {
+    const col = (loadCollections(username)[colId]) || { items: [] };
+    const ROWS = 6;
+    const rows = [];
+    let favBarCb = null;
+    showSimpleDialog("🔗 Tautan di layar — slide no. " + (idx + 1) + (it.favName ? " (" + it.favName + ")" : ""), (box) => {
+      const hint = document.createElement("p");
+      hint.className = "simple-dialog-hint";
+      hint.textContent = "Tombol yang muncul di layar saat slide ini tayang (Layar 2 / Mode Layar Penuh). Isi TUJUAN dengan nama favorit, atau ketik NOMOR urut slide (mis. 50) — slide itu otomatis diberi nama favorit \"Slide 50\" kalau belum bernama. Kolom teks boleh dikosongkan (pakai nama tujuan).";
+      box.appendChild(hint);
+      const dl = document.createElement("datalist");
+      dl.id = "psLinkTargets";
+      (col.items || []).forEach((x, k) => {
+        if (x && x.favName && k !== idx) { const o = document.createElement("option"); o.value = x.favName; o.label = "no. " + (k + 1); dl.appendChild(o); }
+      });
+      box.appendChild(dl);
+      const existing = Array.isArray(it.links) ? it.links : [];
+      for (let r = 0; r < ROWS; r++) {
+        const line = document.createElement("div");
+        line.style.cssText = "display:flex; gap:6px; margin:6px 0;";
+        const lab = document.createElement("input");
+        lab.type = "text"; lab.maxLength = 40; lab.placeholder = "Teks tombol"; lab.className = "columns-lang-select";
+        lab.style.cssText = "flex:1 1 40%; min-width:0;";
+        const to = document.createElement("input");
+        to.type = "text"; to.maxLength = 40; to.placeholder = "Tujuan: nama favorit / nomor"; to.className = "columns-lang-select";
+        to.setAttribute("list", "psLinkTargets");
+        to.style.cssText = "flex:1 1 55%; min-width:0;";
+        if (existing[r]) { lab.value = existing[r].label || ""; to.value = existing[r].to || ""; }
+        line.appendChild(lab); line.appendChild(to);
+        box.appendChild(line);
+        rows.push({ lab, to });
+      }
+      const lb = document.createElement("label");
+      lb.style.cssText = "display:flex; gap:6px; align-items:center; margin-top:10px; font-size:13px;";
+      favBarCb = document.createElement("input");
+      favBarCb.type = "checkbox";
+      favBarCb.checked = !!col.favBar;
+      lb.appendChild(favBarCb);
+      lb.appendChild(document.createTextNode(" Tampilkan SEMUA favorit sebagai tombol di semua slide kumpulan ini"));
+      box.appendChild(lb);
+      return () => ({ rows: rows.map((r) => ({ label: r.lab.value, to: r.to.value })), favBar: favBarCb.checked });
+    }, (val) => {
+      const items = ((loadCollections(username)[colId]) || {}).items || [];
+      const links = [];
+      for (const r of val.rows) {
+        let to = String(r.to || "").trim();
+        if (!to) continue;
+        if (/^\d+$/.test(to)) {
+          const n = parseInt(to, 10);
+          const target = items[n - 1];
+          if (!target) { alert("Nomor " + n + " tidak ada di kumpulan ini (jumlah item: " + items.length + ")."); return; }
+          if (!target.favName) {
+            const nm = "Slide " + n;
+            const rr = setItemFavName(username, colId, n - 1, nm);
+            if (!rr.ok) { alert(rr.error); return; }
+          }
+          to = ((loadCollections(username)[colId] || {}).items || [])[n - 1].favName;
+        } else if (findFavIndex(items, to) < 0) {
+          alert("Tujuan \"" + to + "\" belum menjadi nama favorit slide mana pun. Beri nama dulu lewat tombol ⭐ Favorit di slide tujuan, atau ketik nomor urutnya.");
+          return;
+        }
+        links.push({ label: r.label, to });
+      }
+      setItemLinks(username, colId, idx, links, val.favBar);
+      renderCollectionSelect();
+      resyncActivePlaylistAfterFavEdit_(username, colId);
+    }, "Simpan tautan");
+  }
+
+  function editKidungItemInCollection_(it, idx, username, colId) {
+    const baits = Array.isArray(it.bait) ? it.bait : [];
+    const inputs = [];
+    let koorInput = null;
+    let reqBox = null;
+    const meta = { buku: it.buku, noKidung: it.kidungNo };
+    showSimpleDialog("Edit syair slide ini", (box) => {
+      const hint = document.createElement("p");
+      hint.className = "simple-dialog-hint";
+      hint.textContent = (it.buku || "Kidung") + " " + it.kidungNo + " — " + (it.title || "") + ". Perubahan langsung berlaku di item ini; klik barisnya untuk tayang ulang.";
+      box.appendChild(hint);
+      baits.forEach((b) => {
+        dlgLabel_(box, b.noBait ? "Bait " + b.noBait : "Teks");
+        const t = document.createElement("textarea");
+        t.className = "columns-lang-select"; t.rows = Math.min(10, Math.max(3, String(b.teks || "").split("\n").length + 1));
+        t.style.cssText = "width:100%; resize:vertical;";
+        t.value = b.teks || "";
+        box.appendChild(t); inputs.push(t);
+      });
+      if (it.koorTeks) {
+        dlgLabel_(box, "Koor");
+        koorInput = document.createElement("textarea");
+        koorInput.className = "columns-lang-select"; koorInput.rows = 4;
+        koorInput.style.cssText = "width:100%; resize:vertical;";
+        koorInput.value = it.koorTeks;
+        box.appendChild(koorInput);
+      }
+      reqBox = (window.Revisi && window.Revisi.buildKidungRequestBox) ? window.Revisi.buildKidungRequestBox(box, meta) : null;
+      return () => ({ baits: inputs.map((t) => t.value), koor: koorInput ? koorInput.value : null, send: !!(reqBox && reqBox.isOn()), reason: reqBox ? reqBox.reason() : "" });
+    }, (val) => {
+      const changes = [];
+      baits.forEach((b, k) => {
+        if (String(val.baits[k]).trim() === String(b.teks || "").trim()) return;
+        changes.push({ jenis: b.noBait ? "bait" : "koor", noBait: b.noBait || "", koorGroup: "", orig: b.teks || "", proposed: val.baits[k] });
+      });
+      if (koorInput && String(val.koor).trim() !== String(it.koorTeks || "").trim()) {
+        changes.push({ jenis: "koor", noBait: "", koorGroup: "", orig: it.koorTeks || "", proposed: val.koor });
+      }
+      if (updateKidungItemInCollection(username, colId, idx, val.baits, val.koor)) renderCollectionSelect();
+      if (val.send && window.Revisi) {
+        if (!changes.length) { alert("Tidak ada teks yang berubah, jadi tidak ada usulan yang dikirim."); return; }
+        window.Revisi.submitKidungChanges(meta, changes, val.reason).then((res) => {
+          const parts = [];
+          if (res.sent) parts.push(res.sent + " usulan terkirim ke pusat (menunggu persetujuan administrator)");
+          if (res.dup) parts.push(res.dup + " usulan sama sudah ada");
+          if (res.errors.length) parts.push("Gagal: " + res.errors[0]);
+          alert(parts.join(". ") + ".");
+        });
+      }
+    }, "Simpan perubahan");
+  }
+
+  function editVerseItemInCollection_(it, idx, username, colId) {
+    const BE = window.BibleEdit && window.BibleEdit.helpers;
+    const v = (typeof verseById !== "undefined") ? verseById[it.verseId] : null;
+    const multiOrGroup = (it.verseIds && it.verseIds.length > 1) || (typeof isMultiLangVerseItem_ === "function" && isMultiLangVerseItem_(it));
+    const canReq = !!(BE && v && !multiOrGroup);
+    let ta = null, resetCb = null, reqBox = null;
+    const startText = it.textOverrideSrc || it.textOverride || (canReq ? BE.editor(BE.raw(v)) : genericItemBodyText(it));
+    showSimpleDialog("Edit teks ayat slide ini", (box) => {
+      const hint = document.createElement("p");
+      hint.className = "simple-dialog-hint";
+      hint.textContent = genericItemRefText(it) + ". Hanya mengubah tulisan di item ini (Alkitab-nya sendiri tidak berubah)." + (canReq ? " Tanda catatan kaki ditulis [[1a]] — biarkan di tempatnya." : "");
+      box.appendChild(hint);
+      ta = document.createElement("textarea");
+      ta.className = "columns-lang-select"; ta.rows = 8;
+      ta.style.cssText = "width:100%; resize:vertical;";
+      ta.value = startText;
+      box.appendChild(ta);
+      setTimeout(() => ta.focus(), 30);
+      if (it.textOverride) {
+        const lab = document.createElement("label");
+        lab.style.cssText = "display:flex; gap:6px; align-items:center; margin-top:8px; font-size:13px;";
+        resetCb = document.createElement("input"); resetCb.type = "checkbox";
+        lab.appendChild(resetCb);
+        lab.appendChild(document.createTextNode(" ↩️ Kembalikan ke teks asli Alkitab (hapus perubahan di item ini)"));
+        box.appendChild(lab);
+      }
+      reqBox = (window.Revisi && window.Revisi.buildRequestBox)
+        ? window.Revisi.buildRequestBox(box, { supported: canReq, note: "Hanya ayat tunggal satu bahasa yang bisa diusulkan ke pusat; ayat gabungan/multi-bahasa cukup diedit di sini." })
+        : null;
+      return () => ({ text: ta.value, reset: !!(resetCb && resetCb.checked), send: !!(reqBox && reqBox.isOn()), reason: reqBox ? reqBox.reason() : "" });
+    }, async (val) => {
+      if (val.reset) {
+        if (updateVerseTextInCollection(username, colId, idx, null)) renderCollectionSelect();
+        return;
+      }
+      const raw = String(val.text || "").trim();
+      if (!raw) { alert("Teks ayat tidak boleh kosong."); return; }
+      if (updateVerseTextInCollection(username, colId, idx, stripFootMarks_(raw), raw)) renderCollectionSelect();
+      if (val.send && window.Revisi && canReq) {
+        const r = await window.Revisi.submit({
+          kind: "ayat", lang: v.lang, verseId: String(v.verseId), bookName: v.bookName || "", chapter: v.chapter, verse: v.verse,
+          orig: BE.raw(v), proposed: BE.toRaw(raw), reason: val.reason,
+        });
+        alert(r.ok ? (r.duplicate ? "Usulan yang sama sudah ada dan masih menunggu persetujuan." : "Usulan terkirim ke pusat (menunggu persetujuan administrator).") : "Usulan gagal dikirim: " + r.error);
+      }
+    }, "Simpan perubahan");
+  }
+
   function renderCollectionList() {
     const wrap = el("psCollectionList");
     const sel = el("psCollectionSelect");
@@ -1322,6 +1532,9 @@ const PresentationStudio = (() => {
            ${showGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="group" title="Hapus SEMUA ${groupN} bait kidung ini dari kumpulan, sekali klik">🗑️ Hapus ${groupN} Bait Kidung Ini</button>` : ""}
            ${showMediaGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="mediagroup" title="Hapus SEMUA ${mediaGroupN} halaman berkas ini dari kumpulan, sekali klik">🗑️ Hapus Semua ${mediaGroupN} Halaman Ini</button>` : ""}
            ${isAnn_ ? `<button type="button" class="chip-btn small" data-edit-ann title="Ubah judul/isi pengumuman ini (kalau salah ketik)">✏️ Edit</button>` : ""}
+           ${(it && (it.type === "kidung" || it.type === "verse")) ? `<button type="button" class="chip-btn small" data-edit-item title="Ubah tulisan slide ini langsung di sini (tanpa hapus & tambah ulang)">✏️ Edit</button>` : ""}
+           <button type="button" class="chip-btn small" data-fav title="Beri nama favorit slide ini (mis. Home) supaya bisa dituju dari tombol tautan di layar">⭐ Favorit</button>
+           <button type="button" class="chip-btn small" data-links title="Tombol tautan yang tampil di layar saat slide ini tayang (mis. ke Kidung, Pengumuman, Home)">🔗 Tautan</button>
            ${showVerseGroupDelete ? `<button type="button" class="chip-btn small danger" data-del="versegroup" title="Hapus SEMUA ${verseGroupCount[vKey_]} item ayat ${escapeHtml(verseGroupName[vKey_])} dari kumpulan, sekali klik">🗑️ Hapus ${verseGroupCount[vKey_]} item ${escapeHtml(verseGroupName[vKey_])}</button>` : ""}
            <button type="button" class="chip-btn small danger" data-del="one" title="Hapus item ini saja dari kumpulan">🗑️ Hapus Item Ini</button>
          </div>` +
@@ -1432,6 +1645,27 @@ const PresentationStudio = (() => {
             if (updateAnnouncementInCollection(username, sel.value, i, val.body, val.title)) { renderCollectionSelect(); }
           }, "Simpan perubahan");
         });
+      }
+      // BARU (22 Nov 2026) -- ✏️ Edit kidung / ayat LANGSUNG di Kumpulan Ayat (tanpa ubah di luar, tambah, pindah, hapus yang lama).
+      const editItemBtn = row.querySelector("[data-edit-item]");
+      if (editItemBtn && typeof showSimpleDialog === "function") {
+        editItemBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (it.type === "kidung") editKidungItemInCollection_(it, i, username, sel.value);
+          else editVerseItemInCollection_(it, i, username, sel.value);
+        });
+      }
+      // BARU (23 Nov 2026) -- ⭐ Favorit (nama slide) & 🔗 Tautan (tombol di layar), lihat catatan di js/collections.js
+      const favBtn = row.querySelector("[data-fav]");
+      const linksBtn = row.querySelector("[data-links]");
+      if (favBtn) {
+        favBtn.textContent = it.favName ? "⭐ " + it.favName : "⭐ Favorit";
+        favBtn.addEventListener("click", (e) => { e.stopPropagation(); editFavNameDialog_(it, i, username, sel.value); });
+      }
+      if (linksBtn) {
+        const nLinks = Array.isArray(it.links) ? it.links.length : 0;
+        linksBtn.textContent = "🔗 Tautan" + (nLinks ? " (" + nLinks + ")" : "");
+        linksBtn.addEventListener("click", (e) => { e.stopPropagation(); editLinksDialog_(it, i, username, sel.value); });
       }
       // "🗑️ Hapus N Bait Kidung Ini" -- hapus SEMUA bait kidung yang sama
       // sekaligus (permintaan operator: dulu harus hapus satu-satu).
@@ -2202,7 +2436,44 @@ const PresentationStudio = (() => {
   // disentuh). Dipakai baik oleh klik daftar (mouse) maupun panah/
   // clicker (wirePlaylistKeyNav()) supaya klik pertama & navigasi
   // sesudahnya selalu terasa 1 alur yang sama, bukan 2 perilaku beda.
+  // BARU (23 Nov 2026) -- kirim ke Layar 2 (present.html) daftar tombol tautan untuk slide `it`
+  // (kosong = sembunyikan bilah tombol). Hanya slide yang termasuk daftar aktif (Kumpulan Ayat) yang punya tombol.
+  function pushItemLinks_(it) {
+    let links = [];
+    try {
+      if (activePlaylist && Array.isArray(activePlaylist.items)) {
+        const idx = activePlaylist.items.indexOf(it);
+        if (idx >= 0) {
+          const user = typeof currentUser !== "undefined" ? currentUser : "";
+          const colObj = Object.values(loadCollections(user) || {}).find((c) => c && c.name === activePlaylist.label);
+          links = resolveItemLinks(activePlaylist.items, idx, !!(colObj && colObj.favBar)).map((l) => ({ label: l.label, name: l.name }));
+        }
+      }
+    } catch (e) { links = []; }
+    rawPost({ type: "links", links });
+  }
+  // Setelah nama favorit / tautan diubah: daftar aktif (yang sedang tayang) ikut memakai data terbaru
+  // dan tombol di Layar 2 langsung diperbarui, tanpa perlu tayang ulang slidenya.
+  function resyncActivePlaylistAfterFavEdit_(username, colId) {
+    try {
+      const col = (loadCollections(username) || {})[colId];
+      if (!col || !activePlaylist || activePlaylist.label !== col.name) return;
+      activePlaylist.items = col.items;
+      const cur = activePlaylist.items[activePlaylist.index];
+      if (cur) pushItemLinks_(cur);
+    } catch (e) { /* tidak fatal */ }
+  }
+  // Ketukan tombol tautan di Layar 2 -> pindah ke slide favorit yang dituju.
+  function gotoFavorite_(name) {
+    if (!activePlaylist) return;
+    const ti = findFavIndex(activePlaylist.items, name);
+    if (ti < 0) return;
+    window.__psNavDir = { dir: ti >= activePlaylist.index ? "next" : "prev", t: Date.now() };
+    playlistGoTo(ti);
+  }
+
   function sendGenericItemLive(it) {
+    setTimeout(() => pushItemLinks_(it), 80); // BARU (23 Nov 2026) -- tombol tautan di Layar 2
     if (!it || typeof Presentation === "undefined") return;
     if (window.__annOvFromCollection && !(it.type === "announcement")) { window.__annOvFromCollection = false; rawPost({ type: "annoverlay", show: false }); } // book198: pita dari kumpulan ditutup saat pindah ke slide lain
     LVQ.token++; LVQ.pending = null; // book190 -- pindah slide membatalkan video lokal yang sedang "menunggu panah"
@@ -2218,7 +2489,13 @@ const PresentationStudio = (() => {
     // langsung berhenti tanpa efek apa pun -- perilaku LAMA (audio latar
     // manual lewat tombol 🎧/▶ Play) sama sekali tidak berubah.
     autoplayBgAudioIfEnabled_(it);
-    if (it.type === "verse" && typeof resolveMultiLangVerseItem_ === "function" && resolveMultiLangVerseItem_(it)) {
+    if (it.type === "verse" && it.textOverride && Presentation.sendVerseCombined) {
+      // BARU (22 Nov 2026) -- teks ayat yang sudah diedit di Kumpulan Ayat (✏️ Edit) ditayangkan apa adanya.
+      const ref = genericItemRefText(it);
+      Presentation.sendVerseCombined(ref, it.textOverride, {});
+      renderStudioPreview({ type: "verse", ref, texts: [{ label: "", text: it.textOverride }] });
+      clearMonitorVideo_();
+    } else if (it.type === "verse" && typeof resolveMultiLangVerseItem_ === "function" && resolveMultiLangVerseItem_(it)) {
       // BARU (v56) -- item ayat MULTI-BAHASA dari "➕ Daftar": 1 ayat = semua
       // bahasa bertumpuk (sama seperti "Tampilkan" 1 ayat); >1 ayat = tiap ayat
       // berpasangan dengan terjemahannya (groups, sama seperti slide gabungan v54).
@@ -2575,6 +2852,10 @@ const PresentationStudio = (() => {
       if (detailWrap) detailWrap.hidden = false;
       if (detailTitle) detailTitle.textContent = `${typeof formatKidungNo === "function" ? formatKidungNo(currentMeta.buku, currentMeta.noKidung) : currentMeta.noKidung} — ${currentMeta.judul || ""}`;
       renderKidungBgLinks(); // BARU (18 Sep 2026) -- lihat catatan panjang di atas fungsi ini
+      // BARU (22 Nov 2026) -- tombol pindah ke kidung bahasa lain (tab Kidung_Bahasa, js/revisi.js)
+      if (window.Revisi && typeof window.Revisi.renderLanguageLinks === "function") {
+        window.Revisi.renderLanguageLinks(el("psKidungLangLinks"), currentMeta.buku, currentMeta.noKidung, (b, n) => { openRef(b, n); }).catch(() => {});
+      }
       renderSlides();
       return true;
     }
@@ -3113,8 +3394,40 @@ const PresentationStudio = (() => {
           hint.className = "simple-dialog-hint";
           hint.textContent = "Perbaikan ini HANYA berlaku di perangkat & sesi Studio ini sekarang (tidak mengubah Sheet Kidung aslinya) -- kalau memang salah di sumbernya, benarkan juga di Sheet Kidung supaya tidak muncul lagi lain kali.";
           box.appendChild(hint);
-          return () => ({ baitTexts: baitInputs.map((t) => t.value), koorTexts: koorInputs.map((t) => t.value) });
+          // BARU (22 Nov 2026) -- kotak "Kirim juga usulan ke pusat" (js/revisi.js): bait/koor yang
+          // diubah dikirim ke tab Revisi_Kidung & menunggu persetujuan administrator.
+          const reqBox = (window.Revisi && typeof window.Revisi.buildKidungRequestBox === "function")
+            ? window.Revisi.buildKidungRequestBox(box, currentMeta) : null;
+          return () => ({
+            baitTexts: baitInputs.map((t) => t.value), koorTexts: koorInputs.map((t) => t.value),
+            sendRequest: !!(reqBox && reqBox.isOn()), requestReason: reqBox ? reqBox.reason() : "",
+          });
         }, (val) => {
+          // Usulan ke pusat dihitung dari teks SEBELUM perbaikan lokal di bawah ditimpa.
+          if (val.sendRequest && window.Revisi) {
+            const changes = [];
+            currentBaits.forEach((b, idx) => {
+              const nt = val.baitTexts[idx];
+              if (String(nt).trim() === String(b.teks || "").trim()) return;
+              changes.push({ jenis: b.noBait != null ? "bait" : "koor", noBait: b.noBait, koorGroup: b.noBait != null ? "" : (b.koorGroup || ""), orig: b.teks || "", proposed: nt });
+            });
+            uniqueKoorTexts.forEach((kt, idx) => {
+              if (String(val.koorTexts[idx]).trim() === String(kt).trim()) return;
+              const owner = currentBaits.find((b) => b.koorTeks === kt);
+              changes.push({ jenis: "koor", noBait: "", koorGroup: (owner && owner.koorGroup) || "", orig: kt, proposed: val.koorTexts[idx] });
+            });
+            if (!changes.length) {
+              alert("Tidak ada teks yang berubah, jadi tidak ada usulan yang dikirim.");
+            } else {
+              window.Revisi.submitKidungChanges(currentMeta, changes, val.requestReason).then((res) => {
+                const parts = [];
+                if (res.sent) parts.push(res.sent + " usulan terkirim ke pusat (menunggu persetujuan administrator)");
+                if (res.dup) parts.push(res.dup + " usulan sama sudah ada");
+                if (res.errors.length) parts.push("Gagal: " + res.errors[0]);
+                alert(parts.join(". ") + ".");
+              });
+            }
+          }
           const koorMap = {};
           uniqueKoorTexts.forEach((kt, idx) => { koorMap[kt] = val.koorTexts[idx]; });
           currentBaits = currentBaits.map((b, idx) => Object.assign({}, b, {
@@ -14012,6 +14325,7 @@ const PresentationStudio = (() => {
         if (typeof FunFX !== "undefined" && FunFX.showStatus) FunFX.showStatus(bad.length ? "⚠️ Layar 2 belum versi terbaru: " + bad.join("; ") + ". Upload berkasnya lalu muat ulang Layar 2 dengan Ctrl+Shift+R." : "✅ Layar 2 sudah versi terbaru (build " + inf.build + "): Stop & potong suara aktif.", !bad.length);
         return;
       }
+      if (data.source === "bibleAppPresenter" && data.type === "present_goto") { gotoFavorite_(data.name); return; } // BARU (23 Nov 2026)
       if (data.source === "bibleAppPresenter" && data.type === "present_nav_key") {
         if (data.dir === "next") playlistNext();
         else if (data.dir === "prev") playlistPrev();
