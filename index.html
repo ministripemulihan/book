@@ -32,7 +32,7 @@
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pengaturan Riset Tema & Mode Khotbah, lihat js/aichat-riset.js -->
   <link rel="stylesheet" href="css/aichat-riset.css?v=20260921a" />
   <!-- BARU (21 Sep 2026) -- 🖍️ Penanda berkategori (js/annotations.js) & ✏️ Edit Ayat Administrator (js/bible-edit.js) -->
-  <link rel="stylesheet" href="css/annotations.css?v=20260921b" />
+  <link rel="stylesheet" href="css/annotations.css?v=20261123a" />
 </head>
 <body>
 
@@ -436,6 +436,8 @@
       <button id="userManageBtn" class="more-menu-btn" hidden>🗂️ Kelola Pengguna</button>
       <!-- BARU (21 Sep 2026) -- riwayat edit ayat, khusus administrator (js/bible-edit.js) -->
       <button id="bibleEditMenuBtn" class="more-menu-btn" hidden>✏️ Riwayat Edit Ayat</button>
+      <!-- BARU (22 Nov 2026) -- usulan perbaikan kidung/ayat ke pusat: admin = Usulan Revisi (setujui/tolak), lainnya = Usulan Saya (js/revisi.js) -->
+      <button id="revisiMenuBtn" class="more-menu-btn" hidden>📮 Usulan Saya</button>
       <!-- TAHAP 6 (ROADMAP-drive-sync.md) -- panel admin "Pemakaian
            Penyimpanan Drive", khusus administrator, sama seperti logViewerBtn/
            userManageBtn di atas. -->
@@ -2066,6 +2068,8 @@
               <button type="button" id="psKidungEditBtn" class="chip-btn small" title="Perbaiki typo/teks kidung ini di kumpulan/sesi Studio ini (tidak mengubah Sheet Kidung asli)">✏️ Edit Syair</button>
               <button type="button" id="psKidungBackBtn" class="chip-btn small">✖️ Tutup</button>
             </div>
+            <!-- BARU (22 Nov 2026) -- tombol pindah ke kidung bahasa lain (Inggris/Korea/Mandarin), dari tab Kidung_Bahasa (js/revisi.js) -->
+            <div id="psKidungLangLinks" class="revisi-lang-links" hidden></div>
             <!-- BARU (18 Sep 2026, permintaan operator "kidung butuh mp3/
                  audio youtube latar, teks tetap tayang") -- kalau kidung
                  ini punya link mp3/YouTube di Sheet (kolom linkMp3_1/
@@ -4361,7 +4365,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20261017b177"></script>
+  <script src="js/collections.js?v=20261122b"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20260818b"></script>
@@ -4373,7 +4377,8 @@
   <script src="js/plans-multi.js?v=20260920e"></script>
   <!-- BARU (21 Sep 2026) -- 🖍️ Penanda/Stabilo berkategori + ✏️ Edit Ayat oleh administrator. Additive: js/highlights.js tidak berubah. -->
   <script src="js/annotations.js?v=20260921b"></script>
-  <script src="js/bible-edit.js?v=20260921b"></script>
+  <script src="js/revisi.js?v=20261123b"></script>
+  <script src="js/bible-edit.js?v=20261123a"></script>
   <script src="js/media.js?v=20261016c"></script>
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20261016a"></script>
@@ -4405,7 +4410,7 @@
   <script src="js/signal-meter.js?v=20261022a184"></script>
   <script src="js/shortcuts.js?v=20261112a194"></script>
   <script src="js/fun-fx.js?v=20261121a206"></script>
-  <script src="js/presentation-studio.js?v=20261121a206"></script>
+  <script src="js/presentation-studio.js?v=20261122b"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4433,7 +4438,7 @@
   <script src="js/adminbell.js?v=20261022a183"></script>
   <script src="js/pinyin-ruby.js?v=20261017b"></script>
   <script src="js/tts-sync.js?v=20261017b"></script>
-  <script src="js/app.js?v=20261018b181"></script>
+  <script src="js/app.js?v=20261123a"></script>
   <script src="js/quickjump.js?v=20261112a199"></script> <!-- book199: 📖 pindah kitab cepat + pilihan layar penuh Cepat/Sistem -->
   <script src="js/sync-checklist.js?v=20261016a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
