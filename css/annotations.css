@@ -149,3 +149,36 @@ mark.anno-mark.anno-off { background: transparent; color: inherit; cursor: text;
 .bedit-before, .bedit-after { font-size: 13.5px; margin-top: 6px; line-height: 1.45; }
 .bedit-before { color: var(--ink-soft); }
 .bedit-row-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+/* ===== BARU (22 Nov 2026) -- Usulan Revisi (js/revisi.js) ===== */
+.revisi-sendbox { margin: 10px 0 4px; padding: 8px 10px; border: 1px dashed var(--rule); border-radius: 10px; background: var(--paper); }
+.revisi-sendbox-check { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.revisi-reason { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: inherit; }
+.revisi-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.revisi-sep { color: var(--ink-soft); }
+.revisi-reject { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.revisi-reject .revisi-reason { flex: 1 1 200px; margin-top: 0; }
+.revisi-select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: inherit; }
+.revisi-reason-shown { font-size: 13px; margin-top: 4px; color: var(--ink); }
+.revisi-card.revisi-disetujui { border-left: 4px solid #2e7d32; }
+.revisi-card.revisi-ditolak { border-left: 4px solid #b3261e; opacity: .85; }
+.revisi-card.revisi-menunggu { border-left: 4px solid #e0a800; }
+.revisi-lang-links { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.revisi-lang-links[hidden] { display: none; }
+.revisi-lang-label { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+.verse-report-btn { opacity: .55; }
+.verse-report-btn:hover { opacity: 1; }
+
+/* ===== BARU (23 Nov 2026) -- perbandingan LAMA vs BARU di panel Usulan Revisi ===== */
+.revisi-cmp { margin: 8px 0; }
+.revisi-stats { padding: 8px 10px; border-radius: 8px; background: var(--paper); border: 1px solid var(--rule); font-size: 13px; line-height: 1.5; }
+.revisi-stat + .revisi-stat { margin-top: 2px; }
+.revisi-block { margin-top: 8px; }
+.revisi-block-title { font-size: 12.5px; font-weight: 700; margin-bottom: 3px; color: var(--ink-soft); }
+.revisi-preview-title { margin-top: 6px; }
+.revisi-text { white-space: pre-wrap; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); line-height: 1.55; word-break: break-word; }
+.revisi-ctx .revisi-text { opacity: .85; }
+.revisi-mark { background: #ffe066; color: #111; border-radius: 3px; padding: 0 1px; }
+
+/* BARU (23 Nov 2026) -- tombol favorit/tautan di Mode Layar Penuh */
+.collection-fs-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 8px 12px; }
