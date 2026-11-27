@@ -87,6 +87,7 @@ let kidungLastBgSyncAt = 0;
 // tidak kelihatan lagi.
 let _kidungReaderKeyHandler = null;
 function teardownKidungReaderKeyNav() {
+  try { kdStopAll_(); } catch (e) { /* book220b */ }
   if (_kidungReaderKeyHandler) {
     document.removeEventListener("keydown", _kidungReaderKeyHandler);
     _kidungReaderKeyHandler = null;
@@ -246,6 +247,7 @@ function goToAlkitabFromKidung() {
 }
 
 async function renderKidungHome() {
+  try { kdStopAll_(); } catch (e) { /* book220b: keluar dari layar baca -> header normal lagi */ }
   const panel = el("kidungPanel");
   if (!panel) return;
   teardownKidungReaderKeyNav(); // keluar dari pembaca (kalau lagi aktif) -- lihat catatan di atas
@@ -958,6 +960,7 @@ function renderKidungReader(meta, baits) {
   // applyKidungReaderStyle() di bawah. Diterapkan SETELAH body dipasang
   // ke panel supaya style-nya langsung kelihatan begitu layar baca
   // dibuka (bukan cuma setelah tombol ⚙️ pertama kali ditekan).
+  try { kdStartDesktop_(); } catch (e) { /* book220b */ } // header otomatis hilang + tombol tampilan (komputer saja)
   applyKidungReaderStyle(body);
 
   // BARU (8 Sep 2026, permintaan operator) -- swipe kiri/kanan di HP
@@ -1196,6 +1199,7 @@ function applyKidungReaderStyle(bodyEl) {
   const f = kidungCurrentFontFamily();
   bodyEl.style.fontFamily = f.body || "";
   bodyEl.style.fontWeight = f.weight || "";
+  try { kdApplyLayout_(bodyEl); } catch (e) { /* book220b: tata letak komputer tidak boleh merusak layar baca */ }
 }
 
 function kidungSettingsButton(bodyEl) {
@@ -1273,6 +1277,28 @@ function openKidungSettingsDialog(bodyEl) {
       });
       familyField.appendChild(sel);
       box.appendChild(familyField);
+    }
+
+    // book220b -- pilihan tampilan khusus komputer: rata teks, lirik panjang, header otomatis hilang.
+    if (kdIsDesktop_()) {
+      const mkSel = (labelTxt, key, def, opts, onSet) => {
+        const f = document.createElement("div");
+        f.className = "simple-dialog-field";
+        const l = document.createElement("label"); l.textContent = labelTxt; f.appendChild(l);
+        const sel = document.createElement("select"); sel.className = "columns-lang-select";
+        opts.forEach((o) => { const op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+        sel.value = kdGet_(key, def);
+        sel.addEventListener("change", () => { kdSet_(key, sel.value); if (onSet) onSet(); kdRefresh_(); });
+        f.appendChild(sel); box.appendChild(f);
+      };
+      mkSel("Rata tulisan:", KD_ALIGN_KEY, "left", [["left", "Rata kiri"], ["center", "Di tengah (center)"]]);
+      mkSel("Lirik panjang:", KD_MODE_KEY, "scroll", [["scroll", "Gulir ke bawah (biasa)"], ["fit", "Semua dalam 1 layar (huruf dikecilkan otomatis)"], ["page", "Dibagi per layar (sesuai kapasitas layar)"]]);
+      const apF = document.createElement("div"); apF.className = "simple-dialog-field";
+      const apL = document.createElement("label"); apL.style.cssText = "display:flex;gap:8px;align-items:center;cursor:pointer;";
+      const apC = document.createElement("input"); apC.type = "checkbox"; apC.checked = kdGet_(KD_AUTOHIDE_KEY, "1") === "1";
+      apC.addEventListener("change", () => { kdSet_(KD_AUTOHIDE_KEY, apC.checked ? "1" : "0"); if (apC.checked) kdAutoHideOn_(); else kdAutoHideOff_(); kdRefresh_(); });
+      apL.appendChild(apC); apL.appendChild(document.createTextNode(" Header paling atas hilang sendiri setelah 3 detik (geser kursor ke atas untuk memunculkan)"));
+      apF.appendChild(apL); box.appendChild(apF);
     }
 
     const resetBtn = document.createElement("button");
@@ -1804,4 +1830,229 @@ function kidungInlineMediaSquareButton(icon, title, buildPlayerFn, body) {
     btn.classList.add("active");
   });
   return btn;
+}
+
+// ============================================================
+//  book220b (27 Nov 2026, permintaan operator) -- LAYAR BACA KIDUNG DI KOMPUTER:
+//  1) Header paling atas (+ baris "Kembali") hilang sendiri 3 detik setelah kursor menjauh, muncul lagi saat kursor
+//     digeser ke tepi atas layar (pola sama seperti body.reader-clean di HP, tapi dipicu kursor).
+//  2) Rata tulisan: kiri (bawaan) / tengah.
+//  3) Lirik panjang: "Gulir" (bawaan, tidak berubah) / "Semua 1 layar" (ukuran huruf dikecilkan otomatis sampai
+//     semua muat, minimal 11px) / "Per layar" (bait dikelompokkan sesuai tinggi layar, pindah halaman lewat ‹ ›,
+//     PageUp/PageDown, panah atas/bawah, atau spasi). Satu bait / koor TIDAK dipotong di tengah.
+//  Semua ini hanya aktif di komputer (kursor + lebar >= 900px). Pilihan tersimpan per perangkat (localStorage).
+//  Kontrol: kotak melayang kecil di kanan bawah (#kdViewCtl) + dialog ⚙️.
+// ============================================================
+const KD_ALIGN_KEY = "kidung_align_v1";
+const KD_MODE_KEY = "kidung_fitmode_v1";
+const KD_AUTOHIDE_KEY = "kidung_autohide_top_v1";
+let _kdBody = null, _kdPages = [], _kdPageIdx = 0;
+const _kdAH = { timer: null, y: null, move: null, key: null, resize: null, rt: null };
+
+function kdGet_(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } }
+function kdSet_(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* abaikan */ } }
+function kdIsDesktop_() {
+  try { return !!(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 900px)").matches); }
+  catch (e) { return false; }
+}
+
+// ---- header otomatis hilang ----
+function kdTopZoneBottom_() {
+  const h = document.querySelector(".app-header");
+  let b = h ? h.getBoundingClientRect().bottom : 0;
+  const r = document.querySelector(".kidung-top-row");
+  if (r && document.body.classList.contains("kd-top-show")) b = Math.max(b, r.getBoundingClientRect().bottom);
+  return Math.max(b, 0) + 6;
+}
+function kdScheduleHide_() {
+  if (_kdAH.timer) clearTimeout(_kdAH.timer);
+  _kdAH.timer = setTimeout(() => {
+    const b = document.body;
+    if (!b.classList.contains("kidung-active")) { kdStopAll_(); return; }
+    const h = document.querySelector(".app-header");
+    const ae = document.activeElement;
+    const typing = !!(h && ae && h.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName));
+    const inZone = _kdAH.y != null && _kdAH.y <= kdTopZoneBottom_();
+    if (typing || inZone) { kdScheduleHide_(); return; }
+    b.classList.remove("kd-top-show");
+  }, 3000);
+}
+function kdShowTop_() {
+  const b = document.body;
+  const h = document.querySelector(".app-header");
+  if (h) b.style.setProperty("--kd-hdr-h", h.offsetHeight + "px");
+  b.classList.add("kd-top-show");
+  kdScheduleHide_();
+}
+function kdAutoHideOn_() {
+  const b = document.body;
+  if (b.classList.contains("reader-clean")) return;
+  kdAutoHideOff_();
+  b.classList.add("kd-autohide");
+  _kdAH.move = (e) => {
+    _kdAH.y = e.clientY;
+    if (!b.classList.contains("kidung-active")) { kdStopAll_(); return; }
+    const zone = b.classList.contains("kd-top-show") ? kdTopZoneBottom_() : 40;
+    if (e.clientY <= zone) kdShowTop_();
+  };
+  document.addEventListener("mousemove", _kdAH.move);
+  kdShowTop_(); // tampil dulu, lalu hilang 3 detik kemudian
+}
+function kdAutoHideOff_() {
+  if (_kdAH.timer) { clearTimeout(_kdAH.timer); _kdAH.timer = null; }
+  if (_kdAH.move) { document.removeEventListener("mousemove", _kdAH.move); _kdAH.move = null; }
+  document.body.classList.remove("kd-autohide", "kd-top-show");
+}
+
+// ---- tata letak: rata teks + 1 layar / per layar ----
+function kdApplyLayout_(bodyEl) {
+  if (!bodyEl) return;
+  const panel = bodyEl.parentElement;
+  const desk = kdIsDesktop_();
+  const center = desk && kdGet_(KD_ALIGN_KEY, "left") === "center";
+  if (panel) panel.classList.toggle("kd-align-center", center);
+  _kdBody = bodyEl;
+  const mode = desk ? kdGet_(KD_MODE_KEY, "scroll") : "scroll";
+  kdLayoutPass_(bodyEl, mode);
+  if (mode !== "scroll" && document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { if (_kdBody === bodyEl && bodyEl.isConnected) kdLayoutPass_(bodyEl, kdGet_(KD_MODE_KEY, "scroll")); }).catch(() => {});
+  }
+}
+function kdLayoutPass_(bodyEl, mode) {
+  bodyEl.classList.remove("kd-mode-fit", "kd-mode-page");
+  bodyEl.style.removeProperty("--verse-font-size");
+  const kids = Array.from(bodyEl.children);
+  kids.forEach((c) => c.classList.remove("kd-pg-hide"));
+  _kdPages = [];
+  if (mode === "scroll" || !kids.length) { kdPaintCtl_(); return; }
+  const top = bodyEl.getBoundingClientRect().top + window.scrollY;
+  if (mode === "fit") {
+    bodyEl.classList.add("kd-mode-fit");
+    const avail = Math.floor(window.innerHeight - top - 20);
+    const v = bodyEl.querySelector(".kidung-verse");
+    const max = Math.max(11, Math.round(v ? (parseFloat(getComputedStyle(v).fontSize) || 17) : 17));
+    let lo = 11, hi = max, best = 11;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      bodyEl.style.setProperty("--verse-font-size", mid + "px");
+      if (bodyEl.getBoundingClientRect().height <= avail) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+    }
+    bodyEl.style.setProperty("--verse-font-size", best + "px");
+    window.scrollTo(0, 0);
+    kdPaintCtl_();
+    return;
+  }
+  // mode "page": kelompokkan elemen (judul syair / bait / koor) sesuai tinggi layar yang tersedia
+  bodyEl.classList.add("kd-mode-page");
+  const avail = Math.floor(window.innerHeight - top - 64);
+  const isTitle = (el) => el.classList.contains("kidung-syair-title");
+  const isKoor = (el) => el.classList.contains("kidung-koor");
+  let pages = [[]];
+  let startTop = kids[0].getBoundingClientRect().top;
+  kids.forEach((el) => {
+    const r = el.getBoundingClientRect();
+    let cur = pages[pages.length - 1];
+    if (cur.length && r.bottom - startTop > avail) {
+      const pull = [];
+      if (isKoor(el) && cur.length > 1) pull.unshift(cur.pop());        // koor ikut bait-nya
+      while (cur.length > 1 && isTitle(cur[cur.length - 1])) pull.unshift(cur.pop()); // judul syair tidak sendirian di bawah
+      const np = pull.concat([el]);
+      pages.push(np);
+      startTop = np[0].getBoundingClientRect().top;
+    } else cur.push(el);
+  });
+  _kdPages = pages;
+  _kdPageIdx = Math.max(0, Math.min(_kdPageIdx, pages.length - 1));
+  kdShowPage_();
+  window.scrollTo(0, 0);
+}
+function kdShowPage_() {
+  if (!_kdBody || !_kdPages.length) return;
+  _kdBody.querySelectorAll(":scope > *").forEach((c) => c.classList.add("kd-pg-hide"));
+  (_kdPages[_kdPageIdx] || []).forEach((c) => c.classList.remove("kd-pg-hide"));
+  kdPaintCtl_();
+}
+function kdGoPage_(d) {
+  if (!_kdPages.length) return false;
+  const n = Math.max(0, Math.min(_kdPages.length - 1, _kdPageIdx + d));
+  if (n === _kdPageIdx) return true;
+  _kdPageIdx = n; kdShowPage_(); return true;
+}
+function kdRefresh_() { if (_kdBody && _kdBody.isConnected) kdApplyLayout_(_kdBody); kdPaintCtl_(); }
+
+// ---- kotak kontrol melayang ----
+function kdBuildCtl_() {
+  const old = document.getElementById("kdViewCtl"); if (old) old.remove();
+  const ctl = document.createElement("div");
+  ctl.id = "kdViewCtl"; ctl.className = "kd-view-ctl";
+  const mk = (id, title, fn) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = id; b.title = title; b.setAttribute("aria-label", title);
+    b.addEventListener("click", () => { fn(); try { b.blur(); } catch (e) { /* abaikan */ } }); // lepas fokus supaya PageUp/PageDown tetap jalan
+    ctl.appendChild(b); return b;
+  };
+  mk("kdBtnAlign", "Ganti rata tulisan: kiri / tengah", () => { kdSet_(KD_ALIGN_KEY, kdGet_(KD_ALIGN_KEY, "left") === "center" ? "left" : "center"); kdRefresh_(); });
+  mk("kdBtnMode", "Lirik panjang: gulir / semua 1 layar / dibagi per layar", () => {
+    const order = ["scroll", "fit", "page"]; const cur = kdGet_(KD_MODE_KEY, "scroll");
+    _kdPageIdx = 0; kdSet_(KD_MODE_KEY, order[(order.indexOf(cur) + 1) % 3]); kdRefresh_();
+  });
+  mk("kdBtnPrev", "Halaman sebelumnya (PageUp / ↑)", () => kdGoPage_(-1));
+  const lab = document.createElement("span"); lab.id = "kdPgLabel"; lab.className = "kd-pg-label"; ctl.appendChild(lab);
+  mk("kdBtnNext", "Halaman berikutnya (PageDown / ↓ / spasi)", () => kdGoPage_(1));
+  mk("kdBtnPin", "Header atas: hilang sendiri setelah 3 detik / tetap tampil", () => {
+    const on = kdGet_(KD_AUTOHIDE_KEY, "1") === "1";
+    kdSet_(KD_AUTOHIDE_KEY, on ? "0" : "1");
+    if (on) kdAutoHideOff_(); else kdAutoHideOn_();
+    kdRefresh_();
+  });
+  document.body.appendChild(ctl);
+}
+function kdPaintCtl_() {
+  const ctl = document.getElementById("kdViewCtl"); if (!ctl) return;
+  const q = (id) => document.getElementById(id);
+  const center = kdGet_(KD_ALIGN_KEY, "left") === "center";
+  const mode = kdGet_(KD_MODE_KEY, "scroll");
+  q("kdBtnAlign").textContent = center ? "⬌ Tengah" : "☰ Kiri";
+  q("kdBtnMode").textContent = mode === "fit" ? "⤢ 1 layar" : (mode === "page" ? "▤ Per layar" : "↕ Gulir");
+  const paged = mode === "page" && _kdPages.length > 1;
+  ["kdBtnPrev", "kdBtnNext", "kdPgLabel"].forEach((id) => { q(id).style.display = paged ? "" : "none"; });
+  if (paged) {
+    q("kdPgLabel").textContent = (_kdPageIdx + 1) + " / " + _kdPages.length;
+    q("kdBtnPrev").disabled = _kdPageIdx <= 0;
+    q("kdBtnNext").disabled = _kdPageIdx >= _kdPages.length - 1;
+  }
+  const ap = kdGet_(KD_AUTOHIDE_KEY, "1") === "1";
+  q("kdBtnPin").textContent = ap ? "📌 Auto" : "📌 Tetap";
+}
+
+// ---- mulai / berhenti ----
+function kdStartDesktop_() {
+  kdStopAll_();
+  if (!kdIsDesktop_()) return;
+  _kdPageIdx = 0;
+  kdBuildCtl_();
+  if (kdGet_(KD_AUTOHIDE_KEY, "1") === "1") kdAutoHideOn_();
+  _kdAH.key = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (kdGet_(KD_MODE_KEY, "scroll") !== "page" || _kdPages.length < 2) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || "";
+    if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (tag === "BUTTON" && e.key === " ") return; // spasi di tombol = klik tombol itu
+    if (e.key === "PageDown" || e.key === "ArrowDown" || (e.key === " " && !e.shiftKey)) { e.preventDefault(); kdGoPage_(1); }
+    else if (e.key === "PageUp" || e.key === "ArrowUp" || (e.key === " " && e.shiftKey)) { e.preventDefault(); kdGoPage_(-1); }
+  };
+  document.addEventListener("keydown", _kdAH.key);
+  _kdAH.resize = () => {
+    if (_kdAH.rt) clearTimeout(_kdAH.rt);
+    _kdAH.rt = setTimeout(() => { if (_kdBody && _kdBody.isConnected) kdLayoutPass_(_kdBody, kdGet_(KD_MODE_KEY, "scroll")); }, 150);
+  };
+  window.addEventListener("resize", _kdAH.resize);
+}
+function kdStopAll_() {
+  kdAutoHideOff_();
+  if (_kdAH.key) { document.removeEventListener("keydown", _kdAH.key); _kdAH.key = null; }
+  if (_kdAH.resize) { window.removeEventListener("resize", _kdAH.resize); _kdAH.resize = null; }
+  if (_kdAH.rt) { clearTimeout(_kdAH.rt); _kdAH.rt = null; }
+  const c = document.getElementById("kdViewCtl"); if (c) c.remove();
+  _kdPages = [];
 }
