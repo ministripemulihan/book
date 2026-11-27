@@ -1429,70 +1429,94 @@ const PresentationStudio = (() => {
   let psFavQuery_ = "";
   function renderFavTopBar_(col, items, colId, username, targetBar) {
     // book216 -- targetBar opsional: dok kembar di Pustaka Media (#mlFavDock) memakai fungsi yang sama.
+    // book219 -- WADAH-nya sendiri yang jadi carousel: seluruh bilah = 1 strip yang digeser ke samping (overflow-x), tinggi lega 60px,
+    // TANPA gulir vertikal. Kiri (▾ judul + ‹) dan kanan (› + saklar Layar 2) menempel (sticky), chip di tengah yang bergeser.
+    // Gaya ditulis LANGSUNG dari sini (inline, !important) supaya tidak tergantung versi css/style.css yang tersimpan di cache.
     const bar = targetBar || el("psFavTopBar");
     if (!bar) return;
     const isDockCopy = !!targetBar;
     const favs = [];
     (items || []).forEach((it, i) => { if (it && it.favName) favs.push({ name: it.favName, index: i }); });
     bar.textContent = "";
-    if (!col || !favs.length) { bar.hidden = true; return; }
+    if (!col || !favs.length) { bar.hidden = true; bar.removeAttribute("style"); return; }
     bar.hidden = false;
-    // book217 -- ACCORDION: baris judul (selalu tampil, tinggi tetap) + isi yang bisa dilipat. Bawaan TERBUKA; pilihan
-    // lipat/buka diingat per perangkat (ps_fav_dock_collapsed_v1) dan dipakai bersama oleh dok Studio & dok Pustaka Media.
     let collapsed = false;
     try { collapsed = localStorage.getItem("ps_fav_dock_collapsed_v1") === "1"; } catch (e) { /* abaikan */ }
-    const headRow = document.createElement("div");
-    headRow.className = "ps-fav-dock-head";
+    const BG = "#fff8e1";
+    const barCss = (h) => "display:flex!important;flex:0 0 " + h + "px!important;height:" + h + "px!important;min-height:" + h + "px!important;max-height:" + h + "px!important;"
+      + "overflow:hidden!important;align-items:center!important;gap:8px!important;padding:0 12px!important;margin:0!important;"
+      + "box-sizing:border-box!important;white-space:nowrap;background:" + BG + "!important;border:0!important;"
+      + "border-bottom:1px solid #e6c374!important;border-radius:0!important;position:relative;z-index:6;color:#3a2b00;";
+    const track = document.createElement("div");
+    track.className = "ps-fav-track";
+    track.style.cssText = "position:relative;display:flex;flex:1 1 0;min-width:0;align-items:center;gap:8px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-behavior:smooth;height:100%;padding:0 2px;";
+    // Geser per HALAMAN: ‹ › memindahkan carousel ke chip pertama (›) / terakhir (‹) yang tadinya terpotong di tepi,
+    // jadi tidak ada chip yang berhenti separuh di pinggir.
+    const pageMove = (dir) => {
+      const vis = chips.map((c) => c.btn).filter((x) => x.style.display !== "none");
+      const L = track.scrollLeft, R = L + track.clientWidth;
+      if (dir > 0) {
+        const nx = vis.find((x) => x.offsetLeft + x.offsetWidth > R + 1);
+        if (nx) track.scrollTo({ left: nx.offsetLeft - 2, behavior: "smooth" });
+      } else {
+        let pv = null; vis.forEach((x) => { if (x.offsetLeft < L - 1) pv = x; });
+        if (pv) track.scrollTo({ left: Math.max(0, pv.offsetLeft + pv.offsetWidth - track.clientWidth + 2), behavior: "smooth" });
+      }
+    };
+    const mkArrow = (txt, dir, ttl) => {
+      const ab = document.createElement("button");
+      ab.type = "button"; ab.textContent = txt; ab.title = ttl; ab.className = "ps-fav-arrow";
+      ab.style.cssText = "flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:1px solid #e6c374;background:#fffdf4;color:#7a5b00;font:700 24px/1 system-ui,sans-serif;cursor:pointer;padding:0;";
+      ab.addEventListener("click", () => pageMove(dir));
+      return ab;
+    };
+    const leftBox = document.createElement("div");
+    leftBox.className = "ps-fav-left";
+    leftBox.style.cssText = "display:flex;align-items:center;gap:6px;flex:0 0 auto;height:100%;";
     const toggleBtn = document.createElement("button");
     toggleBtn.type = "button";
     toggleBtn.className = "ps-fav-dock-toggle";
+    toggleBtn.style.cssText = "flex:0 0 auto;font:700 14px system-ui,sans-serif;color:#7a5b00;background:#ffefb5;border:1px solid #e6c374;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;";
+    const prevArrow = mkArrow("‹", -1, "Geser ke kiri");
+    leftBox.appendChild(toggleBtn); leftBox.appendChild(prevArrow);
+    bar.appendChild(leftBox);
+    let favSearch = null;
+    const chips = [];
+    let lb = null;
+    const applyFavFilter = () => {
+      const q = favSearch ? favSearch.value.trim().toLowerCase() : "";
+      let firstDone = false;
+      chips.forEach((c) => {
+        const hit = !q || c.name.toLowerCase().indexOf(q) !== -1 || String(c.index + 1) === q;
+        c.btn.style.display = (hit && !collapsed) ? "" : "none";
+        c.btn.classList.toggle("first", !!q && hit && !firstDone);
+        if (hit) firstDone = true;
+      });
+    };
     const paintToggle = () => {
       toggleBtn.textContent = (collapsed ? "▸ " : "▾ ") + "⭐ Favorit (" + favs.length + ")";
       toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
       toggleBtn.title = collapsed ? "Buka daftar favorit" : "Lipat daftar favorit (kecilkan)";
       bar.classList.toggle("collapsed", collapsed);
+      bar.style.cssText = barCss(collapsed ? 46 : 60);
+      prevArrow.style.display = collapsed ? "none" : "";
+      if (favSearch) favSearch.style.display = collapsed ? "none" : "";
+      if (lb) lb.style.display = collapsed ? "none" : "";
+      if (nextArrow) nextArrow.style.display = collapsed ? "none" : "";
+      track.style.display = collapsed ? "none" : "flex";
+      applyFavFilter();
     };
     toggleBtn.addEventListener("click", () => {
       collapsed = !collapsed;
       try { localStorage.setItem("ps_fav_dock_collapsed_v1", collapsed ? "1" : "0"); } catch (e) { /* abaikan */ }
       paintToggle();
     });
-    headRow.appendChild(toggleBtn);
-    // book218 -- CAROUSEL SATU BARIS (tinggi tetap, TANPA gulir vertikal): [▾ Favorit (N)] [🔍] [‹] [chip chip chip ...] [›] [📺 Layar 2].
-    // Chip digeser ke samping lewat ‹ › (atau gulir/geser trackpad); chip yang sedang tayang otomatis dibawa ke tengah.
-    const body = document.createElement("div");
-    body.className = "ps-fav-dock-body";
-    const track = document.createElement("div");
-    track.className = "ps-fav-track";
-    const mkArrow = (txt, dir, ttl) => {
-      const ab = document.createElement("button");
-      ab.type = "button"; ab.className = "ps-fav-arrow"; ab.textContent = txt; ab.title = ttl;
-      ab.addEventListener("click", () => { track.scrollBy({ left: dir * Math.max(120, Math.round(track.clientWidth * 0.8)), behavior: "smooth" }); });
-      return ab;
-    };
-    const prevArrow = mkArrow("‹", -1, "Geser ke kiri");
-    const nextArrow = mkArrow("›", 1, "Geser ke kanan");
-    headRow.appendChild(toggleBtn);
-    headRow.appendChild(body);
-    bar.appendChild(headRow);
-    paintToggle();
     // 27 Nov 2026 (v2) -- kalau favorit banyak: kolom cari (nama atau nomor slide); Enter = ke yang pertama yang cocok.
-    let favSearch = null;
-    const chips = [];
-    const applyFavFilter = () => {
-      const q = favSearch ? favSearch.value.trim().toLowerCase() : "";
-      let firstDone = false;
-      chips.forEach((c) => {
-        const hit = !q || c.name.toLowerCase().indexOf(q) !== -1 || String(c.index + 1) === q;
-        c.btn.style.display = hit ? "" : "none";
-        c.btn.classList.toggle("first", !!q && hit && !firstDone);
-        if (hit) firstDone = true;
-      });
-    };
     if (favs.length > 5) {
       favSearch = document.createElement("input");
       favSearch.type = "text";
       favSearch.className = "ps-fav-search";
+      favSearch.style.cssText = "flex:0 0 170px;font-size:13px;padding:7px 10px;border:1px solid #e6c374;border-radius:8px;background:#fff;color:#3a2b00;";
       favSearch.placeholder = "🔍 cari favorit / no. slide";
       favSearch.value = psFavQuery_;
       favSearch.addEventListener("input", () => { psFavQuery_ = favSearch.value; applyFavFilter(); });
@@ -1500,13 +1524,14 @@ const PresentationStudio = (() => {
         if (ev.key === "Enter") { ev.preventDefault(); const c = chips.find((x) => x.btn.style.display !== "none"); if (c) c.btn.click(); }
         ev.stopPropagation(); // panah/tombol lain jangan memindah slide saat mengetik
       });
-      body.appendChild(favSearch);
+      bar.appendChild(favSearch);
     }
-    body.appendChild(prevArrow); body.appendChild(track); body.appendChild(nextArrow);
+    bar.appendChild(track);
     favs.forEach((f) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "chip-btn small ps-fav-chip";
+      b.style.cssText = "flex:0 0 auto;white-space:nowrap;font-size:14px;padding:7px 13px;line-height:1.2;";
       if (activePlaylist && activePlaylist.label === col.name && activePlaylist.index === f.index) b.classList.add("active");
       b.title = "Slide no. " + (f.index + 1) + " — ketuk untuk langsung tayang di Layar 2";
       b.appendChild(document.createTextNode(f.name + " "));
@@ -1534,10 +1559,13 @@ const PresentationStudio = (() => {
       track.appendChild(b);
       chips.push({ name: f.name, index: f.index, btn: b });
     });
-    applyFavFilter();
-    try { const act = track.querySelector(".ps-fav-chip.active"); if (act) setTimeout(() => { track.scrollLeft = act.offsetLeft - (track.clientWidth - act.offsetWidth) / 2; }, 0); } catch (e) { /* tidak fatal */ }
-    const lb = document.createElement("label");
+    const rightBox = document.createElement("div");
+    rightBox.className = "ps-fav-right";
+    rightBox.style.cssText = "display:flex;align-items:center;gap:8px;flex:0 0 auto;height:100%;";
+    const nextArrow = mkArrow("›", 1, "Geser ke kanan");
+    lb = document.createElement("label");
     lb.className = "ps-fav-top-toggle";
+    lb.style.cssText = "display:inline-flex;align-items:center;gap:4px;cursor:pointer;font:13px system-ui,sans-serif;color:#5a4300;white-space:nowrap;margin:0;";
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = !col.favHide;
@@ -1549,7 +1577,10 @@ const PresentationStudio = (() => {
     });
     lb.appendChild(cb);
     lb.appendChild(document.createTextNode(" 📺 Tampil di Layar 2"));
-    headRow.appendChild(lb);
+    rightBox.appendChild(nextArrow); rightBox.appendChild(lb);
+    bar.appendChild(rightBox);
+    paintToggle();
+    try { const act = track.querySelector(".ps-fav-chip.active"); if (act && !collapsed) setTimeout(() => { track.scrollLeft = act.offsetLeft - (track.clientWidth - act.offsetWidth) / 2; }, 0); } catch (e) { /* tidak fatal */ }
   }
 
   // book216 -- dipakai Pustaka Media (js/media-library.js): isi dok favorit kembar dengan favorit kumpulan yang
