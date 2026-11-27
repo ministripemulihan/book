@@ -6000,3 +6000,49 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 /* book220 -- tombol ⭐ Favorit (N) di header Studio: status tidak lagi menyerap sisa ruang, slot favorit yang menyerap */
 .ps-topbar-status { flex: 0 0 auto; }
 .ps-topbar-fav-slot { min-width: 0; }
+
+/* ============================================================
+   book220b -- layar baca Kidung di KOMPUTER: header otomatis hilang, rata tengah, 1 layar / per layar.
+   Kelas dipasang dari js/kidung-ui.js (kdStartDesktop_ dkk): body.kd-autohide / .kd-top-show, panel .kd-align-center,
+   body baca .kd-mode-fit / .kd-mode-page, elemen yang disembunyikan .kd-pg-hide, kotak kontrol #kdViewCtl.
+   ============================================================ */
+body.kd-autohide { --header-h: 0px; }
+body.kd-autohide .app-header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  transform: translateY(-115%); transition: transform .18s ease;
+  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+}
+body.kd-autohide:not(.kd-top-show) .app-header { box-shadow: none; }
+body.kd-autohide.kd-top-show .app-header { transform: none; }
+body.kd-autohide .kidung-top-row {
+  position: fixed; left: 0; right: 0; top: var(--kd-hdr-h, 57px); z-index: 59; margin: 0; padding: 6px 16px;
+  background: var(--paper-raised); border-bottom: 1px solid var(--rule);
+  transform: translateY(calc(-100% - var(--kd-hdr-h, 57px) - 8px)); transition: transform .18s ease;
+}
+body.kd-autohide.kd-top-show .kidung-top-row { transform: none; }
+body.kd-autohide .content-wrap { padding-top: 6px; }
+
+.kidung-panel.kd-align-center .kidung-reader-header,
+.kidung-panel.kd-align-center .kidung-reader-body { text-align: center; }
+.kidung-panel.kd-align-center .kidung-reader-badges { justify-content: center; }
+.kidung-panel.kd-align-center .kidung-koor { border-left: 0; padding-left: 0; }
+.kidung-reader-body .kd-pg-hide { display: none !important; }
+
+.kd-view-ctl {
+  position: fixed; right: 84px; bottom: 14px; z-index: 55;
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  background: var(--paper-raised); border: 1px solid var(--rule); border-radius: 999px;
+  box-shadow: var(--shadow); font-size: 13px; color: var(--ink);
+  opacity: .5; transition: opacity .2s;
+}
+.kd-view-ctl:hover, .kd-view-ctl:focus-within { opacity: 1; }
+.kd-view-ctl button {
+  border: 1px solid var(--rule); background: transparent; color: var(--ink);
+  border-radius: 999px; padding: 4px 10px; font: inherit; cursor: pointer; white-space: nowrap;
+}
+.kd-view-ctl button:hover:not(:disabled) { background: var(--rule); }
+.kd-view-ctl button:disabled { opacity: .35; cursor: default; }
+.kd-view-ctl .kd-pg-label { min-width: 44px; text-align: center; font-weight: 700; }
+.kidung-reader-body.kd-mode-fit { line-height: 1.35; }
+.kidung-reader-body.kd-mode-fit .kidung-verse { margin-bottom: 6px; }
+.kidung-reader-body.kd-mode-fit .kidung-koor { margin-bottom: 8px; }
