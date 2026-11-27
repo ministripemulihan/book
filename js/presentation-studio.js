@@ -1458,10 +1458,23 @@ const PresentationStudio = (() => {
       paintToggle();
     });
     headRow.appendChild(toggleBtn);
+    // book218 -- CAROUSEL SATU BARIS (tinggi tetap, TANPA gulir vertikal): [▾ Favorit (N)] [🔍] [‹] [chip chip chip ...] [›] [📺 Layar 2].
+    // Chip digeser ke samping lewat ‹ › (atau gulir/geser trackpad); chip yang sedang tayang otomatis dibawa ke tengah.
     const body = document.createElement("div");
     body.className = "ps-fav-dock-body";
+    const track = document.createElement("div");
+    track.className = "ps-fav-track";
+    const mkArrow = (txt, dir, ttl) => {
+      const ab = document.createElement("button");
+      ab.type = "button"; ab.className = "ps-fav-arrow"; ab.textContent = txt; ab.title = ttl;
+      ab.addEventListener("click", () => { track.scrollBy({ left: dir * Math.max(120, Math.round(track.clientWidth * 0.8)), behavior: "smooth" }); });
+      return ab;
+    };
+    const prevArrow = mkArrow("‹", -1, "Geser ke kiri");
+    const nextArrow = mkArrow("›", 1, "Geser ke kanan");
+    headRow.appendChild(toggleBtn);
+    headRow.appendChild(body);
     bar.appendChild(headRow);
-    bar.appendChild(body);
     paintToggle();
     // 27 Nov 2026 (v2) -- kalau favorit banyak: kolom cari (nama atau nomor slide); Enter = ke yang pertama yang cocok.
     let favSearch = null;
@@ -1489,6 +1502,7 @@ const PresentationStudio = (() => {
       });
       body.appendChild(favSearch);
     }
+    body.appendChild(prevArrow); body.appendChild(track); body.appendChild(nextArrow);
     favs.forEach((f) => {
       const b = document.createElement("button");
       b.type = "button";
@@ -1517,10 +1531,11 @@ const PresentationStudio = (() => {
         renderFavTopBar_(col, items, colId, username, targetBar);
         if (isDockCopy) renderFavTopBar_(col, items, colId, username); // dok Studio ikut menandai chip aktif
       });
-      body.appendChild(b);
+      track.appendChild(b);
       chips.push({ name: f.name, index: f.index, btn: b });
     });
     applyFavFilter();
+    try { const act = track.querySelector(".ps-fav-chip.active"); if (act) setTimeout(() => { track.scrollLeft = act.offsetLeft - (track.clientWidth - act.offsetWidth) / 2; }, 0); } catch (e) { /* tidak fatal */ }
     const lb = document.createElement("label");
     lb.className = "ps-fav-top-toggle";
     const cb = document.createElement("input");
@@ -2390,7 +2405,11 @@ const PresentationStudio = (() => {
       document.querySelectorAll("#psFavTopBar .ps-fav-chip").forEach((c) => c.classList.remove("active"));
       const favChips = document.querySelectorAll("#psFavTopBar .ps-fav-chip");
       const names = []; (activePlaylist.items || []).forEach((x, i) => { if (x && x.favName) names.push(i); });
-      names.forEach((ix, k) => { if (ix === activePlaylist.index && favChips[k]) favChips[k].classList.add("active"); });
+      names.forEach((ix, k) => { if (ix === activePlaylist.index && favChips[k]) {
+        favChips[k].classList.add("active");
+        const tr = favChips[k].parentElement; // book218: carousel ikut membawa chip aktif ke tengah (tanpa menggulir halaman)
+        if (tr && tr.classList.contains("ps-fav-track")) tr.scrollLeft = favChips[k].offsetLeft - (tr.clientWidth - favChips[k].offsetWidth) / 2;
+      } });
     } catch (e) { /* tidak fatal */ }
   }
   // book179 (permintaan operator) -- baris yang sedang tayang di Layar 2 HARUS ikut terlihat di daftar Kumpulan Ayat Studio
