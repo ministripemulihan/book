@@ -2414,10 +2414,26 @@
      yang diproyeksikan ke jemaat, tanpa watermark/teks tambahan apa pun. */
 
   /* BARU (23 Nov 2026) -- bilah tombol tautan/favorit di Layar 2 */
-  #psLinksBar { position: fixed; left: 0; right: 0; bottom: 2.2vh; z-index: 2147483000; display: flex; flex-wrap: wrap; gap: 1.2vmin; justify-content: center; padding: 0 2vw; pointer-events: none; }
+  /* 27 Nov 2026 (v2) -- FAVORIT di Layar 2: yang tampil terus hanya TOMBOL KECIL "⭐ 13" di kiri bawah (di kanan tombol pena,
+     samar, tidak menutupi tulisan). Ketuk tombol itu (atau tekan "/" di papan ketik) -> panel kecil terbuka ke ATAS dengan
+     kolom cari + semua favorit (nomor slide + nama); ketik "kid"/"175"/"filipi" untuk menyaring, Enter = ke yang pertama,
+     Esc / ketuk di luar / diam 10 detik = panel menutup sendiri. Favorit yang sedang tayang disorot (tidak bisa diketuk). */
+  #psLinksBar { position: fixed; left: 170px; bottom: 14px; z-index: 2147483000; pointer-events: none; font-family: system-ui, sans-serif; }
   #psLinksBar[hidden] { display: none; }
-  #psLinksBar button { pointer-events: auto; cursor: pointer; font: 600 max(2.4vmin, 14px)/1.2 system-ui, sans-serif; padding: 1.1vmin 2.6vmin; border-radius: 999px; border: 2px solid rgba(255,255,255,.85); background: rgba(20,20,20,.72); color: #fff; backdrop-filter: blur(4px); box-shadow: 0 2px 10px rgba(0,0,0,.45); }
-  #psLinksBar button:hover, #psLinksBar button:focus-visible { background: #ffe066; color: #111; border-color: #ffe066; }
+  #psLinksBar .fav-fab { pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.55); background: rgba(20,20,20,.55); color: #fff; font: 700 13px/1 system-ui, sans-serif; opacity: .3; transition: opacity .2s; backdrop-filter: blur(3px); }
+  #psLinksBar .fav-fab:hover, #psLinksBar .fav-fab:focus-visible, #psLinksBar.open .fav-fab { opacity: 1; background: rgba(20,20,20,.85); }
+  #psLinksBar .fav-panel { pointer-events: auto; position: absolute; left: 0; bottom: 44px; width: min(56vw, 640px); max-height: 46vh; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,.3); background: rgba(18,18,18,.92); box-shadow: 0 6px 24px rgba(0,0,0,.5); backdrop-filter: blur(6px); }
+  #psLinksBar .fav-panel[hidden] { display: none; }
+  #psLinksBar .fav-search { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.1); color: #fff; font: 600 15px system-ui, sans-serif; outline: none; }
+  #psLinksBar .fav-search::placeholder { color: rgba(255,255,255,.55); }
+  #psLinksBar .fav-list { display: flex; flex-wrap: wrap; gap: 6px; overflow-y: auto; }
+  #psLinksBar .fav-list button { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid rgba(255,255,255,.7); background: rgba(255,255,255,.08); color: #fff; font: 600 15px/1.2 system-ui, sans-serif; }
+  #psLinksBar .fav-list button:hover, #psLinksBar .fav-list button:focus-visible, #psLinksBar .fav-list button.first { background: #ffe066; color: #111; border-color: #ffe066; }
+  #psLinksBar .fav-list button.cur { background: #ffe066; color: #111; border-color: #ffe066; cursor: default; }
+  #psLinksBar .fav-no { display: inline-block; padding: 0 7px; border-radius: 999px; background: #ffe066; color: #111; font-weight: 800; font-size: 12px; line-height: 18px; }
+  #psLinksBar .fav-list button.cur .fav-no, #psLinksBar .fav-list button:hover .fav-no, #psLinksBar .fav-list button.first .fav-no { background: #111; color: #ffe066; }
+  #psLinksBar .fav-empty { color: rgba(255,255,255,.7); font-size: 14px; padding: 4px 2px; }
+  #psLinksBar .fav-hint { color: rgba(255,255,255,.5); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -7935,24 +7951,8 @@
       return;
     }
     if (data.type === "links") {
-      // BARU (23 Nov 2026) -- bilah tombol tautan/favorit; lihat catatan di <div id="psLinksBar"> & pushItemLinks_() di Studio.
-      const bar = document.getElementById("psLinksBar");
-      if (!bar) return;
-      bar.textContent = "";
-      const list = Array.isArray(data.links) ? data.links.slice(0, 16) : [];
-      list.forEach((l) => {
-        if (!l || !l.name) return;
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = String(l.label || l.name);
-        b.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          if (!window.opener) return;
-          try { window.opener.postMessage({ source: "bibleAppPresenter", type: "present_goto", name: String(l.name) }, location.origin); } catch (e) {}
-        });
-        bar.appendChild(b);
-      });
-      bar.hidden = !bar.children.length;
+      // 27 Nov 2026 (v2) -- lihat catatan CSS #psLinksBar: tombol kecil "⭐ N" + panel cari. Data dari pushItemLinks_() di Studio.
+      favSetList_(Array.isArray(data.links) ? data.links.slice(0, 60) : []);
       return;
     }
     if (data.type === "meta") {
@@ -8737,6 +8737,85 @@
 
     window.addEventListener("resize", fitCanvas_);
   })();
+</script>
+
+<script>
+/* 27 Nov 2026 (v2) -- Favorit Layar 2: tombol kecil + panel cari (lihat CSS #psLinksBar). Dipanggil dari handler pesan "links". */
+var favItems_ = [], favIdleTimer_ = null;
+function favEls_() {
+  var bar = document.getElementById("psLinksBar");
+  if (!bar) return null;
+  if (!bar.__built) {
+    bar.__built = true;
+    bar.innerHTML = '<div class="fav-panel" hidden><input class="fav-search" type="text" placeholder="🔍 cari favorit atau nomor slide…" autocomplete="off" spellcheck="false" /><div class="fav-list"></div><div class="fav-hint">Enter = ke yang pertama · Esc = tutup · tombol “/” = buka</div></div><button type="button" class="fav-fab" title="Favorit (tekan / )"></button>';
+    var fab = bar.querySelector(".fav-fab"), panel = bar.querySelector(".fav-panel"), input = bar.querySelector(".fav-search");
+    fab.addEventListener("click", function (ev) { ev.stopPropagation(); favOpen_(panel.hidden); });
+    input.addEventListener("input", function () { favRender_(); favArmIdle_(); });
+    input.addEventListener("keydown", function (ev) {
+      ev.stopPropagation(); // jangan bocor ke pintasan lain (panah = pindah slide, Esc = keluar pena)
+      if (ev.key === "Escape") { ev.preventDefault(); favOpen_(false); }
+      else if (ev.key === "Enter") { ev.preventDefault(); var f = favMatches_()[0]; if (f) favGo_(f); }
+      else favArmIdle_();
+    });
+    panel.addEventListener("mousemove", favArmIdle_);
+    document.addEventListener("mousedown", function (ev) { if (!panel.hidden && !bar.contains(ev.target)) favOpen_(false); }, true);
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey || bar.hidden) return;
+      var tag = (ev.target && ev.target.tagName) || "";
+      if (/INPUT|TEXTAREA|SELECT/.test(tag) || (ev.target && ev.target.isContentEditable)) return;
+      ev.preventDefault(); favOpen_(true);
+    });
+  }
+  return { bar: bar, fab: bar.querySelector(".fav-fab"), panel: bar.querySelector(".fav-panel"), input: bar.querySelector(".fav-search"), list: bar.querySelector(".fav-list") };
+}
+function favMatches_() {
+  var e = favEls_(); var q = e ? e.input.value.trim().toLowerCase() : "";
+  return favItems_.filter(function (l) {
+    if (l.cur) return false;
+    if (!q) return true;
+    return String(l.label || l.name).toLowerCase().indexOf(q) !== -1 || String(l.no || "") === q;
+  });
+}
+function favRender_() {
+  var e = favEls_(); if (!e) return;
+  var q = e.input.value.trim().toLowerCase();
+  e.list.textContent = "";
+  var shown = 0, first = true;
+  favItems_.forEach(function (l) {
+    var hit = !q || String(l.label || l.name).toLowerCase().indexOf(q) !== -1 || String(l.no || "") === q;
+    if (!hit) return;
+    shown++;
+    var b = document.createElement("button"); b.type = "button";
+    if (l.no) { var n = document.createElement("span"); n.className = "fav-no"; n.textContent = String(l.no); b.appendChild(n); }
+    b.appendChild(document.createTextNode(String(l.label || l.name)));
+    b.title = l.no ? "Slide no. " + l.no : "";
+    if (l.cur) b.classList.add("cur");
+    else if (first && q) { b.classList.add("first"); }
+    if (!l.cur) first = false;
+    b.addEventListener("click", function (ev) { ev.stopPropagation(); favGo_(l); });
+    e.list.appendChild(b);
+  });
+  if (!shown) { var d = document.createElement("div"); d.className = "fav-empty"; d.textContent = "Tidak ada favorit yang cocok."; e.list.appendChild(d); }
+}
+function favOpen_(on) {
+  var e = favEls_(); if (!e) return;
+  e.panel.hidden = !on; e.bar.classList.toggle("open", !!on);
+  if (on) { e.input.value = ""; favRender_(); try { e.input.focus(); } catch (x) {} favArmIdle_(); }
+  else { try { e.input.blur(); } catch (x) {} clearTimeout(favIdleTimer_); }
+}
+function favArmIdle_() { clearTimeout(favIdleTimer_); favIdleTimer_ = setTimeout(function () { favOpen_(false); }, 10000); }
+function favGo_(l) {
+  if (!l || l.cur || !window.opener) return;
+  try { window.opener.postMessage({ source: "bibleAppPresenter", type: "present_goto", name: String(l.name) }, location.origin); } catch (x) {}
+  favOpen_(false);
+}
+function favSetList_(list) {
+  var e = favEls_(); if (!e) return;
+  favItems_ = list.filter(function (l) { return l && l.name; });
+  e.fab.textContent = "⭐ " + favItems_.length;
+  e.bar.hidden = !favItems_.length;
+  if (!e.panel.hidden) favRender_();
+}
 </script>
 </body>
 </html>
