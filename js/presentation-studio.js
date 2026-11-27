@@ -315,7 +315,7 @@ const PresentationStudio = (() => {
     [
       // SHORTCUT-DAFTAR-EFEK: tiap baris = [id, nama di dialog ⚙️, id efek, kombinasi BAWAAN]. Format kombinasi: huruf kecil digabung "+", urutan ctrl, alt, shift, meta, tombol (mis. "alt+shift+z", "ctrl+1", "f9").
       // SHORTCUT-GANTI: ubah teks kombinasi (elemen ke-4) di baris di bawah. Pintasan efek TIDAK memakai logika lama, jadi cukup diubah di sini (atau lewat ⚙️). Hindari F5/Ctrl+R/Ctrl+W (dipakai browser).
-      // SHORTCUT: Z/X/C/V = Amin bersama/pria/wanita/anak · L = Seru nama Tuhan · S = Matahari · A/H/O/P = tulisan timbul AMIN/HALELUYA/O TUHAN YESUS/PUJI TUHAN · U = tulisan CUSTOM (isi dari kolom teks Panel Efek) · N = tutup pita pengumuman · Q = HENTIKAN SEMUA  (semuanya dengan Alt+Shift).
+      // SHORTCUT: Z/X/C/V = Amin bersama/pria/wanita/anak · L = Seru nama Tuhan · S = Matahari · A/H/O/P = tulisan timbul AMIN/HALELUYA/O TUHAN YESUS/PUJI TUHAN · U = tulisan CUSTOM (isi dari kolom teks Panel Efek) · N = tutup pita Announcement · Q = HENTIKAN SEMUA  (semuanya dengan Alt+Shift).
       ["fx-amen-all", "Amin bersama (suara + gambar)", "amen-all", "alt+shift+z"],
       ["fx-amen-male", "Amin pria", "amen-male", "alt+shift+x"],
       ["fx-amen-female", "Amin wanita", "amen-female", "alt+shift+c"],
@@ -344,8 +344,8 @@ const PresentationStudio = (() => {
     // SHORTCUT: Alt+Shift+4..9 = kereta api / kereta kuda / mobil / helikopter / pesawat / balon udara · book206: Alt+Shift+I/T/B/F/E/D = minibus hijau / motor / bus biru / kapal laut / becak / sepeda · Alt+Shift+0 = MUTE / UNMUTE suara kendaraan (bawaan: suara NYALA).
     // SHORTCUT-GANTI: ubah teks kombinasi di baris "fx-veh-*" di atas dan di baris "fx-vmute" di bawah (atau lewat ⚙️).
     window.PSShortcuts.registerAction({ id: "fx-vmute", group: "Efek Layar", label: "🔇/🔊 Mute atau nyalakan suara kendaraan (langsung)", def: "alt+shift+0", run: () => { const nx = localStorage.getItem("funfx_song_vmuted") !== "1"; try { localStorage.setItem("funfx_song_vmuted", nx ? "1" : "0"); } catch (e) { /* abaikan */ } rawPost({ type: "funfx", name: "vmute", mute: nx }); } });
-    // SHORTCUT: Alt+Shift+N = tutup pita pengumuman (tumpuk / sisakan ruang) di Layar 2 dan kembalikan ukuran layar. SHORTCUT-GANTI: ubah teks kombinasi di bawah ini (atau lewat ⚙️).
-    window.PSShortcuts.registerAction({ id: "ann-close", group: "Efek Layar", label: "Tutup pita pengumuman (tumpuk / sisakan ruang)", def: "alt+shift+n", run: () => rawPost({ type: "annoverlay", show: false }) });
+    // SHORTCUT: Alt+Shift+N = tutup pita Announcement (tumpuk / sisakan ruang) di Layar 2 dan kembalikan ukuran layar. SHORTCUT-GANTI: ubah teks kombinasi di bawah ini (atau lewat ⚙️).
+    window.PSShortcuts.registerAction({ id: "ann-close", group: "Efek Layar", label: "Tutup pita Announcement (tumpuk / sisakan ruang)", def: "alt+shift+n", run: () => rawPost({ type: "annoverlay", show: false }) });
   })();
   // Dipakai wireSlideDisplayModeControls_() supaya klik tombol
   // Asli/Sesuai Lebar/Zoom langsung terlihat di slide yang SEDANG
@@ -1427,9 +1427,11 @@ const PresentationStudio = (() => {
   // diberi nama favorit (mis. "Home") jadi tombol + nomor slidenya; ketuk = langsung pindah & tayang di Layar 2
   // (sama seperti mengetuk barisnya). Saklar "📺 Layar 2" = tampil/sembunyikan bilah favorit di kiri bawah present.html.
   let psFavQuery_ = "";
-  function renderFavTopBar_(col, items, colId, username) {
-    const bar = el("psFavTopBar");
+  function renderFavTopBar_(col, items, colId, username, targetBar) {
+    // book216 -- targetBar opsional: dok kembar di Pustaka Media (#mlFavDock) memakai fungsi yang sama.
+    const bar = targetBar || el("psFavTopBar");
     if (!bar) return;
+    const isDockCopy = !!targetBar;
     const favs = [];
     (items || []).forEach((it, i) => { if (it && it.favName) favs.push({ name: it.favName, index: i }); });
     bar.textContent = "";
@@ -1484,12 +1486,14 @@ const PresentationStudio = (() => {
         setItemFavName(username, colId, f.index, "");
         renderCollectionSelect();
         resyncActivePlaylistAfterFavEdit_(username, colId);
+        if (isDockCopy) { try { window.PSCore.fillFavDock(targetBar); } catch (e) { /* tidak fatal */ } }
       });
       b.appendChild(xDel);
       b.addEventListener("click", () => {
         setActivePlaylist(items, f.index, col.name);
         sendGenericItemLive(items[f.index]);
-        renderFavTopBar_(col, items, colId, username);
+        renderFavTopBar_(col, items, colId, username, targetBar);
+        if (isDockCopy) renderFavTopBar_(col, items, colId, username); // dok Studio ikut menandai chip aktif
       });
       bar.appendChild(b);
       chips.push({ name: f.name, index: f.index, btn: b });
@@ -1504,11 +1508,24 @@ const PresentationStudio = (() => {
       setCollectionFavHide(username, colId, !cb.checked);
       const fresh = (loadCollections(username) || {})[colId];
       if (fresh && activePlaylist && activePlaylist.label === fresh.name) { activePlaylist.items = fresh.items; const cur = activePlaylist.items[activePlaylist.index]; if (cur) pushItemLinks_(cur); }
-      renderFavTopBar_(fresh || col, (fresh || col).items, colId, username);
+      renderFavTopBar_(fresh || col, (fresh || col).items, colId, username, targetBar);
     });
     lb.appendChild(cb);
     lb.appendChild(document.createTextNode(" 📺 Tampil di Layar 2"));
     bar.appendChild(lb);
+  }
+
+  // book216 -- dipakai Pustaka Media (js/media-library.js): isi dok favorit kembar dengan favorit kumpulan yang
+  // sedang dipilih di Studio. Aman dipanggil kapan saja (Studio belum dibuka -> dok disembunyikan).
+  function fillFavDock_(targetBar) {
+    if (!targetBar) return;
+    try {
+      const sel = el("psCollectionSelect");
+      const username = typeof currentUser !== "undefined" ? currentUser : null;
+      if (!sel || typeof loadCollections !== "function") { targetBar.hidden = true; return; }
+      const col = (loadCollections(username) || {})[sel.value];
+      renderFavTopBar_(col, col && Array.isArray(col.items) ? col.items : [], sel.value, username, targetBar);
+    } catch (e) { targetBar.hidden = true; }
   }
 
   function renderCollectionList() {
@@ -4172,7 +4189,7 @@ const PresentationStudio = (() => {
         // "📺 Tayangkan sekarang" di sebelahnya, atau klik itemnya di Kumpulan Ayat.
       });
     }
-    // BARU (book198, permintaan operator) -- CARA TAMPIL pengumuman: Ganti layar (lama) / Tumpuk / Sisakan ruang, posisi Atas/Tengah/Bawah, warna.
+    // BARU (book198, permintaan operator) -- CARA TAMPIL Announcement: Ganti layar (lama) / Tumpuk / Sisakan ruang, posisi Atas/Tengah/Bawah, warna.
     // Pengaturan disimpan (localStorage "ps_ann_overlay_v1") & dipakai juga saat item Pengumuman di Kumpulan Ayat ditayangkan.
     const ANN_OV_KEY = "ps_ann_overlay_v1";
     const annOvIds = { mode: "psAnnMode", pos: "psAnnPos", maxH: "psAnnMaxH", bg: "psAnnBg", alpha: "psAnnAlpha", fg: "psAnnFg" };
@@ -14473,7 +14490,7 @@ const PresentationStudio = (() => {
   // el()/rawPost()/renderStudioPreview() sendiri. Diisi di sini (akhir
   // file, setelah semua fungsi di atas sudah terdefinisi) -- lihat
   // deklarasi "window.PSCore = {}" di paling atas file ini.
-  Object.assign(window.PSCore, { el, rawPost, renderStudioPreview });
+  Object.assign(window.PSCore, { el, rawPost, renderStudioPreview, fillFavDock: fillFavDock_ });
 
   return { init, openStudio, closeStudio, refreshGuestGate, applySharedTheme };
 })();

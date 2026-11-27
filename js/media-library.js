@@ -661,7 +661,7 @@ const MediaLibrary = (() => {
     favBtn.className = "ml-card-fav";
     const isFav = typeof Favorites !== "undefined" && Favorites.isFavorite(spec.favType, spec.favId);
     favBtn.textContent = isFav ? "❤️" : "🤍";
-    favBtn.setAttribute("aria-label", "Favorit");
+    favBtn.setAttribute("aria-label", "Favorit-Media");
     favBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (typeof Favorites === "undefined") return;
@@ -809,7 +809,7 @@ const MediaLibrary = (() => {
       const res = await fetch("https://soundcloud.com/oembed?format=json&iframe=true&url=" + encodeURIComponent(raw));
       if (res && res.ok) {
         const json = await res.json();
-        const m = /[?&]url=([^&"]+)/.exec((json && json.html) || "");
+        const m = /[?&]url=([^&"]+)/.exec(String((json && json.html) || "").replace(/&amp;/g, "&")); // book202: jawaban oEmbed bisa memakai "&amp;" -- dinormalkan dulu supaya parameter url= tetap terbaca
         if (m && m[1]) return decodeURIComponent(m[1]);
       }
     } catch (e) { /* offline -> pakai link asli */ }
@@ -863,8 +863,21 @@ const MediaLibrary = (() => {
       // SoundCloud URL"); diselesaikan dulu lewat oEmbed resmi (sama seperti Layar 2 / present.html).
       const ctxForSc = playVerseCtx_;
       playVerseCtx_ = null;
-      resolveSoundCloudWidgetUrl_(item.link).then((widgetUrl) => {
+      // book200 (laporan operator: di HP muncul "You have not provided a valid SoundCloud URL") -- SEMUA bentuk link dibersihkan dulu
+      // (teks Bagikan HP, m.soundcloud.com, ?si=/utm_, dst) lewat js/sclink.js; link pendek diterjemahkan dengan batas waktu. Kalau tetap tidak
+      // bisa, JANGAN pasang widget (itulah yang menampilkan pesan error SoundCloud) -- tampilkan alasan + tombol "Buka di SoundCloud".
+      const scResolver_ = (window.SCLink && window.SCLink.resolve)
+        ? window.SCLink.resolve(item.link)
+        : resolveSoundCloudWidgetUrl_(item.link).then((u) => ({ ok: true, url: u }));
+      scResolver_.then((r) => {
         playVerseCtx_ = ctxForSc;
+        if (!r.ok) {
+          const openUrl = (window.SCLink && window.SCLink.extract(item.link)) || item.link || "#";
+          const why = window.SCLink ? window.SCLink.explain(r.reason) : "Link SoundCloud tidak bisa diputar di dalam aplikasi.";
+          openPlayerOverlay_(`<div style="padding:18px 16px;line-height:1.5;text-align:center"><div style="font-size:34px">🎧</div><p style="margin:8px 0 12px"><b>Lagu belum bisa diputar di dalam aplikasi.</b><br>${escapeHtml_(why)}</p><p style="margin:0 0 14px;font-size:.9em;opacity:.8">Solusi: buka lewat SoundCloud, atau ganti link di Pustaka Media dengan link lengkap <i>soundcloud.com/nama-artis/judul-lagu</i>.</p>${r.debug ? `<details style="margin:0 0 12px;font-size:.8em;text-align:left;opacity:.8"><summary>Detail teknis (untuk laporan)</summary><code style="word-break:break-all">${escapeHtml_(String(r.debug))}</code></details>` : ""}<a class="chip-btn primary" href="${escapeHtml_(openUrl)}" target="_blank" rel="noopener" style="display:inline-block;padding:10px 16px">▶ Buka di SoundCloud</a></div>`, item.nama, openUrl, {});
+          return;
+        }
+        const widgetUrl = r.url;
         // book166: audio-saja -> langsung MODE MINI (bar kecil di bawah layar, syair tetap terbaca & lagu terus main)
         openPlayerOverlay_(`<iframe scrolling="no" allow="autoplay" src="https://w.soundcloud.com/player/?url=${encodeURIComponent(widgetUrl)}&auto_play=true&visual=false&show_artwork=false&show_comments=false&show_teaser=false&hide_related=true"></iframe>`, item.nama, item.link, { mini: "audio" });
       });
@@ -2174,7 +2187,7 @@ const MediaLibrary = (() => {
           if (item && matchesSearch_(item)) cards.push(itemToCard_(item));
         });
       }
-      renderGrid_(grid, cards, "Belum ada favorit. Tekan 🤍 di kartu mana pun untuk menambah.");
+      renderGrid_(grid, cards, "Belum ada Favorit-Media. Tekan 🤍 di kartu mana pun untuk menambah.");
     }
   }
 
@@ -3061,7 +3074,7 @@ const MediaLibrary = (() => {
     // js/games/slogankarakter-data.js -- pastikan file itu dimuat
     // SEBELUM media-library.js di index.html.
     { key: "karakter", label: "🔤 Slogan Karakter" },
-    { key: "favorit", label: "⭐ Favorit" },
+    { key: "favorit", label: "⭐ Favorit-Media" },
   ];
 
   function updateAddButtonVisibility_() {
@@ -3093,6 +3106,7 @@ const MediaLibrary = (() => {
         clearYoutubeFilters_();
         renderTabs_();
         renderActiveTab_();
+        refreshFavDock_();
       });
       bar.appendChild(btn);
     });
@@ -3159,12 +3173,25 @@ const MediaLibrary = (() => {
     });
   }
 
+  // BARU (27 Nov 2026, book216) -- dok ⭐ Favorit (slide favorit dari Kumpulan Ayat di Studio Presentasi): tampil di atas
+  // isi tab mana pun, di luar #mlBody yang digulir. Memakai fungsi yang sama dengan Studio (window.PSCore.fillFavDock).
+  // Ketuk chip = langsung tayang di Layar 2 (sama seperti di Studio). Aman gagal: tanpa Studio -> dok disembunyikan.
+  function refreshFavDock_() {
+    const dock = el_("mlFavDock");
+    if (!dock) return;
+    try {
+      if (window.PSCore && typeof window.PSCore.fillFavDock === "function") window.PSCore.fillFavDock(dock);
+      else dock.hidden = true;
+    } catch (e) { dock.hidden = true; }
+  }
+
   function open() {
     const overlay = el_("mediaLibraryOverlay");
     if (!overlay) return;
     overlay.hidden = false;
     wireOnce_();
     renderTabs_();
+    refreshFavDock_();
     updateAddButtonVisibility_();
     loadItems_(false);
   }
@@ -3224,5 +3251,7 @@ const MediaLibrary = (() => {
     // BARU (book163) -- menu sidebar "🎬 Media" (js/app.js showAllMediaPanel()).
     buildAllMediaPanel,
     openCheckPanel: openCheckPanel_,
+    // BARU (book202) -- dipakai tes/diagnosa: putar 1 baris Pustaka Media apa adanya (sama seperti menekan kartunya).
+    playItem: playItem_,
   };
 })();

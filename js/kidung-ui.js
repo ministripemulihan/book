@@ -1416,7 +1416,7 @@ function kidungFavoriteButton(meta) {
   const paint = () => {
     const fav = isKidungFavorite(meta);
     btn.textContent = fav ? "❤️" : "🤍";
-    btn.title = fav ? "Hapus dari favorit" : "Tandai favorit";
+    btn.title = fav ? "Hapus dari Favorit-Kidung" : "Tandai sebagai Favorit-Kidung";
     btn.setAttribute("aria-label", btn.title);
     btn.classList.toggle("active", fav);
   };
