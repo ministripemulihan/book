@@ -5906,3 +5906,21 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 
 /* BARU (book184) -- slot indikator sinyal 4 garis (js/signal-meter.js) */
 .ml-signal-slot { display: inline-flex; align-items: center; margin-right: 4px; }
+
+/* BARU (27 Nov 2026) -- bilah favorit di atas daftar Kumpulan Ayat (Studio Presentasi) */
+.ps-fav-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 4px; padding: 6px 8px; border: 1px solid #e6c374; border-radius: 10px; background: #fff8e1; }
+.ps-fav-top[hidden] { display: none; }
+.ps-fav-top-head { font: 700 12px var(--font-ui, system-ui); color: #7a5b00; }
+.ps-fav-chip { border-color: #e6c374 !important; }
+.ps-fav-chip .ps-fav-no { display: inline-block; margin-left: 2px; padding: 0 6px; border-radius: 999px; background: #7a5b00; color: #fff; font-size: 11px; }
+.ps-fav-chip.active { background: #ffe066 !important; border-color: #b8860b !important; font-weight: 700; }
+.ps-fav-top-toggle { margin-left: auto; font: 12px var(--font-ui, system-ui); color: var(--ink-soft, #555); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+
+/* 27 Nov 2026 (v2) -- bilah favorit Studio: banyak favorit -> bisa digulir + kolom cari */
+.ps-fav-top { max-height: 140px; overflow-y: auto; }
+.ps-fav-search { flex: 1 1 150px; min-width: 120px; padding: 4px 8px; border: 1px solid #e6c374; border-radius: 8px; font: 12px var(--font-ui, system-ui); background: #fff; }
+.ps-fav-chip.first { outline: 2px solid #b8860b; }
+
+/* 27 Nov 2026 -- tombol ✕ hapus di chip favorit Studio */
+.ps-fav-chip .ps-fav-x { margin-left: 4px; padding: 0 4px; border-radius: 50%; font-size: 11px; opacity: .55; cursor: pointer; }
+.ps-fav-chip .ps-fav-x:hover { opacity: 1; background: #c0392b; color: #fff; }
