@@ -1437,10 +1437,32 @@ const PresentationStudio = (() => {
     bar.textContent = "";
     if (!col || !favs.length) { bar.hidden = true; return; }
     bar.hidden = false;
-    const head = document.createElement("span");
-    head.className = "ps-fav-top-head";
-    head.textContent = "⭐ Favorit (" + favs.length + "):";
-    bar.appendChild(head);
+    // book217 -- ACCORDION: baris judul (selalu tampil, tinggi tetap) + isi yang bisa dilipat. Bawaan TERBUKA; pilihan
+    // lipat/buka diingat per perangkat (ps_fav_dock_collapsed_v1) dan dipakai bersama oleh dok Studio & dok Pustaka Media.
+    let collapsed = false;
+    try { collapsed = localStorage.getItem("ps_fav_dock_collapsed_v1") === "1"; } catch (e) { /* abaikan */ }
+    const headRow = document.createElement("div");
+    headRow.className = "ps-fav-dock-head";
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "ps-fav-dock-toggle";
+    const paintToggle = () => {
+      toggleBtn.textContent = (collapsed ? "▸ " : "▾ ") + "⭐ Favorit (" + favs.length + ")";
+      toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggleBtn.title = collapsed ? "Buka daftar favorit" : "Lipat daftar favorit (kecilkan)";
+      bar.classList.toggle("collapsed", collapsed);
+    };
+    toggleBtn.addEventListener("click", () => {
+      collapsed = !collapsed;
+      try { localStorage.setItem("ps_fav_dock_collapsed_v1", collapsed ? "1" : "0"); } catch (e) { /* abaikan */ }
+      paintToggle();
+    });
+    headRow.appendChild(toggleBtn);
+    const body = document.createElement("div");
+    body.className = "ps-fav-dock-body";
+    bar.appendChild(headRow);
+    bar.appendChild(body);
+    paintToggle();
     // 27 Nov 2026 (v2) -- kalau favorit banyak: kolom cari (nama atau nomor slide); Enter = ke yang pertama yang cocok.
     let favSearch = null;
     const chips = [];
@@ -1465,7 +1487,7 @@ const PresentationStudio = (() => {
         if (ev.key === "Enter") { ev.preventDefault(); const c = chips.find((x) => x.btn.style.display !== "none"); if (c) c.btn.click(); }
         ev.stopPropagation(); // panah/tombol lain jangan memindah slide saat mengetik
       });
-      bar.appendChild(favSearch);
+      body.appendChild(favSearch);
     }
     favs.forEach((f) => {
       const b = document.createElement("button");
@@ -1495,7 +1517,7 @@ const PresentationStudio = (() => {
         renderFavTopBar_(col, items, colId, username, targetBar);
         if (isDockCopy) renderFavTopBar_(col, items, colId, username); // dok Studio ikut menandai chip aktif
       });
-      bar.appendChild(b);
+      body.appendChild(b);
       chips.push({ name: f.name, index: f.index, btn: b });
     });
     applyFavFilter();
@@ -1512,7 +1534,7 @@ const PresentationStudio = (() => {
     });
     lb.appendChild(cb);
     lb.appendChild(document.createTextNode(" 📺 Tampil di Layar 2"));
-    bar.appendChild(lb);
+    headRow.appendChild(lb);
   }
 
   // book216 -- dipakai Pustaka Media (js/media-library.js): isi dok favorit kembar dengan favorit kumpulan yang
