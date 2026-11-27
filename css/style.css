@@ -5924,3 +5924,79 @@ body.reader-clean:not(.reader-chrome-show) .app-header { box-shadow: none; }
 /* 27 Nov 2026 -- tombol ✕ hapus di chip favorit Studio */
 .ps-fav-chip .ps-fav-x { margin-left: 4px; padding: 0 4px; border-radius: 50%; font-size: 11px; opacity: .55; cursor: pointer; }
 .ps-fav-chip .ps-fav-x:hover { opacity: 1; background: #c0392b; color: #fff; }
+
+/* ============================================================
+   BARU (27 Nov 2026, book216) -- DOK ⭐ FAVORIT
+   Bilah favorit sekarang berdiri DI LUAR kolom yang digulir:
+   - Studio: #psFavTopBar duduk di atas .ps-columns (flex: 0 0 auto), jadi tidak ikut hilang saat
+     Kumpulan Ayat digulir, tetap tampil saat isi kumpulan link YouTube, dan tetap tampil saat
+     tombol ↔ YouTube menyatukan kolom (kolom kiri disembunyikan pada tingkat 3).
+   - Pustaka Media: #mlFavDock di antara tab dan #mlBody.
+   ============================================================ */
+.ps-fav-dock {
+  flex: 0 0 auto;
+  margin: 0;
+  border-radius: 0;
+  border-width: 0 0 1px 0;
+  padding: 5px 14px;
+  max-height: 84px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 3;
+  box-sizing: border-box;
+}
+.ps-fav-dock .ps-fav-top-toggle { margin-left: auto; }
+.ml-fav-dock { background: #fff8e1; }
+.ml-fav-dock .ps-fav-chip { background: #fffdf4; color: #3a2b00; }
+.present-studio:not(.ps-ui-light) .ps-fav-dock { color: #3a2b00; }
+
+/* ============================================================
+   book217 -- DOK FAVORIT JADI ACCORDION (menggantikan blok .ps-fav-dock di atas yang terpotong separuh).
+   Pembungkus TIDAK lagi punya overflow/max-height (itu penyebab bilah terpotong); yang bisa digulir hanya isinya.
+   Baris judul selalu tampil setinggi tetap; isi bisa dilipat (.collapsed).
+   ============================================================ */
+.ps-fav-dock {
+  display: block; flex: 0 0 auto; flex-shrink: 0;
+  padding: 0; max-height: none; overflow: visible;
+  min-height: 34px; box-sizing: border-box;
+  background: #fff8e1; border-width: 0 0 1px 0;
+  position: relative; z-index: 6;
+}
+.ps-fav-dock-head { display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 3px 14px; box-sizing: border-box; }
+.ps-fav-dock-toggle {
+  font: 700 12.5px var(--font-ui, system-ui); color: #7a5b00; background: #ffefb5;
+  border: 1px solid #e6c374; border-radius: 999px; padding: 4px 12px; cursor: pointer; white-space: nowrap;
+}
+.ps-fav-dock-toggle:hover { background: #ffe58a; }
+.ps-fav-dock-body { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px 14px 7px; max-height: 76px; overflow-y: auto; }
+.ps-fav-dock.collapsed .ps-fav-dock-body { display: none; }
+.ps-fav-dock.collapsed .ps-fav-top-toggle { display: none; }
+.ps-fav-dock .ps-fav-top-toggle { margin-left: auto; color: #5a4300; }
+.ps-fav-dock .ps-fav-chip { color: #3a2b00; }
+
+/* ============================================================
+   book218 -- DOK FAVORIT = CAROUSEL SATU BARIS, TINGGI TETAP (menggantikan book217).
+   Dulu isinya wadah yang bisa digulir vertikal sehingga tulisan kadang terlihat separuh. Sekarang: SATU baris setinggi
+   tetap 42 px, tanpa overflow vertikal; chip digeser ke samping (‹ ›). Nilai !important sengaja, supaya tidak
+   tertimpa aturan .ps-fav-top lama di atas.
+   ============================================================ */
+#psFavTopBar.ps-fav-dock, #mlFavDock.ps-fav-dock {
+  display: block !important; flex: 0 0 42px !important; height: 42px !important; min-height: 42px !important; max-height: 42px !important;
+  overflow: hidden !important; padding: 0 !important; margin: 0 !important; box-sizing: border-box !important;
+}
+#psFavTopBar.ps-fav-dock[hidden], #mlFavDock.ps-fav-dock[hidden] { display: none !important; }
+.ps-fav-dock .ps-fav-dock-head { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; height: 42px; min-height: 0; padding: 0 14px; box-sizing: border-box; }
+.ps-fav-dock .ps-fav-dock-toggle { flex: 0 0 auto; }
+.ps-fav-dock .ps-fav-dock-body { display: flex; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; align-items: center; gap: 6px; padding: 0; max-height: none; overflow: hidden; }
+.ps-fav-dock.collapsed .ps-fav-dock-body { display: none; }
+.ps-fav-dock .ps-fav-search { flex: 0 0 150px; min-width: 100px; }
+.ps-fav-dock .ps-fav-track { position: relative; display: flex; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; align-items: center; gap: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-behavior: smooth; padding: 2px 0; }
+.ps-fav-dock .ps-fav-track::-webkit-scrollbar { display: none; }
+.ps-fav-dock .ps-fav-chip { flex: 0 0 auto; white-space: nowrap; }
+.ps-fav-dock .ps-fav-arrow { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; border: 1px solid #e6c374; background: #fffdf4; color: #7a5b00; font: 700 18px/1 var(--font-ui, system-ui); cursor: pointer; padding: 0; }
+.ps-fav-dock .ps-fav-arrow:hover { background: #ffe58a; }
+.ps-fav-dock .ps-fav-top-toggle { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
+
+/* book220 -- tombol ⭐ Favorit (N) di header Studio: status tidak lagi menyerap sisa ruang, slot favorit yang menyerap */
+.ps-topbar-status { flex: 0 0 auto; }
+.ps-topbar-fav-slot { min-width: 0; }
