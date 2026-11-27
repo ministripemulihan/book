@@ -1438,6 +1438,7 @@ const PresentationStudio = (() => {
     const favs = [];
     (items || []).forEach((it, i) => { if (it && it.favName) favs.push({ name: it.favName, index: i }); });
     bar.textContent = "";
+    if (!isDockCopy) { const slot0 = el("psFavTopSlot"); if (slot0) slot0.textContent = ""; } // book220: tombol header ikut hilang bila tak ada favorit
     if (!col || !favs.length) { bar.hidden = true; bar.removeAttribute("style"); return; }
     bar.hidden = false;
     let collapsed = false;
@@ -1476,9 +1477,16 @@ const PresentationStudio = (() => {
     const toggleBtn = document.createElement("button");
     toggleBtn.type = "button";
     toggleBtn.className = "ps-fav-dock-toggle";
-    toggleBtn.style.cssText = "flex:0 0 auto;font:700 14px system-ui,sans-serif;color:#7a5b00;background:#ffefb5;border:1px solid #e6c374;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;";
+    // book220 -- di Studio, tombol ⭐ Favorit (N) pindah ke HEADER paling atas (#psFavTopSlot) supaya ringkas;
+    // bilah chip di bawahnya hanya ada saat dibuka. Dok kembar Pustaka Media tetap memakai tombol di dalam bilah.
+    const topSlot = (!isDockCopy) ? el("psFavTopSlot") : null;
+    const toggleInHeader = !!topSlot;
+    toggleBtn.style.cssText = toggleInHeader
+      ? "flex:0 0 auto;font:700 13px system-ui,sans-serif;color:#7a5b00;background:#ffefb5;border:1px solid #e6c374;border-radius:999px;padding:4px 12px;cursor:pointer;white-space:nowrap;"
+      : "flex:0 0 auto;font:700 14px system-ui,sans-serif;color:#7a5b00;background:#ffefb5;border:1px solid #e6c374;border-radius:999px;padding:8px 14px;cursor:pointer;white-space:nowrap;";
     const prevArrow = mkArrow("‹", -1, "Geser ke kiri");
-    leftBox.appendChild(toggleBtn); leftBox.appendChild(prevArrow);
+    if (toggleInHeader) { topSlot.textContent = ""; topSlot.appendChild(toggleBtn); leftBox.appendChild(prevArrow); }
+    else { leftBox.appendChild(toggleBtn); leftBox.appendChild(prevArrow); }
     bar.appendChild(leftBox);
     let favSearch = null;
     const chips = [];
@@ -1496,9 +1504,13 @@ const PresentationStudio = (() => {
     const paintToggle = () => {
       toggleBtn.textContent = (collapsed ? "▸ " : "▾ ") + "⭐ Favorit (" + favs.length + ")";
       toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-      toggleBtn.title = collapsed ? "Buka daftar favorit" : "Lipat daftar favorit (kecilkan)";
+      toggleBtn.title = collapsed ? "Buka daftar favorit (muncul di bawah)" : "Tutup daftar favorit (lebih ringkas)";
       bar.classList.toggle("collapsed", collapsed);
       bar.style.cssText = barCss(collapsed ? 46 : 60);
+      if (toggleInHeader) { // book220: terlipat = tidak ada baris sendiri sama sekali (hanya tombol di header)
+        toggleBtn.style.background = collapsed ? "#ffefb5" : "#ffd966";
+        if (collapsed) bar.style.cssText = "display:none!important;";
+      }
       prevArrow.style.display = collapsed ? "none" : "";
       if (favSearch) favSearch.style.display = collapsed ? "none" : "";
       if (lb) lb.style.display = collapsed ? "none" : "";
