@@ -860,6 +860,11 @@ async function openKidungReader(buku, no) {
   }
 
   kidungCurrentBuku = buku;
+  // Catat kidung yang BENAR-BENAR dibuka (buku + nomor), bukan cuma "masuk menu Kidung".
+  if (typeof logActivity === "function") {
+    const jd = result.meta && result.meta.judul ? " – " + result.meta.judul : "";
+    logActivity("Kidung: " + buku + " No. " + no + jd);
+  }
   renderKidungReader(result.meta || { buku, noKidung: no, judul: "" }, result.baits);
 }
 

@@ -8723,7 +8723,7 @@ function openCollectionFullscreen(col, startIndex) {
     // BARU (23 Nov 2026, permintaan operator) -- tombol ⭐ Favorit / 🔗 Tautan (diatur di Kumpulan Ayat Studio,
     // js/collections.js resolveItemLinks): ketuk untuk loncat ke slide favorit (mis. Home / Kidung / Pengumuman).
     if (typeof resolveItemLinks === "function") {
-      const fsLinks = resolveItemLinks(col.items, idx, !!col.favBar);
+      const fsLinks = resolveItemLinks(col.items, idx, !col.favHide).filter((l) => !l.cur);
       if (fsLinks.length) {
         const bar = document.createElement("div");
         bar.className = "collection-fs-links";
@@ -8731,7 +8731,7 @@ function openCollectionFullscreen(col, startIndex) {
           const b = document.createElement("button");
           b.type = "button";
           b.className = "chip-btn";
-          b.textContent = "🔗 " + l.label;
+          b.textContent = "🔗 " + (l.no ? l.no + " · " : "") + l.label;
           b.addEventListener("click", () => { stopCollectionVersePlayback(); idx = l.index; render(); });
           bar.appendChild(b);
         });

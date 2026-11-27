@@ -1061,6 +1061,7 @@ const PresentationStudio = (() => {
       }
     }
     if (el("presentStudio")) el("presentStudio").hidden = false;
+    if (typeof logActivity === "function") logActivity("Studio Presentasi");
     if (bgAudioModuleProblem_) showBgAudioModuleWarning_(false); // Audio Latar nonaktif -- ingatkan lagi tiap Studio dibuka
     document.body.classList.add("ps-open");
     document.documentElement.classList.add("ps-open"); // jaring tambahan untuk <html>, lihat CSS body.ps-open
@@ -1211,10 +1212,42 @@ const PresentationStudio = (() => {
       inp.value = it.favName || "";
       inp.placeholder = "Home";
       box.appendChild(inp);
+      // 27 Nov 2026 -- jalan pintas: ketuk nama favorit yang sudah ada (di slide lain) untuk MEMINDAHKANNYA ke slide ini,
+      // dan tombol untuk mengosongkan nama (= hapus favorit slide ini).
+      const others = [];
+      ((loadCollections(username)[colId] || {}).items || []).forEach((x, i) => { if (x && x.favName && i !== idx) others.push({ name: x.favName, no: i + 1 }); });
+      if (others.length) {
+        const lab = document.createElement("p");
+        lab.className = "simple-dialog-hint";
+        lab.textContent = "Atau pindahkan favorit yang sudah ada ke slide ini (ketuk, lalu Simpan):";
+        box.appendChild(lab);
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "display:flex; flex-wrap:wrap; gap:6px; max-height:120px; overflow:auto;";
+        others.forEach((o) => {
+          const b = document.createElement("button");
+          b.type = "button"; b.className = "chip-btn small";
+          b.textContent = o.name + " (no. " + o.no + ")";
+          b.addEventListener("click", () => { inp.value = o.name; inp.focus(); });
+          wrap.appendChild(b);
+        });
+        box.appendChild(wrap);
+      }
+      if (it.favName) {
+        const del = document.createElement("button");
+        del.type = "button"; del.className = "chip-btn small danger"; del.style.marginTop = "8px";
+        del.textContent = "🗑️ Hapus favorit \"" + it.favName + "\" dari slide ini";
+        del.addEventListener("click", () => { inp.value = ""; inp.focus(); });
+        box.appendChild(del);
+      }
       setTimeout(() => inp.focus(), 30);
       return () => ({ name: inp.value });
     }, (val) => {
-      const r = setItemFavName(username, colId, idx, val.name);
+      let r = setItemFavName(username, colId, idx, val.name);
+      if (!r.ok && r.conflict) {
+        const nm = String(val.name || "").trim();
+        if (!confirm("Favorit \"" + nm + "\" sekarang ada di slide no. " + (r.otherIndex + 1) + ".\n\nPindahkan ke slide ini (no. " + (idx + 1) + ")?")) return;
+        r = setItemFavName(username, colId, idx, val.name, true);
+      }
       if (!r.ok) { alert(r.error); return; }
       renderCollectionSelect();
       resyncActivePlaylistAfterFavEdit_(username, colId);
@@ -1257,9 +1290,9 @@ const PresentationStudio = (() => {
       lb.style.cssText = "display:flex; gap:6px; align-items:center; margin-top:10px; font-size:13px;";
       favBarCb = document.createElement("input");
       favBarCb.type = "checkbox";
-      favBarCb.checked = !!col.favBar;
+      favBarCb.checked = !col.favHide;
       lb.appendChild(favBarCb);
-      lb.appendChild(document.createTextNode(" Tampilkan SEMUA favorit sebagai tombol di semua slide kumpulan ini"));
+      lb.appendChild(document.createTextNode(" Tampilkan SEMUA favorit (dengan nomor slide) di kiri bawah Layar 2"));
       box.appendChild(lb);
       return () => ({ rows: rows.map((r) => ({ label: r.lab.value, to: r.to.value })), favBar: favBarCb.checked });
     }, (val) => {
@@ -1390,6 +1423,94 @@ const PresentationStudio = (() => {
     }, "Simpan perubahan");
   }
 
+  // BARU (27 Nov 2026, permintaan operator) -- bilah ⭐ Favorit di ATAS daftar Kumpulan Ayat: tiap slide yang
+  // diberi nama favorit (mis. "Home") jadi tombol + nomor slidenya; ketuk = langsung pindah & tayang di Layar 2
+  // (sama seperti mengetuk barisnya). Saklar "📺 Layar 2" = tampil/sembunyikan bilah favorit di kiri bawah present.html.
+  let psFavQuery_ = "";
+  function renderFavTopBar_(col, items, colId, username) {
+    const bar = el("psFavTopBar");
+    if (!bar) return;
+    const favs = [];
+    (items || []).forEach((it, i) => { if (it && it.favName) favs.push({ name: it.favName, index: i }); });
+    bar.textContent = "";
+    if (!col || !favs.length) { bar.hidden = true; return; }
+    bar.hidden = false;
+    const head = document.createElement("span");
+    head.className = "ps-fav-top-head";
+    head.textContent = "⭐ Favorit (" + favs.length + "):";
+    bar.appendChild(head);
+    // 27 Nov 2026 (v2) -- kalau favorit banyak: kolom cari (nama atau nomor slide); Enter = ke yang pertama yang cocok.
+    let favSearch = null;
+    const chips = [];
+    const applyFavFilter = () => {
+      const q = favSearch ? favSearch.value.trim().toLowerCase() : "";
+      let firstDone = false;
+      chips.forEach((c) => {
+        const hit = !q || c.name.toLowerCase().indexOf(q) !== -1 || String(c.index + 1) === q;
+        c.btn.style.display = hit ? "" : "none";
+        c.btn.classList.toggle("first", !!q && hit && !firstDone);
+        if (hit) firstDone = true;
+      });
+    };
+    if (favs.length > 5) {
+      favSearch = document.createElement("input");
+      favSearch.type = "text";
+      favSearch.className = "ps-fav-search";
+      favSearch.placeholder = "🔍 cari favorit / no. slide";
+      favSearch.value = psFavQuery_;
+      favSearch.addEventListener("input", () => { psFavQuery_ = favSearch.value; applyFavFilter(); });
+      favSearch.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") { ev.preventDefault(); const c = chips.find((x) => x.btn.style.display !== "none"); if (c) c.btn.click(); }
+        ev.stopPropagation(); // panah/tombol lain jangan memindah slide saat mengetik
+      });
+      bar.appendChild(favSearch);
+    }
+    favs.forEach((f) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip-btn small ps-fav-chip";
+      if (activePlaylist && activePlaylist.label === col.name && activePlaylist.index === f.index) b.classList.add("active");
+      b.title = "Slide no. " + (f.index + 1) + " — ketuk untuk langsung tayang di Layar 2";
+      b.appendChild(document.createTextNode(f.name + " "));
+      const no = document.createElement("span");
+      no.className = "ps-fav-no";
+      no.textContent = "no. " + (f.index + 1);
+      b.appendChild(no);
+      const xDel = document.createElement("span");
+      xDel.className = "ps-fav-x"; xDel.textContent = "✕"; xDel.title = "Hapus favorit ini (slidenya tidak dihapus)";
+      xDel.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (!confirm("Hapus favorit \"" + f.name + "\" (slide no. " + (f.index + 1) + ")?\nSlidenya tetap ada, hanya namanya dilepas.")) return;
+        setItemFavName(username, colId, f.index, "");
+        renderCollectionSelect();
+        resyncActivePlaylistAfterFavEdit_(username, colId);
+      });
+      b.appendChild(xDel);
+      b.addEventListener("click", () => {
+        setActivePlaylist(items, f.index, col.name);
+        sendGenericItemLive(items[f.index]);
+        renderFavTopBar_(col, items, colId, username);
+      });
+      bar.appendChild(b);
+      chips.push({ name: f.name, index: f.index, btn: b });
+    });
+    applyFavFilter();
+    const lb = document.createElement("label");
+    lb.className = "ps-fav-top-toggle";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !col.favHide;
+    cb.addEventListener("change", () => {
+      setCollectionFavHide(username, colId, !cb.checked);
+      const fresh = (loadCollections(username) || {})[colId];
+      if (fresh && activePlaylist && activePlaylist.label === fresh.name) { activePlaylist.items = fresh.items; const cur = activePlaylist.items[activePlaylist.index]; if (cur) pushItemLinks_(cur); }
+      renderFavTopBar_(fresh || col, (fresh || col).items, colId, username);
+    });
+    lb.appendChild(cb);
+    lb.appendChild(document.createTextNode(" 📺 Tampil di Layar 2"));
+    bar.appendChild(lb);
+  }
+
   function renderCollectionList() {
     const wrap = el("psCollectionList");
     const sel = el("psCollectionSelect");
@@ -1407,6 +1528,7 @@ const PresentationStudio = (() => {
     if (countEl) {
       countEl.textContent = col ? `📄 ${items.length} slide/item di kumpulan ini.` : "";
     }
+    renderFavTopBar_(col, items, sel.value, username);
     const deleteAllBtn = el("psCollectionDeleteAllBtn");
     if (deleteAllBtn) deleteAllBtn.disabled = !col;
     if (!items.length) {
@@ -2225,6 +2347,12 @@ const PresentationStudio = (() => {
       `#psCollectionList [data-playlist-idx="${activePlaylist.index}"], #psKidungSlideList [data-playlist-idx="${activePlaylist.index}"]`
     );
     if (rowEl) { rowEl.classList.add("active"); scrollRowIntoListView_(rowEl); }
+    try { // 27 Nov 2026 -- chip favorit di atas ikut menandai slide aktif
+      document.querySelectorAll("#psFavTopBar .ps-fav-chip").forEach((c) => c.classList.remove("active"));
+      const favChips = document.querySelectorAll("#psFavTopBar .ps-fav-chip");
+      const names = []; (activePlaylist.items || []).forEach((x, i) => { if (x && x.favName) names.push(i); });
+      names.forEach((ix, k) => { if (ix === activePlaylist.index && favChips[k]) favChips[k].classList.add("active"); });
+    } catch (e) { /* tidak fatal */ }
   }
   // book179 (permintaan operator) -- baris yang sedang tayang di Layar 2 HARUS ikut terlihat di daftar Kumpulan Ayat Studio
   // (dulu daftar tetap di ayat 10 padahal tayangan sudah ayat 20 -- operator harus cari mouse & gulir). Gulir INSTAN
@@ -2446,7 +2574,7 @@ const PresentationStudio = (() => {
         if (idx >= 0) {
           const user = typeof currentUser !== "undefined" ? currentUser : "";
           const colObj = Object.values(loadCollections(user) || {}).find((c) => c && c.name === activePlaylist.label);
-          links = resolveItemLinks(activePlaylist.items, idx, !!(colObj && colObj.favBar)).map((l) => ({ label: l.label, name: l.name }));
+          links = resolveItemLinks(activePlaylist.items, idx, !!colObj && !colObj.favHide).map((l) => ({ label: l.label, name: l.name, no: l.no, cur: !!l.cur }));
         }
       }
     } catch (e) { links = []; }

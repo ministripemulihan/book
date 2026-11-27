@@ -184,6 +184,8 @@ const UserApproval = (() => {
             u.gender ? "🚻 " + escapeHtml(u.gender) : "",
             u.umur ? "🎂 " + escapeHtml(u.umur) + " th" : "",
           ].filter(Boolean).join(" · ") || "-"}</div>
+          <div class="user-approval-meta">🔑 Login terakhir: ${escapeHtml(u.lastLogin || "belum tercatat")}</div>
+          <div class="user-approval-meta">🕒 Aktivitas terakhir: ${escapeHtml(u.lastActivityAt || "-")}${u.lastMenu ? " — " + escapeHtml(u.lastMenu) : ""}${u.lastDevice ? " (" + escapeHtml(u.lastDevice) + ")" : ""}</div>
         </div>
         <div class="user-approval-actions">
           <span class="user-approval-status ${u.approved ? "ok" : "pending"}">${u.approved ? "✅ Disetujui" : "⏳ Menunggu"}</span>

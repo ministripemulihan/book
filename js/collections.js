@@ -795,19 +795,26 @@ function resolveItemLinks(items, idx, favBar) {
     const ti = findFavIndex(items, l && l.to);
     if (ti < 0 || ti === idx || seen.has(ti)) return;
     seen.add(ti);
-    out.push({ label: String((l.label || items[ti].favName) || "").trim(), name: items[ti].favName, index: ti });
+    out.push({ label: String((l.label || items[ti].favName) || "").trim(), name: items[ti].favName, index: ti, no: ti + 1 });
   });
   if (favBar) {
+    // BARU (27 Nov 2026) -- bilah favorit di Layar 2 kini memuat SEMUA favorit (termasuk slide yang sedang tayang,
+    // ditandai cur:true), berurutan sesuai nomor slide di Kumpulan Ayat, dan tiap tombol membawa nomor slidenya (no).
+    out.length = 0; seen.clear(); // bilah favorit memakai NAMA favorit (bukan label tombol tautan khusus)
     items.forEach((x, i) => {
-      if (!x || !x.favName || i === idx || seen.has(i)) return;
+      if (!x || !x.favName || seen.has(i)) return;
       seen.add(i);
-      out.push({ label: x.favName, name: x.favName, index: i });
+      out.push({ label: x.favName, name: x.favName, index: i, no: i + 1, cur: i === idx });
     });
+    out.sort((a, b) => a.index - b.index);
   }
   return out;
 }
 
-function setItemFavName(username, id, index, name) {
+// 27 Nov 2026 -- parameter `move`: kalau nama sudah dipakai slide lain, TANPA move -> {ok:false, conflict:true, otherIndex}
+// (UI lalu bertanya "pindahkan ke slide ini?"); DENGAN move=true -> nama dilepas dari slide lama & dipasang di slide ini.
+// Tautan (it.links) memakai NAMA, jadi otomatis ikut menuju slide baru.
+function setItemFavName(username, id, index, name, move) {
   const collections = loadCollections(username);
   const col = collections[id];
   const it = col && col.items[index];
@@ -815,7 +822,10 @@ function setItemFavName(username, id, index, name) {
   const nm = String(name == null ? "" : name).replace(/\s+/g, " ").trim().slice(0, 40);
   if (nm) {
     const other = findFavIndex(col.items, nm);
-    if (other >= 0 && other !== index) return { ok: false, error: "Nama favorit \"" + nm + "\" sudah dipakai item no. " + (other + 1) + ". Pakai nama lain." };
+    if (other >= 0 && other !== index) {
+      if (!move) return { ok: false, conflict: true, otherIndex: other, error: "Nama favorit \"" + nm + "\" sudah dipakai item no. " + (other + 1) + ". Pakai nama lain." };
+      delete col.items[other].favName;
+    }
     it.favName = nm;
   } else {
     delete it.favName;
@@ -824,6 +834,18 @@ function setItemFavName(username, id, index, name) {
   saveCollections(username, collections);
   _pushCollectionRemote(username, id, col);
   return { ok: true, name: nm };
+}
+
+// BARU (27 Nov 2026) -- saklar "📺 Tampil di Layar 2" di bilah favorit atas panel Kumpulan Ayat.
+function setCollectionFavHide(username, id, hide) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  if (!col) return false;
+  if (hide) { col.favHide = true; delete col.favBar; } else { delete col.favHide; col.favBar = true; }
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
 }
 
 function setItemLinks(username, id, index, links, favBar) {
@@ -838,7 +860,8 @@ function setItemLinks(username, id, index, links, favBar) {
     clean.push({ label: String(l.label || "").replace(/\s+/g, " ").trim().slice(0, 40), to });
   });
   if (clean.length) it.links = clean.slice(0, 12); else delete it.links;
-  if (favBar !== undefined && favBar !== null) { if (favBar) col.favBar = true; else delete col.favBar; }
+  // 27 Nov 2026 -- bilah favorit kini MENYALA otomatis; yang disimpan adalah pilihan "sembunyikan" (col.favHide).
+  if (favBar !== undefined && favBar !== null) { if (favBar) { col.favBar = true; delete col.favHide; } else { delete col.favBar; col.favHide = true; } }
   col.updatedAt = new Date().toISOString();
   saveCollections(username, collections);
   _pushCollectionRemote(username, id, col);

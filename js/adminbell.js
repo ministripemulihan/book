@@ -110,6 +110,17 @@ const AdminBell = (() => {
       lastPendingCurhat = pendingCurhat || [];
       if (isAdminMode) {
         const res = await Sync._get({ type: "search_stats_today", username });
+        // BARU (book183) -- daftar login hari ini; gagal dimuat tidak boleh
+        // menghalangi statistik pencarian tampil.
+        try {
+          const lg = await Sync._get({ type: "logins_today", username });
+          if (lg && lg.ok && Array.isArray(lg.users)) { lastLoginsToday = lg; lastLoginsErr = ""; }
+          else {
+            lastLoginsToday = null;
+            // 27 Nov 2026 -- alasan gagal ditampilkan (dulu diam-diam kosong sehingga daftar "tidak muncul" tanpa petunjuk)
+            lastLoginsErr = (lg && lg.error) ? String(lg.error) : "Server belum mengenali permintaan ini -- tempel Code.gs terbaru di Apps Script lalu Deploy > Manage deployments > New version.";
+          }
+        } catch (e) { lastLoginsToday = null; lastLoginsErr = "Gagal menghubungi server."; }
         if (res && res.ok) renderAdmin(res);
       } else {
         const res = await Sync._get({ type: "last_login", username });
@@ -131,6 +142,10 @@ const AdminBell = (() => {
   let lastUnseenAnnouncements = [];
   // BARU (15 Sep 2026) -- lihat getPendingCurhatForBell() js/curhat.js.
   let lastPendingCurhat = [];
+  // BARU (book183) -- siapa saja yang login hari ini (KHUSUS administrator),
+  // 1 baris per orang dengan jam login terakhir. Lihat readLoginsToday_() Code.gs.
+  let lastLoginsToday = null; // null = belum/ gagal dimuat
+  let lastLoginsErr = "";
   function pendingApprovalsHtml() {
     const total = lastPendingShares.length + lastPendingMediaDeletes.length;
     if (!total) return "";
@@ -179,6 +194,34 @@ const AdminBell = (() => {
       `</div>`;
   }
 
+  // BARU (book183) -- "👥 Login hari ini": 1 baris per orang, jam login
+  // terakhir. Hanya dipanggil dari renderAdmin() (pengguna biasa tidak
+  // pernah melihat bagian ini).
+  function loginsTodayHtml() {
+    if (!lastLoginsToday) {
+      return lastLoginsErr ? `<p class="admin-bell-total">👥 Daftar login hari ini belum bisa dimuat</p><p class="media-empty">${escapeHtml(lastLoginsErr)}</p>` : "";
+    }
+    const list = lastLoginsToday.users || [];
+    // 27 Nov 2026 -- unique user per hari (termasuk administrator sendiri): jam masuk + jam terakhir + menu terakhir.
+    let html = `<p class="admin-bell-total">👥 <strong>${list.length}</strong> pengguna unik hari ini (termasuk Anda)` +
+      (lastLoginsToday.date ? ` <small>${escapeHtml(lastLoginsToday.date)}</small>` : "") + `</p>`;
+    if (!list.length) return html + `<p class="media-empty">Belum ada yang login hari ini.</p>`;
+    const jamOf = (iso) => {
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? "-" : d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false }).replace(".", ":");
+    };
+    html += `<ul class="admin-bell-breakdown admin-bell-logins">`;
+    list.forEach((u) => {
+      const masuk = jamOf(u.firstAt || u.lastLogin), akhir = jamOf(u.lastAt || u.lastLogin);
+      const menu = (typeof describeActivity === "function" && u.menu) ? describeActivity(u.menu, "", u.os) : (u.menu || "");
+      html += `<li><strong>${escapeHtml(u.username)}</strong> — masuk ${escapeHtml(masuk)}` +
+        (akhir !== masuk ? ` · terakhir ${escapeHtml(akhir)}` : "") +
+        (u.os ? ` <small>(${escapeHtml(u.os)})</small>` : "") +
+        (menu ? `<br><small>${escapeHtml(menu)}</small>` : "") + `</li>`;
+    });
+    return html + `</ul>`;
+  }
+
   function renderAdmin(stats) {
     const badge = el("adminBellBadge");
     if (badge) {
@@ -197,7 +240,8 @@ const AdminBell = (() => {
         `<ul class="admin-bell-breakdown">` +
         `<li>Pengguna masuk (login): <strong>${stats.loggedInCount || 0}</strong></li>` +
         `<li>Mode Tamu (belum login): <strong>${stats.guestCount || 0}</strong></li>` +
-        `</ul>`;
+        `</ul>` +
+        loginsTodayHtml();
       wireAnnouncementsOpenBtn_();
       wireCurhatOpenBtn_();
     }
