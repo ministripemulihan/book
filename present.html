@@ -2434,6 +2434,13 @@
   #psLinksBar .fav-list button.cur .fav-no, #psLinksBar .fav-list button:hover .fav-no, #psLinksBar .fav-list button.first .fav-no { background: #111; color: #ffe066; }
   #psLinksBar .fav-empty { color: rgba(255,255,255,.7); font-size: 14px; padding: 4px 2px; }
   #psLinksBar .fav-hint { color: rgba(255,255,255,.5); font-size: 11px; }
+  /* book221 -- sub-kategori favorit (kalau favorit > 8 & ada >= 2 kategori): menu kategori dulu, ketuk satu = daftar kategori itu. */
+  #psLinksBar .fav-list button.fav-cat { padding: 10px 16px; font-size: 17px; border-radius: 12px; }
+  #psLinksBar .fav-list button.fav-cat .fav-no { font-size: 13px; line-height: 20px; }
+  #psLinksBar .fav-list button.fav-back { background: rgba(255,255,255,.18); border-style: dashed; }
+  #psLinksBar .fav-ord { display: inline-block; min-width: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: rgba(255,255,255,.28); color: #fff; font-weight: 800; font-size: 11px; line-height: 18px; text-align: center; }
+  #psLinksBar .fav-list button:hover .fav-ord, #psLinksBar .fav-list button.first .fav-ord, #psLinksBar .fav-list button.cur .fav-ord { background: rgba(0,0,0,.35); color: #fff; }
+  #psLinksBar .fav-catlabel { width: 100%; color: rgba(255,255,255,.75); font-size: 13px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -8747,7 +8754,7 @@ function favEls_() {
   if (!bar) return null;
   if (!bar.__built) {
     bar.__built = true;
-    bar.innerHTML = '<div class="fav-panel" hidden><input class="fav-search" type="text" placeholder="🔍 cari favorit atau nomor slide…" autocomplete="off" spellcheck="false" /><div class="fav-list"></div><div class="fav-hint">Enter = ke yang pertama · Esc = tutup · tombol “/” = buka</div></div><button type="button" class="fav-fab" title="Favorit (tekan / )"></button>';
+    bar.innerHTML = '<div class="fav-panel" hidden><input class="fav-search" type="text" placeholder="🔍 cari favorit atau nomor slide…" autocomplete="off" spellcheck="false" /><div class="fav-list"></div><div class="fav-hint">Enter = ke yang pertama · Esc = tutup · “/” = buka · Ctrl+Alt+angka = favorit ke-N</div></div><button type="button" class="fav-fab" title="Favorit (tekan / )"></button>';
     var fab = bar.querySelector(".fav-fab"), panel = bar.querySelector(".fav-panel"), input = bar.querySelector(".fav-search");
     fab.addEventListener("click", function (ev) { ev.stopPropagation(); favOpen_(panel.hidden); });
     input.addEventListener("input", function () { favRender_(); favArmIdle_(); });
@@ -8765,30 +8772,77 @@ function favEls_() {
       if (/INPUT|TEXTAREA|SELECT/.test(tag) || (ev.target && ev.target.isContentEditable)) return;
       ev.preventDefault(); favOpen_(true);
     });
+    // book221 -- SHORTCUT (Layar 2): Ctrl+Alt+1..9,0 = favorit ke-1..10 · Ctrl+Alt+Shift+1..9,0 = ke-11..20 (sama dengan Studio).
+    document.addEventListener("keydown", function (ev) {
+      if (!ev.ctrlKey || !ev.altKey || ev.metaKey || bar.hidden) return;
+      var m = /^Digit([0-9])$/.exec(ev.code || ""); if (!m) return;
+      var n = (m[1] === "0" ? 10 : parseInt(m[1], 10)) + (ev.shiftKey ? 10 : 0);
+      var f = favItems_.filter(function (l) { return l.ord === n; })[0];
+      ev.preventDefault();
+      if (f) favGo_(f);
+    });
   }
   return { bar: bar, fab: bar.querySelector(".fav-fab"), panel: bar.querySelector(".fav-panel"), input: bar.querySelector(".fav-search"), list: bar.querySelector(".fav-list") };
 }
+var favCat_ = null; // book221: null = menu kategori (kalau favorit dikelompokkan); "*" = semua; selain itu = nama kategori
+var FAV_ICONS_ = { Kidung: "🎵", Alkitab: "📖", Pengumuman: "📢", Berkas: "🖼️", Video: "▶️", Musik: "🎧", Teks: "📝", Lainnya: "⭐" };
+function favCatNames_() {
+  var seen = {}, out = [];
+  favItems_.forEach(function (l) { var c = l.cat || "Lainnya"; if (!seen[c]) { seen[c] = 0; out.push(c); } seen[c]++; });
+  var order = ["Kidung", "Alkitab", "Pengumuman", "Berkas", "Video", "Musik", "Teks", "Lainnya"];
+  out.sort(function (a, b) { var ia = order.indexOf(a), ib = order.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || (a < b ? -1 : 1); });
+  return { names: out, count: seen };
+}
+function favGrouped_() { return favItems_.length > 8 && favCatNames_().names.length >= 2; }
+function favHit_(l, q) { return String(l.label || l.name).toLowerCase().indexOf(q) !== -1 || String(l.no || "") === q || String(l.ord || "") === q; }
 function favMatches_() {
   var e = favEls_(); var q = e ? e.input.value.trim().toLowerCase() : "";
+  if (!q && favGrouped_() && favCat_ === null) return []; // sedang menu kategori: Enter tidak memilih apa pun
   return favItems_.filter(function (l) {
     if (l.cur) return false;
-    if (!q) return true;
-    return String(l.label || l.name).toLowerCase().indexOf(q) !== -1 || String(l.no || "") === q;
+    if (q) return favHit_(l, q);
+    return !favGrouped_() || favCat_ === "*" || (l.cat || "Lainnya") === favCat_;
   });
 }
 function favRender_() {
   var e = favEls_(); if (!e) return;
   var q = e.input.value.trim().toLowerCase();
   e.list.textContent = "";
+  var grouped = favGrouped_();
+  if (!q && grouped && favCat_ === null) {
+    // MENU KATEGORI -- tidak langsung menampilkan semua (bisa sampai 30) favorit
+    var info = favCatNames_();
+    var mk = function (label, n, icon, key) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "fav-cat";
+      b.appendChild(document.createTextNode(icon + " " + label + " "));
+      var sp = document.createElement("span"); sp.className = "fav-no"; sp.textContent = String(n); b.appendChild(sp);
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); favCat_ = key; favRender_(); favArmIdle_(); });
+      e.list.appendChild(b);
+    };
+    info.names.forEach(function (c) { mk(c, info.count[c], FAV_ICONS_[c] || "📁", c); });
+    mk("Semua", favItems_.length, "☰", "*");
+    return;
+  }
+  var pool = favItems_;
+  if (!q && grouped && favCat_ && favCat_ !== "*") pool = favItems_.filter(function (l) { return (l.cat || "Lainnya") === favCat_; });
+  if (!q && grouped) {
+    var back = document.createElement("button"); back.type = "button"; back.className = "fav-back";
+    back.textContent = "‹ Kategori";
+    back.addEventListener("click", function (ev) { ev.stopPropagation(); favCat_ = null; favRender_(); favArmIdle_(); });
+    e.list.appendChild(back);
+    var lab = document.createElement("div"); lab.className = "fav-catlabel";
+    lab.textContent = favCat_ === "*" ? "Semua favorit" : ((FAV_ICONS_[favCat_] || "📁") + " " + favCat_);
+    e.list.appendChild(lab);
+  }
   var shown = 0, first = true;
-  favItems_.forEach(function (l) {
-    var hit = !q || String(l.label || l.name).toLowerCase().indexOf(q) !== -1 || String(l.no || "") === q;
-    if (!hit) return;
+  pool.forEach(function (l) {
+    if (q && !favHit_(l, q)) return;
     shown++;
     var b = document.createElement("button"); b.type = "button";
+    if (favItems_.length > 1 && l.ord) { var o = document.createElement("span"); o.className = "fav-ord"; o.textContent = String(l.ord); b.appendChild(o); }
     if (l.no) { var n = document.createElement("span"); n.className = "fav-no"; n.textContent = String(l.no); b.appendChild(n); }
     b.appendChild(document.createTextNode(String(l.label || l.name)));
-    b.title = l.no ? "Slide no. " + l.no : "";
+    b.title = (l.ord ? "Favorit ke-" + l.ord + " · " : "") + (l.no ? "slide no. " + l.no : "") + (l.cat ? " · " + l.cat : "");
     if (l.cur) b.classList.add("cur");
     else if (first && q) { b.classList.add("first"); }
     if (!l.cur) first = false;
@@ -8800,7 +8854,7 @@ function favRender_() {
 function favOpen_(on) {
   var e = favEls_(); if (!e) return;
   e.panel.hidden = !on; e.bar.classList.toggle("open", !!on);
-  if (on) { e.input.value = ""; favRender_(); try { e.input.focus(); } catch (x) {} favArmIdle_(); }
+  if (on) { e.input.value = ""; favCat_ = null; favRender_(); try { e.input.focus(); } catch (x) {} favArmIdle_(); }
   else { try { e.input.blur(); } catch (x) {} clearTimeout(favIdleTimer_); }
 }
 function favArmIdle_() { clearTimeout(favIdleTimer_); favIdleTimer_ = setTimeout(function () { favOpen_(false); }, 10000); }

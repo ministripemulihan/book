@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=20261127i" />
+<link rel="stylesheet" href="css/style.css?v=20261128a" />
   <!-- BARU: stylesheet khusus menu "👶 Kidung Anak" -- terpisah total dari style.css,
        lihat catatan di css/kidung-anak.css dan README.md bagian "KIDUNG ANAK". -->
   <link rel="stylesheet" href="css/kidung-anak.css?v=20260829a" />
@@ -417,6 +417,8 @@
       <div class="more-menu-item" id="syncStatus">Memuat status…</div>
       <button id="announcementBtn" class="more-menu-btn">📢 Pengumuman</button>
       <button id="infoKamiBtn" class="more-menu-btn">ℹ️ Info Kami</button>
+      <!-- book221 -- dipindah dari bawah daftar menu (permintaan operator): pertama kali pakai / data kidung belum ada -> langsung ketemu di sini. -->
+      <button id="syncAllBtn" class="more-menu-btn">🔄 Sinkronkan ulang</button>
       <button id="notesMenuBtn" class="more-menu-btn">🗒️ Catatan Saya</button>
       <!-- BARU (21 Sep 2026) -- lihat js/annotations.js -->
       <button id="annoMenuBtn" class="more-menu-btn">🖍️ Penanda Saya</button>
@@ -457,7 +459,7 @@
            js/app.js tergantung ada/tidaknya data lokal. Ikut menyinkronkan
            Pokok Kitab / Garis Besar / Peta+Gambar juga (lihat confirmAndSync). -->
       <!-- BARU: SATU tombol "Sinkronkan ulang" menggantikan 3 tombol terpisah di bawah (masih ada di DOM, disembunyikan, karena kode lain masih merujuknya). -->
-      <button id="syncAllBtn" class="more-menu-btn">🔄 Sinkronkan ulang</button>
+      <!-- book221: tombol "🔄 Sinkronkan ulang" (syncAllBtn) DIPINDAH ke bagian atas menu, tepat di bawah "ℹ️ Info Kami". -->
       <button id="resyncBtn" class="more-menu-btn" style="display:none">🔄 Sinkronkan ulang Alkitab</button>
       <button id="resyncUsersBtn" class="more-menu-btn" style="display:none">👥 Sinkronkan ulang daftar pengguna</button>
       <!-- BARU (21 Sep 2026) -- lihat js/kidung-anak.js (wireMenuResyncButton_/resyncFromMenu_); tombol ini SELF-WIRED oleh berkas itu, js/app.js tidak disentuh -->
@@ -4375,7 +4377,7 @@
        untuk detailnya. Dimuat di sini (setelah db.js/sync.js, sebelum modul
        lain yang memakainya) supaya loadCollections/addMediaItem/dst sudah
        tersedia untuk js/media.js, js/presentation-studio.js & js/app.js. -->
-  <script src="js/collections.js?v=20261127c"></script>
+  <script src="js/collections.js?v=20261128a"></script>
   <script src="js/infokami.js?v=20260818b"></script>
   <script src="js/levels.js?v=20260818b"></script>
   <script src="js/activitylog.js?v=20261126a"></script>
@@ -4393,7 +4395,7 @@
   <script src="js/outlines.js?v=20260820b"></script>
   <script src="js/kidung.js?v=20261016a"></script>
   <script src="js/kidung-ref.js?v=20261004a"></script> <!-- 28 Sep 2026: kode KidungRef K130/S130/KA13 -->
-  <script src="js/kidung-ui.js?v=20261127e"></script>
+  <script src="js/kidung-ui.js?v=20261128a"></script>
   <!-- BARU (6 Sep 2026) -->
   <script src="js/lifestudy.js?v=20260907a"></script>
   <!-- BARU: modul terpisah untuk menu "👶 Kidung Anak" -- lihat README.md -->
@@ -4420,7 +4422,7 @@
   <script src="js/signal-meter.js?v=20261022a184"></script>
   <script src="js/shortcuts.js?v=20261112a194"></script>
   <script src="js/fun-fx.js?v=20261121a206"></script>
-  <script src="js/presentation-studio.js?v=20261127h"></script>
+  <script src="js/presentation-studio.js?v=20261128a"></script>
   <!-- Modul "Game Offline" (folder js/games/) -- WAJIB dimuat SESUDAH
        presentation-studio.js (butuh window.PSCore & window.GameOffline
        yang disiapkan di sana). Menambah game baru = 1 baris tag skrip
@@ -4449,7 +4451,7 @@
   <script src="js/pinyin-ruby.js?v=20261017b"></script>
   <script src="js/tts-sync.js?v=20261017b"></script>
   <script src="js/app.js?v=20261127a"></script>
-  <script src="js/quickjump.js?v=20261112a199"></script> <!-- book199: 📖 pindah kitab cepat + pilihan layar penuh Cepat/Sistem -->
+  <script src="js/quickjump.js?v=20261128a"></script> <!-- book199: 📖 pindah kitab cepat + pilihan layar penuh Cepat/Sistem -->
   <script src="js/sync-checklist.js?v=20261016a"></script> <!-- checklist gabungan 🔄 Sinkronkan ulang -->
   <script src="js/curhat.js?v=20260915a"></script>
   <!-- BARU (21 Sep 2026) -- 🔎 AI Chat: pencarian ber-skor di semua bahasa (ayat + catatan kaki), Mode Khotbah bagian demi bagian. js/aichat.js hanya diberi hook kecil. -->
