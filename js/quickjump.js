@@ -272,12 +272,67 @@ body.reader-clean #quickJumpFab:active,#quickJumpFab:active{opacity:1}
     if (!fab) return;
     fab.classList.toggle("show", (readerOpen() || kidungActive()) && !overlay);
   }
+  // book221 (permintaan operator) -- tombol 📖 BISA DIGESER (HP & komputer): sentuh lalu seret ke mana saja; gerakan < 6px tetap dianggap
+  // ketukan biasa (membuka kotak Pindah Cepat). Posisi diingat per perangkat. Pola sama dengan kontrol suara melayang (wireTtsFloatDrag_ di js/app.js).
+  // SHORTCUT-GANTI (posisi bawaan): hapus kunci localStorage "quickjump_fab_pos_v1" -> tombol kembali ke kanan-bawah.
+  const FAB_POS_KEY = "quickjump_fab_pos_v1";
+  function fabClamp(x, y) {
+    const w = (fab && fab.offsetWidth) || 46, h = (fab && fab.offsetHeight) || 46;
+    return { x: Math.min(Math.max(0, x), Math.max(0, window.innerWidth - w)), y: Math.min(Math.max(0, y), Math.max(0, window.innerHeight - h)) };
+  }
+  function fabPlace(x, y) {
+    const c = fabClamp(x, y);
+    fab.style.left = c.x + "px"; fab.style.top = c.y + "px"; fab.style.right = "auto"; fab.style.bottom = "auto";
+    return c;
+  }
+  function wireFabDrag() {
+    fab.style.touchAction = "none"; // supaya seretan jari tidak dibajak gulir halaman
+    try {
+      const sv = JSON.parse(localStorage.getItem(FAB_POS_KEY) || "null");
+      if (sv && Number.isFinite(sv.x) && Number.isFinite(sv.y)) fabPlace(sv.x, sv.y);
+    } catch (e) { /* abaikan */ }
+    let start = null, moved = false;
+    const onMove = (e) => {
+      if (!start || e.pointerId !== start.id) return;
+      const dx = e.clientX - start.px, dy = e.clientY - start.py;
+      if (!moved && Math.hypot(dx, dy) < 6) return;
+      if (!moved) { moved = true; fab.style.opacity = "1"; fab.style.transform = "scale(1.08)"; }
+      fabPlace(start.x + dx, start.y + dy);
+      e.preventDefault();
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      if (!start) return;
+      if (moved) {
+        const r = fab.getBoundingClientRect();
+        try { localStorage.setItem(FAB_POS_KEY, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); } catch (e) { /* abaikan */ }
+        fab.style.opacity = ""; fab.style.transform = "";
+        const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); }; // klik susulan setelah geser jangan membuka kotak
+        fab.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => fab.removeEventListener("click", swallow, { capture: true }), 80);
+      }
+      start = null; moved = false;
+    };
+    fab.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      const r = fab.getBoundingClientRect();
+      start = { px: e.clientX, py: e.clientY, x: r.left, y: r.top, id: e.pointerId };
+      moved = false;
+      window.addEventListener("pointermove", onMove, { passive: false });
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+    });
+    window.addEventListener("resize", () => { if (fab.style.left) { const r = fab.getBoundingClientRect(); if (r.width) fabPlace(r.left, r.top); } });
+  }
   function init() {
     ensureStyle();
     fab = document.createElement("button");
-    fab.id = "quickJumpFab"; fab.type = "button"; fab.textContent = "📖"; fab.title = "Pindah kitab / pasal cepat"; fab.setAttribute("aria-label", "Pindah kitab cepat");
+    fab.id = "quickJumpFab"; fab.type = "button"; fab.textContent = "📖"; fab.title = "Pindah kitab / pasal cepat (seret untuk memindahkan tombol)"; fab.setAttribute("aria-label", "Pindah kitab cepat");
     fab.addEventListener("click", open);
     document.body.appendChild(fab);
+    wireFabDrag();
     const r = $("reader");
     if (r && typeof MutationObserver === "function") new MutationObserver(syncFab).observe(r, { attributes: true, attributeFilter: ["hidden"] });
     const kp = $("kidungPanel");

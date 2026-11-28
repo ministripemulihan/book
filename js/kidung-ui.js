@@ -274,7 +274,15 @@ async function renderKidungHome() {
     try {
       await resyncKidungSheet();
     } catch (e) {
-      loading.textContent = "Gagal memuat data kidung (periksa koneksi internet), lalu buka menu ini lagi.";
+      // book221 -- kata-kata diganti (dulu "Gagal memuat data kidung ..."): data kidung dimuat lewat menu ⋮ -> Sinkronkan ulang.
+      loading.textContent = "Data kidung belum tersimpan di perangkat ini. Muat dulu lewat menu ⋮ → “🔄 Sinkronkan ulang” (perlu internet sekali), lalu buka menu Kidung lagi.";
+      const goSync = document.createElement("button");
+      goSync.type = "button";
+      goSync.className = "chip-btn small";
+      goSync.style.marginTop = "10px";
+      goSync.textContent = "🔄 Buka Sinkronkan ulang";
+      goSync.addEventListener("click", () => { const b = document.getElementById("syncAllBtn"); if (b) b.click(); });
+      panel.appendChild(goSync);
       return;
     }
     try { count = await LocalDB.countKidungRows(); } catch (e) { count = 0; }

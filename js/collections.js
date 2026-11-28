@@ -779,6 +779,30 @@ function updateAnnouncementInCollection(username, id, index, text, title) {
 // ======================================================================
 function _favKey(s) { return String(s == null ? "" : s).trim().toLowerCase(); }
 
+// book221 -- BATAS & KATEGORI FAVORIT.
+//   FAV_MAX = jumlah favorit maksimal per kumpulan (30). Pintasan keyboard ke-1..30 mengikuti URUTAN nomor slide (lihat
+//   js/presentation-studio.js, cari "book221"). Mengganti batas: ubah angka ini (pintasan di js/presentation-studio.js
+//   sudah disiapkan sampai 30; di atas itu tinggal pakai Ctrl+Alt+F = cari nama/nomor urut).
+//   favCategoryOf() = sub-kategori favorit (dipakai tab kategori di bilah atas Studio & panel favorit Layar 2).
+//   Otomatis dari jenis item; bisa ditimpa per item lewat it.favCat (dialog ⭐ Favorit -> "Kategori").
+const FAV_MAX = 30;
+const FAV_CATS = ["Kidung", "Alkitab", "Pengumuman", "Berkas", "Video", "Musik", "Teks", "Lainnya"];
+function favCategoryOf(it) {
+  if (!it) return "Lainnya";
+  const c = String(it.favCat == null ? "" : it.favCat).trim();
+  if (c) return c.slice(0, 20);
+  switch (it.type) {
+    case "kidung": return "Kidung";
+    case "verse": return "Alkitab";
+    case "announcement": return "Pengumuman";
+    case "image": case "media": case "canva": case "map": return "Berkas";
+    case "youtube_link": case "localvideo": return "Video";
+    case "soundcloud": return "Musik";
+    case "text": return "Teks";
+    default: return "Lainnya";
+  }
+}
+
 function findFavIndex(items, name) {
   const k = _favKey(name);
   if (!k || !Array.isArray(items)) return -1;
@@ -801,10 +825,12 @@ function resolveItemLinks(items, idx, favBar) {
     // BARU (27 Nov 2026) -- bilah favorit di Layar 2 kini memuat SEMUA favorit (termasuk slide yang sedang tayang,
     // ditandai cur:true), berurutan sesuai nomor slide di Kumpulan Ayat, dan tiap tombol membawa nomor slidenya (no).
     out.length = 0; seen.clear(); // bilah favorit memakai NAMA favorit (bukan label tombol tautan khusus)
+    let ord = 0; // book221: nomor URUT favorit (1..30) = urutan nomor slide; dipakai pintasan Ctrl+Alt+angka
     items.forEach((x, i) => {
       if (!x || !x.favName || seen.has(i)) return;
       seen.add(i);
-      out.push({ label: x.favName, name: x.favName, index: i, no: i + 1, cur: i === idx });
+      ord++;
+      out.push({ label: x.favName, name: x.favName, index: i, no: i + 1, cur: i === idx, cat: favCategoryOf(x), ord });
     });
     out.sort((a, b) => a.index - b.index);
   }
@@ -820,6 +846,11 @@ function setItemFavName(username, id, index, name, move) {
   const it = col && col.items[index];
   if (!it) return { ok: false, error: "Item tidak ditemukan." };
   const nm = String(name == null ? "" : name).replace(/\s+/g, " ").trim().slice(0, 40);
+  if (nm && !it.favName) { // book221: tambah favorit BARU -> cek batas maksimal (mengganti nama / memindahkan tidak menambah jumlah)
+    const other0 = findFavIndex(col.items, nm);
+    const count = col.items.filter((x) => x && x.favName).length;
+    if (other0 < 0 && count >= FAV_MAX) return { ok: false, max: true, error: "Favorit di kumpulan ini sudah " + count + " (maksimal " + FAV_MAX + "). Hapus satu favorit dulu, atau pindahkan nama favorit yang sudah ada ke slide ini." };
+  }
   if (nm) {
     const other = findFavIndex(col.items, nm);
     if (other >= 0 && other !== index) {
@@ -834,6 +865,20 @@ function setItemFavName(username, id, index, name, move) {
   saveCollections(username, collections);
   _pushCollectionRemote(username, id, col);
   return { ok: true, name: nm };
+}
+
+// book221 -- kategori favorit manual per item ("" = otomatis dari jenis item).
+function setItemFavCat(username, id, index, cat) {
+  const collections = loadCollections(username);
+  const col = collections[id];
+  const it = col && col.items[index];
+  if (!it) return false;
+  const c = String(cat == null ? "" : cat).replace(/\s+/g, " ").trim().slice(0, 20);
+  if (c) it.favCat = c; else delete it.favCat;
+  col.updatedAt = new Date().toISOString();
+  saveCollections(username, collections);
+  _pushCollectionRemote(username, id, col);
+  return true;
 }
 
 // BARU (27 Nov 2026) -- saklar "📺 Tampil di Layar 2" di bilah favorit atas panel Kumpulan Ayat.

@@ -1201,6 +1201,7 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------------
   function editFavNameDialog_(it, idx, username, colId) {
     let inp = null;
+    let catSel = null;
     showSimpleDialog("⭐ Nama favorit slide no. " + (idx + 1), (box) => {
       const hint = document.createElement("p");
       hint.className = "simple-dialog-hint";
@@ -1212,6 +1213,22 @@ const PresentationStudio = (() => {
       inp.value = it.favName || "";
       inp.placeholder = "Home";
       box.appendChild(inp);
+      // book221 -- sub-kategori favorit (tab di bilah ⭐ atas & panel favorit Layar 2) + info batas maksimal.
+      const catLab = document.createElement("p");
+      catLab.className = "simple-dialog-hint";
+      const nowCount = (((loadCollections(username)[colId] || {}).items) || []).filter((x) => x && x.favName).length;
+      catLab.textContent = "Kategori (untuk mengelompokkan favorit; \"Otomatis\" = dari jenis slide). Favorit di kumpulan ini: " + nowCount + " dari maksimal " + FAV_MAX + ".";
+      box.appendChild(catLab);
+      catSel = document.createElement("select");
+      catSel.className = "columns-lang-select";
+      catSel.style.cssText = "width:100%;";
+      const autoCat = favCategoryOf(Object.assign({}, it, { favCat: "" }));
+      const optA = document.createElement("option"); optA.value = ""; optA.textContent = "Otomatis (" + autoCat + ")"; catSel.appendChild(optA);
+      const catList = FAV_CATS.slice();
+      if (it.favCat && catList.indexOf(it.favCat) < 0) catList.push(it.favCat);
+      catList.forEach((c) => { const o = document.createElement("option"); o.value = c; o.textContent = c; catSel.appendChild(o); });
+      catSel.value = it.favCat || "";
+      box.appendChild(catSel);
       // 27 Nov 2026 -- jalan pintas: ketuk nama favorit yang sudah ada (di slide lain) untuk MEMINDAHKANNYA ke slide ini,
       // dan tombol untuk mengosongkan nama (= hapus favorit slide ini).
       const others = [];
@@ -1240,7 +1257,7 @@ const PresentationStudio = (() => {
         box.appendChild(del);
       }
       setTimeout(() => inp.focus(), 30);
-      return () => ({ name: inp.value });
+      return () => ({ name: inp.value, cat: catSel ? catSel.value : "" });
     }, (val) => {
       let r = setItemFavName(username, colId, idx, val.name);
       if (!r.ok && r.conflict) {
@@ -1249,6 +1266,7 @@ const PresentationStudio = (() => {
         r = setItemFavName(username, colId, idx, val.name, true);
       }
       if (!r.ok) { alert(r.error); return; }
+      if (String(val.name || "").trim()) setItemFavCat(username, colId, idx, val.cat || ""); // book221: kategori manual (kosong = otomatis)
       renderCollectionSelect();
       resyncActivePlaylistAfterFavEdit_(username, colId);
     }, "Simpan");
@@ -1437,6 +1455,24 @@ const PresentationStudio = (() => {
     const isDockCopy = !!targetBar;
     const favs = [];
     (items || []).forEach((it, i) => { if (it && it.favName) favs.push({ name: it.favName, index: i }); });
+    // book221 -- nomor URUT favorit (1..30, mengikuti urutan nomor slide = dasar pintasan Ctrl+Alt+angka) + sub-kategori.
+    favs.forEach((f, k) => { f.ord = k + 1; f.cat = favCategoryOf(items[f.index]); });
+    const catCount = {};
+    favs.forEach((f) => { catCount[f.cat] = (catCount[f.cat] || 0) + 1; });
+    const catNames = Object.keys(catCount).sort((a, b) => {
+      const ia = FAV_CATS.indexOf(a), ib = FAV_CATS.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+    const showCats = favs.length > 6 && catNames.length >= 2; // sedikit favorit = tanpa tab kategori (tampilan tetap seperti dulu)
+    let selCat = null;
+    try { selCat = localStorage.getItem("ps_fav_cat_v1"); } catch (e) { /* abaikan */ }
+    if (!selCat) {
+      // belum pernah memilih: kalau favorit banyak (> 12) jangan langsung tampil semua -> mulai dari kategori slide yang sedang tayang (atau kategori pertama)
+      let actCat = "";
+      if (activePlaylist && activePlaylist.label === col.name) { const af = favs.find((f) => f.index === activePlaylist.index); if (af) actCat = af.cat; }
+      selCat = favs.length > 12 ? (actCat || catNames[0] || "*") : "*";
+    }
+    if (selCat !== "*" && !catCount[selCat]) selCat = "*";
     bar.textContent = "";
     if (!isDockCopy) { const slot0 = el("psFavTopSlot"); if (slot0) slot0.textContent = ""; } // book220: tombol header ikut hilang bila tak ada favorit
     if (!col || !favs.length) { bar.hidden = true; bar.removeAttribute("style"); return; }
@@ -1491,11 +1527,14 @@ const PresentationStudio = (() => {
     let favSearch = null;
     const chips = [];
     let lb = null;
+    let catBox = null; // book221: tab sub-kategori
     const applyFavFilter = () => {
       const q = favSearch ? favSearch.value.trim().toLowerCase() : "";
       let firstDone = false;
       chips.forEach((c) => {
-        const hit = !q || c.name.toLowerCase().indexOf(q) !== -1 || String(c.index + 1) === q;
+        // book221: mencari (ketik) selalu menyisir SEMUA kategori; tanpa ketikan -> hanya kategori yang dipilih.
+        const catOk = !showCats || selCat === "*" || c.cat === selCat;
+        const hit = q ? (c.name.toLowerCase().indexOf(q) !== -1 || String(c.index + 1) === q || String(c.ord) === q) : catOk;
         c.btn.style.display = (hit && !collapsed) ? "" : "none";
         c.btn.classList.toggle("first", !!q && hit && !firstDone);
         if (hit) firstDone = true;
@@ -1504,7 +1543,7 @@ const PresentationStudio = (() => {
     const paintToggle = () => {
       toggleBtn.textContent = (collapsed ? "▸ " : "▾ ") + "⭐ Favorit (" + favs.length + ")";
       toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-      toggleBtn.title = collapsed ? "Buka daftar favorit (muncul di bawah)" : "Tutup daftar favorit (lebih ringkas)";
+      toggleBtn.title = (collapsed ? "Buka daftar favorit (muncul di bawah)" : "Tutup daftar favorit (lebih ringkas)") + " · " + favs.length + " dari maksimal " + FAV_MAX + " favorit";
       bar.classList.toggle("collapsed", collapsed);
       bar.style.cssText = barCss(collapsed ? 46 : 60);
       if (toggleInHeader) { // book220: terlipat = tidak ada baris sendiri sama sekali (hanya tombol di header)
@@ -1514,6 +1553,7 @@ const PresentationStudio = (() => {
       prevArrow.style.display = collapsed ? "none" : "";
       if (favSearch) favSearch.style.display = collapsed ? "none" : "";
       if (lb) lb.style.display = collapsed ? "none" : "";
+      if (catBox) catBox.style.display = collapsed ? "none" : "flex";
       if (nextArrow) nextArrow.style.display = collapsed ? "none" : "";
       track.style.display = collapsed ? "none" : "flex";
       applyFavFilter();
@@ -1538,6 +1578,34 @@ const PresentationStudio = (() => {
       });
       bar.appendChild(favSearch);
     }
+    if (showCats) {
+      // book221 -- SUB-KATEGORI: [Semua 30] [Kidung 12] [Alkitab 8] ... -> ketuk satu = carousel hanya berisi kategori itu
+      // (tidak lagi langsung 30 chip). Kategori otomatis dari jenis slide; bisa diubah di dialog ⭐ Favorit per slide.
+      catBox = document.createElement("div");
+      catBox.className = "ps-fav-cats";
+      catBox.style.cssText = "display:flex;flex:0 0 auto;align-items:center;gap:4px;";
+      const paintCats = () => {
+        catBox.textContent = "";
+        [["*", "Semua", favs.length]].concat(catNames.map((n) => [n, n, catCount[n]])).forEach(([key, label, cnt]) => {
+          const cb2 = document.createElement("button");
+          cb2.type = "button";
+          cb2.className = "ps-fav-cat";
+          const on = selCat === key;
+          cb2.style.cssText = "flex:0 0 auto;border-radius:999px;cursor:pointer;white-space:nowrap;font:700 12.5px system-ui,sans-serif;padding:4px 10px;border:1px solid " + (on ? "#7a5b00" : "#e6c374") + ";background:" + (on ? "#7a5b00" : "#fffdf4") + ";color:" + (on ? "#fff" : "#7a5b00") + ";";
+          cb2.textContent = label + " " + cnt;
+          cb2.title = key === "*" ? "Tampilkan semua favorit" : "Hanya favorit kategori " + label;
+          cb2.addEventListener("click", () => {
+            selCat = key;
+            try { localStorage.setItem("ps_fav_cat_v1", key); } catch (e) { /* abaikan */ }
+            paintCats(); applyFavFilter();
+            try { track.scrollLeft = 0; } catch (e) { /* abaikan */ }
+          });
+          catBox.appendChild(cb2);
+        });
+      };
+      paintCats();
+      bar.appendChild(catBox);
+    }
     bar.appendChild(track);
     favs.forEach((f) => {
       const b = document.createElement("button");
@@ -1545,7 +1613,15 @@ const PresentationStudio = (() => {
       b.className = "chip-btn small ps-fav-chip";
       b.style.cssText = "flex:0 0 auto;white-space:nowrap;font-size:14px;padding:7px 13px;line-height:1.2;";
       if (activePlaylist && activePlaylist.label === col.name && activePlaylist.index === f.index) b.classList.add("active");
-      b.title = "Slide no. " + (f.index + 1) + " — ketuk untuk langsung tayang di Layar 2";
+      const scKey = (window.PSShortcuts && window.PSShortcuts.getCombo) ? window.PSShortcuts.pretty(window.PSShortcuts.getCombo("fav-" + f.ord)) : "";
+      b.title = "Favorit ke-" + f.ord + " · slide no. " + (f.index + 1) + " · kategori " + f.cat + (scKey && scKey !== "(kosong)" ? " · pintasan " + scKey : " · pintasan: Ctrl+Alt+F lalu ketik " + f.ord) + " — ketuk untuk langsung tayang di Layar 2";
+      if (favs.length > 1) {
+        const ordEl = document.createElement("span");
+        ordEl.className = "ps-fav-ord";
+        ordEl.textContent = String(f.ord);
+        ordEl.style.cssText = "display:inline-block;min-width:18px;height:18px;padding:0 3px;box-sizing:border-box;margin-right:6px;border-radius:9px;background:#7a5b00;color:#fff;font:700 11px/18px system-ui,sans-serif;text-align:center;vertical-align:1px;";
+        b.appendChild(ordEl);
+      }
       b.appendChild(document.createTextNode(f.name + " "));
       const no = document.createElement("span");
       no.className = "ps-fav-no";
@@ -1569,7 +1645,7 @@ const PresentationStudio = (() => {
         if (isDockCopy) renderFavTopBar_(col, items, colId, username); // dok Studio ikut menandai chip aktif
       });
       track.appendChild(b);
-      chips.push({ name: f.name, index: f.index, btn: b });
+      chips.push({ name: f.name, index: f.index, cat: f.cat, ord: f.ord, btn: b });
     });
     const rightBox = document.createElement("div");
     rightBox.className = "ps-fav-right";
@@ -1594,6 +1670,106 @@ const PresentationStudio = (() => {
     paintToggle();
     try { const act = track.querySelector(".ps-fav-chip.active"); if (act && !collapsed) setTimeout(() => { track.scrollLeft = act.offsetLeft - (track.clientWidth - act.offsetWidth) / 2; }, 0); } catch (e) { /* tidak fatal */ }
   }
+
+  // ------------------------------------------------------------------
+  // book221 -- PINTASAN KEYBOARD FAVORIT (bilah ⭐ atas) + "Cari favorit" cepat.
+  //   Urutan = urutan nomor slide favorit di kumpulan yang sedang dipilih (sama dengan angka kecil di tiap chip).
+  //   SHORTCUT: Ctrl+Alt+1..9, Ctrl+Alt+0 = favorit ke-1..10 · Ctrl+Alt+Shift+1..9,0 = favorit ke-11..20.
+  //   Favorit ke-21..30: tidak ada kombinasi bawaan (kombinasi di keyboard memang habis) -> pakai Ctrl+Alt+F (ketik nomor
+  //   urut / nama, Enter), ATAU beri kombinasi sendiri di ⚙️ (grup "Favorit (bilah atas)").
+  //   SHORTCUT: Ctrl+Alt+F = kotak "cari favorit": ketik nomor urut (mis. 27) / nama / kategori (mis. kidung), Enter = tayangkan yang pertama.
+  //   SHORTCUT-GANTI: ⚙️ di Studio -> grup "Favorit (bilah atas)", atau ubah kolom def di registerFavShortcuts_() di bawah.
+  //   Ctrl+angka polos TIDAK dipakai (dipakai browser untuk pindah tab); angka polos = Mode Cepat; Alt+angka = Bel Cepat; Alt+Shift+angka = efek.
+  // ------------------------------------------------------------------
+  function psFavCurrent_() {
+    const username = typeof currentUser !== "undefined" ? currentUser : null;
+    const sel = el("psCollectionSelect");
+    if (!sel || typeof loadCollections !== "function") return null;
+    const col = (loadCollections(username) || {})[sel.value];
+    if (!col || !Array.isArray(col.items)) return null;
+    const favs = [];
+    col.items.forEach((it, i) => { if (it && it.favName) favs.push({ name: it.favName, index: i, cat: favCategoryOf(it) }); });
+    favs.forEach((f, k) => { f.ord = k + 1; });
+    return { username, colId: sel.value, col, items: col.items, favs };
+  }
+  function psFavGo_(ctx, f) {
+    setActivePlaylist(ctx.items, f.index, ctx.col.name);
+    sendGenericItemLive(ctx.items[f.index]);
+    renderFavTopBar_(ctx.col, ctx.items, ctx.colId, ctx.username);
+    try { const d = el("mlFavDock"); if (d && !d.hidden) fillFavDock_(d); } catch (e) { /* tidak fatal */ }
+    showPsToast_("⭐ " + f.ord + ". " + f.name + " (slide no. " + (f.index + 1) + ")");
+  }
+  function psFavGoOrd_(n) {
+    const ctx = psFavCurrent_();
+    if (!ctx) { showPsToast_("⭐ Belum ada Kumpulan Ayat yang dipilih."); return; }
+    const f = ctx.favs[n - 1];
+    if (!f) { showPsToast_("⭐ Favorit ke-" + n + " belum ada (jumlah favorit: " + ctx.favs.length + ")."); return; }
+    psFavGo_(ctx, f);
+  }
+  function psFavJump_() {
+    const old = document.getElementById("psFavJumpBox");
+    if (old) { old.remove(); return; }
+    const ctx = psFavCurrent_();
+    if (!ctx || !ctx.favs.length) { showPsToast_("⭐ Belum ada favorit di kumpulan ini."); return; }
+    const wrap = document.createElement("div");
+    wrap.id = "psFavJumpBox";
+    wrap.style.cssText = "position:fixed;inset:0;z-index:100001;background:#0007;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;";
+    const box = document.createElement("div");
+    box.style.cssText = "width:min(560px,92vw);max-height:70vh;display:flex;flex-direction:column;gap:8px;background:#fffaf0;color:#3b2a14;border-radius:14px;padding:12px;box-shadow:0 10px 40px #0008;font:14px system-ui,sans-serif;";
+    const inp = document.createElement("input");
+    inp.type = "text"; inp.autocomplete = "off"; inp.spellcheck = false;
+    inp.placeholder = "⭐ ketik nomor urut (1–" + ctx.favs.length + "), nama, atau kategori — Enter = tayangkan";
+    inp.style.cssText = "padding:9px 12px;border:1px solid #c9a95a;border-radius:9px;font:600 16px system-ui,sans-serif;outline:none;";
+    const list = document.createElement("div");
+    list.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;overflow:auto;";
+    const hint = document.createElement("div");
+    hint.style.cssText = "font-size:12px;color:#8a7a5a;";
+    hint.textContent = "Enter = ke yang pertama · Esc atau klik di luar kotak = tutup";
+    box.appendChild(inp); box.appendChild(list); box.appendChild(hint); wrap.appendChild(box);
+    const close = () => { wrap.remove(); document.removeEventListener("keydown", onKey, true); };
+    const matches = () => {
+      const q = inp.value.trim().toLowerCase();
+      return ctx.favs.filter((f) => !q || String(f.ord) === q || f.name.toLowerCase().indexOf(q) !== -1 || f.cat.toLowerCase().indexOf(q) !== -1 || String(f.index + 1) === q);
+    };
+    const paint = () => {
+      list.textContent = "";
+      const m = matches();
+      m.forEach((f, k) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.style.cssText = "cursor:pointer;border-radius:999px;padding:6px 12px;font:600 14px system-ui,sans-serif;border:1.5px solid " + (k === 0 && inp.value.trim() ? "#b8860b" : "#d9c590") + ";background:" + (k === 0 && inp.value.trim() ? "#ffe9a8" : "#fff") + ";color:#3b2a14;";
+        b.textContent = f.ord + ". " + f.name + "  · " + f.cat + " · no. " + (f.index + 1);
+        b.addEventListener("click", () => { close(); psFavGo_(ctx, f); });
+        list.appendChild(b);
+      });
+      if (!m.length) { const d = document.createElement("div"); d.textContent = "Tidak ada favorit yang cocok."; d.style.color = "#8a7a5a"; list.appendChild(d); }
+    };
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); }
+      else if (e.key === "Enter" && document.activeElement === inp) { e.preventDefault(); e.stopPropagation(); const f = matches()[0]; if (f) { close(); psFavGo_(ctx, f); } }
+    }
+    document.addEventListener("keydown", onKey, true);
+    wrap.addEventListener("mousedown", (e) => { if (e.target === wrap) close(); });
+    inp.addEventListener("input", paint);
+    document.body.appendChild(wrap);
+    paint();
+    setTimeout(() => { try { inp.focus(); } catch (e) { /* abaikan */ } }, 20);
+  }
+  function registerFavShortcuts_() {
+    if (!window.PSShortcuts || !window.PSShortcuts.registerAction || registerFavShortcuts_.done) return;
+    registerFavShortcuts_.done = true;
+    const G = "Favorit (bilah atas)";
+    for (let n = 1; n <= FAV_MAX; n++) {
+      const def = n <= 10 ? "ctrl+alt+" + (n % 10) : (n <= 20 ? "ctrl+alt+shift+" + (n % 10) : ""); // 21..30: kosong (atur sendiri di ⚙️ / pakai Ctrl+Alt+F)
+      window.PSShortcuts.registerAction({
+        id: "fav-" + n, group: G, label: "Favorit ke-" + n, def,
+        labelFn: () => { try { const c = psFavCurrent_(); const f = c && c.favs[n - 1]; return "Favorit ke-" + n + (f ? " — " + f.name + " (slide no. " + (f.index + 1) + ")" : " (belum ada)"); } catch (e) { return "Favorit ke-" + n; } },
+        run: () => psFavGoOrd_(n),
+      });
+    }
+    window.PSShortcuts.registerAction({ id: "fav-jump", group: G, label: "Cari favorit: ketik nomor urut / nama / kategori, Enter", def: "ctrl+alt+f", run: () => psFavJump_() });
+  }
+  registerFavShortcuts_();
 
   // book216 -- dipakai Pustaka Media (js/media-library.js): isi dok favorit kembar dengan favorit kumpulan yang
   // sedang dipilih di Studio. Aman dipanggil kapan saja (Studio belum dibuka -> dok disembunyikan).
@@ -2675,7 +2851,7 @@ const PresentationStudio = (() => {
         if (idx >= 0) {
           const user = typeof currentUser !== "undefined" ? currentUser : "";
           const colObj = Object.values(loadCollections(user) || {}).find((c) => c && c.name === activePlaylist.label);
-          links = resolveItemLinks(activePlaylist.items, idx, !!colObj && !colObj.favHide).map((l) => ({ label: l.label, name: l.name, no: l.no, cur: !!l.cur }));
+          links = resolveItemLinks(activePlaylist.items, idx, !!colObj && !colObj.favHide).map((l) => ({ label: l.label, name: l.name, no: l.no, cur: !!l.cur, cat: l.cat || "", ord: l.ord || 0 })); // book221: cat (kategori) + ord (nomor urut favorit)
         }
       }
     } catch (e) { links = []; }
@@ -6126,19 +6302,34 @@ const PresentationStudio = (() => {
   // ------------------------------------------------------------
   const PDFJS_VERSION = "3.11.174";
   let pdfjsLoadPromise = null;
+  // book221 -- PDF OFFLINE: pdf.js (+ worker) sekarang disimpan LOKAL di js/vendor/pdfjs/ dan ikut di-precache
+  // Service Worker (lihat PRECACHE_EXTRA di sw.js), jadi mengunggah/mengonversi PDF tetap jalan tanpa internet.
+  // Dulu hanya dari CDN cdnjs -> begitu offline (atau setelah cache dibersihkan karena versi naik) muncul
+  // "Gagal memuat pustaka pembaca PDF". CDN tetap dipakai sebagai cadangan kalau berkas lokal tidak ada.
+  const PDFJS_LOCAL_BASE = "js/vendor/pdfjs/";
+  const PDFJS_CDN_BASE = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/`;
+  function loadPdfJsFrom_(base) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = base + "pdf.min.js";
+      s.onload = () => {
+        if (!window.pdfjsLib) { reject(new Error("pdf.js tidak terbaca")); return; }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + "pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      };
+      s.onerror = () => { s.remove(); reject(new Error("gagal memuat " + s.src)); };
+      document.head.appendChild(s);
+    });
+  }
   function loadPdfJs() {
     if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
     if (pdfjsLoadPromise) return pdfjsLoadPromise;
-    pdfjsLoadPromise = new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.min.js`;
-      s.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
-        resolve(window.pdfjsLib);
-      };
-      s.onerror = () => reject(new Error("Gagal memuat pustaka pembaca PDF (cek koneksi internet)."));
-      document.head.appendChild(s);
-    });
+    pdfjsLoadPromise = loadPdfJsFrom_(PDFJS_LOCAL_BASE)
+      .catch(() => loadPdfJsFrom_(PDFJS_CDN_BASE))
+      .catch(() => {
+        pdfjsLoadPromise = null; // boleh dicoba lagi nanti
+        throw new Error("Gagal memuat pustaka pembaca PDF (berkas lokal & CDN tidak tersedia -- cek koneksi internet sekali, lalu buka ulang aplikasi).");
+      });
     return pdfjsLoadPromise;
   }
 
